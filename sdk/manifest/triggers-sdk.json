@@ -29,8 +29,8 @@
   "languages": {
     "typescript": {
       "package": "yunque-client",
-      "implementationFiles": ["sdk/typescript/src/triggers.ts", "sdk/typescript/src/triggers-read.ts", "sdk/typescript/src/triggers-control.ts", "sdk/typescript/src/trigger-definitions.ts", "sdk/typescript/src/trigger-definition-control.ts", "sdk/typescript/src/trigger-history.ts", "sdk/typescript/src/trigger-emit.ts"],
-      "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
+      "implementationFiles": ["packages/yunque-client/src/triggers.ts", "packages/yunque-client/src/triggers-read.ts", "packages/yunque-client/src/triggers-control.ts", "packages/yunque-client/src/trigger-definitions.ts", "packages/yunque-client/src/trigger-definition-control.ts", "packages/yunque-client/src/trigger-history.ts", "packages/yunque-client/src/trigger-emit.ts"],
+      "docs": ["packages/yunque-client/README.md", "docs/plugins/sdk-typescript.md"],
       "entrypoints": {
         "list": "yunque-client/triggers-read#createTriggersReadClient().list",
         "get": "yunque-client/triggers-read#createTriggersReadClient().get",

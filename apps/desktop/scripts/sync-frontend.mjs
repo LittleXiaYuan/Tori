@@ -4,8 +4,8 @@ import { fileURLToPath } from "url";
 import { spawnSync } from "child_process";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.resolve(__dirname, "..", "..");
-const WEB_DIR = path.join(ROOT, "heroui-web");
+const ROOT = path.resolve(__dirname, "..", "..", "..");
+const WEB_DIR = path.join(ROOT, "apps", "web");
 const OUT_DIR = path.join(WEB_DIR, "out");
 const OUT_NEXT_DIR = path.join(OUT_DIR, "_next");
 const FRONTEND_DIR = path.resolve(__dirname, "..", "src-tauri", "frontend");
@@ -19,13 +19,13 @@ function usage() {
   console.log(`Sync the static Next.js export used by the Tauri desktop bundle.
 
 Usage:
-  node scripts/sync-frontend.mjs             # copy heroui-web/out -> src-tauri/frontend
-  node scripts/sync-frontend.mjs --build     # run npm build in heroui-web first
+  node scripts/sync-frontend.mjs             # copy apps/web/out -> src-tauri/frontend
+  node scripts/sync-frontend.mjs --build     # run npm build in apps/web first
   node scripts/sync-frontend.mjs --dry-run   # validate and print planned paths
 
 Why this exists:
   Tauri packages ./src-tauri/frontend, while the canonical UI source lives in
-  ../heroui-web. Running this script prevents desktop builds from silently
+  ../web. Running this script prevents desktop builds from silently
   embedding stale tracked static assets.`);
 }
 
@@ -35,7 +35,7 @@ function fail(message) {
 }
 
 function runBuild() {
-  console.log("Building heroui-web static export...");
+  console.log("Building apps/web static export...");
   const result = spawnSync("npm", ["run", "build"], {
     cwd: WEB_DIR,
     stdio: "inherit",
@@ -43,13 +43,13 @@ function runBuild() {
     env: { ...process.env, NODE_ENV: "production" },
   });
   if (result.status !== 0) {
-    fail(`heroui-web build failed with exit code ${result.status ?? "unknown"}`);
+    fail(`apps/web build failed with exit code ${result.status ?? "unknown"}`);
   }
 }
 
 function ensureExportReady() {
   if (!fs.existsSync(OUT_NEXT_DIR)) {
-    fail(`static export not found at ${OUT_NEXT_DIR}. Run \`npm run build --prefix heroui-web\` or pass --build.`);
+    fail(`static export not found at ${OUT_NEXT_DIR}. Run \`npm run build --prefix apps/web\` or pass --build.`);
   }
   const indexPath = path.join(OUT_DIR, "index.html");
   if (!fs.existsSync(indexPath)) {
@@ -112,4 +112,4 @@ removeDirContents(FRONTEND_DIR);
 const { count, bytes } = copyRecursive(OUT_DIR, FRONTEND_DIR);
 
 console.log(`Done: copied ${count} files (${formatBytes(bytes)}).`);
-console.log("Next: run `npm run build --prefix desktop` to package the refreshed desktop UI.");
+console.log("Next: run `npm run build --prefix apps/desktop` to package the refreshed desktop UI.");

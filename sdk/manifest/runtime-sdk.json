@@ -43,14 +43,14 @@
     "typescript": {
       "package": "yunque-client",
       "implementationFiles": [
-        "sdk/typescript/src/runtime.ts",
-        "sdk/typescript/src/runtime-queue.ts",
-        "sdk/typescript/src/runtime-events.ts",
-        "sdk/typescript/src/runtime-queue-read.ts",
-        "sdk/typescript/src/runtime-queue-control.ts"
+        "packages/yunque-client/src/runtime.ts",
+        "packages/yunque-client/src/runtime-queue.ts",
+        "packages/yunque-client/src/runtime-events.ts",
+        "packages/yunque-client/src/runtime-queue-read.ts",
+        "packages/yunque-client/src/runtime-queue-control.ts"
       ],
       "docs": [
-        "sdk/typescript/README.md",
+        "packages/yunque-client/README.md",
         "docs/plugins/sdk-typescript.md"
       ],
       "entrypoints": {

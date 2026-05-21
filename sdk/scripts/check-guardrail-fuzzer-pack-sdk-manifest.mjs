@@ -71,7 +71,7 @@ for (const token of ["Guardrail Fuzzer", "保存 Corpus", "运行 Fuzzer", "导�
   if (!page.includes(token)) fail(`Guardrail Fuzzer pack page missing product token: ${token}`);
 }
 
-const frontendTest = readRepoFile("heroui-web/src/lib/__tests__/guardrail-fuzzer-pack-client.test.ts");
+const frontendTest = readRepoFile("apps/web/src/lib/__tests__/guardrail-fuzzer-pack-client.test.ts");
 for (const token of ["/v1/guardrail-fuzzer/status", "/v1/guardrail-fuzzer/run", "/v1/guardrail-fuzzer/ci-gate/plan", "/v1/guardrail-fuzzer/native-corpus/plan", "/v1/guardrail-fuzzer/evidence/fuzz-1"]) {
   if (!frontendTest.includes(token)) fail(`Guardrail Fuzzer frontend client test missing token: ${token}`);
 }
@@ -121,7 +121,7 @@ for (const token of [
   if (!backend.includes(token)) fail(`Guardrail Fuzzer backend pack or gate missing token: ${token}`);
 }
 
-const sdk = readRepoFile("sdk/typescript/src/guardrail-fuzzer.ts") + "\n" + readRepoFile("sdk/typescript/src/guardrail-fuzzer.test.ts");
+const sdk = readRepoFile("packages/yunque-client/src/guardrail-fuzzer.ts") + "\n" + readRepoFile("packages/yunque-client/src/guardrail-fuzzer.test.ts");
 for (const token of [
   "createGuardrailFuzzerClient",
   "GuardrailFuzzerClientError",
@@ -149,10 +149,10 @@ for (const token of [
   if (!sdk.includes(token)) fail(`TypeScript Guardrail Fuzzer SDK slice missing token: ${token}`);
 }
 
-const pkg = JSON.parse(readRepoFile("sdk/typescript/package.json") || "{}");
+const pkg = JSON.parse(readRepoFile("packages/yunque-client/package.json") || "{}");
 if (pkg.exports?.["./guardrail-fuzzer"]?.import !== "./src/guardrail-fuzzer.ts") fail("yunque-client/guardrail-fuzzer subpath export is missing or drifted");
 
-const monolithicApi = readRepoFile("heroui-web/src/lib/api.ts");
+const monolithicApi = readRepoFile("apps/web/src/lib/api.ts");
 for (const token of ["guardrailFuzzerStatus:", "guardrailFuzzerRun:", "guardrailFuzzerEvidence:"]) {
   if (monolithicApi.includes(token)) fail(`monolithic api.ts should not expose Guardrail Fuzzer method: ${token}`);
 }

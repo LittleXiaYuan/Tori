@@ -206,7 +206,7 @@ for (const token of ["PACK_CATALOG_SOURCES", "packs/examples,packs/templates", "
   if (!configDocs.includes(token)) fail(`Pack catalog configuration docs missing token: ${token}`);
 }
 
-for (const token of ["packs/examples", "internal/packs", "heroui-web/src/app/packs", "update: { channel: \"stable\", rollback: true }", "sdk: { typescript: sdk }", "routeSpecs", "routeMethod", "--method", "distribution:", "packageUrl", "frontendUrl", "sha256", "RegisterBackendPack", "--dry-run", "--json", "dryRun", "jsonOutput"]) {
+for (const token of ["packs/examples", "internal/packs", "apps/web/src/app/packs", "update: { channel: \"stable\", rollback: true }", "sdk: { typescript: sdk }", "routeSpecs", "routeMethod", "--method", "distribution:", "packageUrl", "frontendUrl", "sha256", "RegisterBackendPack", "--dry-run", "--json", "dryRun", "jsonOutput"]) {
   if (!scaffoldScript.includes(token)) fail(`scaffold-pack.mjs missing token: ${token}`);
 }
 for (const token of ["verifier-pack", "--dry-run", "--json", "manifest.backend.routeSpecs", "manifest.frontend.menus", "manifest.frontend.routes", "manifest.sdk.typescript", "manifest.distribution.packageUrl", "manifest.distribution.frontendUrl", "manifest.distribution.sha256", "manifest.update.rollback"]) {
@@ -367,7 +367,7 @@ for (const path of packFiles) {
   if (manifest.update?.rollback !== true) fail(`${path}: update.rollback should be true for reversible pack updates`);
 }
 
-const apiSource = readText("heroui-web/src/lib/api.ts");
+const apiSource = readText("apps/web/src/lib/api.ts");
 
 const backupManifest = readJSON("packs/examples/backup-pack/pack.json");
 const backupSource = readText("internal/packs/backup/handler.go");
@@ -382,8 +382,8 @@ if (backupManifest) {
 
 const loraManifest = readJSON("packs/examples/lora-pack/pack.json");
 const loraSource = readText("internal/packs/lora/handler.go");
-const loraPage = readText("heroui-web/src/app/packs/lora/page.tsx");
-const legacyLoraPage = readText("heroui-web/src/app/lora/page.tsx");
+const loraPage = readText("apps/web/src/app/packs/lora/page.tsx");
+const legacyLoraPage = readText("apps/web/src/app/lora/page.tsx");
 if (loraManifest) {
   if (!loraSource.includes(`const PackID = "${loraManifest.id}"`)) {
     fail("lora pack handler PackID must match packs/examples/lora-pack/pack.json");
@@ -405,9 +405,9 @@ if (!legacyLoraPage.includes('redirect("/packs/lora")')) {
 const cogniKernelManifest = readJSON("packs/examples/cogni-kernel-pack/pack.json");
 const cogniKernelSource = readText("internal/packs/cognikernel/handler.go");
 const cogniGatewayBridge = readText("internal/controlplane/gateway/handlers_cogni.go");
-const cogniKernelPage = readText("heroui-web/src/app/packs/cognis/page.tsx");
-const legacyCogniPage = readText("heroui-web/src/app/cognis/page.tsx");
-const cogniKernelClient = readText("heroui-web/src/lib/cogni-kernel-pack-client.ts");
+const cogniKernelPage = readText("apps/web/src/app/packs/cognis/page.tsx");
+const legacyCogniPage = readText("apps/web/src/app/cognis/page.tsx");
+const cogniKernelClient = readText("apps/web/src/lib/cogni-kernel-pack-client.ts");
 if (cogniKernelManifest) {
   if (!cogniKernelSource.includes(`const PackID = "${cogniKernelManifest.id}"`)) {
     fail("Cogni Kernel pack handler PackID must match packs/examples/cogni-kernel-pack/pack.json");
@@ -443,10 +443,10 @@ for (const token of ["运行态 Gate", "starts_runtime_loops", "stops_runtime_lo
   if (!cogniKernelPage.includes(token)) fail(`Cogni Kernel page missing runtime gate token: ${token}`);
 }
 const hardcodedCogniShell = [
-  "heroui-web/src/components/sidebar.tsx",
-  "heroui-web/src/lib/nav-items.tsx",
-  "heroui-web/src/components/layout/account-rail.tsx",
-  "heroui-web/src/components/command-palette.tsx",
+  "apps/web/src/components/sidebar.tsx",
+  "apps/web/src/lib/nav-items.tsx",
+  "apps/web/src/components/layout/account-rail.tsx",
+  "apps/web/src/components/command-palette.tsx",
 ].map(readText).join("\n");
 if (hardcodedCogniShell.includes('href: "/cognis"') || hardcodedCogniShell.includes("nav-cognis")) {
   fail("Cogni Kernel must not remain a hard-coded main-shell nav item; use /v1/packs/enabled pack sync");
@@ -455,9 +455,9 @@ if (hardcodedCogniShell.includes('href: "/cognis"') || hardcodedCogniShell.inclu
 const browserIntentManifest = readJSON("packs/examples/browser-intent-pack/pack.json");
 const browserIntentSource = readText("internal/packs/browserintent/handler.go");
 const browserIntentBridge = readText("internal/controlplane/gateway/handlers_browser_pack.go");
-const browserIntentPage = readText("heroui-web/src/app/packs/browser/page.tsx");
-const legacyBrowserPage = readText("heroui-web/src/app/browser/page.tsx");
-const browserIntentClient = readText("heroui-web/src/lib/browser-intent-pack-client.ts");
+const browserIntentPage = readText("apps/web/src/app/packs/browser/page.tsx");
+const legacyBrowserPage = readText("apps/web/src/app/browser/page.tsx");
+const browserIntentClient = readText("apps/web/src/lib/browser-intent-pack-client.ts");
 if (browserIntentManifest) {
   if (!browserIntentSource.includes(`const PackID = "${browserIntentManifest.id}"`)) {
     fail("Browser Intent pack handler PackID must match packs/examples/browser-intent-pack/pack.json");
@@ -491,9 +491,9 @@ for (const token of ["/v1/browser/intent/plan", "BrowserActPlan", "browserActPla
   if (!browserIntentSource.includes(token) && !browserIntentClient.includes(token) && !browserIntentPage.includes(token)) fail(`Browser Intent browser_act plan gate missing token: ${token}`);
 }
 const hardcodedBrowserShell = [
-  "heroui-web/src/components/sidebar.tsx",
-  "heroui-web/src/lib/nav-items.tsx",
-  "heroui-web/src/components/command-palette.tsx",
+  "apps/web/src/components/sidebar.tsx",
+  "apps/web/src/lib/nav-items.tsx",
+  "apps/web/src/components/command-palette.tsx",
 ].map(readText).join("\n");
 if (hardcodedBrowserShell.includes('href: "/browser"') || hardcodedBrowserShell.includes("nav-browser")) {
   fail("Browser Intent must not remain a hard-coded main-shell nav item; use /v1/packs/enabled pack sync");
@@ -503,10 +503,10 @@ if (hardcodedBrowserShell.includes('href: "/browser"') || hardcodedBrowserShell.
 const chaosProbeManifest = readJSON("packs/examples/chaos-probe-pack/pack.json");
 const chaosProbeSource = readText("internal/packs/chaosprobe/handler.go");
 const chaosProbeGateTest = readText("internal/controlplane/gateway/handlers_chaos_probe_pack_test.go");
-const chaosProbePage = readText("heroui-web/src/app/packs/chaos-probe/page.tsx");
-const chaosProbeClient = readText("heroui-web/src/lib/chaos-probe-pack-client.ts");
-const chaosProbeClientTest = readText("heroui-web/src/lib/__tests__/chaos-probe-pack-client.test.ts");
-const chaosProbeSdk = readText("sdk/typescript/src/chaos-probe.ts") + "\n" + readText("sdk/typescript/src/chaos-probe.test.ts");
+const chaosProbePage = readText("apps/web/src/app/packs/chaos-probe/page.tsx");
+const chaosProbeClient = readText("apps/web/src/lib/chaos-probe-pack-client.ts");
+const chaosProbeClientTest = readText("apps/web/src/lib/__tests__/chaos-probe-pack-client.test.ts");
+const chaosProbeSdk = readText("packages/yunque-client/src/chaos-probe.ts") + "\n" + readText("packages/yunque-client/src/chaos-probe.test.ts");
 if (chaosProbeManifest) {
   if (!chaosProbeSource.includes(`const PackID = "${chaosProbeManifest.id}"`)) {
     fail("Chaos Probe pack handler PackID must match packs/examples/chaos-probe-pack/pack.json");
@@ -588,10 +588,10 @@ for (const token of ["chaosProbeStatus:", "chaosProbeRun:", "chaosProbeEvidence:
 const cognitiveCanaryManifest = readJSON("packs/examples/cognitive-canary-pack/pack.json");
 const cognitiveCanarySource = readText("internal/packs/cognitivecanary/handler.go");
 const cognitiveCanaryGateTest = readText("internal/controlplane/gateway/handlers_cognitive_canary_pack_test.go");
-const cognitiveCanaryPage = readText("heroui-web/src/app/packs/cognitive-canary/page.tsx");
-const cognitiveCanaryClient = readText("heroui-web/src/lib/cognitive-canary-pack-client.ts");
-const cognitiveCanaryClientTest = readText("heroui-web/src/lib/__tests__/cognitive-canary-pack-client.test.ts");
-const cognitiveCanarySdk = readText("sdk/typescript/src/cognitive-canary.ts") + "\n" + readText("sdk/typescript/src/cognitive-canary.test.ts");
+const cognitiveCanaryPage = readText("apps/web/src/app/packs/cognitive-canary/page.tsx");
+const cognitiveCanaryClient = readText("apps/web/src/lib/cognitive-canary-pack-client.ts");
+const cognitiveCanaryClientTest = readText("apps/web/src/lib/__tests__/cognitive-canary-pack-client.test.ts");
+const cognitiveCanarySdk = readText("packages/yunque-client/src/cognitive-canary.ts") + "\n" + readText("packages/yunque-client/src/cognitive-canary.test.ts");
 if (cognitiveCanaryManifest) {
   if (!cognitiveCanarySource.includes(`const PackID = "${cognitiveCanaryManifest.id}"`)) {
     fail("Cognitive Canary pack handler PackID must match packs/examples/cognitive-canary-pack/pack.json");
@@ -641,10 +641,10 @@ for (const token of ["cognitiveCanaryStatus:", "cognitiveCanaryEvaluate:", "cogn
 const rpaReplayManifest = readJSON("packs/examples/rpa-replay-pack/pack.json");
 const rpaReplaySource = readText("internal/packs/rpareplay/handler.go");
 const rpaReplayGateTest = readText("internal/controlplane/gateway/handlers_rpa_replay_pack_test.go");
-const rpaReplayPage = readText("heroui-web/src/app/packs/rpa-replay/page.tsx");
-const rpaReplayClient = readText("heroui-web/src/lib/rpa-replay-pack-client.ts");
-const rpaReplayClientTest = readText("heroui-web/src/lib/__tests__/rpa-replay-pack-client.test.ts");
-const rpaReplaySdk = readText("sdk/typescript/src/rpa-replay.ts") + "\n" + readText("sdk/typescript/src/rpa-replay.test.ts");
+const rpaReplayPage = readText("apps/web/src/app/packs/rpa-replay/page.tsx");
+const rpaReplayClient = readText("apps/web/src/lib/rpa-replay-pack-client.ts");
+const rpaReplayClientTest = readText("apps/web/src/lib/__tests__/rpa-replay-pack-client.test.ts");
+const rpaReplaySdk = readText("packages/yunque-client/src/rpa-replay.ts") + "\n" + readText("packages/yunque-client/src/rpa-replay.test.ts");
 if (rpaReplayManifest) {
   if (!rpaReplaySource.includes(`const PackID = "${rpaReplayManifest.id}"`)) {
     fail("RPA Replay pack handler PackID must match packs/examples/rpa-replay-pack/pack.json");
@@ -685,10 +685,10 @@ for (const token of ["rpaReplayStatus:", "createRPAReplayTrace:", "rpaReplay:", 
 const sbomDriftManifest = readJSON("packs/examples/sbom-drift-pack/pack.json");
 const sbomDriftSource = readText("internal/packs/sbomdrift/handler.go");
 const sbomDriftGateTest = readText("internal/controlplane/gateway/handlers_sbom_drift_pack_test.go");
-const sbomDriftPage = readText("heroui-web/src/app/packs/sbom-drift/page.tsx");
-const sbomDriftClient = readText("heroui-web/src/lib/sbom-drift-pack-client.ts");
-const sbomDriftClientTest = readText("heroui-web/src/lib/__tests__/sbom-drift-pack-client.test.ts");
-const sbomDriftSdk = readText("sdk/typescript/src/sbom-drift.ts") + "\n" + readText("sdk/typescript/src/sbom-drift.test.ts");
+const sbomDriftPage = readText("apps/web/src/app/packs/sbom-drift/page.tsx");
+const sbomDriftClient = readText("apps/web/src/lib/sbom-drift-pack-client.ts");
+const sbomDriftClientTest = readText("apps/web/src/lib/__tests__/sbom-drift-pack-client.test.ts");
+const sbomDriftSdk = readText("packages/yunque-client/src/sbom-drift.ts") + "\n" + readText("packages/yunque-client/src/sbom-drift.test.ts");
 const sbomDriftClientContract = `${sbomDriftClient}\n${sbomDriftSdk}`;
 if (sbomDriftManifest) {
   if (!sbomDriftSource.includes(`const PackID = "${sbomDriftManifest.id}"`)) {
@@ -724,7 +724,7 @@ for (const token of ["TestSBOMDrift", "StatusNotFound", "StatusMethodNotAllowed"
 for (const token of ["createSBOMDriftClient", "SBOMDriftClientError", "/v1/sbom-drift/status", "/v1/sbom-drift/cyclonedx/", "/v1/sbom-drift/ci-gate/plan", "/v1/sbom-drift/baseline/artifact-source/plan", "/v1/sbom-drift/ci-gate/baseline/writeback", "/v1/sbom-drift/ci-gate/workflow/writeback/plan", "/v1/sbom-drift/evidence/", "SBOMDriftGovulncheckPlan", "SBOMDriftBaselineArtifactSourcePlan", "SBOMDriftCIWorkflowWritebackPlan", "govulncheck_plan_ready", "govulncheck_plan", "govulncheck-report.json", "writes_files", "writes_ci_baseline_store", "baselineArtifactSourcePlan", "artifact_source_plan_ready", "baseline_fetch_plan_ready", "fetches_artifact_baseline", "writes_baseline_snapshot", "ciWorkflowWritebackPlan", "consumes_ci_baseline_store"]) {
   if (!sbomDriftSdk.includes(token)) fail(`SBOM Drift TypeScript SDK missing token: ${token}`);
 }
-if (!readText("sdk/typescript/src/sbom-drift-ci.ts").includes("createSBOMDriftCIClient") || !readText("sdk/typescript/src/sbom-drift-ci.ts").includes("baselineArtifactSourcePlan")) fail("SBOM Drift CI helper slice missing createSBOMDriftCIClient or baselineArtifactSourcePlan");
+if (!readText("packages/yunque-client/src/sbom-drift-ci.ts").includes("createSBOMDriftCIClient") || !readText("packages/yunque-client/src/sbom-drift-ci.ts").includes("baselineArtifactSourcePlan")) fail("SBOM Drift CI helper slice missing createSBOMDriftCIClient or baselineArtifactSourcePlan");
 for (const token of ["/v1/sbom-drift/status", "/v1/sbom-drift/diff", "/v1/sbom-drift/cyclonedx/baseline", "/v1/sbom-drift/ci-gate/plan", "/v1/sbom-drift/baseline/artifact-source/plan", "/v1/sbom-drift/ci-gate/baseline/writeback", "/v1/sbom-drift/ci-gate/workflow/writeback/plan", "/v1/sbom-drift/evidence/baseline"]) {
   if (!sbomDriftClientTest.includes(token)) fail(`SBOM Drift frontend client test missing token: ${token}`);
 }
@@ -748,10 +748,10 @@ for (const token of ["sbomDriftStatus:", "createSBOMDriftSnapshot:", "sbomDriftD
 const guardrailFuzzerManifest = readJSON("packs/examples/guardrail-fuzzer-pack/pack.json");
 const guardrailFuzzerSource = readText("internal/packs/guardrailfuzzer/handler.go");
 const guardrailFuzzerGateTest = readText("internal/controlplane/gateway/handlers_guardrail_fuzzer_pack_test.go");
-const guardrailFuzzerPage = readText("heroui-web/src/app/packs/guardrail-fuzzer/page.tsx");
-const guardrailFuzzerClient = readText("heroui-web/src/lib/guardrail-fuzzer-pack-client.ts");
-const guardrailFuzzerClientTest = readText("heroui-web/src/lib/__tests__/guardrail-fuzzer-pack-client.test.ts");
-const guardrailFuzzerSdk = readText("sdk/typescript/src/guardrail-fuzzer.ts") + "\n" + readText("sdk/typescript/src/guardrail-fuzzer.test.ts");
+const guardrailFuzzerPage = readText("apps/web/src/app/packs/guardrail-fuzzer/page.tsx");
+const guardrailFuzzerClient = readText("apps/web/src/lib/guardrail-fuzzer-pack-client.ts");
+const guardrailFuzzerClientTest = readText("apps/web/src/lib/__tests__/guardrail-fuzzer-pack-client.test.ts");
+const guardrailFuzzerSdk = readText("packages/yunque-client/src/guardrail-fuzzer.ts") + "\n" + readText("packages/yunque-client/src/guardrail-fuzzer.test.ts");
 if (guardrailFuzzerManifest) {
   if (!guardrailFuzzerSource.includes(`const PackID = "${guardrailFuzzerManifest.id}"`)) {
     fail("Guardrail Fuzzer pack handler PackID must match packs/examples/guardrail-fuzzer-pack/pack.json");
@@ -799,12 +799,12 @@ for (const token of ["guardrailFuzzerStatus:", "guardrailFuzzerRun:", "guardrail
 const memoryTimeTravelManifest = readJSON("packs/examples/memory-time-travel-pack/pack.json");
 const memoryTimeTravelSource = readText("internal/packs/memorytimetravel/handler.go");
 const memoryTimeTravelGateTest = readText("internal/controlplane/gateway/handlers_memory_time_travel_pack_test.go");
-const memoryTimeTravelPage = readText("heroui-web/src/app/packs/memory-time-travel/page.tsx");
-const memoryTimeTravelClient = readText("heroui-web/src/lib/memory-time-travel-pack-client.ts");
-const memoryTimeTravelClientTest = readText("heroui-web/src/lib/__tests__/memory-time-travel-pack-client.test.ts");
+const memoryTimeTravelPage = readText("apps/web/src/app/packs/memory-time-travel/page.tsx");
+const memoryTimeTravelClient = readText("apps/web/src/lib/memory-time-travel-pack-client.ts");
+const memoryTimeTravelClientTest = readText("apps/web/src/lib/__tests__/memory-time-travel-pack-client.test.ts");
 const temporalKVSource = readText("internal/ledger/temporal_kv.go") + "\n" + readText("internal/ledger/temporal_kv_test.go");
 const ledgerPersisterSource = readText("internal/ledger/ledger_persister.go") + "\n" + readText("internal/ledger/ledger_persister_test.go");
-const memoryTimeTravelSdk = readText("sdk/typescript/src/memory-time-travel.ts") + "\n" + readText("sdk/typescript/src/memory-time-travel.test.ts");
+const memoryTimeTravelSdk = readText("packages/yunque-client/src/memory-time-travel.ts") + "\n" + readText("packages/yunque-client/src/memory-time-travel.test.ts");
 const memoryTimeTravelClientContract = `${memoryTimeTravelClient}\n${memoryTimeTravelSdk}`;
 if (memoryTimeTravelManifest) {
   if (!memoryTimeTravelSource.includes(`const PackID = "${memoryTimeTravelManifest.id}"`)) {
@@ -867,10 +867,10 @@ for (const token of ["memoryTimeTravelStatus:", "memoryTimeTravelDiff:", "memory
 const skillAnomalyManifest = readJSON("packs/examples/skill-anomaly-pack/pack.json");
 const skillAnomalySource = readText("internal/packs/skillanomaly/handler.go");
 const skillAnomalyGateTest = readText("internal/controlplane/gateway/handlers_skill_anomaly_pack_test.go");
-const skillAnomalyPage = readText("heroui-web/src/app/packs/skill-anomaly/page.tsx");
-const skillAnomalyClient = readText("heroui-web/src/lib/skill-anomaly-pack-client.ts");
-const skillAnomalyClientTest = readText("heroui-web/src/lib/__tests__/skill-anomaly-pack-client.test.ts");
-const skillAnomalySdk = readText("sdk/typescript/src/skill-anomaly.ts") + "\n" + readText("sdk/typescript/src/skill-anomaly.test.ts");
+const skillAnomalyPage = readText("apps/web/src/app/packs/skill-anomaly/page.tsx");
+const skillAnomalyClient = readText("apps/web/src/lib/skill-anomaly-pack-client.ts");
+const skillAnomalyClientTest = readText("apps/web/src/lib/__tests__/skill-anomaly-pack-client.test.ts");
+const skillAnomalySdk = readText("packages/yunque-client/src/skill-anomaly.ts") + "\n" + readText("packages/yunque-client/src/skill-anomaly.test.ts");
 if (skillAnomalyManifest) {
   if (!skillAnomalySource.includes(`const PackID = "${skillAnomalyManifest.id}"`)) {
     fail("Skill Anomaly pack handler PackID must match packs/examples/skill-anomaly-pack/pack.json");
@@ -913,10 +913,10 @@ for (const token of ["skillAnomalyStatus:", "createSkillAnomalyEvent:", "skillAn
 const wasmPluginManifest = readJSON("packs/examples/wasm-plugin-pack/pack.json");
 const wasmPluginSource = readText("internal/packs/wasmplugin/handler.go");
 const wasmPluginGateTest = readText("internal/controlplane/gateway/handlers_wasm_plugin_pack_test.go");
-const wasmPluginPage = readText("heroui-web/src/app/packs/wasm-plugin/page.tsx");
-const wasmPluginClient = readText("heroui-web/src/lib/wasm-plugin-pack-client.ts");
-const wasmPluginClientTest = readText("heroui-web/src/lib/__tests__/wasm-plugin-pack-client.test.ts");
-const wasmPluginSdk = readText("sdk/typescript/src/wasm-plugin.ts") + "\n" + readText("sdk/typescript/src/wasm-plugin.test.ts");
+const wasmPluginPage = readText("apps/web/src/app/packs/wasm-plugin/page.tsx");
+const wasmPluginClient = readText("apps/web/src/lib/wasm-plugin-pack-client.ts");
+const wasmPluginClientTest = readText("apps/web/src/lib/__tests__/wasm-plugin-pack-client.test.ts");
+const wasmPluginSdk = readText("packages/yunque-client/src/wasm-plugin.ts") + "\n" + readText("packages/yunque-client/src/wasm-plugin.test.ts");
 const wasmPluginClientContract = `${wasmPluginClient}\n${wasmPluginSdk}`;
 if (wasmPluginManifest) {
   if (!wasmPluginSource.includes(`const PackID = "${wasmPluginManifest.id}"`)) {

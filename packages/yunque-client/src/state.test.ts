@@ -31,9 +31,9 @@ test("StateClient updates focus and topics", async () => {
 
 test("StateClient manages resources", async () => {
   const calls: { url: string; init?: RequestInit }[] = [];
-  const client = createStateClient({ baseUrl: "http://localhost:9090", fetch: async (url, init) => { calls.push({ url: String(url), init }); if (init?.method === "POST") return jsonResponse({ status: "tracked" }); if (init?.method === "DELETE") return jsonResponse({ status: "released" }); return jsonResponse([{ id: "r1", path: "sdk/typescript", type: "repo" }]); } });
-  const resources = await client.resources(); const tracked = await client.trackResource({ path: "sdk/typescript", type: "repo" }); const released = await client.releaseResource("r1");
-  assertEqual(resources[0]?.path, "sdk/typescript"); assertEqual(tracked.status, "tracked"); assertEqual(released.status, "released"); assertEqual(calls[2]?.url, "http://localhost:9090/v1/state/resources?id=r1");
+  const client = createStateClient({ baseUrl: "http://localhost:9090", fetch: async (url, init) => { calls.push({ url: String(url), init }); if (init?.method === "POST") return jsonResponse({ status: "tracked" }); if (init?.method === "DELETE") return jsonResponse({ status: "released" }); return jsonResponse([{ id: "r1", path: "packages/yunque-client", type: "repo" }]); } });
+  const resources = await client.resources(); const tracked = await client.trackResource({ path: "packages/yunque-client", type: "repo" }); const released = await client.releaseResource("r1");
+  assertEqual(resources[0]?.path, "packages/yunque-client"); assertEqual(tracked.status, "tracked"); assertEqual(released.status, "released"); assertEqual(calls[2]?.url, "http://localhost:9090/v1/state/resources?id=r1");
 });
 
 test("StateClient throws StateClientError with parsed and text bodies", async () => {

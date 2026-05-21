@@ -19,8 +19,8 @@
   "languages": {
     "typescript": {
       "package": "yunque-client",
-      "implementationFiles": ["sdk/typescript/src/reflect.ts", "sdk/typescript/src/reflect-experiences.ts", "sdk/typescript/src/reflect-strategies.ts", "sdk/typescript/src/missions.ts"],
-      "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
+      "implementationFiles": ["packages/yunque-client/src/reflect.ts", "packages/yunque-client/src/reflect-experiences.ts", "packages/yunque-client/src/reflect-strategies.ts", "packages/yunque-client/src/missions.ts"],
+      "docs": ["packages/yunque-client/README.md", "docs/plugins/sdk-typescript.md"],
       "entrypoints": {
         "experiences": "yunque-client/reflect-experiences#createReflectExperiencesClient().list",
         "stats": "yunque-client/reflect-experiences#createReflectExperiencesClient().stats",

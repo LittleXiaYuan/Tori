@@ -22,8 +22,8 @@
   "languages": {
     "typescript": {
       "package": "yunque-client",
-      "implementationFiles": ["sdk/typescript/src/cron.ts", "sdk/typescript/src/cron-read.ts", "sdk/typescript/src/cron-control.ts"],
-      "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
+      "implementationFiles": ["packages/yunque-client/src/cron.ts", "packages/yunque-client/src/cron-read.ts", "packages/yunque-client/src/cron-control.ts"],
+      "docs": ["packages/yunque-client/README.md", "docs/plugins/sdk-typescript.md"],
       "entrypoints": {
         "list": "yunque-client/cron-read#createCronReadClient().list",
         "add": "yunque-client/cron-control#createCronControlClient().add",

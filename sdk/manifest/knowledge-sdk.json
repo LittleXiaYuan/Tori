@@ -30,8 +30,8 @@
   "languages": {
     "typescript": {
       "package": "yunque-client",
-      "implementationFiles": ["sdk/typescript/src/knowledge.ts", "sdk/typescript/src/knowledge-search.ts", "sdk/typescript/src/knowledge-sources.ts", "sdk/typescript/src/knowledge-ingest.ts", "sdk/typescript/src/knowledge-import.ts", "sdk/typescript/src/knowledge-upload.ts"],
-      "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
+      "implementationFiles": ["packages/yunque-client/src/knowledge.ts", "packages/yunque-client/src/knowledge-search.ts", "packages/yunque-client/src/knowledge-sources.ts", "packages/yunque-client/src/knowledge-ingest.ts", "packages/yunque-client/src/knowledge-import.ts", "packages/yunque-client/src/knowledge-upload.ts"],
+      "docs": ["packages/yunque-client/README.md", "docs/plugins/sdk-typescript.md"],
       "entrypoints": {
         "search": "yunque-client/knowledge-search#createKnowledgeSearchClient().search",
         "sources": "yunque-client/knowledge-sources#createKnowledgeSourcesClient().list",

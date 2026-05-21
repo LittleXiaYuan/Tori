@@ -47,7 +47,7 @@ func (p *GeneralPlugin) Skills() []skills.Skill {
 	}
 
 	// Default write dirs: data/tasks for task artifacts, data/output for general output,
-	// plus "." and "output" to be more forgiving for desktop/CLI usage.
+	// plus "." and "output" to be more forgiving for apps/desktop/CLI usage.
 	writeDirs := p.hostWritePaths
 	if len(writeDirs) == 0 {
 		writeDirs = []string{"data/tasks", "data/output", "output", "."}

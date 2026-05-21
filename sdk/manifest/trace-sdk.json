@@ -36,14 +36,14 @@
     "typescript": {
       "package": "yunque-client",
       "implementationFiles": [
-        "sdk/typescript/src/trace.ts",
-        "sdk/typescript/src/trace-recent.ts",
-        "sdk/typescript/src/trace-events.ts",
-        "sdk/typescript/src/trace-by-id.ts",
-        "sdk/typescript/src/task-trace.ts"
+        "packages/yunque-client/src/trace.ts",
+        "packages/yunque-client/src/trace-recent.ts",
+        "packages/yunque-client/src/trace-events.ts",
+        "packages/yunque-client/src/trace-by-id.ts",
+        "packages/yunque-client/src/task-trace.ts"
       ],
       "docs": [
-        "sdk/typescript/README.md",
+        "packages/yunque-client/README.md",
         "docs/plugins/sdk-typescript.md"
       ],
       "entrypoints": {

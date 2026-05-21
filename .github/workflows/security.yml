@@ -39,12 +39,12 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: heroui-web/package-lock.json
+          cache-dependency-path: apps/web/package-lock.json
       - name: Install deps
-        working-directory: heroui-web
+        working-directory: apps/web
         run: npm ci --prefer-offline --no-audit
       - name: npm audit (production)
-        working-directory: heroui-web
+        working-directory: apps/web
         run: npm audit --omit=dev --audit-level=high
 
   sdk-npm-audit:
@@ -56,12 +56,12 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: sdk/typescript/package-lock.json
+          cache-dependency-path: packages/yunque-client/package-lock.json
       - name: Install deps
-        working-directory: sdk/typescript
+        working-directory: packages/yunque-client
         run: npm ci --prefer-offline --no-audit --no-fund
       - name: npm audit
-        working-directory: sdk/typescript
+        working-directory: packages/yunque-client
         run: npm audit --audit-level=high
 
   secret-scan:

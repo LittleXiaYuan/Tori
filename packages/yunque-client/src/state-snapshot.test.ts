@@ -10,10 +10,10 @@ function jsonResponse(body: unknown, init?: ResponseInit): Response { return new
 
 test("StateSnapshotClient reads typed state snapshot with bearer token", async () => {
   const calls: { url: string; init?: RequestInit }[] = [];
-  const client = createStateSnapshotClient({ baseUrl: "http://localhost:9090/", token: "token-123", fetch: async (url, init) => { calls.push({ url: String(url), init }); return jsonResponse({ goals: [{ id: "g1", title: "ship sdk" }], resources: [{ id: "r1", path: "sdk/typescript", type: "repo" }], focus: "SDK incremental package", topics: ["sdk"], recent_actions: [{ action: "test", success: true }], capabilities: { total_skills: 12, unresolved_gaps: 1 }, updated_at: "2026-05-12T00:00:00Z" }); } });
+  const client = createStateSnapshotClient({ baseUrl: "http://localhost:9090/", token: "token-123", fetch: async (url, init) => { calls.push({ url: String(url), init }); return jsonResponse({ goals: [{ id: "g1", title: "ship sdk" }], resources: [{ id: "r1", path: "packages/yunque-client", type: "repo" }], focus: "SDK incremental package", topics: ["sdk"], recent_actions: [{ action: "test", success: true }], capabilities: { total_skills: 12, unresolved_gaps: 1 }, updated_at: "2026-05-12T00:00:00Z" }); } });
   const snapshot = await client.get();
   assertEqual(snapshot.goals[0]?.title, "ship sdk");
-  assertEqual(snapshot.resources[0]?.path, "sdk/typescript");
+  assertEqual(snapshot.resources[0]?.path, "packages/yunque-client");
   assertEqual(snapshot.focus, "SDK incremental package");
   assertEqual(snapshot.capabilities?.unresolved_gaps, 1);
   assertEqual(calls[0]?.url, "http://localhost:9090/v1/state");

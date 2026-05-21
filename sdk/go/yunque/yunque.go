@@ -1095,7 +1095,7 @@ func (f *federationNamespace) Broadcast(ctx context.Context) (FederationStatusRe
 
 // ── Admin / Operator (/v1/desktop, /v1/tenants, /v1/nl-config) ──
 
-// Admin exposes desktop/operator helpers for external admin panels, CLIs, plugins, and automation scripts.
+// Admin exposes apps/desktop/operator helpers for external admin panels, CLIs, plugins, and automation scripts.
 var Admin = &adminNamespace{}
 
 type adminNamespace struct{}

@@ -12,7 +12,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.resolve(__dirname, "..", "..");
+const ROOT = path.resolve(__dirname, "..", "..", "..");
 // Tauri v2 expects externalBin entries at <src-tauri>/<path>, e.g. the
 // tauri.conf.json entry "binaries/yunque-agent" points at
 // <src-tauri>/binaries/yunque-agent-<triple><ext>. Keeping the binaries in a

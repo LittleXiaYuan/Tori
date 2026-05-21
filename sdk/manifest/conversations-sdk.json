@@ -18,8 +18,8 @@
   "languages": {
     "typescript": {
       "package": "yunque-client",
-      "implementationFiles": ["sdk/typescript/src/conversations.ts", "sdk/typescript/src/conversation-sessions.ts", "sdk/typescript/src/conversation-messages.ts", "sdk/typescript/src/conversation-manage.ts", "sdk/typescript/src/conversation-replay.ts"],
-      "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
+      "implementationFiles": ["packages/yunque-client/src/conversations.ts", "packages/yunque-client/src/conversation-sessions.ts", "packages/yunque-client/src/conversation-messages.ts", "packages/yunque-client/src/conversation-manage.ts", "packages/yunque-client/src/conversation-replay.ts"],
+      "docs": ["packages/yunque-client/README.md", "docs/plugins/sdk-typescript.md"],
       "entrypoints": { "list": "createConversationsClient().list", "messages": "createConversationsClient().messages", "deleteMessages": "createConversationsClient().deleteMessages", "manage": "createConversationsClient().manage", "replay": "createConversationsClient().replay" }
     },
     "go": {

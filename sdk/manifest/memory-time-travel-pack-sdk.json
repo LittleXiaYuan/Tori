@@ -33,8 +33,8 @@
   "frontend": {
     "menuPath": "/packs/memory-time-travel",
     "component": "memory/MemoryTimeTravelPackPage",
-    "page": "heroui-web/src/app/packs/memory-time-travel/page.tsx",
-    "client": "heroui-web/src/lib/memory-time-travel-pack-client.ts"
+    "page": "apps/web/src/app/packs/memory-time-travel/page.tsx",
+    "client": "apps/web/src/lib/memory-time-travel-pack-client.ts"
   },
   "capabilities": [
     "snapshotStore",

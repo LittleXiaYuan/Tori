@@ -24,7 +24,7 @@
   "frontend": {
     "menuPath": "/packs/cognitive-canary",
     "component": "ops/CognitiveCanaryPackPage",
-    "client": "heroui-web/src/lib/cognitive-canary-pack-client.ts",
-    "page": "heroui-web/src/app/packs/cognitive-canary/page.tsx"
+    "client": "apps/web/src/lib/cognitive-canary-pack-client.ts",
+    "page": "apps/web/src/app/packs/cognitive-canary/page.tsx"
   }
 }

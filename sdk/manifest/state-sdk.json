@@ -90,16 +90,16 @@
     "typescript": {
       "package": "yunque-client",
       "implementationFiles": [
-        "sdk/typescript/src/state.ts",
-        "sdk/typescript/src/state-snapshot.ts",
-        "sdk/typescript/src/state-actions.ts",
-        "sdk/typescript/src/state-capabilities.ts",
-        "sdk/typescript/src/goal-state.ts",
-        "sdk/typescript/src/focus-state.ts",
-        "sdk/typescript/src/resource-state.ts"
+        "packages/yunque-client/src/state.ts",
+        "packages/yunque-client/src/state-snapshot.ts",
+        "packages/yunque-client/src/state-actions.ts",
+        "packages/yunque-client/src/state-capabilities.ts",
+        "packages/yunque-client/src/goal-state.ts",
+        "packages/yunque-client/src/focus-state.ts",
+        "packages/yunque-client/src/resource-state.ts"
       ],
       "docs": [
-        "sdk/typescript/README.md",
+        "packages/yunque-client/README.md",
         "docs/plugins/sdk-typescript.md"
       ],
       "entrypoints": {

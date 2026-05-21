@@ -57,12 +57,12 @@
     "typescript": {
       "package": "yunque-client",
       "implementationFiles": [
-        "sdk/typescript/src/planner.ts",
-        "sdk/typescript/src/planner-recovery.ts",
-        "sdk/typescript/src/agent-kit.ts"
+        "packages/yunque-client/src/planner.ts",
+        "packages/yunque-client/src/planner-recovery.ts",
+        "packages/yunque-client/src/agent-kit.ts"
       ],
       "docs": [
-        "sdk/typescript/README.md",
+        "packages/yunque-client/README.md",
         "docs/plugins/sdk-typescript.md"
       ],
       "entrypoints": {

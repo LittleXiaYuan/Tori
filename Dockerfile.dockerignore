@@ -31,10 +31,10 @@ yunque-agent/coverage.*
 yunque-agent/*.out
 yunque-agent/*.err
 yunque-agent/*.log
-yunque-agent/heroui-web/node_modules/
-yunque-agent/heroui-web/.next/
-yunque-agent/heroui-web/out/
-yunque-agent/heroui-web/coverage/
+yunque-agent/apps/web/node_modules/
+yunque-agent/apps/web/.next/
+yunque-agent/apps/web/out/
+yunque-agent/apps/web/coverage/
 yunque-agent/yunque-mcp/node_modules/
 ledger/coverage
 ledger/coverage_*
@@ -44,9 +44,9 @@ ledger/*.err
 ledger/*.log
 
 # Large app/documentation areas that are not needed to compile the agent image.
-yunque-agent/browser-extension/
-yunque-agent/desktop/
-yunque-agent/desktop/src-tauri/target*/
+yunque-agent/apps/browser-extension/
+yunque-agent/apps/desktop/
+yunque-agent/apps/desktop/src-tauri/target*/
 yunque-agent/xiaoyu/
 yunque-agent/.atomcode/
 yunque-agent/.tmp/

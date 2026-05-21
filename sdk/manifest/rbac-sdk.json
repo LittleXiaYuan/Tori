@@ -64,14 +64,14 @@
     "typescript": {
       "package": "yunque-client",
       "implementationFiles": [
-        "sdk/typescript/src/rbac.ts",
-        "sdk/typescript/src/roles.ts",
-        "sdk/typescript/src/role-bindings.ts",
-        "sdk/typescript/src/permissions.ts",
-        "sdk/typescript/src/my-roles.ts"
+        "packages/yunque-client/src/rbac.ts",
+        "packages/yunque-client/src/roles.ts",
+        "packages/yunque-client/src/role-bindings.ts",
+        "packages/yunque-client/src/permissions.ts",
+        "packages/yunque-client/src/my-roles.ts"
       ],
       "docs": [
-        "sdk/typescript/README.md",
+        "packages/yunque-client/README.md",
         "docs/plugins/sdk-typescript.md"
       ],
       "entrypoints": {

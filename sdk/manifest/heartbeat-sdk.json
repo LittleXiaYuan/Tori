@@ -43,12 +43,12 @@
     "typescript": {
       "package": "yunque-client",
       "implementationFiles": [
-        "sdk/typescript/src/heartbeat.ts",
-        "sdk/typescript/src/heartbeat-observe.ts",
-        "sdk/typescript/src/heartbeat-control.ts"
+        "packages/yunque-client/src/heartbeat.ts",
+        "packages/yunque-client/src/heartbeat-observe.ts",
+        "packages/yunque-client/src/heartbeat-control.ts"
       ],
       "docs": [
-        "sdk/typescript/README.md",
+        "packages/yunque-client/README.md",
         "docs/plugins/sdk-typescript.md"
       ],
       "entrypoints": {

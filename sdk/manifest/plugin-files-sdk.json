@@ -29,11 +29,11 @@
     "typescript": {
       "package": "yunque-client",
       "implementationFiles": [
-        "sdk/typescript/src/plugin-files.ts",
-        "sdk/typescript/src/agent-kit.ts"
+        "packages/yunque-client/src/plugin-files.ts",
+        "packages/yunque-client/src/agent-kit.ts"
       ],
       "docs": [
-        "sdk/typescript/README.md",
+        "packages/yunque-client/README.md",
         "docs/plugins/sdk-typescript.md"
       ],
       "entrypoints": {

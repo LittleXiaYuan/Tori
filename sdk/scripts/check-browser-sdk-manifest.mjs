@@ -36,15 +36,15 @@ if (browserPackManifest.frontend?.menus?.[0]?.path !== "/packs/browser") fail("B
 if (browserPackManifest.update?.rollback !== true) fail("Browser Intent pack must be rollbackable");
 const browserPackRouteSpecs = new Set((browserPackManifest.backend?.routeSpecs ?? []).map((route) => `${route.method} ${route.path}`));
 for (const route of manifest.routes ?? []) if (!browserPackRouteSpecs.has(route)) fail(`Browser Intent pack manifest missing routeSpec: ${route}`);
-const browserPackClient = readRepoFile("heroui-web/src/lib/browser-intent-pack-client.ts");
+const browserPackClient = readRepoFile("apps/web/src/lib/browser-intent-pack-client.ts");
 for (const token of ["createBrowserIntentPackClient", "/v1/browser/status", "/api/browser/ext/session", "/api/browser/ext/scenarios/run"]) if (!browserPackClient.includes(token)) fail(`browser-intent-pack-client missing token: ${token}`);
-const browserPackPage = readRepoFile("heroui-web/src/app/packs/browser/page.tsx");
+const browserPackPage = readRepoFile("apps/web/src/app/packs/browser/page.tsx");
 if (!browserPackPage.includes("createBrowserIntentPackClient") || browserPackPage.includes('from "@/lib/api"')) fail("Browser Intent pack page must use browser-intent-pack-client instead of monolithic api.ts");
-const legacyBrowserPage = readRepoFile("heroui-web/src/app/browser/page.tsx");
+const legacyBrowserPage = readRepoFile("apps/web/src/app/browser/page.tsx");
 if (!legacyBrowserPage.includes('redirect("/packs/browser")')) fail("legacy /browser page must redirect to /packs/browser");
 const browserPackBackend = readRepoFile("internal/packs/browserintent/handler.go") + "\n" + readRepoFile("internal/controlplane/gateway/handlers_packs.go") + "\n" + readRepoFile("cmd/agent/init_tasks.go");
 for (const token of ["const PackID = \"yunque.pack.browser-intent\"", "HandleBrowserIntentPack", "HandleBrowserIntentSession", "BackendRouteAuthPassthrough", "browserintentpack.NewHandler", "packs/examples/browser-intent-pack/pack.json"]) if (!browserPackBackend.includes(token)) fail(`Browser Intent backend pack missing token: ${token}`);
-const hardcodedBrowserShell = readRepoFile("heroui-web/src/components/sidebar.tsx") + "\n" + readRepoFile("heroui-web/src/lib/nav-items.tsx");
+const hardcodedBrowserShell = readRepoFile("apps/web/src/components/sidebar.tsx") + "\n" + readRepoFile("apps/web/src/lib/nav-items.tsx");
 if (hardcodedBrowserShell.includes('href: "/browser"') || hardcodedBrowserShell.includes("nav-browser")) fail("Browser Intent must not remain a hard-coded main-shell nav item; use /v1/packs/enabled pack sync");
 
 if (failures.length) { console.error("Browser SDK manifest check failed:"); for (const failure of failures) console.error(`- ${failure}`); process.exit(1); }

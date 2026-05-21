@@ -35,12 +35,12 @@
     "typescript": {
       "package": "yunque-client",
       "implementationFiles": [
-        "sdk/typescript/src/webchat.ts",
-        "sdk/typescript/src/webchat-widget.ts",
-        "sdk/typescript/src/webchat-embed.ts"
+        "packages/yunque-client/src/webchat.ts",
+        "packages/yunque-client/src/webchat-widget.ts",
+        "packages/yunque-client/src/webchat-embed.ts"
       ],
       "docs": [
-        "sdk/typescript/README.md",
+        "packages/yunque-client/README.md",
         "docs/plugins/sdk-typescript.md"
       ],
       "entrypoints": {

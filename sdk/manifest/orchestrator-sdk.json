@@ -78,14 +78,14 @@
     "typescript": {
       "package": "yunque-client",
       "implementationFiles": [
-        "sdk/typescript/src/orchestrator.ts",
-        "sdk/typescript/src/orchestrator-read.ts",
-        "sdk/typescript/src/orchestrator-status.ts",
-        "sdk/typescript/src/orchestrator-events.ts",
-        "sdk/typescript/src/orchestrator-control.ts"
+        "packages/yunque-client/src/orchestrator.ts",
+        "packages/yunque-client/src/orchestrator-read.ts",
+        "packages/yunque-client/src/orchestrator-status.ts",
+        "packages/yunque-client/src/orchestrator-events.ts",
+        "packages/yunque-client/src/orchestrator-control.ts"
       ],
       "docs": [
-        "sdk/typescript/README.md",
+        "packages/yunque-client/README.md",
         "docs/plugins/sdk-typescript.md"
       ],
       "entrypoints": {

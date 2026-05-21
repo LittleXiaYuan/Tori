@@ -40,8 +40,8 @@
   "languages": {
     "typescript": {
       "package": "yunque-client",
-      "implementationFiles": ["sdk/typescript/src/skillhub.ts", "sdk/typescript/src/agent-kit.ts"],
-      "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
+      "implementationFiles": ["packages/yunque-client/src/skillhub.ts", "packages/yunque-client/src/agent-kit.ts"],
+      "docs": ["packages/yunque-client/README.md", "docs/plugins/sdk-typescript.md"],
       "entrypoints": { "search": "createSkillHubClient().search", "installed": "createSkillHubClient().installed", "install": "createSkillHubClient().install", "uninstall": "createSkillHubClient().uninstall", "trending": "createSkillHubClient().trending", "detail": "createSkillHubClient().detail", "checkUpdates": "createSkillHubClient().checkUpdates", "update": "createSkillHubClient().update", "rollback": "createSkillHubClient().rollback", "versions": "createSkillHubClient().versions", "policy": "createSkillHubClient().policy", "policyCheck": "createSkillHubClient().policyCheck", "analytics": "createSkillHubClient().analytics" }
     },
     "go": {

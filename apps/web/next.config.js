@@ -1,4 +1,5 @@
 /** @type {import('next').NextConfig} */
+const path = require("path");
 const isProd = process.env.NODE_ENV === "production";
 
 // NOTE: `output: "export"` produces a static bundle and ignores `headers()`,
@@ -39,7 +40,18 @@ const securityHeaders = [
 const nextConfig = {
   ...(isProd ? { output: "export" } : {}),
   images: { unoptimized: true },
+  // Keep the local SDK as a first-class source dependency during Turbopack
+  // builds so subpath imports like `yunque-client/packs` resolve directly to
+  // the shared TS source under packages/yunque-client/src.
   transpilePackages: ["yunque-client"],
+  turbopack: {
+    // Turbopack needs the repo root as its workspace root to see the linked
+    // package outside apps/web/.
+    root: path.resolve(__dirname, "..", ".."),
+    resolveAlias: {
+      "yunque-client": path.resolve(__dirname, "..", "..", "packages", "yunque-client", "src"),
+    },
+  },
   experimental: {
     externalDir: true,
   },

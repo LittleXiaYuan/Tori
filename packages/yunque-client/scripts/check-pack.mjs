@@ -26,15 +26,15 @@ const maxUnpackedGrowthPerPackSdkHelperExport = 700;
 const maxUnpackedGrowthForPackPrepareSummaryHelperExport = 2_800;
 const maxNonEntryFiles = 16;
 const pkg = JSON.parse(readFileSync("package.json", "utf8"));
-const packManifestPath = "../manifest/packs-sdk.json";
+const packManifestPath = "../../sdk/manifest/packs-sdk.json";
 const packManifest = existsSync(packManifestPath)
   ? JSON.parse(readFileSync(packManifestPath, "utf8"))
   : { capabilities: [] };
-const memoryTimeTravelManifestPath = "../manifest/memory-time-travel-pack-sdk.json";
+const memoryTimeTravelManifestPath = "../../sdk/manifest/memory-time-travel-pack-sdk.json";
 const memoryTimeTravelManifest = existsSync(memoryTimeTravelManifestPath)
   ? JSON.parse(readFileSync(memoryTimeTravelManifestPath, "utf8"))
   : { capabilities: [] };
-const wasmPluginManifestPath = "../manifest/wasm-plugin-pack-sdk.json";
+const wasmPluginManifestPath = "../../sdk/manifest/wasm-plugin-pack-sdk.json";
 const wasmPluginManifest = existsSync(wasmPluginManifestPath)
   ? JSON.parse(readFileSync(wasmPluginManifestPath, "utf8"))
   : { routes: [] };

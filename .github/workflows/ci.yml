@@ -58,10 +58,10 @@ jobs:
               - 'internal/controlplane/gateway/**'
               - '.github/workflows/ci.yml'
             web:
-              - 'heroui-web/**'
+              - 'apps/web/**'
               - '.github/workflows/ci.yml'
             desktop:
-              - 'desktop/**'
+              - 'apps/desktop/**'
               - '.github/workflows/ci.yml'
             docker:
               - 'Dockerfile*'
@@ -138,7 +138,7 @@ jobs:
     timeout-minutes: 10
     defaults:
       run:
-        working-directory: sdk/typescript
+        working-directory: packages/yunque-client
     steps:
       - uses: actions/checkout@v4
 
@@ -146,7 +146,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: sdk/typescript/package-lock.json
+          cache-dependency-path: packages/yunque-client/package-lock.json
 
       - name: npm ci
         run: npm ci --prefer-offline --no-audit --no-fund
@@ -195,14 +195,14 @@ jobs:
           args: --timeout 5m
 
   web:
-    name: Frontend (heroui-web)
+    name: Frontend (apps/web)
     needs: changes
     if: needs.changes.outputs.web == 'true' || github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 12
     defaults:
       run:
-        working-directory: heroui-web
+        working-directory: apps/web
     steps:
       - uses: actions/checkout@v4
 
@@ -210,7 +210,7 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: heroui-web/package-lock.json
+          cache-dependency-path: apps/web/package-lock.json
 
       - name: npm ci
         run: npm ci --prefer-offline --no-audit --no-fund
@@ -250,11 +250,11 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: desktop/src-tauri -> target
+          workspaces: apps/desktop/src-tauri -> target
 
       - name: cargo check (Tauri shell)
-        working-directory: desktop/src-tauri
-        # Sidecar binaries live in desktop/src-tauri/binaries/ at runtime
+        working-directory: apps/desktop/src-tauri
+        # Sidecar binaries live in apps/desktop/src-tauri/binaries/ at runtime
         # (see copy-sidecar.mjs), but cargo check doesn't need them, so we
         # don't run the copy-sidecar step in CI.
         run: cargo check --locked

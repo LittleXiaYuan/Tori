@@ -136,7 +136,7 @@ for (const token of [
 }
 
 const frontendTest = readRepoFile(
-  "heroui-web/src/lib/__tests__/chaos-probe-pack-client.test.ts",
+  "apps/web/src/lib/__tests__/chaos-probe-pack-client.test.ts",
 );
 for (const token of [
   "/v1/chaos-probe/status",
@@ -211,9 +211,9 @@ for (const token of [
 }
 
 const sdk =
-  readRepoFile("sdk/typescript/src/chaos-probe.ts") +
+  readRepoFile("packages/yunque-client/src/chaos-probe.ts") +
   "\n" +
-  readRepoFile("sdk/typescript/src/chaos-probe.test.ts");
+  readRepoFile("packages/yunque-client/src/chaos-probe.test.ts");
 for (const token of [
   "createChaosProbeClient",
   "ChaosProbeClientError",
@@ -244,11 +244,11 @@ for (const token of [
     fail(`TypeScript Chaos Probe SDK slice missing token: ${token}`);
 }
 
-const pkg = JSON.parse(readRepoFile("sdk/typescript/package.json") || "{}");
+const pkg = JSON.parse(readRepoFile("packages/yunque-client/package.json") || "{}");
 if (pkg.exports?.["./chaos-probe"]?.import !== "./src/chaos-probe.ts")
   fail("yunque-client/chaos-probe subpath export is missing or drifted");
 
-const monolithicApi = readRepoFile("heroui-web/src/lib/api.ts");
+const monolithicApi = readRepoFile("apps/web/src/lib/api.ts");
 for (const token of [
   "chaosProbeStatus:",
   "chaosProbeRun:",

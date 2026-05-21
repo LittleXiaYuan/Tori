@@ -16,8 +16,8 @@
   "languages": {
     "typescript": {
       "package": "yunque-client",
-      "implementationFiles": ["sdk/typescript/src/missions.ts", "sdk/typescript/src/missions-parse.ts"],
-      "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
+      "implementationFiles": ["packages/yunque-client/src/missions.ts", "packages/yunque-client/src/missions-parse.ts"],
+      "docs": ["packages/yunque-client/README.md", "docs/plugins/sdk-typescript.md"],
       "entrypoints": {
         "parse": "yunque-client/missions-parse#createMissionsParseClient().parse"
       }

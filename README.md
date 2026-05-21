@@ -16,11 +16,11 @@
 
 | 目录 | 说明 |
 |------|------|
-| `heroui-web/` | **当前主前端**（HeroUI + Next.js 16），Go 嵌入 `heroui-web/out/` |
+| `apps/web/` | **当前主前端**（HeroUI + Next.js 16），Go 嵌入 `apps/web/out/` |
 | `web/` | 已归档旧前端，不再维护，见 `web/README.md` |
 | `docs/` | 面向用户的正式文档与文档站（VitePress） |
 | `doc/` | 内部开发文档、连续性记录、设计蓝图（`.gitignore` 排除） |
-| `browser-extension/` | 浏览器连接器扩展（Chrome/Edge） |
+| `apps/browser-extension/` | 浏览器连接器扩展（Chrome/Edge） |
 | `data/plugins/` | 第三方插件热加载目录 |
 | `data/skills/` | 文件技能热加载目录 |
 
@@ -133,7 +133,7 @@ make release   # 生成 Windows/macOS/Linux (amd64+arm64) 6 个二进制
 
 ### 构建与运行
 
-- **Go 编译 + 前端嵌入**: 后端二进制内嵌 `heroui-web/out/`
+- **Go 编译 + 前端嵌入**: 后端二进制内嵌 `apps/web/out/`
 - **启动即打开浏览器**: 默认进入 Dashboard
 - **多平台构建**: `make release` 生成 Windows/macOS/Linux 构建产物
 - **Docker 部署**: 提供轻量版、完整版和开发版脚本

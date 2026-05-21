@@ -22,7 +22,7 @@ Invoke-Step "SDK manifest suite" {
 }
 
 Invoke-Step "TypeScript focused state slices" {
-  Push-Location sdk\typescript
+  Push-Location packages\yunque-client
   try {
     npm run check:sdk-manifests
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -33,7 +33,7 @@ Invoke-Step "TypeScript focused state slices" {
 }
 
 Invoke-Step "TypeScript focused reflect slices" {
-  Push-Location sdk\typescript
+  Push-Location packages\yunque-client
   try {
     node scripts\run-incremental-tests.mjs reflect reflect-experiences reflect-strategies
   } finally {
@@ -42,7 +42,7 @@ Invoke-Step "TypeScript focused reflect slices" {
 }
 
 Invoke-Step "TypeScript focused plugin API slices" {
-  Push-Location sdk\typescript
+  Push-Location packages\yunque-client
   try {
     node scripts\run-incremental-tests.mjs plugin-api plugin-llm plugin-search plugin-send plugin-memory plugin-agent-memory plugin-knowledge plugin-cron plugin-extensions
   } finally {

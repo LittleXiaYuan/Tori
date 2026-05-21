@@ -50,12 +50,12 @@
     "typescript": {
       "package": "yunque-client",
       "implementationFiles": [
-        "sdk/typescript/src/subagents.ts",
-        "sdk/typescript/src/subagents-read.ts",
-        "sdk/typescript/src/subagents-control.ts"
+        "packages/yunque-client/src/subagents.ts",
+        "packages/yunque-client/src/subagents-read.ts",
+        "packages/yunque-client/src/subagents-control.ts"
       ],
       "docs": [
-        "sdk/typescript/README.md",
+        "packages/yunque-client/README.md",
         "docs/plugins/sdk-typescript.md"
       ],
       "entrypoints": {

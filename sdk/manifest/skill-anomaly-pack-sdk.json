@@ -25,7 +25,7 @@
   "frontend": {
     "menuPath": "/packs/skill-anomaly",
     "component": "security/SkillAnomalyPackPage",
-    "client": "heroui-web/src/lib/skill-anomaly-pack-client.ts",
-    "page": "heroui-web/src/app/packs/skill-anomaly/page.tsx"
+    "client": "apps/web/src/lib/skill-anomaly-pack-client.ts",
+    "page": "apps/web/src/app/packs/skill-anomaly/page.tsx"
   }
 }

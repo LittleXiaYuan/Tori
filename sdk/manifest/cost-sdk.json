@@ -78,16 +78,16 @@
     "typescript": {
       "package": "yunque-client",
       "implementationFiles": [
-        "sdk/typescript/src/cost.ts",
-        "sdk/typescript/src/cost-budget.ts",
-        "sdk/typescript/src/cost-observe.ts",
-        "sdk/typescript/src/cost-task.ts",
-        "sdk/typescript/src/cost-history.ts",
-        "sdk/typescript/src/cost-alerts.ts",
-        "sdk/typescript/src/usage.ts"
+        "packages/yunque-client/src/cost.ts",
+        "packages/yunque-client/src/cost-budget.ts",
+        "packages/yunque-client/src/cost-observe.ts",
+        "packages/yunque-client/src/cost-task.ts",
+        "packages/yunque-client/src/cost-history.ts",
+        "packages/yunque-client/src/cost-alerts.ts",
+        "packages/yunque-client/src/usage.ts"
       ],
       "docs": [
-        "sdk/typescript/README.md",
+        "packages/yunque-client/README.md",
         "docs/plugins/sdk-typescript.md"
       ],
       "entrypoints": {

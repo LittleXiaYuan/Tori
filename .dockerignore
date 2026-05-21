@@ -31,17 +31,17 @@ Thumbs.db
 vendor/
 
 # ── Frontend build artifacts & deps ──
-heroui-web/node_modules/
-heroui-web/.next/
-heroui-web/out/
+apps/web/node_modules/
+apps/web/.next/
+apps/web/out/
 
 # ── Local-only content to keep out of online builds ──
 xiaoyu/
 doc/
 docs/
-desktop/src-tauri/target*/
-desktop/src-tauri/frontend/
-sdk/typescript/node_modules/
+apps/desktop/src-tauri/target*/
+apps/desktop/src-tauri/frontend/
+packages/yunque-client/node_modules/
 
 # ── Legacy frontend ──
 web/
@@ -61,7 +61,7 @@ testdata/
 .golangci.yml
 
 # ── Desktop app (Tauri) ──
-desktop/
+apps/desktop/
 
 # ── Misc ──
 coverage.out

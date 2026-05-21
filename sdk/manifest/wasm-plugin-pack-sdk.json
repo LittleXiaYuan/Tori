@@ -35,7 +35,7 @@
   "frontend": {
     "menuPath": "/packs/wasm-plugin",
     "component": "wasm/WASMPluginPackPage",
-    "client": "heroui-web/src/lib/wasm-plugin-pack-client.ts",
-    "page": "heroui-web/src/app/packs/wasm-plugin/page.tsx"
+    "client": "apps/web/src/lib/wasm-plugin-pack-client.ts",
+    "page": "apps/web/src/app/packs/wasm-plugin/page.tsx"
   }
 }

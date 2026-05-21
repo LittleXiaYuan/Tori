@@ -5,8 +5,8 @@ echo "=== Yunque Agent Test Coverage ==="
 echo ""
 
 # Prepare data dirs
-mkdir -p data/plugins data/sessions data/persona/skills data/cron data/audit heroui-web/out
-test -f heroui-web/out/index.html || echo '<!DOCTYPE html><html><body></body></html>' > heroui-web/out/index.html
+mkdir -p data/plugins data/sessions data/persona/skills data/cron data/audit apps/web/out
+test -f apps/web/out/index.html || echo '<!DOCTYPE html><html><body></body></html>' > apps/web/out/index.html
 
 # Run tests with coverage
 echo "Running tests..."

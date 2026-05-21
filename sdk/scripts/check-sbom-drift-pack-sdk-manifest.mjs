@@ -66,7 +66,7 @@ for (const token of ["SBOM 依赖漂移", "生成漂移报告", "CycloneDX", "CI
   if (!page.includes(token)) fail(`SBOM Drift pack page missing product token: ${token}`);
 }
 
-const frontendTest = readRepoFile("heroui-web/src/lib/__tests__/sbom-drift-pack-client.test.ts");
+const frontendTest = readRepoFile("apps/web/src/lib/__tests__/sbom-drift-pack-client.test.ts");
 for (const token of ["/v1/sbom-drift/status", "/v1/sbom-drift/diff", "/v1/sbom-drift/cyclonedx/baseline", "/v1/sbom-drift/ci-gate/plan", "/v1/sbom-drift/baseline/artifact-source/plan", "/v1/sbom-drift/ci-gate/baseline/writeback", "/v1/sbom-drift/ci-gate/workflow/writeback/plan", "/v1/sbom-drift/evidence/baseline"]) {
   if (!frontendTest.includes(token)) fail(`SBOM Drift frontend client test missing token: ${token}`);
 }
@@ -115,7 +115,7 @@ for (const token of [
   if (!backend.includes(token)) fail(`SBOM Drift backend pack or gate missing token: ${token}`);
 }
 
-const sdk = readRepoFile("sdk/typescript/src/sbom-drift.ts") + "\n" + readRepoFile("sdk/typescript/src/sbom-drift.test.ts");
+const sdk = readRepoFile("packages/yunque-client/src/sbom-drift.ts") + "\n" + readRepoFile("packages/yunque-client/src/sbom-drift.test.ts");
 for (const token of [
   "createSBOMDriftClient",
   "SBOMDriftClientError",
@@ -152,11 +152,11 @@ for (const token of [
   if (!sdk.includes(token)) fail(`TypeScript SBOM Drift SDK slice missing token: ${token}`);
 }
 
-const pkg = JSON.parse(readRepoFile("sdk/typescript/package.json") || "{}");
+const pkg = JSON.parse(readRepoFile("packages/yunque-client/package.json") || "{}");
 if (pkg.exports?.["./sbom-drift"]?.import !== "./src/sbom-drift.ts") fail("yunque-client/sbom-drift subpath export is missing or drifted");
 if (pkg.exports?.["./sbom-drift-ci"]?.import !== "./src/sbom-drift-ci.ts") fail("yunque-client/sbom-drift-ci subpath export is missing or drifted");
 
-const monolithicApi = readRepoFile("heroui-web/src/lib/api.ts");
+const monolithicApi = readRepoFile("apps/web/src/lib/api.ts");
 for (const token of ["sbomDriftStatus:", "createSBOMDriftSnapshot:", "sbomDriftDiff:", "sbomDriftEvidence:"]) {
   if (monolithicApi.includes(token)) fail(`monolithic api.ts should not expose SBOM Drift method: ${token}`);
 }

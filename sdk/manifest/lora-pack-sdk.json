@@ -24,6 +24,6 @@
   "frontend": {
     "menuPath": "/packs/lora",
     "component": "lora/LoRAPackPage",
-    "client": "heroui-web/src/lib/lora-pack-client.ts"
+    "client": "apps/web/src/lib/lora-pack-client.ts"
   }
 }

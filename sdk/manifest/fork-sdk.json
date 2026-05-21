@@ -56,14 +56,14 @@
     "typescript": {
       "package": "yunque-client",
       "implementationFiles": [
-        "sdk/typescript/src/fork.ts",
-        "sdk/typescript/src/fork-read.ts",
-        "sdk/typescript/src/fork-root.ts",
-        "sdk/typescript/src/fork-list.ts",
-        "sdk/typescript/src/fork-control.ts"
+        "packages/yunque-client/src/fork.ts",
+        "packages/yunque-client/src/fork-read.ts",
+        "packages/yunque-client/src/fork-root.ts",
+        "packages/yunque-client/src/fork-list.ts",
+        "packages/yunque-client/src/fork-control.ts"
       ],
       "docs": [
-        "sdk/typescript/README.md",
+        "packages/yunque-client/README.md",
         "docs/plugins/sdk-typescript.md"
       ],
       "entrypoints": {

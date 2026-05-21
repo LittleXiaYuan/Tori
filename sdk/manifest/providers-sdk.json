@@ -155,17 +155,17 @@
     "typescript": {
       "package": "yunque-client",
       "implementationFiles": [
-        "sdk/typescript/src/providers.ts",
-        "sdk/typescript/src/provider-registry.ts",
-        "sdk/typescript/src/provider-control.ts",
-        "sdk/typescript/src/provider-mode.ts",
-        "sdk/typescript/src/provider-session.ts",
-        "sdk/typescript/src/provider-health.ts",
-        "sdk/typescript/src/provider-breaker.ts",
-        "sdk/typescript/src/models.ts"
+        "packages/yunque-client/src/providers.ts",
+        "packages/yunque-client/src/provider-registry.ts",
+        "packages/yunque-client/src/provider-control.ts",
+        "packages/yunque-client/src/provider-mode.ts",
+        "packages/yunque-client/src/provider-session.ts",
+        "packages/yunque-client/src/provider-health.ts",
+        "packages/yunque-client/src/provider-breaker.ts",
+        "packages/yunque-client/src/models.ts"
       ],
       "docs": [
-        "sdk/typescript/README.md",
+        "packages/yunque-client/README.md",
         "docs/plugins/sdk-typescript.md"
       ],
       "entrypoints": {

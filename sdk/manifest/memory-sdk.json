@@ -22,8 +22,8 @@
   "languages": {
     "typescript": {
       "package": "yunque-client",
-      "implementationFiles": ["sdk/typescript/src/memory.ts", "sdk/typescript/src/memory-stats.ts", "sdk/typescript/src/memory-search.ts", "sdk/typescript/src/memory-add.ts", "sdk/typescript/src/memory-compact.ts"],
-      "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
+      "implementationFiles": ["packages/yunque-client/src/memory.ts", "packages/yunque-client/src/memory-stats.ts", "packages/yunque-client/src/memory-search.ts", "packages/yunque-client/src/memory-add.ts", "packages/yunque-client/src/memory-compact.ts"],
+      "docs": ["packages/yunque-client/README.md", "docs/plugins/sdk-typescript.md"],
       "entrypoints": {
         "stats": "yunque-client/memory-stats#createMemoryStatsClient().stats",
         "search": "yunque-client/memory-search#createMemorySearchClient().search",

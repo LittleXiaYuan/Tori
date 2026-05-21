@@ -59,18 +59,18 @@
     "typescript": {
       "package": "yunque-client",
       "implementationFiles": [
-        "sdk/typescript/src/plugin-api.ts",
-        "sdk/typescript/src/plugin-llm.ts",
-        "sdk/typescript/src/plugin-search.ts",
-        "sdk/typescript/src/plugin-send.ts",
-        "sdk/typescript/src/plugin-memory.ts",
-        "sdk/typescript/src/plugin-agent-memory.ts",
-        "sdk/typescript/src/plugin-knowledge.ts",
-        "sdk/typescript/src/plugin-cron.ts",
-        "sdk/typescript/src/plugin-extensions.ts",
-        "sdk/typescript/src/plugin-extension-register.ts"
+        "packages/yunque-client/src/plugin-api.ts",
+        "packages/yunque-client/src/plugin-llm.ts",
+        "packages/yunque-client/src/plugin-search.ts",
+        "packages/yunque-client/src/plugin-send.ts",
+        "packages/yunque-client/src/plugin-memory.ts",
+        "packages/yunque-client/src/plugin-agent-memory.ts",
+        "packages/yunque-client/src/plugin-knowledge.ts",
+        "packages/yunque-client/src/plugin-cron.ts",
+        "packages/yunque-client/src/plugin-extensions.ts",
+        "packages/yunque-client/src/plugin-extension-register.ts"
       ],
-      "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
+      "docs": ["packages/yunque-client/README.md", "docs/plugins/sdk-typescript.md"],
       "entrypoints": {
         "llm": "yunque-client/plugin-llm#createPluginLLMClient().complete",
         "search": "yunque-client/plugin-search#createPluginSearchClient().search",

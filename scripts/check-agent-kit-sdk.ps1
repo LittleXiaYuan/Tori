@@ -26,7 +26,7 @@ Invoke-Step "SDK manifest suite" {
 }
 
 Invoke-Step "TypeScript Agent Kit, Mission Parse, and Scheduler slices" {
-  Push-Location sdk\typescript
+  Push-Location packages\yunque-client
   try {
     node scripts\run-incremental-tests.mjs agent-kit missions missions-parse scheduler scheduler-read scheduler-control
   } finally {
