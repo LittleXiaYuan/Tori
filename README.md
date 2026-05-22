@@ -1,10 +1,28 @@
 # 云雀 Agent (Yunque Agent)
 
-一个本地优先的个人 AI 工作伙伴：从场景出发，完成任务，交付可验收产物，并把反馈沉淀成记忆。
+云雀不是另一个本地聊天壳，而是围绕 **Cogni** 构建的声明式 Agent 工作伙伴：用可验证的声明描述“何时激活、注入什么上下文、暴露哪些工具、如何自测、如何从反馈中演化”，再把一次次使用收束成 **场景 → 行动 → 产物 → 反馈 → 记忆** 的闭环。
+
+> **信念驱动，非指令驱动。**
+>
+> 传统 Agent 多半是“收到指令 → 调工具 → 结束”。云雀希望 Agent 有稳定的价值结构、可追踪的运行边界、可审计的经验增长；Pack、SDK、工作负载都只是让这套 Cogni 运行时按需展开的方式。
 
 > **Language Note** — Code comments, godoc, and architecture docs are in English.
 > Log messages, system prompts, and user-facing strings are in Chinese, reflecting the primary target market.
 > Contributions in either language are welcome.
+
+## Cogni：云雀为什么是云雀
+
+Cogni 不是一个可选 workload，也不是一个 prompt 模板。它是云雀组织能力的核心抽象：
+
+- **Declaration**：一个 JSON/YAML 声明定义一个 Agent 单元，包括身份、激活规则、上下文注入、工具面、记忆策略、工作流、经验与预算。
+- **ActivationCheck**：把“这个 Agent 什么时候应该出现”写成可跑的声明式自测，让 Agent 配置像代码一样能被 CI / reload gate 验证。
+- **三环运行时**：Active Loop 处理当前任务；Reflective Loop 在任务后提取经验；Dreaming Loop 在空闲时做回放、探索和技能生长。
+- **Genesis**：从场景生成可落地的 Cogni / Pack / workload 初始形态，而不是只生成一段临时 prompt。
+- **Evolution**：反馈进入经验、记忆、策略与能力包边界；可观察、可回滚，而不是黑盒“自我进化”。
+
+所以云雀的默认界面才会先问“你要完成什么”，而不是先把模型、插件、渠道、API 端点全部铺出来。Browser/RPA、WASM、记忆回溯是云雀能做的事；Cogni 是云雀为什么这样做。
+
+进一步阅读：[What is Cogni, and why does Yunque need it?](docs/guide/cogni-what-and-why.md) / [Cogni 是什么，为什么云雀需要它？](docs/zh/guide/cogni-what-and-why.md)
 
 ## 产品主线
 

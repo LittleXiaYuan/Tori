@@ -336,7 +336,7 @@ export default function PacksPage() {
           <div>
             <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>工作负载 / SDK 面</div>
             <div className="text-xs mt-1" style={{ color: "var(--yunque-text-muted)" }}>
-              像 Visual Studio workloads 一样，先选一条用户真的会走的路，再逐步展开能力。这里的 SDK 不是“开发者专属工具箱”，而是“可以按场景启用的增量工作负载”。
+              Cogni 决定 Agent 为什么介入；workload 决定用户这次要启用哪类能力。像 Visual Studio workloads 一样，先选一条真实路径，再逐步展开 Pack 与 SDK slice。
             </div>
           </div>
           <Chip size="sm" style={{ background: "rgba(59,130,246,0.12)", color: "var(--yunque-primary)" }}>
@@ -353,7 +353,7 @@ export default function PacksPage() {
                   <div className="text-[11px] mt-1" style={{ color: "var(--yunque-text-muted)" }}>{preset.subtitle}</div>
                 </div>
                 <Chip size="sm" style={{ background: "rgba(255,255,255,0.06)", color: "var(--yunque-text-muted)" }}>
-                  工作负载
+                  {preset.badge || "工作负载"}
                 </Chip>
               </div>
 
