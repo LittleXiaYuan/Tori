@@ -55,7 +55,7 @@ func TestFeedbackProposalRequiresReviewForBoundaryFeedback(t *testing.T) {
 		Kind:            FeedbackBoundaryViolation,
 		Severity:        FeedbackSeverityHigh,
 		Message:         "这里不能为了安慰而承诺永远在线。",
-		TargetBeliefIDs: []string{"xy.boundary.no_forever_promise"},
+		TargetBeliefIDs: []string{"pc.boundary.no_forever_promise"},
 	})
 
 	if proposal.Outcome != FeedbackOutcomeReviewRequired {
@@ -84,7 +84,7 @@ func TestFeedbackProposalDoesNotAutoWeakenRootValueBoundary(t *testing.T) {
 		ID:              "fb-reject-value",
 		Kind:            FeedbackRejection,
 		Message:         "这条价值表达不合适。",
-		TargetBeliefIDs: []string{"xy.value.honest_comfort"},
+		TargetBeliefIDs: []string{"pc.value.honest_comfort"},
 	})
 
 	if proposal.Outcome != FeedbackOutcomeReviewRequired {

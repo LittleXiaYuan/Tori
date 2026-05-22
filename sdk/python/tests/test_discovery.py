@@ -19,21 +19,21 @@ spec.loader.exec_module(yunque)
 class DiscoveryTest(unittest.TestCase):
     def test_discovery_namespace_delegates_identity_embeddings_and_search(self) -> None:
         with patch.object(yunque, "_api_call", side_effect=[
-            {"unified_id": "u1", "display_name": "小羽"},
+            {"unified_id": "u1", "display_name": "测试用户"},
             {"profiles": [{"unified_id": "u1"}]},
             {"providers": ["mock"]},
             {"embedding": [0.1, 0.2], "dimensions": 2},
             {"results": [{"title": "云雀"}]},
             {"enabled": True, "providers": ["bing"]},
         ]) as api_call:
-            self.assertEqual(yunque.discovery.resolve_identity("feishu", "42", "小羽")["unified_id"], "u1")
+            self.assertEqual(yunque.discovery.resolve_identity("feishu", "42", "测试用户")["unified_id"], "u1")
             self.assertEqual(yunque.discovery.identity_profiles()["profiles"][0]["unified_id"], "u1")
             self.assertEqual(yunque.discovery.embedding_providers()["providers"][0], "mock")
             self.assertEqual(yunque.discovery.embed("云雀", "mock")["dimensions"], 2)
             self.assertEqual(yunque.discovery.search("planner", limit=3, provider="bing")["results"][0]["title"], "云雀")
             self.assertTrue(yunque.discovery.search_providers()["enabled"])
 
-        self.assertEqual(api_call.call_args_list[0].args, ("POST", "/v1/identity/resolve", {"channel": "feishu", "user_id": "42", "display_name": "小羽"}))
+        self.assertEqual(api_call.call_args_list[0].args, ("POST", "/v1/identity/resolve", {"channel": "feishu", "user_id": "42", "display_name": "测试用户"}))
         self.assertEqual(api_call.call_args_list[1].args, ("GET", "/v1/identity/profiles"))
         self.assertEqual(api_call.call_args_list[2].args, ("GET", "/v1/embeddings"))
         self.assertEqual(api_call.call_args_list[3].args, ("POST", "/v1/embeddings", {"text": "云雀", "provider": "mock"}))

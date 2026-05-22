@@ -59,7 +59,7 @@ type BeliefNode struct {
 	ID string `json:"id"`
 
 	// Statement is the natural-language expression of this belief.
-	// e.g. "小羽想让夏鸢开心"
+	// e.g. "Agent 希望让用户安心"
 	Statement string `json:"statement"`
 
 	// Kind classifies the role of this belief.

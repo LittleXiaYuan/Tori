@@ -13,7 +13,7 @@ func TestLoadPackManifestJSONAndYAML(t *testing.T) {
 	jsonPath := filepath.Join(dir, "companion.pack.json")
 	yamlPath := filepath.Join(dir, "work.pack.yaml")
 
-	jsonPack := XiaoyuCompanionPack()
+	jsonPack := PersonalCompanionPack()
 	yamlPack := YunqueWorkPack()
 
 	if err := SavePackManifest(jsonPack, jsonPath); err != nil {
@@ -67,7 +67,7 @@ disposition_rules:
 
 func TestLoadPacksFromDirAndBuildManager(t *testing.T) {
 	dir := t.TempDir()
-	if err := SavePackManifest(XiaoyuCompanionPack(), filepath.Join(dir, "companion.pack.json")); err != nil {
+	if err := SavePackManifest(PersonalCompanionPack(), filepath.Join(dir, "companion.pack.json")); err != nil {
 		t.Fatalf("save companion pack: %v", err)
 	}
 	if err := SavePackManifest(YunqueWorkPack(), filepath.Join(dir, "work.pack.json")); err != nil {

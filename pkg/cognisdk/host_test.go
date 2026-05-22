@@ -31,7 +31,7 @@ func TestHostAdapterProposeUpdates(t *testing.T) {
 		ID:              "host-fb-1",
 		Kind:            FeedbackBoundaryViolation,
 		Message:         "不能承诺永久陪伴。",
-		TargetBeliefIDs: []string{"xy.boundary.no_forever_promise"},
+		TargetBeliefIDs: []string{"pc.boundary.no_forever_promise"},
 	})
 
 	if proposal.Outcome != FeedbackOutcomeReviewRequired {

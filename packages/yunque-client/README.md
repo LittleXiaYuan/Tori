@@ -556,7 +556,7 @@ const discovery = createDiscoveryClient({
   baseUrl: "http://localhost:9090",
   apiKey: "<your-api-key>",
 });
-const profile = await discovery.resolveIdentity({ channel: "feishu", user_id: "42", display_name: "小羽" });
+const profile = await discovery.resolveIdentity({ channel: "feishu", user_id: "42", display_name: "测试用户" });
 const web = await discovery.search("云雀 Agent Planner", { limit: 3 });
 console.log(profile.unified_id, web.results);
 

@@ -30,7 +30,7 @@ func ExampleEngine_ProposeUpdates() {
 
 func ExamplePackManager_ExportBundle() {
 	manager := cognisdk.NewPackManager(cognisdk.BuiltinPacks()...)
-	_ = manager.Disable(cognisdk.PackXiaoyuCompanion)
+	_ = manager.Disable(cognisdk.PackPersonalCompanion)
 	bundle, _ := manager.ExportBundle("automation-cogni-packs")
 	restored, _ := cognisdk.NewHostAdapterFromBundle(bundle)
 	result := restored.Evaluate(context.Background(), cognisdk.Input{
@@ -63,8 +63,8 @@ func ExampleRenderFeedbackProposalMarkdown() {
 }
 
 func ExamplePlanPackBundleApply_actions() {
-	current, _ := cognisdk.NewPackBundle("current", []cognisdk.PackManifest{cognisdk.XiaoyuCompanionPack()}, []string{cognisdk.PackXiaoyuCompanion})
-	candidate, _ := cognisdk.NewPackBundle("candidate", cognisdk.BuiltinPacks(), []string{cognisdk.PackXiaoyuCompanion, cognisdk.PackYunqueWork})
+	current, _ := cognisdk.NewPackBundle("current", []cognisdk.PackManifest{cognisdk.PersonalCompanionPack()}, []string{cognisdk.PackPersonalCompanion})
+	candidate, _ := cognisdk.NewPackBundle("candidate", cognisdk.BuiltinPacks(), []string{cognisdk.PackPersonalCompanion, cognisdk.PackYunqueWork})
 	plan, _ := cognisdk.PlanPackBundleApply(context.Background(), current, candidate)
 
 	for _, action := range plan.Actions {

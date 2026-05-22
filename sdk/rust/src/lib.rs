@@ -11457,7 +11457,7 @@ mod tests {
         assert_eq!(client.url("/v1/embeddings"), "http://localhost:9090/v1/embeddings");
         assert_eq!(client.url("/v1/search/providers"), "http://localhost:9090/v1/search/providers");
         assert_eq!(discovery_search_query("planner", 3, "bing"), "/v1/search?q=planner&limit=3&provider=bing");
-        let identity = serde_json::to_value(DiscoveryResolveIdentityRequest { channel: "feishu".to_string(), user_id: "42".to_string(), display_name: "小羽".to_string() }).unwrap();
+        let identity = serde_json::to_value(DiscoveryResolveIdentityRequest { channel: "feishu".to_string(), user_id: "42".to_string(), display_name: "测试用户".to_string() }).unwrap();
         assert_eq!(identity["channel"], "feishu");
         assert_eq!(identity["user_id"], "42");
         let embed = serde_json::to_value(DiscoveryEmbedRequest { text: "云雀".to_string(), provider: "mock".to_string() }).unwrap();

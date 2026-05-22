@@ -10,9 +10,9 @@ function jsonResponse(body: unknown, init?: ResponseInit): Response { return new
 
 test("DiscoveryIdentityClient resolves identity with bearer token", async () => {
   const calls: { url: string; init?: RequestInit }[] = [];
-  const client = createDiscoveryIdentityClient({ baseUrl: "http://localhost:9090/", token: "token-123", fetch: async (url, init) => { calls.push({ url: String(url), init }); return jsonResponse({ unified_id: "u1", display_name: "小羽", channels: { feishu: "42" } }); } });
-  const profile = await client.resolveIdentity({ channel: "feishu", user_id: "42", display_name: "小羽" });
-  assertEqual(profile.unified_id, "u1"); assertEqual(calls[0]?.url, "http://localhost:9090/v1/identity/resolve"); assertEqual(new Headers(calls[0]?.init?.headers).get("authorization"), "Bearer token-123"); assertDeepEqual(JSON.parse(String(calls[0]?.init?.body)), { channel: "feishu", user_id: "42", display_name: "小羽" });
+  const client = createDiscoveryIdentityClient({ baseUrl: "http://localhost:9090/", token: "token-123", fetch: async (url, init) => { calls.push({ url: String(url), init }); return jsonResponse({ unified_id: "u1", display_name: "测试用户", channels: { feishu: "42" } }); } });
+  const profile = await client.resolveIdentity({ channel: "feishu", user_id: "42", display_name: "测试用户" });
+  assertEqual(profile.unified_id, "u1"); assertEqual(calls[0]?.url, "http://localhost:9090/v1/identity/resolve"); assertEqual(new Headers(calls[0]?.init?.headers).get("authorization"), "Bearer token-123"); assertDeepEqual(JSON.parse(String(calls[0]?.init?.body)), { channel: "feishu", user_id: "42", display_name: "测试用户" });
 });
 
 test("DiscoveryIdentityClient lists identity profiles", async () => {
