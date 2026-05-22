@@ -343,9 +343,9 @@ func (p *Planner) buildFunctionDefs(userMessage, tenantID, channelType string, d
 	// Cogni surface filter — narrows the tool list to the union of every
 	// activated cogni's ToolSurface. The hook returns the input unchanged
 	// when no cogni activates, so the previous behaviour is preserved.
-	if p.cogniSkillFilter != nil && !disableDelegation && len(allowedSkills) == 0 {
+	if p.cogniService != nil && p.cogniService.HasSkillFilter() && !disableDelegation && len(allowedSkills) == 0 {
 		before := len(allSkills)
-		allSkills = p.cogniSkillFilter(userMessage, tenantID, channelType, allSkills)
+		allSkills = p.cogniService.FilterSkills(userMessage, tenantID, channelType, allSkills)
 		if after := len(allSkills); after != before {
 			slog.Info("buildFunctionDefs: cogni surface filter applied",
 				"before", before, "after", after, "msg_prefix", truncate(userMessage, 50))

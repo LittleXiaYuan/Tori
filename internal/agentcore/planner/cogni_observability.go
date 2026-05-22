@@ -46,10 +46,10 @@ func (d CogniTraceDetail) summary() string {
 }
 
 func (p *Planner) maybeEmitCogniTrace(req PlanRequest) {
-	if p == nil || p.cogniTrace == nil || req.StepCallback == nil {
+	if p == nil || p.cogniService == nil || !p.cogniService.HasTrace() || req.StepCallback == nil {
 		return
 	}
-	detail, ok := p.cogniTrace(extractUserMessage(req), req.TenantID, req.ChannelType)
+	detail, ok := p.cogniService.Trace(extractUserMessage(req), req.TenantID, req.ChannelType)
 	if !ok || !detail.hasVisibleEffect() {
 		return
 	}
