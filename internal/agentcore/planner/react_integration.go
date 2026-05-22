@@ -58,7 +58,7 @@ func (p *Planner) runReAct(ctx context.Context, req PlanRequest) (*PlanResult, e
 	thinkFn := func(ctx context.Context, history []ldg.ReActStep) (*ldg.ThinkResult, error) {
 		// MetaCog escalation: force expert tier when critical anomalies accumulate
 		selectedTier := req.ModelOverride
-		if p.metacogBridge != nil && taskID != "" && p.metacogBridge.ShouldEscalate(taskID) && selectedTier == "" {
+		if p.learningSidecar != nil && taskID != "" && p.learningSidecar.ShouldEscalate(taskID) && selectedTier == "" {
 			selectedTier = "expert"
 			slog.Info("planner: metacog escalation → expert tier", "task", taskID)
 		}
@@ -343,8 +343,8 @@ func (p *Planner) buildReActMessages(ctx context.Context, req PlanRequest, histo
 	}
 
 	// MetaCog correction hints: inject anomaly-based guidance when detected
-	if p.metacogBridge != nil && req.TaskID != "" {
-		if hint := p.metacogBridge.CorrectionHint(req.TaskID); hint != "" {
+	if p.learningSidecar != nil && req.TaskID != "" {
+		if hint := p.learningSidecar.CorrectionHint(req.TaskID); hint != "" {
 			msgs = append(msgs, llm.Message{
 				Role:    "system",
 				Content: hint,
