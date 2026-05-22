@@ -51,8 +51,6 @@ type Planner struct {
 	sysPromptVer           int                        // incremented when skills change
 	skillIndex             SkillIndexFunc             // L2 installed skill index (nil = no L2)
 	handoffReg             *subagent.HandoffRegistry  // handoff tool registry for subagent delegation
-	reverie                *Reverie                   // background inner monologue system
-	taskFailureMon         *TaskFailureMonitor        // event-driven trigger on skill failure spikes
 	longHorizonCheckpoints LongHorizonCheckpointStore // recoverable DAG checkpoint persistence
 	stateContext           func() string              // structured state kernel context
 	strategyContext        func() string              // reflection loop strategy context
@@ -75,6 +73,7 @@ type Planner struct {
 	cogniService     *CogniContextService        // declarative Cogni activation/context boundary
 	learningSidecar  *LearningSidecar            // post-run learning and metacognition side effects
 	skillRuntime     *SkillRuntimeService        // skill surface scoring/recommendation/growth boundary
+	proactiveCog     *ProactiveCognitionService  // proactive cognition and Reverie event boundary
 }
 
 // CogniContextFunc returns the assembled Cogni context block for the current
@@ -186,10 +185,14 @@ func (p *Planner) SetSkillOptimizer(opt *SkillOptimizer) {
 }
 
 // SetReverie attaches the background inner monologue system.
-func (p *Planner) SetReverie(r *Reverie) { p.reverie = r }
+func (p *Planner) SetReverie(r *Reverie) {
+	p.ensureProactiveCognition().SetReverie(r)
+}
 
 // SetTaskFailureMonitor attaches a monitor that emits Reverie events on skill failure spikes.
-func (p *Planner) SetTaskFailureMonitor(m *TaskFailureMonitor) { p.taskFailureMon = m }
+func (p *Planner) SetTaskFailureMonitor(m *TaskFailureMonitor) {
+	p.ensureProactiveCognition().SetTaskFailureMonitor(m)
+}
 
 // SetTrustRecord attaches a callback called after each skill execution to update trust scores.
 func (p *Planner) SetTrustRecord(fn func(skillName string, success bool)) {
@@ -284,6 +287,13 @@ func (p *Planner) ensureTrustGate() *SkillTrustGate {
 		p.trustGate = NewSkillTrustGate()
 	}
 	return p.trustGate
+}
+
+func (p *Planner) ensureProactiveCognition() *ProactiveCognitionService {
+	if p.proactiveCog == nil {
+		p.proactiveCog = NewProactiveCognitionService()
+	}
+	return p.proactiveCog
 }
 
 // LocalBrain returns the attached local brain (may be nil).

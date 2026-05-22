@@ -29,7 +29,7 @@ type PromptBuilder struct {
 	stateContext       func() string
 	strategyContext    func() string
 	strategyContextFor func(query string) string
-	reverie            *Reverie
+	proactiveCog       *ProactiveCognitionService
 	skillRuntime       *SkillRuntimeService
 	cognitiveContext   CognitiveContextFunc // CognitivePlugin dynamic context
 	cogniService       *CogniContextService // declarative Cogni context/activation boundary
@@ -47,7 +47,7 @@ func NewPromptBuilder(p *Planner) *PromptBuilder {
 		stateContext:       p.stateContext,
 		strategyContext:    p.strategyContext,
 		strategyContextFor: p.strategyContextFor,
-		reverie:            p.reverie,
+		proactiveCog:       p.proactiveCog,
 		skillRuntime:       p.skillRuntime,
 		cognitiveContext:   p.cognitiveContext,
 		cogniService:       p.cogniService,
@@ -317,8 +317,8 @@ func (pb *PromptBuilder) BuildDynamicContext(ctx context.Context, req DynamicCon
 		}
 	}
 	// Reverie: inject only high-relevance inner thoughts with natural delivery guidance
-	if pb.reverie != nil {
-		if jctx := pb.reverie.JournalContext(2, req.LastMessage); jctx != "" {
+	if pb.proactiveCog != nil {
+		if jctx := pb.proactiveCog.JournalContext(2, req.LastMessage); jctx != "" {
 			layers = append(layers, ctxwindow.Layer{
 				Name:     "reverie",
 				Priority: ctxwindow.LayerPriorityHints,

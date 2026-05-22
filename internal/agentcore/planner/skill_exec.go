@@ -72,9 +72,7 @@ func (p *Planner) executeSkill(ctx context.Context, name string, args map[string
 		if p.skillMetrics != nil {
 			p.skillMetrics(execName, res.Duration, res.Err)
 		}
-		if p.taskFailureMon != nil {
-			p.taskFailureMon.Record(res.Err != nil)
-		}
+		p.proactiveCog.RecordExecutionFailure(res.Err != nil)
 		p.trustGate.Record(execName, res.Err == nil)
 	}()
 	res.Output, res.Err = skill.Execute(ctx, execArgs, env)
