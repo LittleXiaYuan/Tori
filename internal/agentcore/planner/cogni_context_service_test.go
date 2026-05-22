@@ -35,17 +35,17 @@ func TestPlannerSetCogniCallbacksUsesService(t *testing.T) {
 		return CogniTraceDetail{Activated: []string{"demo"}}, true
 	})
 
-	if p.cogniService == nil {
-		t.Fatal("expected cogni service to be initialized")
+	if p.contextAssembly == nil || p.contextAssembly.cogniService == nil {
+		t.Fatal("expected context assembly cogni service to be initialized")
 	}
-	if got := p.cogniService.Context(context.Background(), "hello", "tenant", "web"); got != "cogni:hello" {
+	if got := p.contextAssembly.cogniService.Context(context.Background(), "hello", "tenant", "web"); got != "cogni:hello" {
 		t.Fatalf("context = %q, want cogni:hello", got)
 	}
-	filtered := p.cogniService.FilterSkills("hello", "tenant", "web", []skills.Skill{dummyPlannerSkill("a"), dummyPlannerSkill("b")})
+	filtered := p.contextAssembly.FilterCogniSkills("hello", "tenant", "web", []skills.Skill{dummyPlannerSkill("a"), dummyPlannerSkill("b")})
 	if len(filtered) != 1 || filtered[0].Name() != "a" {
 		t.Fatalf("unexpected filtered skills: %#v", filtered)
 	}
-	trace, ok := p.cogniService.Trace("hello", "tenant", "web")
+	trace, ok := p.contextAssembly.CogniTrace("hello", "tenant", "web")
 	if !ok || len(trace.Activated) != 1 || trace.Activated[0] != "demo" {
 		t.Fatalf("unexpected trace: %#v ok=%v", trace, ok)
 	}

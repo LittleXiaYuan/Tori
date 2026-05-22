@@ -37,13 +37,10 @@ type Planner struct {
 	registry               *skills.Registry
 	toolTimeout            time.Duration // per-tool execution timeout (default 60s)
 	maxSteps               int
-	memory                 MemorySearchFunc
 	reflect                ReflectFunc
 	skillMetrics           SkillMetricsFunc
 	domainPrompt           string
 	personaPrompt          func() string              // dynamic persona system prompt
-	graphContext           func(query string) string  // knowledge graph context injector
-	codeContext            func(query string) string  // code knowledge context injector (repo-level)
 	useNativeFC            bool                       // use native LLM function calling
 	windowCfg              *ctxwindow.WindowConfig    // context window trimming config
 	ctxManager             *ctxwindow.Manager         // multi-stage context compression manager
@@ -52,24 +49,19 @@ type Planner struct {
 	skillIndex             SkillIndexFunc             // L2 installed skill index (nil = no L2)
 	handoffReg             *subagent.HandoffRegistry  // handoff tool registry for subagent delegation
 	longHorizonCheckpoints LongHorizonCheckpointStore // recoverable DAG checkpoint persistence
-	stateContext           func() string              // structured state kernel context
-	strategyContext        func() string              // reflection loop strategy context
-	strategyContextFor     func(query string) string  // query-aware reflection strategy context
 	dynContextBudget       int                        // max tokens for dynamic context layer assembly (DynContextBudgetDefault = use 4000)
 	ackEnabled             bool                       // send typing indicators / ack
 	locale                 string                     // agent locale (e.g. "zh-CN")
 	// browserDispatch removed — browser skills now handled via skill registry (browserskill package)
-	trustGate        *SkillTrustGate            // skill execution trust gate and score feedback
-	cognitiveContext CognitiveContextFunc       // CognitivePlugin dynamic context injector
-	beliefContext    BeliefContextFunc          // Cognition SDK belief context injector
-	ledger           *ldg.Ledger                // Ledger instance for ReAct/Reasoning/Eval
-	runState         RunStateAccessor           // per-session interrupt checking (nil = no interrupt support)
-	fedBridge        FederationBridge           // OPP federation bridge for A2A delegation (nil = disabled)
-	cogniService     *CogniContextService       // declarative Cogni activation/context boundary
-	learningSidecar  *LearningSidecar           // post-run learning and metacognition side effects
-	skillRuntime     *SkillRuntimeService       // skill surface scoring/recommendation/growth boundary
-	proactiveCog     *ProactiveCognitionService // proactive cognition and Reverie event boundary
-	runtimeStrategy  *RuntimeStrategyService    // mode switches, local brain, and provider routing
+	trustGate       *SkillTrustGate            // skill execution trust gate and score feedback
+	ledger          *ldg.Ledger                // Ledger instance for ReAct/Reasoning/Eval
+	runState        RunStateAccessor           // per-session interrupt checking (nil = no interrupt support)
+	fedBridge       FederationBridge           // OPP federation bridge for A2A delegation (nil = disabled)
+	contextAssembly *ContextAssemblyService    // dynamic context and declarative Cogni boundary
+	learningSidecar *LearningSidecar           // post-run learning and metacognition side effects
+	skillRuntime    *SkillRuntimeService       // skill surface scoring/recommendation/growth boundary
+	proactiveCog    *ProactiveCognitionService // proactive cognition and Reverie event boundary
+	runtimeStrategy *RuntimeStrategyService    // mode switches, local brain, and provider routing
 }
 
 // CogniContextFunc returns the assembled Cogni context block for the current
@@ -98,7 +90,9 @@ type MemorySearchFunc func(ctx context.Context, tenantID, query string) string
 
 type ReflectFunc func(ctx context.Context, intent, reply string) bool
 
-func (p *Planner) SetMemory(fn MemorySearchFunc) { p.memory = fn }
+func (p *Planner) SetMemory(fn MemorySearchFunc) {
+	p.ensureContextAssembly().SetMemory(fn)
+}
 
 func (p *Planner) SetReflect(fn ReflectFunc) { p.reflect = fn }
 
@@ -112,24 +106,39 @@ func (p *Planner) SetMetaCogBridge(b *iledger.MetaCogBridge) {
 func (p *Planner) SetPersonaPrompt(fn func() string) { p.personaPrompt = fn }
 
 // SetGraphContext: fn(query) returns relevant entities/relations as text.
-func (p *Planner) SetGraphContext(fn func(query string) string) { p.graphContext = fn }
+func (p *Planner) SetGraphContext(fn func(query string) string) {
+	p.ensureContextAssembly().SetGraphContext(fn)
+}
 
 // GraphContext returns the current graphContext callback (may be nil).
-func (p *Planner) GraphContext() func(query string) string { return p.graphContext }
+func (p *Planner) GraphContext() func(query string) string {
+	if p.contextAssembly == nil {
+		return nil
+	}
+	return p.contextAssembly.GraphContext()
+}
 
 // SetBrowser is a no-op kept for backward compatibility — browser skills are now in the skill registry.
 
 // SetCodeContext: fn(query) returns formatted code snippets from repo-type knowledge.
-func (p *Planner) SetCodeContext(fn func(query string) string) { p.codeContext = fn }
+func (p *Planner) SetCodeContext(fn func(query string) string) {
+	p.ensureContextAssembly().SetCodeContext(fn)
+}
 
-func (p *Planner) SetStateContext(fn func() string) { p.stateContext = fn }
+func (p *Planner) SetStateContext(fn func() string) {
+	p.ensureContextAssembly().SetStateContext(fn)
+}
 
-func (p *Planner) SetStrategyContext(fn func() string) { p.strategyContext = fn }
+func (p *Planner) SetStrategyContext(fn func() string) {
+	p.ensureContextAssembly().SetStrategyContext(fn)
+}
 
 // SetStrategyContextFor attaches a query-aware reflection strategy provider.
 // The legacy SetStrategyContext callback remains as a fallback for callers that
 // cannot cheaply scope strategy context to the current user message.
-func (p *Planner) SetStrategyContextFor(fn func(query string) string) { p.strategyContextFor = fn }
+func (p *Planner) SetStrategyContextFor(fn func(query string) string) {
+	p.ensureContextAssembly().SetStrategyContextFor(fn)
+}
 
 // DynContextBudgetDefault signals "use the built-in default" (currently 4000 tokens).
 // Callers should use this constant instead of bare 0 to express intent clearly.
@@ -201,10 +210,14 @@ func (p *Planner) SetTrustCheck(fn func(skillName string) error) {
 }
 
 // SetCognitiveContext attaches the CognitivePlugin dynamic context collector.
-func (p *Planner) SetCognitiveContext(fn CognitiveContextFunc) { p.cognitiveContext = fn }
+func (p *Planner) SetCognitiveContext(fn CognitiveContextFunc) {
+	p.ensureContextAssembly().SetCognitiveContext(fn)
+}
 
 // SetBeliefContext attaches the Cognition SDK dynamic context collector.
-func (p *Planner) SetBeliefContext(fn BeliefContextFunc) { p.beliefContext = fn }
+func (p *Planner) SetBeliefContext(fn BeliefContextFunc) {
+	p.ensureContextAssembly().SetBeliefContext(fn)
+}
 
 // SetLedger attaches a Ledger instance for ReAct mode, reasoning traces, and self-evaluation.
 func (p *Planner) SetLedger(l *ldg.Ledger) { p.ledger = l }
@@ -250,7 +263,7 @@ func (p *Planner) SetProviderRegistry(reg *llm.ProviderRegistry) {
 // SetCogniContext attaches a declarative Cogni context injector. The callback
 // is invoked once per turn from the prompt builder; nil disables the layer.
 func (p *Planner) SetCogniContext(fn CogniContextFunc) {
-	p.ensureCogniService().SetContext(fn)
+	p.ensureContextAssembly().SetCogniContext(fn)
 }
 
 // SetCogniSkillFilter attaches a declarative Cogni surface filter. The
@@ -258,20 +271,20 @@ func (p *Planner) SetCogniContext(fn CogniContextFunc) {
 // the union of every activated cogni's ToolSurface; nil keeps the full
 // skill set.
 func (p *Planner) SetCogniSkillFilter(fn CogniSkillFilterFunc) {
-	p.ensureCogniService().SetSkillFilter(fn)
+	p.ensureContextAssembly().SetCogniSkillFilter(fn)
 }
 
 // SetCogniTrace attaches a declarative Cogni observability callback. Nil keeps
 // Cogni internal-only and preserves prior behaviour.
 func (p *Planner) SetCogniTrace(fn CogniTraceFunc) {
-	p.ensureCogniService().SetTrace(fn)
+	p.ensureContextAssembly().SetCogniTrace(fn)
 }
 
-func (p *Planner) ensureCogniService() *CogniContextService {
-	if p.cogniService == nil {
-		p.cogniService = NewCogniContextService()
+func (p *Planner) ensureContextAssembly() *ContextAssemblyService {
+	if p.contextAssembly == nil {
+		p.contextAssembly = NewContextAssemblyService()
 	}
-	return p.cogniService
+	return p.contextAssembly
 }
 
 func (p *Planner) ensureLearningSidecar() *LearningSidecar {
@@ -368,10 +381,10 @@ func (p *Planner) buildEnv(req PlanRequest) *skills.Environment {
 			return client.Chat(ctx, msgs, 0.7)
 		},
 		MemorySearch: func(ctx context.Context, tenantID, query string, topK int) (string, error) {
-			if p.memory != nil {
-				return p.memory(ctx, tenantID, query), nil
+			if p.contextAssembly == nil {
+				return "", nil
 			}
-			return "", nil
+			return p.contextAssembly.Memory(ctx, tenantID, query), nil
 		},
 	}
 }
