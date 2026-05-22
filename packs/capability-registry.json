@@ -1,0 +1,984 @@
+{
+  "version": 1,
+  "description": "Central registry for official Pack Runtime capability IDs. Official pack manifests may only declare IDs listed here.",
+  "capabilities": [
+    {
+      "id": "backup.export",
+      "ownerPack": "yunque.pack.backup",
+      "source": "official-pack-manifest",
+      "lifecycle": "active"
+    },
+    {
+      "id": "backup.import",
+      "ownerPack": "yunque.pack.backup",
+      "source": "official-pack-manifest",
+      "lifecycle": "active"
+    },
+    {
+      "id": "backup.info",
+      "ownerPack": "yunque.pack.backup",
+      "source": "official-pack-manifest",
+      "lifecycle": "active"
+    },
+    {
+      "id": "browser.capture",
+      "ownerPack": "yunque.pack.browser-intent",
+      "source": "official-pack-manifest",
+      "lifecycle": "active"
+    },
+    {
+      "id": "browser.config",
+      "ownerPack": "yunque.pack.browser-intent",
+      "source": "official-pack-manifest",
+      "lifecycle": "active"
+    },
+    {
+      "id": "browser.extension.action",
+      "ownerPack": "yunque.pack.browser-intent",
+      "source": "official-pack-manifest",
+      "lifecycle": "active"
+    },
+    {
+      "id": "browser.extension.scenarios",
+      "ownerPack": "yunque.pack.browser-intent",
+      "source": "official-pack-manifest",
+      "lifecycle": "active"
+    },
+    {
+      "id": "browser.extension.session",
+      "ownerPack": "yunque.pack.browser-intent",
+      "source": "official-pack-manifest",
+      "lifecycle": "active"
+    },
+    {
+      "id": "browser.extension.status",
+      "ownerPack": "yunque.pack.browser-intent",
+      "source": "official-pack-manifest",
+      "lifecycle": "active"
+    },
+    {
+      "id": "browser.intent.plan",
+      "ownerPack": "yunque.pack.browser-intent",
+      "source": "official-pack-manifest",
+      "lifecycle": "active"
+    },
+    {
+      "id": "browser.navigate",
+      "ownerPack": "yunque.pack.browser-intent",
+      "source": "official-pack-manifest",
+      "lifecycle": "active"
+    },
+    {
+      "id": "browser.ocr",
+      "ownerPack": "yunque.pack.browser-intent",
+      "source": "official-pack-manifest",
+      "lifecycle": "active"
+    },
+    {
+      "id": "browser.opp",
+      "ownerPack": "yunque.pack.browser-intent",
+      "source": "official-pack-manifest",
+      "lifecycle": "active"
+    },
+    {
+      "id": "browser.opp.gate_plan",
+      "ownerPack": "yunque.pack.browser-intent",
+      "source": "official-pack-manifest",
+      "lifecycle": "active"
+    },
+    {
+      "id": "browser.permission.gate_plan",
+      "ownerPack": "yunque.pack.browser-intent",
+      "source": "official-pack-manifest",
+      "lifecycle": "active"
+    },
+    {
+      "id": "browser.runtime_skill.gate_plan",
+      "ownerPack": "yunque.pack.browser-intent",
+      "source": "official-pack-manifest",
+      "lifecycle": "active"
+    },
+    {
+      "id": "browser.status",
+      "ownerPack": "yunque.pack.browser-intent",
+      "source": "official-pack-manifest",
+      "lifecycle": "active"
+    },
+    {
+      "id": "chaos_probe.alert.writeback.plan",
+      "ownerPack": "yunque.pack.chaos-probe",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "chaos_probe.audit.append.plan",
+      "ownerPack": "yunque.pack.chaos-probe",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "chaos_probe.degrade_state.engine.plan",
+      "ownerPack": "yunque.pack.chaos-probe",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "chaos_probe.degrade_state.writeback",
+      "ownerPack": "yunque.pack.chaos-probe",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "chaos_probe.degrade.writeback.plan",
+      "ownerPack": "yunque.pack.chaos-probe",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "chaos_probe.evidence.export",
+      "ownerPack": "yunque.pack.chaos-probe",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "chaos_probe.metrics.plan",
+      "ownerPack": "yunque.pack.chaos-probe",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "chaos_probe.probes.list",
+      "ownerPack": "yunque.pack.chaos-probe",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "chaos_probe.probes.save",
+      "ownerPack": "yunque.pack.chaos-probe",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "chaos_probe.report.detail",
+      "ownerPack": "yunque.pack.chaos-probe",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "chaos_probe.report.list",
+      "ownerPack": "yunque.pack.chaos-probe",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "chaos_probe.run",
+      "ownerPack": "yunque.pack.chaos-probe",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "chaos_probe.scheduler.plan",
+      "ownerPack": "yunque.pack.chaos-probe",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "chaos_probe.status",
+      "ownerPack": "yunque.pack.chaos-probe",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "cognis.alerts",
+      "ownerPack": "yunque.pack.cogni-kernel",
+      "source": "official-pack-manifest",
+      "lifecycle": "active"
+    },
+    {
+      "id": "cognis.bundle",
+      "ownerPack": "yunque.pack.cogni-kernel",
+      "source": "official-pack-manifest",
+      "lifecycle": "active"
+    },
+    {
+      "id": "cognis.economics",
+      "ownerPack": "yunque.pack.cogni-kernel",
+      "source": "official-pack-manifest",
+      "lifecycle": "active"
+    },
+    {
+      "id": "cognis.evolution",
+      "ownerPack": "yunque.pack.cogni-kernel",
+      "source": "official-pack-manifest",
+      "lifecycle": "active"
+    },
+    {
+      "id": "cognis.experience",
+      "ownerPack": "yunque.pack.cogni-kernel",
+      "source": "official-pack-manifest",
+      "lifecycle": "active"
+    },
+    {
+      "id": "cognis.federation",
+      "ownerPack": "yunque.pack.cogni-kernel",
+      "source": "official-pack-manifest",
+      "lifecycle": "active"
+    },
+    {
+      "id": "cognis.generate",
+      "ownerPack": "yunque.pack.cogni-kernel",
+      "source": "official-pack-manifest",
+      "lifecycle": "active"
+    },
+    {
+      "id": "cognis.health",
+      "ownerPack": "yunque.pack.cogni-kernel",
+      "source": "official-pack-manifest",
+      "lifecycle": "active"
+    },
+    {
+      "id": "cognis.registry",
+      "ownerPack": "yunque.pack.cogni-kernel",
+      "source": "official-pack-manifest",
+      "lifecycle": "active"
+    },
+    {
+      "id": "cognis.reload",
+      "ownerPack": "yunque.pack.cogni-kernel",
+      "source": "official-pack-manifest",
+      "lifecycle": "active"
+    },
+    {
+      "id": "cognis.runtime.loop_gate",
+      "ownerPack": "yunque.pack.cogni-kernel",
+      "source": "official-pack-manifest",
+      "lifecycle": "active"
+    },
+    {
+      "id": "cognis.runtime.pack_state",
+      "ownerPack": "yunque.pack.cogni-kernel",
+      "source": "official-pack-manifest",
+      "lifecycle": "active"
+    },
+    {
+      "id": "cognis.traces",
+      "ownerPack": "yunque.pack.cogni-kernel",
+      "source": "official-pack-manifest",
+      "lifecycle": "active"
+    },
+    {
+      "id": "cognis.verify",
+      "ownerPack": "yunque.pack.cogni-kernel",
+      "source": "official-pack-manifest",
+      "lifecycle": "active"
+    },
+    {
+      "id": "cognis.workflows",
+      "ownerPack": "yunque.pack.cogni-kernel",
+      "source": "official-pack-manifest",
+      "lifecycle": "active"
+    },
+    {
+      "id": "cognitive_canary.evaluate",
+      "ownerPack": "yunque.pack.cognitive-canary",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "cognitive_canary.evidence.export",
+      "ownerPack": "yunque.pack.cognitive-canary",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "cognitive_canary.judge.plan",
+      "ownerPack": "yunque.pack.cognitive-canary",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "cognitive_canary.metrics.plan",
+      "ownerPack": "yunque.pack.cognitive-canary",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "cognitive_canary.report.detail",
+      "ownerPack": "yunque.pack.cognitive-canary",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "cognitive_canary.report.list",
+      "ownerPack": "yunque.pack.cognitive-canary",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "cognitive_canary.response_collector.pipeline.plan",
+      "ownerPack": "yunque.pack.cognitive-canary",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "cognitive_canary.response_collector.plan",
+      "ownerPack": "yunque.pack.cognitive-canary",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "cognitive_canary.response_collector.writeback",
+      "ownerPack": "yunque.pack.cognitive-canary",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "cognitive_canary.rollback.plan",
+      "ownerPack": "yunque.pack.cognitive-canary",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "cognitive_canary.scenarios.list",
+      "ownerPack": "yunque.pack.cognitive-canary",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "cognitive_canary.scenarios.save",
+      "ownerPack": "yunque.pack.cognitive-canary",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "cognitive_canary.shadow.plan",
+      "ownerPack": "yunque.pack.cognitive-canary",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "cognitive_canary.status",
+      "ownerPack": "yunque.pack.cognitive-canary",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "guardrail_fuzzer.alert.plan",
+      "ownerPack": "yunque.pack.guardrail-fuzzer",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "guardrail_fuzzer.ci_gate.plan",
+      "ownerPack": "yunque.pack.guardrail-fuzzer",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "guardrail_fuzzer.corpus.list",
+      "ownerPack": "yunque.pack.guardrail-fuzzer",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "guardrail_fuzzer.corpus.save",
+      "ownerPack": "yunque.pack.guardrail-fuzzer",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "guardrail_fuzzer.evidence.export",
+      "ownerPack": "yunque.pack.guardrail-fuzzer",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "guardrail_fuzzer.go_native_fuzz.plan",
+      "ownerPack": "yunque.pack.guardrail-fuzzer",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "guardrail_fuzzer.native_corpus.manifest_preview",
+      "ownerPack": "yunque.pack.guardrail-fuzzer",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "guardrail_fuzzer.native_corpus.plan",
+      "ownerPack": "yunque.pack.guardrail-fuzzer",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "guardrail_fuzzer.report.detail",
+      "ownerPack": "yunque.pack.guardrail-fuzzer",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "guardrail_fuzzer.report.list",
+      "ownerPack": "yunque.pack.guardrail-fuzzer",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "guardrail_fuzzer.rule_writeback.plan",
+      "ownerPack": "yunque.pack.guardrail-fuzzer",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "guardrail_fuzzer.run",
+      "ownerPack": "yunque.pack.guardrail-fuzzer",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "guardrail_fuzzer.status",
+      "ownerPack": "yunque.pack.guardrail-fuzzer",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "lora.config",
+      "ownerPack": "yunque.pack.lora",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "lora.evolution",
+      "ownerPack": "yunque.pack.lora",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "lora.history",
+      "ownerPack": "yunque.pack.lora",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "lora.preview",
+      "ownerPack": "yunque.pack.lora",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "lora.rollback",
+      "ownerPack": "yunque.pack.lora",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "lora.status",
+      "ownerPack": "yunque.pack.lora",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "lora.summary",
+      "ownerPack": "yunque.pack.lora",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "lora.trigger",
+      "ownerPack": "yunque.pack.lora",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "memory_time_travel.audit.links",
+      "ownerPack": "yunque.pack.memory-time-travel",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "memory_time_travel.audit.links_preview",
+      "ownerPack": "yunque.pack.memory-time-travel",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "memory_time_travel.audit.links_writeback_executor_plan",
+      "ownerPack": "yunque.pack.memory-time-travel",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "memory_time_travel.audit.links_writeback_plan",
+      "ownerPack": "yunque.pack.memory-time-travel",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "memory_time_travel.audit.links_writeback_store",
+      "ownerPack": "yunque.pack.memory-time-travel",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "memory_time_travel.audit.verify",
+      "ownerPack": "yunque.pack.memory-time-travel",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "memory_time_travel.diff",
+      "ownerPack": "yunque.pack.memory-time-travel",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "memory_time_travel.evidence.export",
+      "ownerPack": "yunque.pack.memory-time-travel",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "memory_time_travel.kv_history.cutover_plan",
+      "ownerPack": "yunque.pack.memory-time-travel",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "memory_time_travel.kv_history.cutover_readiness",
+      "ownerPack": "yunque.pack.memory-time-travel",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "memory_time_travel.kv_history.dual_read_parity",
+      "ownerPack": "yunque.pack.memory-time-travel",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "memory_time_travel.kv_history.migration_preview",
+      "ownerPack": "yunque.pack.memory-time-travel",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "memory_time_travel.kv_history.native_plan",
+      "ownerPack": "yunque.pack.memory-time-travel",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "memory_time_travel.retention.plan",
+      "ownerPack": "yunque.pack.memory-time-travel",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "memory_time_travel.retention.prune_execute",
+      "ownerPack": "yunque.pack.memory-time-travel",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "memory_time_travel.retention.prune_plan",
+      "ownerPack": "yunque.pack.memory-time-travel",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "memory_time_travel.rollback_plan",
+      "ownerPack": "yunque.pack.memory-time-travel",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "memory_time_travel.rollback.approved_plan",
+      "ownerPack": "yunque.pack.memory-time-travel",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "memory_time_travel.rollback.writeback_executor_plan",
+      "ownerPack": "yunque.pack.memory-time-travel",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "memory_time_travel.rollback.writeback_plan",
+      "ownerPack": "yunque.pack.memory-time-travel",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "memory_time_travel.rollback.writeback_store",
+      "ownerPack": "yunque.pack.memory-time-travel",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "memory_time_travel.snapshot_at",
+      "ownerPack": "yunque.pack.memory-time-travel",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "memory_time_travel.snapshot.detail",
+      "ownerPack": "yunque.pack.memory-time-travel",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "memory_time_travel.snapshot.list",
+      "ownerPack": "yunque.pack.memory-time-travel",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "memory_time_travel.snapshot.save",
+      "ownerPack": "yunque.pack.memory-time-travel",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "memory_time_travel.status",
+      "ownerPack": "yunque.pack.memory-time-travel",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "rpa.action_tracer.handoff_plan",
+      "ownerPack": "yunque.pack.rpa-replay",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "rpa.browser_intent.gate_plan",
+      "ownerPack": "yunque.pack.rpa-replay",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "rpa.evidence.export",
+      "ownerPack": "yunque.pack.rpa-replay",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "rpa.executor.plan",
+      "ownerPack": "yunque.pack.rpa-replay",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "rpa.recording.start",
+      "ownerPack": "yunque.pack.rpa-replay",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "rpa.recording.stop",
+      "ownerPack": "yunque.pack.rpa-replay",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "rpa.replay.dry_run",
+      "ownerPack": "yunque.pack.rpa-replay",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "rpa.status",
+      "ownerPack": "yunque.pack.rpa-replay",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "rpa.trace.detail",
+      "ownerPack": "yunque.pack.rpa-replay",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "rpa.trace.store",
+      "ownerPack": "yunque.pack.rpa-replay",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "sbom.baseline.artifact_source.plan",
+      "ownerPack": "yunque.pack.sbom-drift",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "sbom.baseline.fetch.plan",
+      "ownerPack": "yunque.pack.sbom-drift",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "sbom.ci_baseline.writeback",
+      "ownerPack": "yunque.pack.sbom-drift",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "sbom.ci_gate.plan",
+      "ownerPack": "yunque.pack.sbom-drift",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "sbom.ci_workflow.writeback_plan",
+      "ownerPack": "yunque.pack.sbom-drift",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "sbom.cyclonedx.export",
+      "ownerPack": "yunque.pack.sbom-drift",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "sbom.drift.diff",
+      "ownerPack": "yunque.pack.sbom-drift",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "sbom.evidence.export",
+      "ownerPack": "yunque.pack.sbom-drift",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "sbom.govulncheck.plan",
+      "ownerPack": "yunque.pack.sbom-drift",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "sbom.snapshot.create",
+      "ownerPack": "yunque.pack.sbom-drift",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "sbom.snapshot.detail",
+      "ownerPack": "yunque.pack.sbom-drift",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "sbom.snapshot.list",
+      "ownerPack": "yunque.pack.sbom-drift",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "sbom.status",
+      "ownerPack": "yunque.pack.sbom-drift",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "skill_anomaly.approval_manager.bridge.plan",
+      "ownerPack": "yunque.pack.skill-anomaly",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "skill_anomaly.approval_queue.writeback",
+      "ownerPack": "yunque.pack.skill-anomaly",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "skill_anomaly.audit_hook.plan",
+      "ownerPack": "yunque.pack.skill-anomaly",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "skill_anomaly.detect",
+      "ownerPack": "yunque.pack.skill-anomaly",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "skill_anomaly.event.list",
+      "ownerPack": "yunque.pack.skill-anomaly",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "skill_anomaly.event.observe",
+      "ownerPack": "yunque.pack.skill-anomaly",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "skill_anomaly.evidence.export",
+      "ownerPack": "yunque.pack.skill-anomaly",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "skill_anomaly.profile.detail",
+      "ownerPack": "yunque.pack.skill-anomaly",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "skill_anomaly.profile.list",
+      "ownerPack": "yunque.pack.skill-anomaly",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "skill_anomaly.status",
+      "ownerPack": "yunque.pack.skill-anomaly",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "wasm.evidence.export",
+      "ownerPack": "yunque.pack.wasm-plugin",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "wasm.host_abi.execution_gate",
+      "ownerPack": "yunque.pack.wasm-plugin",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "wasm.host_abi.plan",
+      "ownerPack": "yunque.pack.wasm-plugin",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "wasm.module.integrity_gate",
+      "ownerPack": "yunque.pack.wasm-plugin",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "wasm.plugin.detail",
+      "ownerPack": "yunque.pack.wasm-plugin",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "wasm.plugin.execute",
+      "ownerPack": "yunque.pack.wasm-plugin",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "wasm.plugin.install",
+      "ownerPack": "yunque.pack.wasm-plugin",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "wasm.plugin.list",
+      "ownerPack": "yunque.pack.wasm-plugin",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "wasm.plugin.load",
+      "ownerPack": "yunque.pack.wasm-plugin",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "wasm.plugin.unload",
+      "ownerPack": "yunque.pack.wasm-plugin",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "wasm.remote_install.approval_decision_plan",
+      "ownerPack": "yunque.pack.wasm-plugin",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "wasm.remote_install.approval_plan",
+      "ownerPack": "yunque.pack.wasm-plugin",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "wasm.remote_install.approval_queue_plan",
+      "ownerPack": "yunque.pack.wasm-plugin",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "wasm.remote_install.approval_queue_writeback",
+      "ownerPack": "yunque.pack.wasm-plugin",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "wasm.remote_install.approval_writeback_plan",
+      "ownerPack": "yunque.pack.wasm-plugin",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "wasm.remote_install.installer_continuation_plan",
+      "ownerPack": "yunque.pack.wasm-plugin",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "wasm.remote_install.installer_download_writeback",
+      "ownerPack": "yunque.pack.wasm-plugin",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "wasm.remote_install.installer_registration_plan",
+      "ownerPack": "yunque.pack.wasm-plugin",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "wasm.remote_install.package_inspect_writeback",
+      "ownerPack": "yunque.pack.wasm-plugin",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "wasm.remote_install.plan",
+      "ownerPack": "yunque.pack.wasm-plugin",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "wasm.remote_install.signature_verification_plan",
+      "ownerPack": "yunque.pack.wasm-plugin",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "wasm.remote_install.signature_verification_writeback",
+      "ownerPack": "yunque.pack.wasm-plugin",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "wasm.status",
+      "ownerPack": "yunque.pack.wasm-plugin",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    }
+  ]
+}
