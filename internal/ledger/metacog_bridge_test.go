@@ -4,9 +4,9 @@ import (
 	"testing"
 	"time"
 
-	ldg "github.com/LittleXiaYuan/ledger"
-	lsqlite "github.com/LittleXiaYuan/ledger/backend/sqlite"
 	"yunque-agent/internal/experimental/metacog"
+	ldg "yunque-agent/internal/ledgercore"
+	lsqlite "yunque-agent/internal/ledgercore/backend/sqlite"
 )
 
 func newMetaCogTestLedger(t *testing.T) *ldg.Ledger {

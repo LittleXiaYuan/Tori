@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	ldg "github.com/LittleXiaYuan/ledger"
+	ldg "yunque-agent/internal/ledgercore"
 )
 
 // EvolutionCoordinator orchestrates the three evolution layers of the agent:
@@ -49,9 +49,9 @@ type EvolutionCoordinator struct {
 // CoordinatorConfig controls escalation thresholds.
 type CoordinatorConfig struct {
 	// Strategy layer triggers
-	StrategyInterval       int           // update strategy every N tasks (default 20)
-	StrategySuccessTarget  float64       // target success rate; below → more aggressive evolution (default 0.8)
-	StrategyMinObservations int          // minimum observations before strategy updates apply (default 50)
+	StrategyInterval        int     // update strategy every N tasks (default 20)
+	StrategySuccessTarget   float64 // target success rate; below → more aggressive evolution (default 0.8)
+	StrategyMinObservations int     // minimum observations before strategy updates apply (default 50)
 
 	// Weight layer triggers (on top of LoRAScheduler's own MinSamples/MinInterval)
 	WeightHitRateThreshold float64       // trigger LoRA if rolling success rate drops below this (default 0.7)
@@ -76,32 +76,32 @@ func DefaultCoordinatorConfig() CoordinatorConfig {
 
 // CoordinatorState is the coordinator's persistent state.
 type CoordinatorState struct {
-	TotalTasks           int            `json:"total_tasks"`
-	SuccessTasks         int            `json:"success_tasks"`
-	TasksSinceStrategy   int            `json:"tasks_since_strategy"`
-	TasksSinceWeights    int            `json:"tasks_since_weights"`
-	LastStrategyUpdate   time.Time      `json:"last_strategy_update"`
-	LastWeightTrigger    time.Time      `json:"last_weight_trigger"`
-	StrategyUpdates      int            `json:"strategy_updates"`
-	WeightTriggers       int            `json:"weight_triggers"`
-	RollingSuccessRate   float64        `json:"rolling_success_rate"`
-	RecentWindow         []bool         `json:"recent_window"` // last N task outcomes
-	ByTenant             map[string]int `json:"by_tenant"`
+	TotalTasks         int            `json:"total_tasks"`
+	SuccessTasks       int            `json:"success_tasks"`
+	TasksSinceStrategy int            `json:"tasks_since_strategy"`
+	TasksSinceWeights  int            `json:"tasks_since_weights"`
+	LastStrategyUpdate time.Time      `json:"last_strategy_update"`
+	LastWeightTrigger  time.Time      `json:"last_weight_trigger"`
+	StrategyUpdates    int            `json:"strategy_updates"`
+	WeightTriggers     int            `json:"weight_triggers"`
+	RollingSuccessRate float64        `json:"rolling_success_rate"`
+	RecentWindow       []bool         `json:"recent_window"` // last N task outcomes
+	ByTenant           map[string]int `json:"by_tenant"`
 }
 
 // TaskOutcome describes a single task completion, used as the input signal
 // for evolution decisions.
 type TaskOutcome struct {
-	TaskID       string
-	TenantID     string
-	Success      bool
-	UserQuery    string
-	FinalReply   string
-	Reward       float64
-	Steps        int
-	Backtracks   int
-	Duration     time.Duration
-	CompletedAt  time.Time
+	TaskID      string
+	TenantID    string
+	Success     bool
+	UserQuery   string
+	FinalReply  string
+	Reward      float64
+	Steps       int
+	Backtracks  int
+	Duration    time.Duration
+	CompletedAt time.Time
 }
 
 // EvolutionDecision reports what the coordinator did for a given task.

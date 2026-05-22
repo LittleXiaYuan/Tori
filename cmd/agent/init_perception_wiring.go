@@ -22,7 +22,7 @@ import (
 	"yunque-agent/internal/controlplane/gateway"
 	iledger "yunque-agent/internal/ledger"
 
-	"github.com/LittleXiaYuan/ledger"
+	"yunque-agent/internal/ledgercore"
 )
 
 type perceptionResult struct {
@@ -86,7 +86,7 @@ func initPerceptionWiring(app *agentrt.App, gw *gateway.Gateway) (*perceptionRes
 	app.Set("skill_lifecycle", skillLifecycle)
 
 	r.costTracker = costtrack.NewWithPersistence(cfg.DataDir)
-	if ldgRaw, ok := app.Get("github.com/LittleXiaYuan/ledger"); ok {
+	if ldgRaw, ok := app.Get(agentrt.CompLedger); ok {
 		if ldg, ok := ldgRaw.(*ledger.Ledger); ok {
 			r.costTracker.SetKVStore(iledger.NewKVConfigStore(ldg, "costtrack"))
 			slog.Info("cost tracker wired to Ledger KV")
@@ -136,7 +136,7 @@ func initPerceptionWiring(app *agentrt.App, gw *gateway.Gateway) (*perceptionRes
 	gw.SetReverie(app.Reverie)
 
 	emotionHistory := emotion.NewHistory(DefaultEmotionHistoryCapacity)
-	if ldgRaw, ok := app.Get("github.com/LittleXiaYuan/ledger"); ok {
+	if ldgRaw, ok := app.Get(agentrt.CompLedger); ok {
 		if ldg, ok := ldgRaw.(*ledger.Ledger); ok {
 			migrator := iledger.NewKVMigrator(ldg)
 			_ = migrator.MigrateFile("emotion_history", "entries", cfg.DataPath("emotion_history.json"))

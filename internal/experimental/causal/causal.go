@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/LittleXiaYuan/ledger"
+	"yunque-agent/internal/ledgercore"
 )
 
 // CausalEngine extends the ContextGraph with causal reasoning capabilities.
@@ -15,12 +15,12 @@ type CausalEngine struct {
 
 // CausalLink represents a directed causal relationship: Cause → Effect.
 type CausalLink struct {
-	CauseEventID  string          `json:"cause_event_id"`
-	EffectEventID string          `json:"effect_event_id"`
+	CauseEventID  string           `json:"cause_event_id"`
+	EffectEventID string           `json:"effect_event_id"`
 	CauseKind     ledger.EventKind `json:"cause_kind"`
 	EffectKind    ledger.EventKind `json:"effect_kind"`
-	Strength      float64         `json:"strength"`
-	Mechanism     string          `json:"mechanism"`
+	Strength      float64          `json:"strength"`
+	Mechanism     string           `json:"mechanism"`
 }
 
 // CausalChain is a sequence of causal links forming a chain.

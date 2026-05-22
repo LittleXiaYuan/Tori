@@ -3,7 +3,7 @@ package ledger
 import (
 	"testing"
 
-	"github.com/LittleXiaYuan/ledger"
+	"yunque-agent/internal/ledgercore"
 
 	agtask "yunque-agent/internal/agentcore/task"
 )

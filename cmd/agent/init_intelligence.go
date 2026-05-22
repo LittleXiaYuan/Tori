@@ -4,7 +4,7 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/LittleXiaYuan/ledger"
+	"yunque-agent/internal/ledgercore"
 
 	"yunque-agent/internal/agentcore/localbrain"
 	agentrt "yunque-agent/internal/agentcore/runtime"

@@ -20,7 +20,7 @@ import (
 	pluginpkg "yunque-agent/pkg/plugin"
 	"yunque-agent/pkg/safego"
 
-	"github.com/LittleXiaYuan/ledger"
+	"yunque-agent/internal/ledgercore"
 
 	"os"
 )
@@ -37,7 +37,7 @@ func initMemory(app *agentrt.App) error {
 	app.MemManager = memory.NewManager(app.ShortMem, app.MidMem, app.LongMem)
 
 	// Persistence: prefer Ledger (SQLite), fallback to JSON file
-	if ldgRaw, ok := app.Get("github.com/LittleXiaYuan/ledger"); ok {
+	if ldgRaw, ok := app.Get(agentrt.CompLedger); ok {
 		if ldg, ok := ldgRaw.(*ledger.Ledger); ok {
 			ledgerPersister := iledger.NewLedgerPersister(
 				ldg,
@@ -138,7 +138,7 @@ func initMemory(app *agentrt.App) error {
 
 	// TF-IDF importance scorer: replaces heuristic keyword matching with statistical scoring.
 	// Rare/specific content gets higher importance → promoted to mid/long-term memory.
-	if ldgRaw, ok := app.Get("github.com/LittleXiaYuan/ledger"); ok {
+	if ldgRaw, ok := app.Get(agentrt.CompLedger); ok {
 		if ldg, ok := ldgRaw.(*ledger.Ledger); ok {
 			tfidfScorer := ledger.NewTFIDFScorer()
 			existing, _ := ldg.Memory.Search(context.Background(), ledger.MemoryQuery{Limit: 500})
@@ -188,7 +188,7 @@ func initMemory(app *agentrt.App) error {
 	slog.Info("guardrails initialized")
 
 	// Orchestrator persistence: Ledger or file
-	if ldgRaw, ok := app.Get("github.com/LittleXiaYuan/ledger"); ok {
+	if ldgRaw, ok := app.Get(agentrt.CompLedger); ok {
 		if ldg, ok := ldgRaw.(*ledger.Ledger); ok {
 			orchPersister := iledger.NewLedgerOrchPersister(ldg, app.KnGraph, app.EditableMem)
 			app.Set(agentrt.CompOrchPersist, orchPersister)

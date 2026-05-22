@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/LittleXiaYuan/ledger"
+	"yunque-agent/internal/ledgercore"
 
 	"yunque-agent/internal/agentcore/adaptive"
 	ctxwindow "yunque-agent/internal/agentcore/context"
@@ -141,7 +141,7 @@ func initPlanner(app *agentrt.App) error {
 	// Ledger Recall → Planner graphContext
 	// When planning, the Planner queries Ledger for historical experiences
 	// using 7-factor scoring (keyword, goal, kind, recency, confidence, frequency, trust).
-	if ldgRaw, ok := app.Get("github.com/LittleXiaYuan/ledger"); ok {
+	if ldgRaw, ok := app.Get(agentrt.CompLedger); ok {
 		if ldg, ok := ldgRaw.(*ledger.Ledger); ok {
 			recallBridge := iledger.NewRecallBridge(ldg, "system")
 			p.SetGraphContext(recallBridge.Query)
@@ -277,7 +277,7 @@ func initPlanner(app *agentrt.App) error {
 	// ── Ledger KV Persistence ──
 	// Migrate legacy JSON files into Ledger KV and wire KV stores to subsystems.
 	// This centralizes all state into a single SQLite-backed database.
-	if ldgRaw, ok := app.Get("github.com/LittleXiaYuan/ledger"); ok {
+	if ldgRaw, ok := app.Get(agentrt.CompLedger); ok {
 		if ldg, ok := ldgRaw.(*ledger.Ledger); ok {
 			migrator := iledger.NewKVMigrator(ldg)
 			_ = migrator.MigrateFile("trust", "scores", cfg.DataPath("trust_scores.json"))

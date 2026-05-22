@@ -10,7 +10,7 @@ import (
 	agentrt "yunque-agent/internal/agentcore/runtime"
 	"yunque-agent/pkg/safego"
 
-	"github.com/LittleXiaYuan/ledger"
+	"yunque-agent/internal/ledgercore"
 )
 
 const (

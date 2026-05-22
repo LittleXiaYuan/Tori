@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/LittleXiaYuan/ledger"
+	"yunque-agent/internal/ledgercore"
 )
 
 // Model tracks the agent's understanding of the external environment.

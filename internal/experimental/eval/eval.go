@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/LittleXiaYuan/ledger"
+	"yunque-agent/internal/ledgercore"
 
 	"yunque-agent/internal/experimental/taskdistill"
 )

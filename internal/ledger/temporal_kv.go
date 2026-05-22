@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	baseledger "github.com/LittleXiaYuan/ledger"
+	baseledger "yunque-agent/internal/ledgercore"
 )
 
 const temporalKVHistoryNamespace = "__kv_history__"

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/LittleXiaYuan/ledger"
+	"yunque-agent/internal/ledgercore"
 )
 
 // Runner executes ReAct and Plan-Execute-Reflect loops,

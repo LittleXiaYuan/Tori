@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	ldg "github.com/LittleXiaYuan/ledger"
+	ldg "yunque-agent/internal/ledgercore"
 
 	"yunque-agent/internal/agentcore/emotion"
 )
@@ -89,10 +89,10 @@ func (c *companionMode) Stance(ctx context.Context, j *Judgment) (*Stance, error
 	return stance, nil
 }
 
-func (c *companionMode) Sampling() SamplingConfig              { return c.preset.Sampling }
+func (c *companionMode) Sampling() SamplingConfig               { return c.preset.Sampling }
 func (c *companionMode) ContextStrategy() ContextStrategy       { return c.preset.Context }
 func (c *companionMode) MemoryPolicy() MemoryPolicy             { return c.preset.Memory }
-func (c *companionMode) GuardrailOverrides() GuardrailOverrides  { return c.preset.Guardrails }
+func (c *companionMode) GuardrailOverrides() GuardrailOverrides { return c.preset.Guardrails }
 
 func (c *companionMode) recordJudgmentTrace(ctx context.Context, j *Judgment) {
 	tracer := c.ledger.Reasoning("mode:companion:"+c.tenantID, "companion")

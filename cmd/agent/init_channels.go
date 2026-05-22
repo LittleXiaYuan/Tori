@@ -5,7 +5,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/LittleXiaYuan/ledger"
+	"yunque-agent/internal/ledgercore"
 
 	agentrt "yunque-agent/internal/agentcore/runtime"
 	"yunque-agent/internal/execution/channel"
@@ -24,7 +24,7 @@ func initChannels(app *agentrt.App) error {
 	channelReg.SetGroupFilter(channel.LoadGroupFilterConfig())
 
 	// Wire GroupTracker → Ledger KV
-	if ldgRaw, ok := app.Get("github.com/LittleXiaYuan/ledger"); ok {
+	if ldgRaw, ok := app.Get(agentrt.CompLedger); ok {
 		if ldg, ok := ldgRaw.(*ledger.Ledger); ok {
 			migrator := iledger.NewKVMigrator(ldg)
 			_ = migrator.MigrateFile("channel", "groups", cfg.DataPath("groups.json"))

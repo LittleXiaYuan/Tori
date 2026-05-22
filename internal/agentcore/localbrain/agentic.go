@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"time"
 
-	ldg "github.com/LittleXiaYuan/ledger"
+	ldg "yunque-agent/internal/ledgercore"
 
 	"yunque-agent/internal/agentcore/llm"
 	"yunque-agent/pkg/jsonutil"
@@ -19,10 +19,10 @@ import (
 //   - Agentic Thinking：思考本身是为了行动，行动的结果实时塑造思考
 //
 // 技术实现：
-//   1. 小模型做快速"直觉判断"（<50ms），决定是否需要深度思考
-//   2. 思考强度根据任务复杂度动态调整（不是每次都 deep think）
-//   3. 每一步 action 的结果立即融入下一步 thinking 的 context
-//   4. Ledger 完整记录 thinking trajectory，用于事后 LoRA 微调
+//  1. 小模型做快速"直觉判断"（<50ms），决定是否需要深度思考
+//  2. 思考强度根据任务复杂度动态调整（不是每次都 deep think）
+//  3. 每一步 action 的结果立即融入下一步 thinking 的 context
+//  4. Ledger 完整记录 thinking trajectory，用于事后 LoRA 微调
 type AgenticThinking struct {
 	brain  *LocalBrain
 	pool   *llm.Pool
@@ -64,10 +64,10 @@ func DefaultAgenticConfig() AgenticConfig {
 type ThinkLevel int
 
 const (
-	ThinkNone    ThinkLevel = 0 // 不思考
-	ThinkQuick   ThinkLevel = 1 // 一句话思考
-	ThinkNormal  ThinkLevel = 2 // 标准 plan
-	ThinkDeep    ThinkLevel = 3 // 多角度深度分析
+	ThinkNone   ThinkLevel = 0 // 不思考
+	ThinkQuick  ThinkLevel = 1 // 一句话思考
+	ThinkNormal ThinkLevel = 2 // 标准 plan
+	ThinkDeep   ThinkLevel = 3 // 多角度深度分析
 )
 
 // ThinkRequest 请求。
@@ -94,9 +94,9 @@ type StepSummary struct {
 type ThinkResult struct {
 	Level      ThinkLevel `json:"level"`
 	Thought    string     `json:"thought"`
-	NextAction string     `json:"next_action"`  // 建议的下一步 action
+	NextAction string     `json:"next_action"` // 建议的下一步 action
 	Confidence float64    `json:"confidence"`
-	ShouldStop bool       `json:"should_stop"`  // 是否应该停止（任务已完成）
+	ShouldStop bool       `json:"should_stop"` // 是否应该停止（任务已完成）
 }
 
 // NewAgenticThinking 创建 Agentic Thinking 引擎。

@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/LittleXiaYuan/ledger"
+	"yunque-agent/internal/ledgercore"
 )
 
 func newTestMonitor() *MetaCogMonitor {

@@ -16,7 +16,7 @@ import (
 	"yunque-agent/internal/controlplane/gateway"
 	iledger "yunque-agent/internal/ledger"
 
-	"github.com/LittleXiaYuan/ledger"
+	"yunque-agent/internal/ledgercore"
 )
 
 func initKnowledgeWiring(app *agentrt.App, gw *gateway.Gateway, embedRes *embeddings.Resolver) *knowledge.Store {
@@ -67,7 +67,7 @@ func initKnowledgeWiring(app *agentrt.App, gw *gateway.Gateway, embedRes *embedd
 	}
 	kbStats := knowledgeStore.Stats()
 	slog.Info("knowledge base loaded", "sources", kbStats.Sources, "chunks", kbStats.Chunks)
-	if ldgRaw, ok := app.Get("github.com/LittleXiaYuan/ledger"); ok {
+	if ldgRaw, ok := app.Get(agentrt.CompLedger); ok {
 		if ldg, ok := ldgRaw.(*ledger.Ledger); ok {
 			knowledgeStore.SetKVStore(iledger.NewKVConfigStore(ldg, "knowledge"))
 			slog.Info("knowledge store wired to Ledger KV")
@@ -93,7 +93,7 @@ func initKnowledgeWiring(app *agentrt.App, gw *gateway.Gateway, embedRes *embedd
 		return client.Chat(ctx, []llm.Message{{Role: "user", Content: prompt}}, 0.3)
 	})
 	wikiStore := knowledge.NewWikiStore(wikiDigester)
-	if ldgRaw, ok := app.Get("github.com/LittleXiaYuan/ledger"); ok {
+	if ldgRaw, ok := app.Get(agentrt.CompLedger); ok {
 		if ldg, ok := ldgRaw.(*ledger.Ledger); ok {
 			wikiStore.SetKVStore(iledger.NewKVConfigStore(ldg, "wiki"))
 		}

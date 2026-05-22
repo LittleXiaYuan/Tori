@@ -9,16 +9,16 @@ import (
 	"sync"
 	"time"
 
-	"github.com/LittleXiaYuan/ledger"
+	"yunque-agent/internal/ledgercore"
 	"yunque-agent/pkg/jsonutil"
 )
 
 // InterestTracker tracks user interests and skill gaps to generate better exploration questions.
 type InterestTracker struct {
-	ldg      *ledger.Ledger
-	mu       sync.Mutex
-	topics   map[string]*TopicInterest // tenantID:topic → interest
-	skillGaps map[string][]string      // tenantID → missing skill names
+	ldg       *ledger.Ledger
+	mu        sync.Mutex
+	topics    map[string]*TopicInterest // tenantID:topic → interest
+	skillGaps map[string][]string       // tenantID → missing skill names
 }
 
 // TopicInterest records how interested a user is in a topic.
@@ -190,4 +190,3 @@ Output JSON:
 
 	return result, nil
 }
-

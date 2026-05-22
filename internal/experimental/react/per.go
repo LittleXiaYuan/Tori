@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/LittleXiaYuan/ledger"
+	"yunque-agent/internal/ledgercore"
 )
 
 // PlanExecuteReflect runs the three-stage reasoning loop:

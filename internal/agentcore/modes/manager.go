@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	ldg "github.com/LittleXiaYuan/ledger"
+	ldg "yunque-agent/internal/ledgercore"
 )
 
 // ModeManager is the central coordinator for the multi-mode system.

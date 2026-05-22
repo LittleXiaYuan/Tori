@@ -9,17 +9,17 @@ import (
 	"path/filepath"
 	"time"
 
-	ldg "github.com/LittleXiaYuan/ledger"
+	ldg "yunque-agent/internal/ledgercore"
 )
 
 // TrainingPipeline 从 Ledger 推理轨迹中提取 LoRA 微调训练数据。
 //
 // 工作原理（对应林俊旸文章中的 "Agentic RL" 基础设施需求）：
-//   1. Ledger 的 ReasoningTracer 记录每一步 Think/Observe/Decide/Backtrack
-//   2. 这些 trace 天然就是 RL 的 trajectory 数据
-//   3. RewardModel 对轨迹打分（成功/失败/效率）
-//   4. 打分后的数据导出为 JSONL，用于 LoRA 微调小模型
-//   5. 微调后的小模型替换 LocalBrain.client → 形成正循环
+//  1. Ledger 的 ReasoningTracer 记录每一步 Think/Observe/Decide/Backtrack
+//  2. 这些 trace 天然就是 RL 的 trajectory 数据
+//  3. RewardModel 对轨迹打分（成功/失败/效率）
+//  4. 打分后的数据导出为 JSONL，用于 LoRA 微调小模型
+//  5. 微调后的小模型替换 LocalBrain.client → 形成正循环
 type TrainingPipeline struct {
 	ledger   *ldg.Ledger
 	brain    *LocalBrain
@@ -49,16 +49,16 @@ func (tp *TrainingPipeline) SetRewardModel(rm RewardModel) {
 
 // TrajectoryRecord 是一条完整的训练轨迹记录。
 type TrajectoryRecord struct {
-	TaskID      string          `json:"task_id"`
+	TaskID      string           `json:"task_id"`
 	Trajectory  []TrajectoryStep `json:"trajectory"`
-	Reward      float64         `json:"reward"`
-	TaskSuccess bool            `json:"task_success"`
-	ExportedAt  time.Time       `json:"exported_at"`
+	Reward      float64          `json:"reward"`
+	TaskSuccess bool             `json:"task_success"`
+	ExportedAt  time.Time        `json:"exported_at"`
 }
 
 // TrajectoryStep 是轨迹中的单步。
 type TrajectoryStep struct {
-	StepType   string  `json:"step_type"`   // think/observe/decide/backtrack
+	StepType   string  `json:"step_type"` // think/observe/decide/backtrack
 	Content    string  `json:"content"`
 	Confidence float64 `json:"confidence,omitempty"`
 	Decision   string  `json:"decision,omitempty"`
@@ -166,10 +166,10 @@ func (tp *TrainingPipeline) ExportBatch(ctx context.Context, taskIDs []string, t
 				"confidence": step.Confidence,
 			})
 			sample := map[string]interface{}{
-				"instruction": "You are an agentic decision maker. Given the context, decide whether to use a tool, think deeper, or answer directly.",
-				"input":       step.Content,
-				"output":      string(decisionJSON),
-				"reward":      record.Reward,
+				"instruction":  "You are an agentic decision maker. Given the context, decide whether to use a tool, think deeper, or answer directly.",
+				"input":        step.Content,
+				"output":       string(decisionJSON),
+				"reward":       record.Reward,
 				"task_success": record.TaskSuccess,
 			}
 			if err := enc.Encode(sample); err != nil {

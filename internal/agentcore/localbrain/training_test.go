@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	ldg "github.com/LittleXiaYuan/ledger"
+	ldg "yunque-agent/internal/ledgercore"
 )
 
 func TestDefaultRewardModel_SuccessfulTask(t *testing.T) {
