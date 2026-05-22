@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"github.com/LittleXiaYuan/ledger"
+	"yunque-agent/internal/ledgercore"
 )
 
 func TestParseVectorANNBackend(t *testing.T) {

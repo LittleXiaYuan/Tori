@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/LittleXiaYuan/ledger"
-	lsqlite "github.com/LittleXiaYuan/ledger/backend/sqlite"
+	"yunque-agent/internal/ledgercore"
+	lsqlite "yunque-agent/internal/ledgercore/backend/sqlite"
 )
 
 func newTestLedger(t *testing.T) *ledger.Ledger {

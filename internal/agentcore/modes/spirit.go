@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	ldg "github.com/LittleXiaYuan/ledger"
+	ldg "yunque-agent/internal/ledgercore"
 
 	"yunque-agent/internal/agentcore/emotion"
 )
@@ -23,11 +23,11 @@ import (
 //   - High temperature + presence penalty for varied, personality-rich output
 //   - Low agreement bias: will disagree when the value system says so
 type spiritMode struct {
-	preset   *ModePreset
-	values   *ValueSystem
+	preset    *ModePreset
+	values    *ValueSystem
 	stanceGen *StanceGenerator
-	ledger   *ldg.Ledger
-	tenantID string
+	ledger    *ldg.Ledger
+	tenantID  string
 }
 
 // NewSpiritMode creates a Spirit behavior engine.
@@ -90,9 +90,9 @@ func (s *spiritMode) Stance(ctx context.Context, j *Judgment) (*Stance, error) {
 	return stance, nil
 }
 
-func (s *spiritMode) Sampling() SamplingConfig         { return s.preset.Sampling }
-func (s *spiritMode) ContextStrategy() ContextStrategy  { return s.preset.Context }
-func (s *spiritMode) MemoryPolicy() MemoryPolicy        { return s.preset.Memory }
+func (s *spiritMode) Sampling() SamplingConfig               { return s.preset.Sampling }
+func (s *spiritMode) ContextStrategy() ContextStrategy       { return s.preset.Context }
+func (s *spiritMode) MemoryPolicy() MemoryPolicy             { return s.preset.Memory }
 func (s *spiritMode) GuardrailOverrides() GuardrailOverrides { return s.preset.Guardrails }
 
 // ─── Ledger integration ─────────────────────────────────────────────────────

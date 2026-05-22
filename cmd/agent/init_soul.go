@@ -33,7 +33,7 @@ import (
 	"yunque-agent/internal/experimental/trait"
 	"yunque-agent/internal/experimental/world"
 
-	"github.com/LittleXiaYuan/ledger"
+	"yunque-agent/internal/ledgercore"
 
 	iledger "yunque-agent/internal/ledger"
 )

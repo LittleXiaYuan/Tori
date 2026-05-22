@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
-	ldg "github.com/LittleXiaYuan/ledger"
+	ldg "yunque-agent/internal/ledgercore"
 )
 
 // LoRAHook is called after training data export to trigger LoRA training.
@@ -26,6 +26,7 @@ type LoRAHook interface {
 //  2. Event log compaction
 //  3. Training data export to JSONL
 //  4. LoRA training trigger (if hook is set)
+//
 // DreamHook runs cross-conversation pattern recognition during night cycle.
 type DreamHook interface {
 	RunDreams(ctx context.Context, tenantID string) error
@@ -47,8 +48,8 @@ func (ns *NightScheduler) SetDreamHook(hook DreamHook) { ns.dreamHook = hook }
 
 // NightSchedulerConfig configures the nighttime batch processor.
 type NightSchedulerConfig struct {
-	OutputDir string            // directory for JSONL output (default: ./data/training)
-	TenantIDs func() []string  // callback to list active tenant IDs
+	OutputDir string          // directory for JSONL output (default: ./data/training)
+	TenantIDs func() []string // callback to list active tenant IDs
 }
 
 func NewNightScheduler(l *ldg.Ledger, cfg NightSchedulerConfig) *NightScheduler {
@@ -64,7 +65,7 @@ func NewNightScheduler(l *ldg.Ledger, cfg NightSchedulerConfig) *NightScheduler 
 
 // NightResult summarizes one nightly run.
 type NightResult struct {
-	TenantID        string `json:"tenant_id"`
+	TenantID        string               `json:"tenant_id"`
 	LifecycleResult *ldg.LifecycleResult `json:"lifecycle"`
 	CompactResult   *ldg.CompactResult   `json:"compact"`
 	ExportResult    *ldg.ExportResult    `json:"export"`

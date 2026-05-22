@@ -3,7 +3,7 @@ package eval
 import (
 	"testing"
 
-	"github.com/LittleXiaYuan/ledger"
+	"yunque-agent/internal/ledgercore"
 
 	"yunque-agent/internal/experimental/taskdistill"
 )

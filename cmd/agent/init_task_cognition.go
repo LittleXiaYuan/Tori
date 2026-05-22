@@ -16,7 +16,7 @@ import (
 	iledger "yunque-agent/internal/ledger"
 	"yunque-agent/pkg/cognisdk"
 
-	"github.com/LittleXiaYuan/ledger"
+	"yunque-agent/internal/ledgercore"
 )
 
 func initCognitionWiring(

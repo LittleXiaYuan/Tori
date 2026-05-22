@@ -7,8 +7,8 @@ import (
 	"strings"
 	"sync"
 
-	ldg "github.com/LittleXiaYuan/ledger"
 	"yunque-agent/internal/experimental/metacog"
+	ldg "yunque-agent/internal/ledgercore"
 )
 
 // MetaCogBridge connects the Ledger MetaCogMonitor to the Planner's

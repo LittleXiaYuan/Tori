@@ -7,7 +7,7 @@ import (
 	"os"
 	"sync"
 
-	"github.com/LittleXiaYuan/ledger"
+	"yunque-agent/internal/ledgercore"
 
 	"yunque-agent/internal/agentcore/memory"
 )

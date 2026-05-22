@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/LittleXiaYuan/ledger"
+	"yunque-agent/internal/ledgercore"
 )
 
 func TestToPrompt(t *testing.T) {

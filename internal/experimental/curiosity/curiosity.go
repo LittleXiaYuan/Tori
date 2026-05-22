@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/LittleXiaYuan/ledger"
+	"yunque-agent/internal/ledgercore"
 )
 
 // Module drives autonomous exploration when the agent is idle.

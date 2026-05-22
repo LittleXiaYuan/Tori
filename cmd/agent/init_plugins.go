@@ -8,10 +8,10 @@ import (
 	"strings"
 
 	agentrt "yunque-agent/internal/agentcore/runtime"
-	"yunque-agent/internal/agentcore/task"
-	"yunque-agent/internal/config"
-	"yunque-agent/internal/agentcore/websearch"
 	"yunque-agent/internal/agentcore/skillmarket"
+	"yunque-agent/internal/agentcore/task"
+	"yunque-agent/internal/agentcore/websearch"
+	"yunque-agent/internal/config"
 	"yunque-agent/internal/execution/sandbox"
 	iledger "yunque-agent/internal/ledger"
 	mcppkg "yunque-agent/internal/mcp"
@@ -25,7 +25,7 @@ import (
 	"yunque-agent/plugins/general"
 	"yunque-agent/plugins/qqchat"
 
-	"github.com/LittleXiaYuan/ledger"
+	"yunque-agent/internal/ledgercore"
 )
 
 // initPlugins initializes the plugin registry, skill registry, web search,
@@ -110,7 +110,7 @@ func initPlugins(app *agentrt.App) error {
 	app.Set(agentrt.CompPluginStateMgr, pluginStateMgr)
 
 	// Wire dynamic skills to Ledger KV
-	if ldgRaw, ok := app.Get("github.com/LittleXiaYuan/ledger"); ok {
+	if ldgRaw, ok := app.Get(agentrt.CompLedger); ok {
 		if ldg, ok := ldgRaw.(*ledger.Ledger); ok {
 			migrator := iledger.NewKVMigrator(ldg)
 			_ = migrator.MigrateFile("dynamic_skills", "defs", cfg.DataPath("dynamic_skills.json"))

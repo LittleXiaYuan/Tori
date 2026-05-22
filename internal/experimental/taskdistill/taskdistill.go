@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/LittleXiaYuan/ledger"
+	"yunque-agent/internal/ledgercore"
 )
 
 // AnalyzeFunc is the LLM-powered analysis function.
@@ -256,9 +256,9 @@ func (d *Distiller) heuristicDistill(s *TaskEventSummary) *Result {
 
 	if s.Status == ledger.TaskFailed {
 		result.Rules = append(result.Rules, Rule{
-			Condition: "Attempting similar goal: " + ledger.TruncateStr(s.Goal, 100),
-			Action:    "Consider a different approach — previous attempt failed",
-			Rationale: fmt.Sprintf("Task %s failed after %d steps with %d backtracks", s.TaskID, s.StepCount, s.Backtracks),
+			Condition:  "Attempting similar goal: " + ledger.TruncateStr(s.Goal, 100),
+			Action:     "Consider a different approach — previous attempt failed",
+			Rationale:  fmt.Sprintf("Task %s failed after %d steps with %d backtracks", s.TaskID, s.StepCount, s.Backtracks),
 			Confidence: 0.6,
 		})
 	}

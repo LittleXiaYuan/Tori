@@ -9,7 +9,7 @@ import (
 
 	agentrt "yunque-agent/internal/agentcore/runtime"
 
-	"github.com/LittleXiaYuan/ledger"
+	"yunque-agent/internal/ledgercore"
 )
 
 func configureLedgerVectorANN(ctx context.Context, app *agentrt.App, ldg *ledger.Ledger, tenantID string) {

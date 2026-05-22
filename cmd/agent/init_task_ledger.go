@@ -11,7 +11,7 @@ import (
 	iledger "yunque-agent/internal/ledger"
 	"yunque-agent/pkg/safego"
 
-	"github.com/LittleXiaYuan/ledger"
+	"yunque-agent/internal/ledgercore"
 )
 
 func initLedgerStateEngine(app *agentrt.App, typedLdg *ledger.Ledger, taskStore task.Store, taskRunner *task.Runner) {

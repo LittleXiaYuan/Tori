@@ -9,8 +9,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	ldg "github.com/LittleXiaYuan/ledger"
 	"yunque-agent/internal/agentcore/llm"
+	ldg "yunque-agent/internal/ledgercore"
 	"yunque-agent/pkg/safego"
 )
 

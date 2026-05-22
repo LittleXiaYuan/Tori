@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	ldg "github.com/LittleXiaYuan/ledger"
+	ldg "yunque-agent/internal/ledgercore"
 )
 
 // SelfDistillPipeline orchestrates the full self-distillation cognitive loop:
@@ -32,16 +32,16 @@ type SelfDistillPipeline struct {
 
 // SelfDistillConfig controls the distillation run.
 type SelfDistillConfig struct {
-	TenantID      string  `json:"tenant_id"`
-	BaseModel     string  `json:"base_model"`
-	MinSamples    int     `json:"min_samples"`
-	MinScore      float64 `json:"min_score"`
-	NumEpochs     int     `json:"num_epochs"`
-	LoRARank      int     `json:"lora_rank"`
-	LearningRate  float64 `json:"learning_rate"`
-	DaysLookback  int     `json:"days_lookback"`
-	MaxSeqLength  int     `json:"max_seq_length"`
-	AdapterDir    string  `json:"adapter_dir"`
+	TenantID     string  `json:"tenant_id"`
+	BaseModel    string  `json:"base_model"`
+	MinSamples   int     `json:"min_samples"`
+	MinScore     float64 `json:"min_score"`
+	NumEpochs    int     `json:"num_epochs"`
+	LoRARank     int     `json:"lora_rank"`
+	LearningRate float64 `json:"learning_rate"`
+	DaysLookback int     `json:"days_lookback"`
+	MaxSeqLength int     `json:"max_seq_length"`
+	AdapterDir   string  `json:"adapter_dir"`
 }
 
 // DefaultSelfDistillConfig returns a CPU-friendly demo configuration.
@@ -63,11 +63,11 @@ func DefaultSelfDistillConfig() SelfDistillConfig {
 // DistillReport is the final output of a distillation run, designed
 // for PPT slides and demo dashboards.
 type DistillReport struct {
-	RunID         string         `json:"run_id"`
-	StartedAt     time.Time      `json:"started_at"`
-	CompletedAt   time.Time      `json:"completed_at"`
-	Duration      time.Duration  `json:"duration"`
-	Config        SelfDistillConfig `json:"config"`
+	RunID       string            `json:"run_id"`
+	StartedAt   time.Time         `json:"started_at"`
+	CompletedAt time.Time         `json:"completed_at"`
+	Duration    time.Duration     `json:"duration"`
+	Config      SelfDistillConfig `json:"config"`
 
 	// Collection phase
 	RawConversations int `json:"raw_conversations"`
@@ -78,22 +78,22 @@ type DistillReport struct {
 	ScoreDistribution ScoreDistribution `json:"score_distribution"`
 
 	// Training phase
-	TrainResult  *TrainResult  `json:"train_result,omitempty"`
-	DataPath     string        `json:"data_path"`
+	TrainResult *TrainResult `json:"train_result,omitempty"`
+	DataPath    string       `json:"data_path"`
 
 	// Evaluation phase
-	EvalBefore   *EvalResult   `json:"eval_before,omitempty"`
-	EvalAfter    *EvalResult   `json:"eval_after,omitempty"`
-	Improvement  float64       `json:"improvement"`
+	EvalBefore  *EvalResult `json:"eval_before,omitempty"`
+	EvalAfter   *EvalResult `json:"eval_after,omitempty"`
+	Improvement float64     `json:"improvement"`
 
 	// Deploy phase
-	AdapterName  string `json:"adapter_name"`
-	Deployed     bool   `json:"deployed"`
+	AdapterName string `json:"adapter_name"`
+	Deployed    bool   `json:"deployed"`
 
 	// Summary
-	Success      bool   `json:"success"`
-	Error        string `json:"error,omitempty"`
-	Steps        []StepLog `json:"steps"`
+	Success bool      `json:"success"`
+	Error   string    `json:"error,omitempty"`
+	Steps   []StepLog `json:"steps"`
 }
 
 // ScoreDistribution breaks down conversation quality scores.

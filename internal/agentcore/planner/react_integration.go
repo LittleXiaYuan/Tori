@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	ldg "github.com/LittleXiaYuan/ledger"
+	ldg "yunque-agent/internal/ledgercore"
 
 	"yunque-agent/pkg/safego"
 

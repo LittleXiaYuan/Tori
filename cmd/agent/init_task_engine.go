@@ -34,7 +34,7 @@ import (
 	"yunque-agent/internal/observe"
 	"yunque-agent/pkg/skills"
 
-	"github.com/LittleXiaYuan/ledger"
+	"yunque-agent/internal/ledgercore"
 )
 
 func initTaskEngine(
@@ -58,7 +58,7 @@ func initTaskEngine(
 	emotionShiftDetector := app.MustGet("emotion_shift_detector").(*planner.EmotionShiftDetector)
 
 	var typedLdg *ledger.Ledger
-	if ldgRaw, ok := app.Get("github.com/LittleXiaYuan/ledger"); ok {
+	if ldgRaw, ok := app.Get(agentrt.CompLedger); ok {
 		if typed, castOk := ldgRaw.(*ledger.Ledger); castOk {
 			typedLdg = typed
 		} else {
@@ -158,7 +158,7 @@ func initTaskEngine(
 	gw.SetTriggerRuntime(triggerRT)
 
 	triggerStore := trigger.NewStore(cfg.DataPath("triggers"))
-	if ldgRaw, ok := app.Get("github.com/LittleXiaYuan/ledger"); ok {
+	if ldgRaw, ok := app.Get(agentrt.CompLedger); ok {
 		if ldg, ok := ldgRaw.(*ledger.Ledger); ok {
 			tmigrator := iledger.NewKVMigrator(ldg)
 			_ = tmigrator.MigrateFile("trigger", "data", cfg.DataPath("triggers/triggers.json"))
@@ -173,7 +173,7 @@ func initTaskEngine(
 
 	// ── Workflow Engine ──
 	wfStore := workflow.NewJSONStore(cfg.DataPath("workflows"))
-	if ldgRaw, ok := app.Get("github.com/LittleXiaYuan/ledger"); ok {
+	if ldgRaw, ok := app.Get(agentrt.CompLedger); ok {
 		if ldg, ok := ldgRaw.(*ledger.Ledger); ok {
 			wfStore.SetKVStore(iledger.NewKVConfigStore(ldg, "workflow"))
 			slog.Info("workflow store wired to Ledger KV")
@@ -313,7 +313,7 @@ func initTaskEngine(
 
 	// ── State Kernel ──
 	stateKernel := state.NewKernel(cfg.DataDir)
-	if ldgRaw, ok := app.Get("github.com/LittleXiaYuan/ledger"); ok {
+	if ldgRaw, ok := app.Get(agentrt.CompLedger); ok {
 		if ldg, ok := ldgRaw.(*ledger.Ledger); ok {
 			stateKernel.SetKVStore(iledger.NewKVConfigStore(ldg, "state_kernel"))
 		}

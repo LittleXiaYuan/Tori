@@ -14,7 +14,7 @@ import (
 
 // initStorage initializes storage backends.
 // Ledger (SQLite) is the primary persistence layer, initialized here in Phase 1
-// so that all later phases (memory, planner, tasks) can access it via app.Get("github.com/LittleXiaYuan/ledger").
+// so that all later phases (memory, planner, tasks) can access it via app.Get(agentrt.CompLedger).
 func initStorage(app *agentrt.App) error {
 	dbPath := os.Getenv("LEDGER_DB_PATH")
 	if dbPath == "" {
@@ -34,7 +34,7 @@ func initStorage(app *agentrt.App) error {
 		return fmt.Errorf("ledger init failed: %w (set ALLOW_EPHEMERAL=true to run without persistence)", err)
 	}
 
-	app.Set("github.com/LittleXiaYuan/ledger", ldg)
+	app.Set(agentrt.CompLedger, ldg)
 	app.Ledger = ldg
 
 	slog.Info("storage: Ledger (SQLite) initialized", "db", dbPath)

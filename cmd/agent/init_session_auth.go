@@ -21,7 +21,7 @@ import (
 	"yunque-agent/internal/experimental/heartbeat"
 	iledger "yunque-agent/internal/ledger"
 
-	"github.com/LittleXiaYuan/ledger"
+	"yunque-agent/internal/ledgercore"
 )
 
 type sessionAuthResult struct {
@@ -93,7 +93,7 @@ func initSessionAuth(app *agentrt.App) (*sessionAuthResult, error) {
 	// ── Bot Manager / Inbox ──
 	r.botMgr = bots.NewManager()
 	r.inboxStore = inbox.NewStore(DefaultInboxCapacity)
-	if ldgRaw, ok := app.Get("github.com/LittleXiaYuan/ledger"); ok {
+	if ldgRaw, ok := app.Get(agentrt.CompLedger); ok {
 		if ldg, ok := ldgRaw.(*ledger.Ledger); ok {
 			r.botMgr.SetKVStore(iledger.NewKVConfigStore(ldg, "bots"))
 			r.inboxStore.SetKVStore(iledger.NewKVConfigStore(ldg, "inbox"))
@@ -147,7 +147,7 @@ func initSessionAuth(app *agentrt.App) (*sessionAuthResult, error) {
 	// ── Fork tree ──
 	r.forkTree = session.NewForkTree()
 	r.forkPersister = session.NewForkPersister(cfg.DataPath("forks.json"))
-	if ldgRaw, ok := app.Get("github.com/LittleXiaYuan/ledger"); ok {
+	if ldgRaw, ok := app.Get(agentrt.CompLedger); ok {
 		if ldg, ok := ldgRaw.(*ledger.Ledger); ok {
 			migrator := iledger.NewKVMigrator(ldg)
 			_ = migrator.MigrateFile("fork_tree", "forks", cfg.DataPath("forks.json"))
