@@ -6,11 +6,11 @@ import (
 )
 
 func TestPlanPackBundleApplyReady(t *testing.T) {
-	current, err := NewPackBundle("current", []PackManifest{XiaoyuCompanionPack()}, []string{PackXiaoyuCompanion})
+	current, err := NewPackBundle("current", []PackManifest{PersonalCompanionPack()}, []string{PackPersonalCompanion})
 	if err != nil {
 		t.Fatalf("current bundle: %v", err)
 	}
-	candidate, err := NewPackBundle("candidate", BuiltinPacks(), []string{PackXiaoyuCompanion, PackYunqueWork})
+	candidate, err := NewPackBundle("candidate", BuiltinPacks(), []string{PackPersonalCompanion, PackYunqueWork})
 	if err != nil {
 		t.Fatalf("candidate bundle: %v", err)
 	}
@@ -37,14 +37,14 @@ func TestPlanPackBundleApplyReady(t *testing.T) {
 }
 
 func TestPlanPackBundleApplyRequiresReviewForChangedPack(t *testing.T) {
-	currentPack := XiaoyuCompanionPack()
-	current, err := NewPackBundle("current", []PackManifest{currentPack}, []string{PackXiaoyuCompanion})
+	currentPack := PersonalCompanionPack()
+	current, err := NewPackBundle("current", []PackManifest{currentPack}, []string{PackPersonalCompanion})
 	if err != nil {
 		t.Fatalf("current bundle: %v", err)
 	}
 	changed := currentPack
 	changed.Version = "0.2.0"
-	candidate, err := NewPackBundle("candidate", []PackManifest{changed}, []string{PackXiaoyuCompanion})
+	candidate, err := NewPackBundle("candidate", []PackManifest{changed}, []string{PackPersonalCompanion})
 	if err != nil {
 		t.Fatalf("candidate bundle: %v", err)
 	}

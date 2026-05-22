@@ -8,7 +8,7 @@ import (
 
 func TestPackManagerExportBundleRoundTrip(t *testing.T) {
 	pm := NewPackManager(BuiltinPacks()...)
-	if err := pm.Disable(PackXiaoyuCompanion); err != nil {
+	if err := pm.Disable(PackPersonalCompanion); err != nil {
 		t.Fatalf("disable companion pack: %v", err)
 	}
 
@@ -31,7 +31,7 @@ func TestPackManagerExportBundleRoundTrip(t *testing.T) {
 		t.Fatalf("restore bundle: %v", err)
 	}
 	merged := restored.Merge()
-	if containsString(merged.PackIDs, PackXiaoyuCompanion) {
+	if containsString(merged.PackIDs, PackPersonalCompanion) {
 		t.Fatalf("disabled pack was re-enabled: %#v", merged.PackIDs)
 	}
 	if !containsString(merged.PackIDs, PackYunqueWork) {
@@ -40,7 +40,7 @@ func TestPackManagerExportBundleRoundTrip(t *testing.T) {
 }
 
 func TestSaveAndLoadPackBundle(t *testing.T) {
-	bundle, err := NewPackBundle("portable", []PackManifest{XiaoyuCompanionPack()}, []string{PackXiaoyuCompanion})
+	bundle, err := NewPackBundle("portable", []PackManifest{PersonalCompanionPack()}, []string{PackPersonalCompanion})
 	if err != nil {
 		t.Fatalf("new bundle: %v", err)
 	}
@@ -52,13 +52,13 @@ func TestSaveAndLoadPackBundle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load bundle: %v", err)
 	}
-	if loaded.ID != bundle.ID || len(loaded.Packs) != 1 || loaded.Packs[0].ID != PackXiaoyuCompanion {
+	if loaded.ID != bundle.ID || len(loaded.Packs) != 1 || loaded.Packs[0].ID != PackPersonalCompanion {
 		t.Fatalf("loaded bundle mismatch: %#v", loaded)
 	}
 }
 
 func TestValidatePackBundleRejectsMissingEnabledPack(t *testing.T) {
-	bundle, err := NewPackBundle("bad", []PackManifest{XiaoyuCompanionPack()}, nil)
+	bundle, err := NewPackBundle("bad", []PackManifest{PersonalCompanionPack()}, nil)
 	if err != nil {
 		t.Fatalf("new bundle: %v", err)
 	}
@@ -69,7 +69,7 @@ func TestValidatePackBundleRejectsMissingEnabledPack(t *testing.T) {
 }
 
 func TestRunPackBundleGoldenTests(t *testing.T) {
-	bundle, err := NewPackBundle("golden-bundle", BuiltinPacks(), []string{PackXiaoyuCompanion, PackYunqueWork})
+	bundle, err := NewPackBundle("golden-bundle", BuiltinPacks(), []string{PackPersonalCompanion, PackYunqueWork})
 	if err != nil {
 		t.Fatalf("new bundle: %v", err)
 	}
@@ -99,7 +99,7 @@ func TestRenderGoldenTestSummaryMarkdown(t *testing.T) {
 }
 
 func TestSummarizePackBundle(t *testing.T) {
-	bundle, err := NewPackBundle("summary", BuiltinPacks(), []string{PackXiaoyuCompanion})
+	bundle, err := NewPackBundle("summary", BuiltinPacks(), []string{PackPersonalCompanion})
 	if err != nil {
 		t.Fatalf("new bundle: %v", err)
 	}
@@ -117,7 +117,7 @@ func TestSummarizePackBundle(t *testing.T) {
 		t.Fatalf("expected bundle digest: %#v", summary)
 	}
 	markdown := RenderPackBundleSummaryMarkdown(summary)
-	for _, want := range []string{"Cogni Pack Bundle Summary", "digest: sha256:", "enabled: 1", PackXiaoyuCompanion} {
+	for _, want := range []string{"Cogni Pack Bundle Summary", "digest: sha256:", "enabled: 1", PackPersonalCompanion} {
 		if !strings.Contains(markdown, want) {
 			t.Fatalf("summary markdown missing %q:\n%s", want, markdown)
 		}
@@ -125,11 +125,11 @@ func TestSummarizePackBundle(t *testing.T) {
 }
 
 func TestDigestPackBundleIsStableAcrossPackOrder(t *testing.T) {
-	left, err := NewPackBundle("digest", []PackManifest{XiaoyuCompanionPack(), YunqueWorkPack()}, []string{PackYunqueWork, PackXiaoyuCompanion})
+	left, err := NewPackBundle("digest", []PackManifest{PersonalCompanionPack(), YunqueWorkPack()}, []string{PackYunqueWork, PackPersonalCompanion})
 	if err != nil {
 		t.Fatalf("left bundle: %v", err)
 	}
-	right, err := NewPackBundle("digest", []PackManifest{YunqueWorkPack(), XiaoyuCompanionPack()}, []string{PackXiaoyuCompanion, PackYunqueWork})
+	right, err := NewPackBundle("digest", []PackManifest{YunqueWorkPack(), PersonalCompanionPack()}, []string{PackPersonalCompanion, PackYunqueWork})
 	if err != nil {
 		t.Fatalf("right bundle: %v", err)
 	}
@@ -147,7 +147,7 @@ func TestDigestPackBundleIsStableAcrossPackOrder(t *testing.T) {
 }
 
 func TestVerifyPackBundleDigest(t *testing.T) {
-	bundle, err := NewPackBundle("digest-check", BuiltinPacks(), []string{PackXiaoyuCompanion, PackYunqueWork})
+	bundle, err := NewPackBundle("digest-check", BuiltinPacks(), []string{PackPersonalCompanion, PackYunqueWork})
 	if err != nil {
 		t.Fatalf("new bundle: %v", err)
 	}

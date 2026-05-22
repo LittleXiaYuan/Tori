@@ -48,14 +48,14 @@ func TestRunInitAndPromoteReadyBundle(t *testing.T) {
 
 func TestRunPromoteRejectsReviewWithoutOverride(t *testing.T) {
 	dir := t.TempDir()
-	currentPack := cognisdk.XiaoyuCompanionPack()
-	current, err := cognisdk.NewPackBundle("current", []cognisdk.PackManifest{currentPack}, []string{cognisdk.PackXiaoyuCompanion})
+	currentPack := cognisdk.PersonalCompanionPack()
+	current, err := cognisdk.NewPackBundle("current", []cognisdk.PackManifest{currentPack}, []string{cognisdk.PackPersonalCompanion})
 	if err != nil {
 		t.Fatalf("current bundle: %v", err)
 	}
 	changed := currentPack
 	changed.Version = "0.2.0"
-	candidate, err := cognisdk.NewPackBundle("candidate", []cognisdk.PackManifest{changed}, []string{cognisdk.PackXiaoyuCompanion})
+	candidate, err := cognisdk.NewPackBundle("candidate", []cognisdk.PackManifest{changed}, []string{cognisdk.PackPersonalCompanion})
 	if err != nil {
 		t.Fatalf("candidate bundle: %v", err)
 	}
@@ -86,14 +86,14 @@ func TestRunPromoteRejectsReviewWithoutOverride(t *testing.T) {
 
 func TestRunPlanFailOnReviewGate(t *testing.T) {
 	dir := t.TempDir()
-	currentPack := cognisdk.XiaoyuCompanionPack()
-	current, err := cognisdk.NewPackBundle("current", []cognisdk.PackManifest{currentPack}, []string{cognisdk.PackXiaoyuCompanion})
+	currentPack := cognisdk.PersonalCompanionPack()
+	current, err := cognisdk.NewPackBundle("current", []cognisdk.PackManifest{currentPack}, []string{cognisdk.PackPersonalCompanion})
 	if err != nil {
 		t.Fatalf("current bundle: %v", err)
 	}
 	changed := currentPack
 	changed.Version = "0.2.0"
-	candidate, err := cognisdk.NewPackBundle("candidate", []cognisdk.PackManifest{changed}, []string{cognisdk.PackXiaoyuCompanion})
+	candidate, err := cognisdk.NewPackBundle("candidate", []cognisdk.PackManifest{changed}, []string{cognisdk.PackPersonalCompanion})
 	if err != nil {
 		t.Fatalf("candidate bundle: %v", err)
 	}

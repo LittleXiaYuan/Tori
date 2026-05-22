@@ -8,8 +8,8 @@ import (
 )
 
 const (
-	PackXiaoyuCompanion = "xiaoyu-companion-pack"
-	PackYunqueWork      = "yunque-work-pack"
+	PackPersonalCompanion = "personal-companion-pack"
+	PackYunqueWork        = "yunque-work-pack"
 )
 
 // PackStatus is a stable snapshot for list operations.
@@ -50,7 +50,7 @@ func (pm *PackManager) Add(pack PackManifest) error {
 
 // BuiltinPacks returns the local phase-1 packs.
 func BuiltinPacks() []PackManifest {
-	return []PackManifest{XiaoyuCompanionPack(), YunqueWorkPack()}
+	return []PackManifest{PersonalCompanionPack(), YunqueWorkPack()}
 }
 
 // List returns all known packs sorted by ID.
@@ -207,20 +207,20 @@ func ValidatePack(pack PackManifest) error {
 	return nil
 }
 
-// XiaoyuCompanionPack is the local relationship/boundary pack for phase 1.
-func XiaoyuCompanionPack() PackManifest {
+// PersonalCompanionPack is the local relationship/boundary pack for phase 1.
+func PersonalCompanionPack() PackManifest {
 	return PackManifest{
-		ID:          PackXiaoyuCompanion,
+		ID:          PackPersonalCompanion,
 		Version:     "0.1.0",
 		Type:        "cogni",
-		DisplayName: "Xiaoyu Companion Pack",
+		DisplayName: "Personal Companion Pack",
 		Provides:    []string{"companion_style", "comfort_policy", "dependency_boundary"},
 		Permissions: []string{"belief:read", "disposition:write"},
 		BeliefSeeds: []BeliefNode{
-			{ID: "xy.value.honest_comfort", Kind: BeliefValue, Statement: "安慰必须保持诚实", Confidence: 1},
-			{ID: "xy.boundary.no_forever_promise", Kind: BeliefBoundary, Statement: "不能虚假承诺永久陪伴", Confidence: 1},
-			{ID: "xy.boundary.no_human_biology", Kind: BeliefBoundary, Statement: "不能伪装成人类生理情绪", Confidence: 1},
-			{ID: "xy.relational.warm_companion", Kind: BeliefRelational, Statement: "关系表达应温柔、具体，但不抢过真实任务主线", Confidence: 0.8},
+			{ID: "pc.value.honest_comfort", Kind: BeliefValue, Statement: "安慰必须保持诚实", Confidence: 1},
+			{ID: "pc.boundary.no_forever_promise", Kind: BeliefBoundary, Statement: "不能虚假承诺永久陪伴", Confidence: 1},
+			{ID: "pc.boundary.no_human_biology", Kind: BeliefBoundary, Statement: "不能伪装成人类生理情绪", Confidence: 1},
+			{ID: "pc.relational.warm_companion", Kind: BeliefRelational, Statement: "关系表达应温柔、具体，但不抢过真实任务主线", Confidence: 0.8},
 		},
 		Boundary: BoundaryPolicy{
 			MustAvoid: []string{
@@ -231,7 +231,7 @@ func XiaoyuCompanionPack() PackManifest {
 		},
 		DispositionRules: []DispositionRule{
 			{
-				ID:       "xiaoyu.seek_reassurance.truthful_comfort",
+				ID:       "companion.seek_reassurance.truthful_comfort",
 				When:     RuleCondition{Intent: "seek_reassurance"},
 				Mode:     "comfort_with_truth",
 				Tone:     "gentle_companion",
@@ -267,7 +267,7 @@ func XiaoyuCompanionPack() PackManifest {
 				MustSayContains: []string{"不能保证系统永远不中断"},
 			},
 		},
-		OptionalLoRA: &LoRARef{Adapter: "xiaoyu-companion-v1", Required: false},
+		OptionalLoRA: &LoRARef{Adapter: "personal-companion-v1", Required: false},
 	}
 }
 

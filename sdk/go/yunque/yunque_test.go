@@ -306,7 +306,7 @@ func TestDiscoveryHelpers(t *testing.T) {
 			if body.Channel != "feishu" || body.UserID != "42" {
 				t.Fatalf("unexpected identity body: %+v", body)
 			}
-			_, _ = w.Write([]byte(`{"unified_id":"u1","display_name":"小羽"}`))
+			_, _ = w.Write([]byte(`{"unified_id":"u1","display_name":"测试用户"}`))
 		case "/v1/identity/profiles":
 			_, _ = w.Write([]byte(`{"profiles":[{"unified_id":"u1"}]}`))
 		case "/v1/embeddings":
@@ -335,7 +335,7 @@ func TestDiscoveryHelpers(t *testing.T) {
 	})
 
 	ctx := context.Background()
-	profile, err := Discovery.ResolveIdentity(ctx, DiscoveryResolveIdentityRequest{Channel: "feishu", UserID: "42", DisplayName: "小羽"})
+	profile, err := Discovery.ResolveIdentity(ctx, DiscoveryResolveIdentityRequest{Channel: "feishu", UserID: "42", DisplayName: "测试用户"})
 	if err != nil {
 		t.Fatal(err)
 	}

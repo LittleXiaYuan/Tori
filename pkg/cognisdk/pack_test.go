@@ -12,23 +12,23 @@ func TestPackManagerListEnableDisable(t *testing.T) {
 	if len(statuses) != 2 {
 		t.Fatalf("expected 2 built-in packs, got %d", len(statuses))
 	}
-	if statuses[0].ID != PackXiaoyuCompanion || statuses[1].ID != PackYunqueWork {
+	if statuses[0].ID != PackPersonalCompanion || statuses[1].ID != PackYunqueWork {
 		t.Fatalf("packs are not sorted by id: %#v", statuses)
 	}
 
-	if err := pm.Disable(PackXiaoyuCompanion); err != nil {
+	if err := pm.Disable(PackPersonalCompanion); err != nil {
 		t.Fatalf("disable companion pack: %v", err)
 	}
 	merged := pm.Merge()
-	if containsString(merged.PackIDs, PackXiaoyuCompanion) {
+	if containsString(merged.PackIDs, PackPersonalCompanion) {
 		t.Fatalf("disabled pack still appears in merge: %#v", merged.PackIDs)
 	}
 
-	if err := pm.Enable(PackXiaoyuCompanion); err != nil {
+	if err := pm.Enable(PackPersonalCompanion); err != nil {
 		t.Fatalf("enable companion pack: %v", err)
 	}
 	merged = pm.Merge()
-	if !containsString(merged.PackIDs, PackXiaoyuCompanion) {
+	if !containsString(merged.PackIDs, PackPersonalCompanion) {
 		t.Fatalf("enabled pack missing from merge: %#v", merged.PackIDs)
 	}
 }
