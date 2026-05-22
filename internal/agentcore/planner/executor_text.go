@@ -409,9 +409,7 @@ func (p *Planner) runTextBased(ctx context.Context, req PlanRequest) (*PlanResul
 						if p.skillMetrics != nil {
 							p.skillMetrics(c.Name, dur, err)
 						}
-						if p.taskFailureMon != nil {
-							p.taskFailureMon.Record(err != nil)
-						}
+						p.proactiveCog.RecordExecutionFailure(err != nil)
 						if req.StepCallback != nil {
 							doneEvt := observe.NewEvent(req.TraceID, observe.DomainAgent, observe.EventHandoffDone,
 								fmt.Sprintf("✅ [%s] 完成 (%.1fs)", agentName, dur.Seconds()))
