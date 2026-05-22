@@ -290,12 +290,7 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 	}
 
 	if len(usedSkills) > 0 {
-		p.recentSkillsMu.Lock()
-		p.recentSkills = append(usedSkills, p.recentSkills...)
-		if len(p.recentSkills) > 20 {
-			p.recentSkills = p.recentSkills[:20]
-		}
-		p.recentSkillsMu.Unlock()
+		p.ensureSkillRuntime().RecordRecent(usedSkills)
 	}
 
 	return &PlanResult{Reply: p.cleanReply(reply), SkillsUsed: usedSkills, Steps: steps, Plan: planSteps, ContextLayers: ctxLayers}, nil
@@ -397,17 +392,11 @@ func (p *Planner) buildFunctionDefs(userMessage, tenantID, channelType string, d
 	// Strategy 1: Dynamic filtering by intent (threshold lowered from 25 to 10
 	// so intent-based narrowing kicks in earlier, reducing tool noise for LLMs)
 	if userMessage != "" && len(allSkills) > 10 && len(cats) > 0 && len(allowedSkills) == 0 {
-		scorer := p.skillScorer
-		if scorer != nil {
-			p.recentSkillsMu.Lock()
-			if len(p.recentSkills) > 0 {
-				recent := make([]string, len(p.recentSkills))
-				copy(recent, p.recentSkills)
-				scorer.RecentSkills = recent
-			}
-			p.recentSkillsMu.Unlock()
+		var skillScorer *skills.SkillScorer
+		if p.skillRuntime != nil {
+			skillScorer = p.skillRuntime.ScorerWithRecent()
 		}
-		filtered := p.registry.FilterByIntentScored(userMessage, scorer)
+		filtered := p.registry.FilterByIntentScored(userMessage, skillScorer)
 		if len(filtered) < len(allSkills) && len(filtered) > 0 {
 			filtered = p.rankSkillsByRecommendation(userMessage, filtered)
 			slog.Info("skill dynamic filter applied",

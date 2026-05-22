@@ -30,7 +30,7 @@ type PromptBuilder struct {
 	strategyContext    func() string
 	strategyContextFor func(query string) string
 	reverie            *Reverie
-	skillOptimizer     *SkillOptimizer
+	skillRuntime       *SkillRuntimeService
 	cognitiveContext   CognitiveContextFunc // CognitivePlugin dynamic context
 	cogniService       *CogniContextService // declarative Cogni context/activation boundary
 	beliefContext      BeliefContextFunc    // Cognition SDK belief context
@@ -48,7 +48,7 @@ func NewPromptBuilder(p *Planner) *PromptBuilder {
 		strategyContext:    p.strategyContext,
 		strategyContextFor: p.strategyContextFor,
 		reverie:            p.reverie,
-		skillOptimizer:     p.skillOptimizer,
+		skillRuntime:       p.skillRuntime,
 		cognitiveContext:   p.cognitiveContext,
 		cogniService:       p.cogniService,
 		beliefContext:      p.beliefContext,
@@ -331,8 +331,8 @@ func (pb *PromptBuilder) BuildDynamicContext(ctx context.Context, req DynamicCon
 	}
 
 	// P5: Hints — skill optimization
-	if pb.skillOptimizer != nil {
-		if hints := pb.skillOptimizer.OptimizationHints(); hints != "" {
+	if pb.skillRuntime != nil {
+		if hints := pb.skillRuntime.OptimizationHints(); hints != "" {
 			layers = append(layers, ctxwindow.Layer{
 				Name:     "skill_hints",
 				Priority: ctxwindow.LayerPriorityHints,

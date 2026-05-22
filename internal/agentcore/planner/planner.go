@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
-	"sync"
 	"time"
 
 	ldg "yunque-agent/internal/ledgercore"
@@ -52,7 +51,6 @@ type Planner struct {
 	sysPromptVer           int                        // incremented when skills change
 	skillIndex             SkillIndexFunc             // L2 installed skill index (nil = no L2)
 	handoffReg             *subagent.HandoffRegistry  // handoff tool registry for subagent delegation
-	skillOptimizer         *SkillOptimizer            // skill usage analytics and optimization hints
 	reverie                *Reverie                   // background inner monologue system
 	taskFailureMon         *TaskFailureMonitor        // event-driven trigger on skill failure spikes
 	longHorizonCheckpoints LongHorizonCheckpointStore // recoverable DAG checkpoint persistence
@@ -61,13 +59,7 @@ type Planner struct {
 	strategyContextFor     func(query string) string  // query-aware reflection strategy context
 	dynContextBudget       int                        // max tokens for dynamic context layer assembly (DynContextBudgetDefault = use 4000)
 	ackEnabled             bool                       // send typing indicators / ack
-	skillScorer            *skills.SkillScorer        // Ledger-driven skill scoring for intent routing
-	skillRecommender       *recommend.Engine          // experience-distilled skill recommendation/ranking
-	skillRecommendVersion  int                        // registry version last synced into skillRecommender
-	skillRecommendMu       sync.Mutex
-	recentSkills           []string // last N skills used (for routing recency bonus)
-	recentSkillsMu         sync.Mutex
-	locale                 string // agent locale (e.g. "zh-CN")
+	locale                 string                     // agent locale (e.g. "zh-CN")
 	// browserDispatch removed — browser skills now handled via skill registry (browserskill package)
 	trustRecord      func(skillName string, success bool) // trust score recorder (nil = disabled)
 	trustCheck       func(skillName string) error         // trust gate: returns non-nil to block skill
@@ -79,11 +71,11 @@ type Planner struct {
 	runState         RunStateAccessor                     // per-session interrupt checking (nil = no interrupt support)
 	localBrain       *localbrain.LocalBrain               // local small model decision layer (nil = disabled)
 	agenticThinking  *localbrain.AgenticThinking          // agentic thinking engine (nil = disabled)
-	skillGrowth      *SkillGrowth                         // autonomous skill acquisition (nil = disabled)
 	fedBridge        FederationBridge                     // OPP federation bridge for A2A delegation (nil = disabled)
 	providerReg      *llm.ProviderRegistry                // capability-aware provider registry (nil = use pool only)
 	cogniService     *CogniContextService                 // declarative Cogni activation/context boundary
 	learningSidecar  *LearningSidecar                     // post-run learning and metacognition side effects
+	skillRuntime     *SkillRuntimeService                 // skill surface scoring/recommendation/growth boundary
 }
 
 // CogniContextFunc returns the assembled Cogni context block for the current
@@ -165,20 +157,16 @@ func (p *Planner) SetContextManager(mgr *ctxwindow.Manager) { p.ctxManager = mgr
 func (p *Planner) SetSkillMetrics(fn SkillMetricsFunc) { p.skillMetrics = fn }
 
 // SetSkillScorer sets the Ledger-derived skill scoring data for intent-based routing.
-func (p *Planner) SetSkillScorer(scorer *skills.SkillScorer) { p.skillScorer = scorer }
+func (p *Planner) SetSkillScorer(scorer *skills.SkillScorer) {
+	p.ensureSkillRuntime().SetScorer(scorer)
+}
 
 // SetSkillRecommendationEngine attaches the experience-distilled recommender
 // used to rank the current planner skill surface. The recommender is seeded
 // with the registry's current skills immediately and re-synced when the
 // registry version changes.
 func (p *Planner) SetSkillRecommendationEngine(engine *recommend.Engine) {
-	p.skillRecommendMu.Lock()
-	defer p.skillRecommendMu.Unlock()
-	p.skillRecommender = engine
-	p.skillRecommendVersion = -1
-	if engine != nil {
-		p.syncSkillRecommendationItemsLocked()
-	}
+	p.ensureSkillRuntime().SetRecommendationEngine(engine)
 }
 
 // SetSkillIndex provides the L2 index: skills listed by name+description in the prompt,
@@ -194,7 +182,9 @@ func (p *Planner) SetLLMPool(pool *llm.Pool) { p.llmPool = pool }
 func (p *Planner) SetHandoffRegistry(hr *subagent.HandoffRegistry) { p.handoffReg = hr }
 
 // SetSkillOptimizer attaches a skill optimizer for usage analytics-driven hints.
-func (p *Planner) SetSkillOptimizer(opt *SkillOptimizer) { p.skillOptimizer = opt }
+func (p *Planner) SetSkillOptimizer(opt *SkillOptimizer) {
+	p.ensureSkillRuntime().SetOptimizer(opt)
+}
 
 // SetReverie attaches the background inner monologue system.
 func (p *Planner) SetReverie(r *Reverie) { p.reverie = r }
@@ -233,7 +223,9 @@ func (p *Planner) SetLocalBrain(lb *localbrain.LocalBrain) { p.localBrain = lb }
 func (p *Planner) SetAgenticThinking(at *localbrain.AgenticThinking) { p.agenticThinking = at }
 
 // SetSkillGrowth attaches the autonomous skill acquisition module.
-func (p *Planner) SetSkillGrowth(sg *SkillGrowth) { p.skillGrowth = sg }
+func (p *Planner) SetSkillGrowth(sg *SkillGrowth) {
+	p.ensureSkillRuntime().SetGrowth(sg)
+}
 
 // SetDataCollector attaches the training data collector for LoRA pipeline.
 func (p *Planner) SetDataCollector(dc *DataCollector) {
@@ -275,6 +267,13 @@ func (p *Planner) ensureLearningSidecar() *LearningSidecar {
 		p.learningSidecar = NewLearningSidecar()
 	}
 	return p.learningSidecar
+}
+
+func (p *Planner) ensureSkillRuntime() *SkillRuntimeService {
+	if p.skillRuntime == nil {
+		p.skillRuntime = NewSkillRuntimeService(p.registry)
+	}
+	return p.skillRuntime
 }
 
 // LocalBrain returns the attached local brain (may be nil).
