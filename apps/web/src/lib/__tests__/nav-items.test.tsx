@@ -20,4 +20,17 @@ describe("nav capability layering", () => {
   it("keeps full mode discoverable without changing the source list", () => {
     expect(filterNavItemsByProfile(NAV_ITEMS, "full")).toEqual(NAV_ITEMS);
   });
+
+  it("keeps packs as the default extension entry and demotes skills/plugins to advanced surfaces", () => {
+    const packs = NAV_ITEMS.find((item) => item.id === "nav-packs");
+    const skills = NAV_ITEMS.find((item) => item.id === "nav-skills");
+    const plugins = NAV_ITEMS.find((item) => item.id === "nav-plugins");
+
+    expect(packs?.layer).toBe("pack");
+    expect(packs?.defaultVisible).toBe(true);
+    expect(skills?.layer).toBe("lab");
+    expect(skills?.defaultVisible).toBeUndefined();
+    expect(plugins?.layer).toBe("control-plane");
+    expect(plugins?.defaultVisible).toBeUndefined();
+  });
 });
