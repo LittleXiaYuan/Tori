@@ -23,37 +23,21 @@ type PromptBuilder struct {
 	LastIncludedLayers []string
 
 	// Data sources (injected from Planner's callbacks)
-	memory             func(ctx context.Context, tenantID, query string) string
-	graphContext       func(query string) string
-	codeContext        func(query string) string
-	stateContext       func() string
-	strategyContext    func() string
-	strategyContextFor func(query string) string
-	proactiveCog       *ProactiveCognitionService
-	skillRuntime       *SkillRuntimeService
-	cognitiveContext   CognitiveContextFunc // CognitivePlugin dynamic context
-	cogniService       *CogniContextService // declarative Cogni context/activation boundary
-	beliefContext      BeliefContextFunc    // Cognition SDK belief context
-	dynBudget          int
-	contextFilter      *localbrain.LocalBrain // System 1 context filter (nil = disabled)
+	contextAssembly *ContextAssemblyService
+	proactiveCog    *ProactiveCognitionService
+	skillRuntime    *SkillRuntimeService
+	dynBudget       int
+	contextFilter   *localbrain.LocalBrain // System 1 context filter (nil = disabled)
 }
 
 // NewPromptBuilder creates a PromptBuilder from Planner's callbacks.
 func NewPromptBuilder(p *Planner) *PromptBuilder {
 	return &PromptBuilder{
-		memory:             p.memory,
-		graphContext:       p.graphContext,
-		codeContext:        p.codeContext,
-		stateContext:       p.stateContext,
-		strategyContext:    p.strategyContext,
-		strategyContextFor: p.strategyContextFor,
-		proactiveCog:       p.proactiveCog,
-		skillRuntime:       p.skillRuntime,
-		cognitiveContext:   p.cognitiveContext,
-		cogniService:       p.cogniService,
-		beliefContext:      p.beliefContext,
-		dynBudget:          p.dynContextBudget,
-		contextFilter:      p.LocalBrain(),
+		contextAssembly: p.contextAssembly,
+		proactiveCog:    p.proactiveCog,
+		skillRuntime:    p.skillRuntime,
+		dynBudget:       p.dynContextBudget,
+		contextFilter:   p.LocalBrain(),
 	}
 }
 
@@ -144,30 +128,30 @@ func (pb *PromptBuilder) BuildDynamicContext(ctx context.Context, req DynamicCon
 	pending := 0
 	skipRetrieval := len([]rune(req.LastMessage)) < 6
 
-	if pb.memory != nil && !skipRetrieval {
+	if pb.contextAssembly != nil && pb.contextAssembly.memory != nil && !skipRetrieval {
 		pending++
 		safego.Go("prompt-memory-recall", func() {
-			if memCtx := pb.memory(ctx, req.TenantID, req.LastMessage); memCtx != "" {
+			if memCtx := pb.contextAssembly.Memory(ctx, req.TenantID, req.LastMessage); memCtx != "" {
 				results <- layerResult{"memory", ctxwindow.LayerPriorityMemory, "## 记忆上下文\n", memCtx}
 			} else {
 				results <- layerResult{}
 			}
 		})
 	}
-	if pb.graphContext != nil && !skipRetrieval {
+	if pb.contextAssembly != nil && pb.contextAssembly.graphContext != nil && !skipRetrieval {
 		pending++
 		safego.Go("prompt-graph-context", func() {
-			if graphCtx := pb.graphContext(req.LastMessage); graphCtx != "" {
+			if graphCtx := pb.contextAssembly.graphContext(req.LastMessage); graphCtx != "" {
 				results <- layerResult{"graph", ctxwindow.LayerPriorityRetrieval, "## 知识图谱\n", graphCtx}
 			} else {
 				results <- layerResult{}
 			}
 		})
 	}
-	if pb.codeContext != nil && !skipRetrieval {
+	if pb.contextAssembly != nil && pb.contextAssembly.codeContext != nil && !skipRetrieval {
 		pending++
 		safego.Go("prompt-code-context", func() {
-			if codeCtx := pb.codeContext(req.LastMessage); codeCtx != "" {
+			if codeCtx := pb.contextAssembly.codeContext(req.LastMessage); codeCtx != "" {
 				results <- layerResult{"code", ctxwindow.LayerPriorityRetrieval, "", codeCtx}
 			} else {
 				results <- layerResult{}
@@ -243,8 +227,8 @@ func (pb *PromptBuilder) BuildDynamicContext(ctx context.Context, req DynamicCon
 
 	// P3.5: CognitivePlugin dynamic context — domain-specific knowledge
 	// injected by plugins that implement CognitivePlugin.DynamicContext()
-	if pb.cognitiveContext != nil {
-		if cogCtx := pb.cognitiveContext(ctx, req.LastMessage); cogCtx != "" {
+	if pb.contextAssembly != nil && pb.contextAssembly.cognitiveContext != nil {
+		if cogCtx := pb.contextAssembly.cognitiveContext(ctx, req.LastMessage); cogCtx != "" {
 			layers = append(layers, ctxwindow.Layer{
 				Name:     "cognitive_plugins",
 				Priority: ctxwindow.LayerPriorityRetrieval,
@@ -256,8 +240,8 @@ func (pb *PromptBuilder) BuildDynamicContext(ctx context.Context, req DynamicCon
 	// P3.6: Declarative Cogni context — assembled from cogni.Registry.Active()
 	// declarations whose ActivationRules match the current message/tenant/channel.
 	// The hook (pkg/cogni.Hook) handles evaluation, exclusivity, and rendering.
-	if pb.cogniService != nil {
-		if cgCtx := pb.cogniService.Context(ctx, req.LastMessage, req.TenantID, req.Channel); cgCtx != "" {
+	if pb.contextAssembly != nil && pb.contextAssembly.cogniService != nil {
+		if cgCtx := pb.contextAssembly.cogniService.Context(ctx, req.LastMessage, req.TenantID, req.Channel); cgCtx != "" {
 			layers = append(layers, ctxwindow.Layer{
 				Name:     "cogni",
 				Priority: ctxwindow.LayerPriorityRetrieval,
@@ -267,8 +251,8 @@ func (pb *PromptBuilder) BuildDynamicContext(ctx context.Context, req DynamicCon
 	}
 
 	// P3.7: Cognition SDK belief context — packed inner state and disposition.
-	if pb.beliefContext != nil {
-		if beliefCtx := pb.beliefContext(ctx, req.LastMessage, req.TenantID, req.Channel); beliefCtx != "" {
+	if pb.contextAssembly != nil && pb.contextAssembly.beliefContext != nil {
+		if beliefCtx := pb.contextAssembly.beliefContext(ctx, req.LastMessage, req.TenantID, req.Channel); beliefCtx != "" {
 			layers = append(layers, ctxwindow.Layer{
 				Name:     "belief",
 				Priority: ctxwindow.LayerPriorityCognition,
@@ -289,13 +273,13 @@ func (pb *PromptBuilder) BuildDynamicContext(ctx context.Context, req DynamicCon
 			})
 		}
 	}
-	if pb.strategyContextFor != nil || pb.strategyContext != nil {
+	if pb.contextAssembly != nil && (pb.contextAssembly.strategyContextFor != nil || pb.contextAssembly.strategyContext != nil) {
 		strCtx := ""
-		if pb.strategyContextFor != nil {
-			strCtx = pb.strategyContextFor(req.LastMessage)
+		if pb.contextAssembly.strategyContextFor != nil {
+			strCtx = pb.contextAssembly.strategyContextFor(req.LastMessage)
 		}
-		if strCtx == "" && pb.strategyContext != nil {
-			strCtx = pb.strategyContext()
+		if strCtx == "" && pb.contextAssembly.strategyContext != nil {
+			strCtx = pb.contextAssembly.strategyContext()
 		}
 		if strCtx != "" {
 			layers = append(layers, ctxwindow.Layer{
@@ -307,8 +291,8 @@ func (pb *PromptBuilder) BuildDynamicContext(ctx context.Context, req DynamicCon
 			})
 		}
 	}
-	if pb.stateContext != nil {
-		if sCtx := pb.stateContext(); sCtx != "" {
+	if pb.contextAssembly != nil && pb.contextAssembly.stateContext != nil {
+		if sCtx := pb.contextAssembly.stateContext(); sCtx != "" {
 			layers = append(layers, ctxwindow.Layer{
 				Name:     "state",
 				Priority: ctxwindow.LayerPriorityCognition,
