@@ -83,9 +83,7 @@ type Planner struct {
 	fedBridge        FederationBridge                     // OPP federation bridge for A2A delegation (nil = disabled)
 	dataCollector    *DataCollector                       // training data collector (nil = disabled)
 	providerReg      *llm.ProviderRegistry                // capability-aware provider registry (nil = use pool only)
-	cogniContext     CogniContextFunc                     // declarative Cogni context injector (nil = disabled)
-	cogniSkillFilter CogniSkillFilterFunc                 // declarative Cogni surface filter (nil = identity)
-	cogniTrace       CogniTraceFunc                       // declarative Cogni trace snapshot for planner-visible events
+	cogniService     *CogniContextService                 // declarative Cogni activation/context boundary
 	metacogBridge    *iledger.MetaCogBridge               // metacognitive anomaly bridge (nil = disabled)
 }
 
@@ -244,17 +242,30 @@ func (p *Planner) SetProviderRegistry(reg *llm.ProviderRegistry) { p.providerReg
 
 // SetCogniContext attaches a declarative Cogni context injector. The callback
 // is invoked once per turn from the prompt builder; nil disables the layer.
-func (p *Planner) SetCogniContext(fn CogniContextFunc) { p.cogniContext = fn }
+func (p *Planner) SetCogniContext(fn CogniContextFunc) {
+	p.ensureCogniService().SetContext(fn)
+}
 
 // SetCogniSkillFilter attaches a declarative Cogni surface filter. The
 // callback is invoked from buildFunctionDefs to narrow the tool list to
 // the union of every activated cogni's ToolSurface; nil keeps the full
 // skill set.
-func (p *Planner) SetCogniSkillFilter(fn CogniSkillFilterFunc) { p.cogniSkillFilter = fn }
+func (p *Planner) SetCogniSkillFilter(fn CogniSkillFilterFunc) {
+	p.ensureCogniService().SetSkillFilter(fn)
+}
 
 // SetCogniTrace attaches a declarative Cogni observability callback. Nil keeps
 // Cogni internal-only and preserves prior behaviour.
-func (p *Planner) SetCogniTrace(fn CogniTraceFunc) { p.cogniTrace = fn }
+func (p *Planner) SetCogniTrace(fn CogniTraceFunc) {
+	p.ensureCogniService().SetTrace(fn)
+}
+
+func (p *Planner) ensureCogniService() *CogniContextService {
+	if p.cogniService == nil {
+		p.cogniService = NewCogniContextService()
+	}
+	return p.cogniService
+}
 
 // LocalBrain returns the attached local brain (may be nil).
 func (p *Planner) LocalBrain() *localbrain.LocalBrain { return p.localBrain }

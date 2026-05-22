@@ -32,7 +32,7 @@ type PromptBuilder struct {
 	reverie            *Reverie
 	skillOptimizer     *SkillOptimizer
 	cognitiveContext   CognitiveContextFunc // CognitivePlugin dynamic context
-	cogniContext       CogniContextFunc     // declarative Cogni context (pkg/cogni hook)
+	cogniService       *CogniContextService // declarative Cogni context/activation boundary
 	beliefContext      BeliefContextFunc    // Cognition SDK belief context
 	dynBudget          int
 	contextFilter      *localbrain.LocalBrain // System 1 context filter (nil = disabled)
@@ -50,7 +50,7 @@ func NewPromptBuilder(p *Planner) *PromptBuilder {
 		reverie:            p.reverie,
 		skillOptimizer:     p.skillOptimizer,
 		cognitiveContext:   p.cognitiveContext,
-		cogniContext:       p.cogniContext,
+		cogniService:       p.cogniService,
 		beliefContext:      p.beliefContext,
 		dynBudget:          p.dynContextBudget,
 		contextFilter:      p.localBrain,
@@ -256,8 +256,8 @@ func (pb *PromptBuilder) BuildDynamicContext(ctx context.Context, req DynamicCon
 	// P3.6: Declarative Cogni context — assembled from cogni.Registry.Active()
 	// declarations whose ActivationRules match the current message/tenant/channel.
 	// The hook (pkg/cogni.Hook) handles evaluation, exclusivity, and rendering.
-	if pb.cogniContext != nil {
-		if cgCtx := pb.cogniContext(ctx, req.LastMessage, req.TenantID, req.Channel); cgCtx != "" {
+	if pb.cogniService != nil {
+		if cgCtx := pb.cogniService.Context(ctx, req.LastMessage, req.TenantID, req.Channel); cgCtx != "" {
 			layers = append(layers, ctxwindow.Layer{
 				Name:     "cogni",
 				Priority: ctxwindow.LayerPriorityRetrieval,
