@@ -1,0 +1,237 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://yunque.local/schemas/pack.schema.json",
+  "title": "Yunque Pack Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "name",
+    "version",
+    "description",
+    "requiresCore",
+    "optional",
+    "defaultState",
+    "backend",
+    "frontend",
+    "sdk",
+    "update",
+    "metadata",
+    "distribution"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^yunque\\.pack\\.[a-z0-9][a-z0-9-]*$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "requiresCore": {
+      "type": "string",
+      "minLength": 1
+    },
+    "optional": {
+      "type": "boolean"
+    },
+    "defaultState": {
+      "enum": ["enabled", "disabled"]
+    },
+    "backend": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["capabilities", "routes", "permissions", "routeSpecs"],
+      "properties": {
+        "capabilities": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$"
+          }
+        },
+        "routes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^/(api|v1)/"
+          }
+        },
+        "permissions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_-]*:[a-z][a-z0-9_-]*$"
+          }
+        },
+        "routeSpecs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["method", "path", "description"],
+            "properties": {
+              "method": {
+                "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"]
+              },
+              "path": {
+                "type": "string",
+                "pattern": "^/(api|v1)/"
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "frontend": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["menus", "routes", "assets"],
+      "properties": {
+        "menus": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["key", "label", "path", "icon", "order"],
+            "properties": {
+              "key": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9-]*$"
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1
+              },
+              "path": {
+                "type": "string",
+                "pattern": "^/packs/"
+              },
+              "icon": {
+                "type": "string",
+                "minLength": 1
+              },
+              "order": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        "routes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "component", "title"],
+            "properties": {
+              "path": {
+                "type": "string",
+                "pattern": "^/packs/"
+              },
+              "component": {
+                "type": "string",
+                "minLength": 1
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "assets": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "entry"],
+          "properties": {
+            "type": {
+              "enum": ["builtin", "remote"]
+            },
+            "entry": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "sdk": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["typescript"],
+      "properties": {
+        "typescript": {
+          "type": "string",
+          "pattern": "^yunque-client/[a-z0-9][a-z0-9-]*$"
+        }
+      }
+    },
+    "update": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["channel", "rollback"],
+      "properties": {
+        "channel": {
+          "enum": ["stable", "beta", "dev"]
+        },
+        "rollback": {
+          "type": "boolean"
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "distribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["manifestUrl", "packageUrl", "frontendUrl", "sha256", "sizeBytes"],
+      "properties": {
+        "manifestUrl": {
+          "type": "string",
+          "pattern": "^https://"
+        },
+        "packageUrl": {
+          "type": "string",
+          "pattern": "^https://"
+        },
+        "frontendUrl": {
+          "type": "string",
+          "pattern": "^https://"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "sizeBytes": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  }
+}
