@@ -81,10 +81,9 @@ type Planner struct {
 	agenticThinking  *localbrain.AgenticThinking          // agentic thinking engine (nil = disabled)
 	skillGrowth      *SkillGrowth                         // autonomous skill acquisition (nil = disabled)
 	fedBridge        FederationBridge                     // OPP federation bridge for A2A delegation (nil = disabled)
-	dataCollector    *DataCollector                       // training data collector (nil = disabled)
 	providerReg      *llm.ProviderRegistry                // capability-aware provider registry (nil = use pool only)
 	cogniService     *CogniContextService                 // declarative Cogni activation/context boundary
-	metacogBridge    *iledger.MetaCogBridge               // metacognitive anomaly bridge (nil = disabled)
+	learningSidecar  *LearningSidecar                     // post-run learning and metacognition side effects
 }
 
 // CogniContextFunc returns the assembled Cogni context block for the current
@@ -120,7 +119,9 @@ func (p *Planner) SetReflect(fn ReflectFunc) { p.reflect = fn }
 // SetMetaCogBridge attaches the metacognitive anomaly bridge.
 // When set, the planner checks for reasoning anomalies (loops, stalls,
 // drift) and injects correction hints into subsequent prompts.
-func (p *Planner) SetMetaCogBridge(b *iledger.MetaCogBridge) { p.metacogBridge = b }
+func (p *Planner) SetMetaCogBridge(b *iledger.MetaCogBridge) {
+	p.ensureLearningSidecar().SetMetaCogBridge(b)
+}
 
 func (p *Planner) SetPersonaPrompt(fn func() string) { p.personaPrompt = fn }
 
@@ -235,7 +236,9 @@ func (p *Planner) SetAgenticThinking(at *localbrain.AgenticThinking) { p.agentic
 func (p *Planner) SetSkillGrowth(sg *SkillGrowth) { p.skillGrowth = sg }
 
 // SetDataCollector attaches the training data collector for LoRA pipeline.
-func (p *Planner) SetDataCollector(dc *DataCollector) { p.dataCollector = dc }
+func (p *Planner) SetDataCollector(dc *DataCollector) {
+	p.ensureLearningSidecar().SetDataCollector(dc)
+}
 
 // SetProviderRegistry attaches the capability-aware provider registry for dynamic model routing.
 func (p *Planner) SetProviderRegistry(reg *llm.ProviderRegistry) { p.providerReg = reg }
@@ -265,6 +268,13 @@ func (p *Planner) ensureCogniService() *CogniContextService {
 		p.cogniService = NewCogniContextService()
 	}
 	return p.cogniService
+}
+
+func (p *Planner) ensureLearningSidecar() *LearningSidecar {
+	if p.learningSidecar == nil {
+		p.learningSidecar = NewLearningSidecar()
+	}
+	return p.learningSidecar
 }
 
 // LocalBrain returns the attached local brain (may be nil).
@@ -670,25 +680,8 @@ func (p *Planner) Run(ctx context.Context, req PlanRequest) (*PlanResult, error)
 	result, err := p.runInner(ctx, req)
 	observe.EndSpan(span, err)
 
-	if err == nil && p.dataCollector != nil && result != nil {
-		var reflectScore float64
-		if p.reflect != nil && result.Reply != "" {
-			goal := extractGoal(req)
-			if p.reflect(ctx, goal, result.Reply) {
-				reflectScore = 0.8
-			} else {
-				reflectScore = 0.3
-			}
-		}
-		p.dataCollector.Collect(ctx, req, result, reflectScore)
-	}
-
-	// MetaCog post-execution: log anomaly summary and clear task state
-	if p.metacogBridge != nil && req.TaskID != "" {
-		if summary := p.metacogBridge.FormatAnomalySummary(req.TaskID); summary != "" {
-			slog.Info("planner: metacog summary", "detail", summary)
-		}
-		p.metacogBridge.ClearTask(req.TaskID)
+	if p.learningSidecar != nil {
+		p.learningSidecar.AfterRun(ctx, req, result, err, p.reflect)
 	}
 
 	return result, err
