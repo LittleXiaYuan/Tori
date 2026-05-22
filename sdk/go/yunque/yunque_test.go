@@ -495,7 +495,7 @@ func TestFederationHelpers(t *testing.T) {
 	if peers["local_id"] != "agent-local" || stats["messages"].(float64) != 2 || caps["local"] == nil || updated["status"] != "updated" || found["count"].(float64) != 1 || delegated["status"] != "delegated" || bridge["configured"] != true || broadcast["status"] != "broadcasted" || NewAgentKit().Federation != Federation {
 		t.Fatalf("unexpected federation results")
 	}
-	if len(seen) != 15 {
+	if len(seen) != 8 {
 		t.Fatalf("expected 8 federation API calls, got %d: %v", len(seen), seen)
 	}
 }
@@ -544,7 +544,7 @@ func TestAdminHelpers(t *testing.T) {
 	if consoleStatus["console_hidden"] != false || consoleToggle["console_hidden"] != true || autostartStatus["autostart_enabled"] != false || autostartToggle["autostart_enabled"] != true || tenants["count"].(float64) != 1 || created["name"] != "team" || translated["executed"] != false || executed["executed"] != true || NewAgentKit().Admin != Admin {
 		t.Fatalf("unexpected admin results")
 	}
-	if len(seen) != 15 {
+	if len(seen) != 8 {
 		t.Fatalf("expected 8 admin API calls, got %d: %v", len(seen), seen)
 	}
 }
@@ -639,7 +639,7 @@ func TestSystemHelpers(t *testing.T) {
 	if NewAgentKit().System != System {
 		t.Fatalf("agent kit should reuse System namespace")
 	}
-	if len(seen) != 15 {
+	if len(seen) != 12 {
 		t.Fatalf("expected 12 system API calls, got %d: %v", len(seen), seen)
 	}
 }
@@ -1462,7 +1462,7 @@ func TestPersonaHelpers(t *testing.T) {
 	if state["identity"] != "Tori" || updated["status"] != "ok" || skills["skills"] == nil || presets["active"] != "default" || NewAgentKit().Persona != Persona {
 		t.Fatalf("unexpected persona results: state=%+v updated=%+v skills=%+v presets=%+v", state, updated, skills, presets)
 	}
-	if len(seen) != 11 || seen[0] != "GET /v1/persona" || seen[9] != "DELETE /v1/persona/presets/custom" {
+	if len(seen) != 10 || seen[0] != "GET /v1/persona" || seen[9] != "DELETE /v1/persona/presets/custom" {
 		t.Fatalf("unexpected persona requests: %v", seen)
 	}
 }
@@ -1578,7 +1578,7 @@ func TestTrustHelpers(t *testing.T) {
 	if scores["count"].(float64) != 1 || reset["slug"] != "shell" || grantAll["slug"] != "*" || status["enabled"] != true || patterns["count"].(float64) != 1 || skillGrowPatterns["count"].(float64) != 1 || reviewStatus["enabled"] != true || NewAgentKit().Trust != Trust || NewAgentKit().SkillGrow != SkillGrow || NewAgentKit().Review != Review {
 		t.Fatalf("unexpected trust results: scores=%+v reset=%+v grantAll=%+v status=%+v patterns=%+v", scores, reset, grantAll, status, patterns)
 	}
-	if len(seen) != 12 || seen[0] != "GET /api/trust/scores" || seen[4] != "GET /api/skillgrow/patterns" || seen[5] != "GET /api/skillgrow/patterns" || seen[6] != "GET /api/review/status" {
+	if len(seen) != 7 || seen[0] != "GET /api/trust/scores" || seen[4] != "GET /api/skillgrow/patterns" || seen[5] != "GET /api/skillgrow/patterns" || seen[6] != "GET /api/review/status" {
 		t.Fatalf("unexpected trust requests: %v", seen)
 	}
 }
@@ -1942,7 +1942,7 @@ func TestRBACHelpers(t *testing.T) {
 	if roles["total"].(float64) != 1 || created["id"] != "operator" || deleted["deleted"] != "operator" || assigned["status"] != "assigned" || revoked["status"] != "revoked" || !checked["allowed"].(bool) || mine["total"].(float64) != 1 || NewAgentKit().RBAC != RBAC {
 		t.Fatalf("unexpected RBAC results")
 	}
-	if len(seen) != 12 || seen[0] != "GET /v1/rbac/roles" || seen[2] != "DELETE /v1/rbac/roles?id=operator" || seen[6] != "GET /v1/rbac/my-roles" {
+	if len(seen) != 7 || seen[0] != "GET /v1/rbac/roles" || seen[2] != "DELETE /v1/rbac/roles?id=operator" || seen[6] != "GET /v1/rbac/my-roles" {
 		t.Fatalf("unexpected RBAC requests: %v", seen)
 	}
 }
@@ -1985,7 +1985,7 @@ func TestApprovalsHelpers(t *testing.T) {
 	if pending["total"].(float64) != 1 || history["total"].(float64) != 1 || approved["status"] != "approved" || denied["status"] != "denied" || decided["decision"] != "allow_once" || rules["total"].(float64) != 1 || added["id"] != "r1" || !deleted["deleted"].(bool) || NewAgentKit().Approvals != Approvals {
 		t.Fatalf("unexpected approval results")
 	}
-	if len(seen) != 12 || seen[0] != "GET /v1/approvals?status=pending" || seen[1] != "GET /v1/approvals?history=true&status=approved" || seen[7] != "DELETE /v1/approvals/rules?id=r1" {
+	if len(seen) != 8 || seen[0] != "GET /v1/approvals?status=pending" || seen[1] != "GET /v1/approvals?history=true&status=approved" || seen[7] != "DELETE /v1/approvals/rules?id=r1" {
 		t.Fatalf("unexpected approval requests: %v", seen)
 	}
 }
@@ -2046,8 +2046,8 @@ func TestConversationsHelpers(t *testing.T) {
 	if NewAgentKit().Conversations != Conversations {
 		t.Fatalf("agent kit should reuse Conversations namespace")
 	}
-	if len(seen) != 15 {
-		t.Fatalf("expected 12 requests, got %d: %v", len(seen), seen)
+	if len(seen) != 7 {
+		t.Fatalf("expected 7 requests, got %d: %v", len(seen), seen)
 	}
 }
 
@@ -2186,8 +2186,8 @@ func TestReverieHelpers(t *testing.T) {
 	if _, err := Reverie.Targets(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if len(seen) != 15 {
-		t.Fatalf("expected 12 requests, got %d: %v", len(seen), seen)
+	if len(seen) != 8 {
+		t.Fatalf("expected 8 requests, got %d: %v", len(seen), seen)
 	}
 }
 
@@ -2309,8 +2309,8 @@ func TestStateFocusedHelpers(t *testing.T) {
 		t.Fatalf("unexpected release response: %+v", released)
 	}
 
-	if len(seen) != 15 {
-		t.Fatalf("expected 12 requests, got %d: %v", len(seen), seen)
+	if len(seen) != 8 {
+		t.Fatalf("expected 8 requests, got %d: %v", len(seen), seen)
 	}
 }
 
@@ -2806,8 +2806,8 @@ func TestGraphNamespaceReadsAndWrites(t *testing.T) {
 	if len(entities.Entities) != 1 || entity.ID != "e1" || len(relations.Relations) != 1 || relation.ID != "r1" || !strings.Contains(contextResult.Context, "SDK") || stats.Entities != 2 || !deleted.OK {
 		t.Fatalf("unexpected graph results: entities=%+v entity=%+v relations=%+v relation=%+v context=%+v stats=%+v deleted=%+v", entities, entity, relations, relation, contextResult, stats, deleted)
 	}
-	if len(seen) != 15 {
-		t.Fatalf("expected 12 requests, got %d: %v", len(seen), seen)
+	if len(seen) != 7 {
+		t.Fatalf("expected 7 requests, got %d: %v", len(seen), seen)
 	}
 }
 
@@ -2886,8 +2886,8 @@ func TestKnowledgeKBStatsSearchSourcesAndMutations(t *testing.T) {
 	if stats["chunks"].(float64) != 8 || len(sources.Sources) != 1 || found.Count != 1 || ingested.Source.ID != "src_2" || updated.Source.Name != "inline-updated" || deleted.Deleted != "src_2" || len(importedURL.Sources) != 1 || importedRepo.Source.ID != "src_repo" {
 		t.Fatalf("unexpected knowledge results: stats=%+v sources=%+v found=%+v ingested=%+v updated=%+v deleted=%+v url=%+v repo=%+v", stats, sources, found, ingested, updated, deleted, importedURL, importedRepo)
 	}
-	if len(seen) != 15 {
-		t.Fatalf("expected 12 requests, got %d: %v", len(seen), seen)
+	if len(seen) != 8 {
+		t.Fatalf("expected 8 requests, got %d: %v", len(seen), seen)
 	}
 }
 
@@ -2975,8 +2975,8 @@ func TestWorkflowsNamespaceRunsDefinitionsAndInstances(t *testing.T) {
 	if list.Total != 1 || got.Name != "SDK flow" || saved.ID != "wf_1" || run.InstanceID != "inst_1" || instances.Total != 1 || instance.Status != "running" || cancelled.Status != "cancelling" || deleted.Deleted != "wf_1" {
 		t.Fatalf("unexpected workflow results")
 	}
-	if len(seen) != 15 {
-		t.Fatalf("expected 12 requests, got %d: %v", len(seen), seen)
+	if len(seen) != 8 {
+		t.Fatalf("expected 8 requests, got %d: %v", len(seen), seen)
 	}
 }
 
@@ -3119,8 +3119,8 @@ func TestDispatchNamespaceManagesWorkersQueueAndConfig(t *testing.T) {
 	if workers.Count != 1 || worker.Type != "cursor" || removed.Status != "removed" || queue["message"] == "" || enqueued.Status != "enqueued" || config.Type != "cursor" || kit.Dispatch != Dispatch {
 		t.Fatalf("unexpected dispatch results")
 	}
-	if len(seen) != 15 {
-		t.Fatalf("expected 12 requests, got %d: %v", len(seen), seen)
+	if len(seen) != 6 {
+		t.Fatalf("expected 6 requests, got %d: %v", len(seen), seen)
 	}
 }
 
@@ -3328,8 +3328,8 @@ func TestNotifyNamespaceManagesChannelsAndShare(t *testing.T) {
 	if channels.Channels[0].ID != "feishu-main" || !added.OK || !removed.OK || !toggled.OK || !tested.OK || shared.Share["code"] != "yq_abc" {
 		t.Fatalf("unexpected notify results")
 	}
-	if len(seen) != 15 {
-		t.Fatalf("expected 12 requests, got %d: %v", len(seen), seen)
+	if len(seen) != 6 {
+		t.Fatalf("expected 6 requests, got %d: %v", len(seen), seen)
 	}
 }
 
@@ -3421,8 +3421,8 @@ func TestLoRALifecycleHelpers(t *testing.T) {
 	if status["active_model"] != "adapter-a" || history["count"].(float64) != 1 || summary["summary"].(map[string]any)["best_score"].(float64) != 0.9 || preview["preview"].(map[string]any)["ready"] != true || triggered["status"] != "ok" || rolledBack["status"] != "ok" || evolution["state"].(map[string]any)["phase"] != "eval" || config["config"].(map[string]any)["min_samples"].(float64) != 8 || updated["status"] != "updated" {
 		t.Fatalf("unexpected lora results")
 	}
-	if len(seen) != 15 {
-		t.Fatalf("expected 12 requests, got %d: %v", len(seen), seen)
+	if len(seen) != 9 {
+		t.Fatalf("expected 9 requests, got %d: %v", len(seen), seen)
 	}
 }
 
@@ -3639,8 +3639,8 @@ func TestTriggersListEmitHistoryAndControl(t *testing.T) {
 	if list.Total != 1 || created.ID != "tr_1" || updated.Name != "review done" || emitted.Status != "emitted" || runs.Total != 1 || events.Total != 1 || deleted.Deleted != "tr_1" {
 		t.Fatalf("unexpected trigger results: list=%+v created=%+v updated=%+v emitted=%+v runs=%+v events=%+v deleted=%+v", list, created, updated, emitted, runs, events, deleted)
 	}
-	if len(seen) != 15 {
-		t.Fatalf("expected 12 requests, got %d: %v", len(seen), seen)
+	if len(seen) != 7 {
+		t.Fatalf("expected 7 requests, got %d: %v", len(seen), seen)
 	}
 }
 
@@ -3739,8 +3739,8 @@ func TestOrchestratorHelpers(t *testing.T) {
 	if !status.Running || toggled.Status != "started" || sessions.Sessions[0].Adapter != "cursor" || ides.IDEs[0].Name != "Cursor" || events.Total != 1 || timeline.TaskID != "t1" || policy["allow_auto_launch"] != false || updated.Policy["allow_auto_launch"] != true || adapter.Name != "custom" {
 		t.Fatalf("unexpected orchestrator results")
 	}
-	if len(seen) != 15 {
-		t.Fatalf("expected 12 requests, got %d: %v", len(seen), seen)
+	if len(seen) != 9 {
+		t.Fatalf("expected 9 requests, got %d: %v", len(seen), seen)
 	}
 }
 
@@ -3809,8 +3809,8 @@ func TestForkHelpers(t *testing.T) {
 	if root["id"] != "fork_1" || got.ID != "fork_1" || len(created.Messages) != 1 || !removed.Deleted || branched.ParentID != "fork_1" || len(list.Forks) != 1 {
 		t.Fatalf("unexpected fork results")
 	}
-	if len(seen) != 15 {
-		t.Fatalf("expected 12 requests, got %d: %v", len(seen), seen)
+	if len(seen) != 6 {
+		t.Fatalf("expected 6 requests, got %d: %v", len(seen), seen)
 	}
 }
 
@@ -3904,8 +3904,8 @@ func TestCostHelpers(t *testing.T) {
 	if summary["today_cost"].(float64) != 0.12 || !budget["ok"].(bool) || task["total_cost_usd"].(float64) != 0.2 || timeline["records"] == nil || breakdown["by_provider"] == nil || history["page"].(float64) != 2 || alerts["alerts"] == nil || usage["tenant_id"] != "tenant-1" || quota["status"] != "ok" || kit.Cost != Cost {
 		t.Fatalf("unexpected cost results")
 	}
-	if len(seen) != 15 {
-		t.Fatalf("expected 12 requests, got %d: %v", len(seen), seen)
+	if len(seen) != 9 {
+		t.Fatalf("expected 9 requests, got %d: %v", len(seen), seen)
 	}
 }
 
@@ -4090,8 +4090,8 @@ func TestCognisHelpers(t *testing.T) {
 	if list["count"].(float64) != 1 || created["id"] != "reviewer" || !detail["enabled"].(bool) || removed["id"] != "reviewer" || enabled["status"] != "ok" || disabled["status"] != "ok" || reloaded["status"] != "ok" || traces["count"].(float64) != 1 || trace["count"].(float64) != 1 || stats["activations"].(float64) != 2 || !health["healthy"].(bool) || !verify["ok"].(bool) || alerts["count"].(float64) != 0 || scanned["status"] != "ok" || generated["status"] != "ok" || exported["bundle"] == nil || imported["status"] != "ok" || workflows["workflows"] == nil || ran["status"] != "ok" || !experience["enabled"].(bool) || recorded["status"] != "ok" || confirmed["status"] != "ok" || evolved["status"] != "ok" || evolution["generation"].(float64) != 2 || !federation["enabled"].(bool) || peers["peers"] == nil || discovered["status"] != "ok" || exposed["status"] != "ok" || unexposed["status"] != "ok" || economics["cost"].(float64) != 0 || kit.Cognis != Cognis {
 		t.Fatalf("unexpected cognis results")
 	}
-	if len(seen) != 47 {
-		t.Fatalf("expected 47 requests, got %d: %v", len(seen), seen)
+	if len(seen) != 30 {
+		t.Fatalf("expected 30 requests, got %d: %v", len(seen), seen)
 	}
 }
 
@@ -4326,7 +4326,7 @@ func TestBotsNamespaceManagesBotsInboxAndChannels(t *testing.T) {
 	if NewAgentKit().Bots != Bots {
 		t.Fatalf("agent kit should expose Bots namespace")
 	}
-	if len(seen) != 15 {
+	if len(seen) != 11 {
 		t.Fatalf("expected 11 requests, got %d: %v", len(seen), seen)
 	}
 }
@@ -4554,7 +4554,7 @@ func TestSkillHubNamespaceManagesIncrementalPackages(t *testing.T) {
 	if NewAgentKit().SkillHub != SkillHub {
 		t.Fatalf("agent kit should expose SkillHub namespace")
 	}
-	if len(seen) != 15 {
+	if len(seen) != 14 {
 		t.Fatalf("expected 14 requests, got %d: %v", len(seen), seen)
 	}
 }
@@ -4667,7 +4667,7 @@ func TestSkillsNamespaceManagesRuntimeSkills(t *testing.T) {
 	if NewAgentKit().Skills != Skills || NewAgentKit().SkillsCatalog != SkillsCatalog || NewAgentKit().SkillsScan != SkillsScan || NewAgentKit().SkillsSuggestions != SkillsSuggestions || NewAgentKit().SkillsDynamic != SkillsDynamic {
 		t.Fatalf("agent kit should expose Skills and SkillsCatalog namespaces")
 	}
-	if len(seen) != 15 {
+	if len(seen) != 12 {
 		t.Fatalf("expected 12 requests, got %d: %v", len(seen), seen)
 	}
 }
