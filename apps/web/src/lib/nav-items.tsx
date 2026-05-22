@@ -64,9 +64,9 @@ export const NAV_ITEMS: NavItem[] = [
   { id: "nav-reverie", href: "/reverie", label: "思考记录", group: "智能", layer: "lab", icon: <BrainCircuit size={16} />, keywords: "reverie 思考 记录 lab 实验" },
   { id: "nav-heartbeat", href: "/heartbeat", label: "心跳", group: "智能", layer: "lab", icon: <HeartPulse size={16} />, keywords: "heartbeat 心跳 lab 实验" },
 
-  { id: "nav-packs", href: "/packs", label: "能力包", group: "扩展", layer: "pack", defaultVisible: true, icon: <Boxes size={16} />, keywords: "packs pack runtime 增量包 能力包 热插拔 可选能力" },
-  { id: "nav-skills", href: "/skills", label: "技能", group: "扩展", layer: "pack", icon: <Package size={16} />, keywords: "skills 技能 pack 可选能力" },
-  { id: "nav-plugins", href: "/plugins", label: "插件", group: "扩展", layer: "pack", icon: <Puzzle size={16} />, keywords: "plugins 插件 pack 可选能力" },
+  { id: "nav-packs", href: "/packs", label: "能力包", group: "扩展", layer: "pack", defaultVisible: true, icon: <Boxes size={16} />, keywords: "packs pack runtime 增量包 能力包 热插拔 可选能力 默认入口" },
+  { id: "nav-skills", href: "/skills", label: "技能库", group: "扩展", layer: "lab", icon: <Package size={16} />, keywords: "skills 技能 运行时技能 高级入口 legacy pack 的原子能力来源" },
+  { id: "nav-plugins", href: "/plugins", label: "插件宿主", group: "扩展", layer: "control-plane", icon: <Puzzle size={16} />, keywords: "plugins 插件 宿主 运行时 高级入口 legacy pack 的代码载体" },
 
   { id: "nav-settings", href: "/settings", label: "设置", group: "系统", layer: "core", defaultVisible: true, icon: <Settings size={16} />, keywords: "settings 偏好 设置" },
   { id: "nav-inbox", href: "/inbox", label: "收件箱", group: "系统", layer: "control-plane", icon: <MailWarning size={16} />, keywords: "inbox 消息 通知 渠道 控制面" },
