@@ -59,21 +59,17 @@ type Planner struct {
 	ackEnabled             bool                       // send typing indicators / ack
 	locale                 string                     // agent locale (e.g. "zh-CN")
 	// browserDispatch removed — browser skills now handled via skill registry (browserskill package)
-	trustGate        *SkillTrustGate             // skill execution trust gate and score feedback
-	cognitiveContext CognitiveContextFunc        // CognitivePlugin dynamic context injector
-	beliefContext    BeliefContextFunc           // Cognition SDK belief context injector
-	ledger           *ldg.Ledger                 // Ledger instance for ReAct/Reasoning/Eval
-	reactMode        bool                        // if true, use ReAct mode instead of basic FC loop
-	longHorizonMode  bool                        // if true, use DAG planner for complex multi-step tasks
-	runState         RunStateAccessor            // per-session interrupt checking (nil = no interrupt support)
-	localBrain       *localbrain.LocalBrain      // local small model decision layer (nil = disabled)
-	agenticThinking  *localbrain.AgenticThinking // agentic thinking engine (nil = disabled)
-	fedBridge        FederationBridge            // OPP federation bridge for A2A delegation (nil = disabled)
-	providerReg      *llm.ProviderRegistry       // capability-aware provider registry (nil = use pool only)
-	cogniService     *CogniContextService        // declarative Cogni activation/context boundary
-	learningSidecar  *LearningSidecar            // post-run learning and metacognition side effects
-	skillRuntime     *SkillRuntimeService        // skill surface scoring/recommendation/growth boundary
-	proactiveCog     *ProactiveCognitionService  // proactive cognition and Reverie event boundary
+	trustGate        *SkillTrustGate            // skill execution trust gate and score feedback
+	cognitiveContext CognitiveContextFunc       // CognitivePlugin dynamic context injector
+	beliefContext    BeliefContextFunc          // Cognition SDK belief context injector
+	ledger           *ldg.Ledger                // Ledger instance for ReAct/Reasoning/Eval
+	runState         RunStateAccessor           // per-session interrupt checking (nil = no interrupt support)
+	fedBridge        FederationBridge           // OPP federation bridge for A2A delegation (nil = disabled)
+	cogniService     *CogniContextService       // declarative Cogni activation/context boundary
+	learningSidecar  *LearningSidecar           // post-run learning and metacognition side effects
+	skillRuntime     *SkillRuntimeService       // skill surface scoring/recommendation/growth boundary
+	proactiveCog     *ProactiveCognitionService // proactive cognition and Reverie event boundary
+	runtimeStrategy  *RuntimeStrategyService    // mode switches, local brain, and provider routing
 }
 
 // CogniContextFunc returns the assembled Cogni context block for the current
@@ -214,19 +210,27 @@ func (p *Planner) SetBeliefContext(fn BeliefContextFunc) { p.beliefContext = fn 
 func (p *Planner) SetLedger(l *ldg.Ledger) { p.ledger = l }
 
 // SetReActMode enables the Ledger-powered ReAct reasoning loop.
-func (p *Planner) SetReActMode(enabled bool) { p.reactMode = enabled }
+func (p *Planner) SetReActMode(enabled bool) {
+	p.ensureRuntimeStrategy().SetReActMode(enabled)
+}
 
 // SetLongHorizonMode enables the DAG-based long-horizon planner for complex tasks.
-func (p *Planner) SetLongHorizonMode(enabled bool) { p.longHorizonMode = enabled }
+func (p *Planner) SetLongHorizonMode(enabled bool) {
+	p.ensureRuntimeStrategy().SetLongHorizonMode(enabled)
+}
 
 // SetRunStateAccessor attaches the per-session interrupt checking function.
 func (p *Planner) SetRunStateAccessor(fn RunStateAccessor) { p.runState = fn }
 
 // SetLocalBrain attaches the local small model decision layer.
-func (p *Planner) SetLocalBrain(lb *localbrain.LocalBrain) { p.localBrain = lb }
+func (p *Planner) SetLocalBrain(lb *localbrain.LocalBrain) {
+	p.ensureRuntimeStrategy().SetLocalBrain(lb)
+}
 
 // SetAgenticThinking attaches the agentic thinking engine.
-func (p *Planner) SetAgenticThinking(at *localbrain.AgenticThinking) { p.agenticThinking = at }
+func (p *Planner) SetAgenticThinking(at *localbrain.AgenticThinking) {
+	p.ensureRuntimeStrategy().SetAgenticThinking(at)
+}
 
 // SetSkillGrowth attaches the autonomous skill acquisition module.
 func (p *Planner) SetSkillGrowth(sg *SkillGrowth) {
@@ -239,7 +243,9 @@ func (p *Planner) SetDataCollector(dc *DataCollector) {
 }
 
 // SetProviderRegistry attaches the capability-aware provider registry for dynamic model routing.
-func (p *Planner) SetProviderRegistry(reg *llm.ProviderRegistry) { p.providerReg = reg }
+func (p *Planner) SetProviderRegistry(reg *llm.ProviderRegistry) {
+	p.ensureRuntimeStrategy().SetProviderRegistry(reg)
+}
 
 // SetCogniContext attaches a declarative Cogni context injector. The callback
 // is invoked once per turn from the prompt builder; nil disables the layer.
@@ -296,8 +302,20 @@ func (p *Planner) ensureProactiveCognition() *ProactiveCognitionService {
 	return p.proactiveCog
 }
 
+func (p *Planner) ensureRuntimeStrategy() *RuntimeStrategyService {
+	if p.runtimeStrategy == nil {
+		p.runtimeStrategy = NewRuntimeStrategyService()
+	}
+	return p.runtimeStrategy
+}
+
 // LocalBrain returns the attached local brain (may be nil).
-func (p *Planner) LocalBrain() *localbrain.LocalBrain { return p.localBrain }
+func (p *Planner) LocalBrain() *localbrain.LocalBrain {
+	if p.runtimeStrategy == nil {
+		return nil
+	}
+	return p.runtimeStrategy.LocalBrain()
+}
 
 // LLMPool returns the attached LLM pool (may be nil).
 func (p *Planner) LLMPool() *llm.Pool { return p.llmPool }
@@ -691,7 +709,7 @@ func (p *Planner) Run(ctx context.Context, req PlanRequest) (*PlanResult, error)
 	span.Attrs["mode"] = "text-based"
 	if p.shouldUseLongHorizon(req) {
 		span.Attrs["mode"] = "long-horizon"
-	} else if p.reactMode && p.ledger != nil {
+	} else if p.runtimeStrategy != nil && p.runtimeStrategy.ReActMode() && p.ledger != nil {
 		span.Attrs["mode"] = "react"
 	} else if p.useNativeFC {
 		span.Attrs["mode"] = "native-fc"
@@ -726,9 +744,9 @@ func (p *Planner) runInner(ctx context.Context, req PlanRequest) (*PlanResult, e
 
 	// LocalBrain 预分类：用本地小模型决定路由（省 API token）
 	var lbNoTools bool
-	if p.localBrain != nil && req.ModelOverride == "" && !req.DisableDelegation {
+	if p.runtimeStrategy != nil && p.runtimeStrategy.LocalBrain() != nil && req.ModelOverride == "" && !req.DisableDelegation {
 		query := extractGoal(req)
-		if decision, err := p.localBrain.Classify(ctx, query, req.TenantID); err == nil {
+		if decision, err := p.runtimeStrategy.Classify(ctx, query, req.TenantID); err == nil {
 			slog.Info("planner: localbrain decision", "handler", decision.Handler, "intent", decision.Intent.Category, "need_tools", decision.Intent.NeedTools, "reason", decision.Reason)
 			if decision.Handler != "local" {
 				req.ModelOverride = decision.Handler
@@ -765,7 +783,7 @@ func (p *Planner) runInner(ctx context.Context, req PlanRequest) (*PlanResult, e
 		p.emitCognitiveLoadEvent(req, assessCognitiveLoad(req))
 		return p.runLongHorizon(ctx, req)
 	}
-	if p.reactMode && p.ledger != nil {
+	if p.runtimeStrategy != nil && p.runtimeStrategy.ReActMode() && p.ledger != nil {
 		return p.runReAct(ctx, req)
 	}
 	if p.useNativeFC {

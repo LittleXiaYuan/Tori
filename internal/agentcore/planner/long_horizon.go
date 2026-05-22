@@ -359,22 +359,15 @@ func (p *Planner) executeReasoningStep(ctx context.Context, req PlanRequest, pl 
 
 	// AgenticThinking: 自适应选择模型层级
 	selectedTier := req.ModelOverride
-	if selectedTier == "" && p.agenticThinking != nil {
+	if selectedTier == "" && p.runtimeStrategy != nil {
 		thinkReq := localbrain.ThinkRequest{
 			TaskID:    pl.ID,
 			TenantID:  req.TenantID,
 			Query:     step.Description,
 			StepIndex: stepIndex,
 		}
-		if agResult, err := p.agenticThinking.Think(ctx, thinkReq); err == nil {
-			switch agResult.Level {
-			case localbrain.ThinkQuick:
-				selectedTier = "fast"
-			case localbrain.ThinkDeep:
-				selectedTier = "expert"
-			default:
-				selectedTier = "smart"
-			}
+		if tier, _, _ := p.runtimeStrategy.SelectTierFromThinking(ctx, thinkReq); tier != "" {
+			selectedTier = tier
 		}
 	}
 
