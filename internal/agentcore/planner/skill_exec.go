@@ -58,11 +58,9 @@ func (p *Planner) executeSkill(ctx context.Context, name string, args map[string
 		res.Err = fmt.Errorf("unknown skill: %s", name)
 		return res
 	}
-	if p.trustCheck != nil {
-		if err := p.trustCheck(execName); err != nil {
-			res.Err = fmt.Errorf("blocked by trust gate: %w", err)
-			return res
-		}
+	if err := p.trustGate.Check(execName); err != nil {
+		res.Err = fmt.Errorf("blocked by trust gate: %w", err)
+		return res
 	}
 	t0 := time.Now()
 	defer func() {
@@ -77,9 +75,7 @@ func (p *Planner) executeSkill(ctx context.Context, name string, args map[string
 		if p.taskFailureMon != nil {
 			p.taskFailureMon.Record(res.Err != nil)
 		}
-		if p.trustRecord != nil {
-			p.trustRecord(execName, res.Err == nil)
-		}
+		p.trustGate.Record(execName, res.Err == nil)
 	}()
 	res.Output, res.Err = skill.Execute(ctx, execArgs, env)
 	return res
