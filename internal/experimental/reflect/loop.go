@@ -13,6 +13,10 @@ import (
 
 // LearningLoop implements continuous self-improvement.
 // After each interaction, it evaluates quality, extracts lessons, and updates strategy.
+//
+// Deprecated: internal/cognikernel.ReflectiveLoop is the canonical
+// post-interaction learning loop. Keep LearningLoop only for compatibility
+// until callers move their lesson extraction into the canonical pipeline.
 type LearningLoop struct {
 	llm      *llm.Client
 	onUpdate func(key, value string)                                        // callback to update memory
@@ -21,6 +25,8 @@ type LearningLoop struct {
 }
 
 // NewLearningLoop creates a learning loop.
+//
+// Deprecated: configure internal/cognikernel.ReflectiveLoop instead.
 func NewLearningLoop(llmClient *llm.Client, onUpdate func(key, value string)) *LearningLoop {
 	return &LearningLoop{llm: llmClient, onUpdate: onUpdate, engine: NewEngine(llmClient)}
 }
@@ -41,6 +47,9 @@ type Lesson struct {
 }
 
 // AfterInteraction runs after each agent interaction to extract lessons.
+//
+// Deprecated: emit ConversationEndData into cognikernel.ReflectiveLoop or
+// adapt the evaluator with Engine.AsReflectEvalFunc.
 func (l *LearningLoop) AfterInteraction(ctx context.Context, userMsg, agentReply string, skillsUsed []string, quality int) {
 	if quality >= 8 {
 		// High quality — just note what worked

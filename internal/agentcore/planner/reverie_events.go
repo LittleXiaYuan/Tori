@@ -19,6 +19,11 @@ import (
 // Events flow through ReverieEventBus → Reverie.thinkLoop selects
 // on both the timer and the event channel, triggering immediate
 // reflection when something noteworthy happens.
+//
+// Boundary note: these events are proactive cognition triggers, not a second
+// reflection owner. Post-turn learning and memory-update policy should flow
+// through internal/cognikernel.ReflectiveLoop; Reverie may later emit structured
+// events into that loop, but it should not reimplement the loop.
 // ────────────────────────────────────────────────────────────
 
 // ReverieEventType identifies the kind of external trigger.

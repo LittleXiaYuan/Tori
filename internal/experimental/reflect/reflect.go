@@ -19,6 +19,10 @@ const (
 )
 
 // Engine evaluates execution results and suggests improvements.
+//
+// Deprecated: use internal/cognikernel.ReflectiveLoop as the reflection
+// pipeline owner. Keep Engine only as an evaluator behind AsReflectEvalFunc
+// while existing callers migrate to the canonical loop.
 type Engine struct {
 	mu        sync.RWMutex
 	llm       *llm.Client // primary LLM (fallback)
@@ -29,6 +33,9 @@ type Engine struct {
 }
 
 // NewEngine creates a reflection engine.
+//
+// Deprecated: new code should configure cognikernel.ReflectiveLoop directly
+// and only use Engine through AsReflectEvalFunc for migration.
 func NewEngine(llmClient *llm.Client) *Engine {
 	return &Engine{
 		llm:     llmClient,
@@ -111,6 +118,10 @@ type MemoryUpdate struct {
 }
 
 // Evaluate assesses whether the agent's response satisfies the user's intent.
+//
+// Deprecated: prefer wiring Engine.AsReflectEvalFunc into
+// cognikernel.ReflectiveLoop, then migrate evaluator behavior into canonical
+// ReflectiveLoop hooks.
 func (e *Engine) Evaluate(ctx context.Context, userIntent, agentReply string, skillResults []string) (*Evaluation, error) {
 	if !e.Enabled() {
 		return &Evaluation{Satisfied: true, Quality: 8}, nil
@@ -159,4 +170,3 @@ func (e *Engine) Evaluate(ctx context.Context, userIntent, agentReply string, sk
 func (e *Evaluation) ShouldRetry() bool {
 	return !e.Satisfied && e.Quality < 5
 }
-
