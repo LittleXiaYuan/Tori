@@ -48,6 +48,7 @@ import (
 	agentrt "yunque-agent/internal/agentcore/runtime"
 	"yunque-agent/internal/agentcore/selfheal"
 	"yunque-agent/internal/agentcore/session"
+	"yunque-agent/internal/agentcore/skillgrowth"
 	"yunque-agent/internal/agentcore/skillmarket"
 	"yunque-agent/internal/agentcore/speech"
 	"yunque-agent/internal/agentcore/state"
@@ -224,6 +225,7 @@ type Gateway struct {
 	heartbeat       *heartbeat.Service
 	healer          *selfheal.Healer
 	lifecycle       *selfheal.Lifecycle
+	skillGrowthPipe skillgrowth.GapHandler
 	adaptiveLoop    *adaptive.Loop
 	learning        *reflectpkg.LearningLoop
 	iterateEngine   *iterate.Engine

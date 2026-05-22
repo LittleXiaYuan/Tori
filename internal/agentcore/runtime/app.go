@@ -183,4 +183,5 @@ const (
 	CompCogniTraces         = "cogni_traces"
 	CompCogniSentinel       = "cogni_sentinel"
 	CompPackRuntimeRegistry = "pack_runtime_registry"
+	CompSkillGrowthPipeline = "skillgrowth_pipeline"
 )

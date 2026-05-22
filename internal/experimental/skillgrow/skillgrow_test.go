@@ -3,6 +3,8 @@ package skillgrow
 import (
 	"context"
 	"testing"
+
+	"yunque-agent/internal/agentcore/skillgrowth"
 )
 
 func TestNewDetector(t *testing.T) {
@@ -37,8 +39,12 @@ func TestDetectorObserveBelowThreshold(t *testing.T) {
 func TestDetectorObserveAboveThreshold(t *testing.T) {
 	d := NewDetector(3)
 	proposalCalled := false
+	var gotGap skillgrowth.Gap
 	d.SetOnProposal(func(ctx context.Context, pattern, suggestion string) {
 		proposalCalled = true
+	})
+	d.SetOnGap(func(ctx context.Context, gap skillgrowth.Gap) {
+		gotGap = gap
 	})
 	d.SetMemSearch(func(ctx context.Context, query string) (int, string) {
 		return 5, "sample response" // above threshold
@@ -47,6 +53,15 @@ func TestDetectorObserveAboveThreshold(t *testing.T) {
 	d.Observe(context.Background(), "deploy to staging")
 	if !proposalCalled {
 		t.Error("expected proposal callback")
+	}
+	if gotGap.CapabilityID == "" {
+		t.Fatal("expected canonical gap callback")
+	}
+	if gotGap.Source != "skillgrow.detector" {
+		t.Fatalf("unexpected gap source: %q", gotGap.Source)
+	}
+	if gotGap.Evidence["count"] != "5" {
+		t.Fatalf("unexpected gap evidence: %#v", gotGap.Evidence)
 	}
 }
 
@@ -177,5 +192,31 @@ func TestGeneratorOnGeneratedCallback(t *testing.T) {
 	g.GenerateFromPattern(context.Background(), Pattern{Query: "cb", Count: 3})
 	if !called {
 		t.Error("expected onGenerated callback")
+	}
+}
+
+func TestPipelineGeneratorAdaptsTemplate(t *testing.T) {
+	g := NewGenerator(func(ctx context.Context, system, user string) (string, error) {
+		return `{"slug":"pipeline_skill","name":"Pipeline Skill","description":"Generated through pipeline","parameters":[],"code":"","trigger":"pipeline"}`, nil
+	})
+	adapter := NewPipelineGenerator(g)
+
+	candidate, err := adapter.GenerateCandidate(context.Background(), skillgrowth.Gap{
+		CapabilityID:   "cap.pipeline",
+		Description:    "repeat pipeline task",
+		FailureContext: "sample",
+		Evidence:       map[string]string{"count": "4"},
+	})
+	if err != nil {
+		t.Fatalf("GenerateCandidate: %v", err)
+	}
+	if candidate.ID != "pipeline_skill" {
+		t.Fatalf("candidate id = %q, want pipeline_skill", candidate.ID)
+	}
+	if candidate.CapabilityID != "cap.pipeline" {
+		t.Fatalf("candidate capability = %q, want cap.pipeline", candidate.CapabilityID)
+	}
+	if candidate.Source != "skillgrow" {
+		t.Fatalf("candidate source = %q, want skillgrow", candidate.Source)
 	}
 }

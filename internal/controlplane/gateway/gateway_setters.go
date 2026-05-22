@@ -34,6 +34,7 @@ import (
 	agentrt "yunque-agent/internal/agentcore/runtime"
 	"yunque-agent/internal/agentcore/selfheal"
 	"yunque-agent/internal/agentcore/session"
+	"yunque-agent/internal/agentcore/skillgrowth"
 	"yunque-agent/internal/agentcore/skillmarket"
 	"yunque-agent/internal/agentcore/speech"
 	"yunque-agent/internal/agentcore/state"
@@ -118,6 +119,13 @@ func (g *Gateway) SetHealer(h *selfheal.Healer) { g.healer = h }
 
 // SetLifecycle attaches a skill lifecycle manager.
 func (g *Gateway) SetLifecycle(lc *selfheal.Lifecycle) { g.lifecycle = lc }
+
+// SetSkillGrowthPipeline attaches the canonical detect→generate→review→promote
+// skill-growth pipeline. Detectors should feed capability gaps here instead of
+// directly generating/installing skills.
+func (g *Gateway) SetSkillGrowthPipeline(p skillgrowth.GapHandler) {
+	g.skillGrowthPipe = p
+}
 
 // SetPersonaChain attaches a persona priority chain for session/conversation overrides.
 func (g *Gateway) SetPersonaChain(pc *persona.PriorityChain) { g.personaChain = pc }
@@ -274,6 +282,18 @@ func (g *Gateway) SetSkillGrow(sg *skillgrow.Detector) {
 					_ = g.orchestrator.Ingest(ctx, "default", fact, "skill_pattern", "skillgrow")
 				})
 			}
+		})
+		sg.SetOnGap(func(ctx context.Context, gap skillgrowth.Gap) {
+			if g.skillGrowthPipe == nil {
+				return
+			}
+			safego.Go("skillgrowth-pipeline", func() {
+				pipeCtx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+				defer cancel()
+				if _, _, err := g.skillGrowthPipe.HandleGap(pipeCtx, gap); err != nil {
+					slog.Warn("skillgrowth: pipeline gap handling failed", "capability", gap.CapabilityID, "err", err)
+				}
+			})
 		})
 	}
 }
