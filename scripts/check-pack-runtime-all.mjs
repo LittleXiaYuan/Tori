@@ -26,6 +26,11 @@ const checks = [
     args: ["scripts/check-pack-capability-registry.mjs"],
   },
   {
+    name: "Pack manifest schema",
+    command: process.execPath,
+    args: ["scripts/check-pack-manifest-schema.mjs"],
+  },
+  {
     name: "Pack scaffold contract",
     command: process.execPath,
     args: ["scripts/check-pack-scaffold.mjs"],
