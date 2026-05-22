@@ -3,6 +3,7 @@ export interface WorkloadPreset {
   title: string;
   subtitle: string;
   description: string;
+  badge?: string;
   capabilities: string[];
 }
 
@@ -72,8 +73,9 @@ export const WORKLOAD_PRESETS: WorkloadPreset[] = [
   {
     id: "cogni-lab",
     title: "Cogni / 实验",
-    subtitle: "把声明式认知能力当成单独工作负载",
-    description: "把 Cogni 声明、经验、进化和联邦能力收成一条实验路径。",
+    subtitle: "查看云雀核心声明层，而不是普通能力包",
+    description: "Cogni 是所有工作负载背后的组织原则；这里作为实验入口暴露声明、经验、进化和联邦观测面。",
+    badge: "核心解释层",
     capabilities: [
       "cognis.generate",
       "cognis.workflows",
