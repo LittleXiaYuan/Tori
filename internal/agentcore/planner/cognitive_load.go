@@ -130,7 +130,7 @@ func countKeywordHits(text string, keywords []string) int {
 }
 
 func (p *Planner) shouldUseLongHorizon(req PlanRequest) bool {
-	if !p.longHorizonMode {
+	if p.runtimeStrategy == nil || !p.runtimeStrategy.LongHorizonMode() {
 		return false
 	}
 	return p.isComplexTask(req)

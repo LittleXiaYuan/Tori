@@ -64,7 +64,7 @@ func (p *Planner) runReAct(ctx context.Context, req PlanRequest) (*PlanResult, e
 		}
 
 		// 第一阶段：Agentic Thinking 决定思考深度
-		if p.agenticThinking != nil && len(history) > 0 {
+		if p.runtimeStrategy != nil && len(history) > 0 {
 			lastObs := ""
 			if last := history[len(history)-1]; last.Result != nil {
 				if last.Result.Error != "" {
@@ -82,26 +82,16 @@ func (p *Planner) runReAct(ctx context.Context, req PlanRequest) (*PlanResult, e
 				StepIndex:        len(history),
 				StepHistory:      convertToStepSummary(history),
 			}
-			if agResult, err := p.agenticThinking.Think(ctx, thinkReq); err == nil {
-				// 如果 AgenticThinking 判断任务已完成
-				if agResult.ShouldStop {
-					return &ldg.ThinkResult{
-						Thought:    agResult.Thought,
-						Answer:     agResult.Thought,
-						Confidence: agResult.Confidence,
-					}, nil
-				}
-				// 根据思考深度选择模型层级
-				if selectedTier == "" {
-					switch agResult.Level {
-					case localbrain.ThinkQuick:
-						selectedTier = "fast"
-					case localbrain.ThinkDeep:
-						selectedTier = "expert"
-					default:
-						selectedTier = "smart"
-					}
-				}
+			tier, stop, agResult := p.runtimeStrategy.SelectTierFromThinking(ctx, thinkReq)
+			if stop && agResult != nil {
+				return &ldg.ThinkResult{
+					Thought:    agResult.Thought,
+					Answer:     agResult.Thought,
+					Confidence: agResult.Confidence,
+				}, nil
+			}
+			if selectedTier == "" && tier != "" {
+				selectedTier = tier
 			}
 		}
 

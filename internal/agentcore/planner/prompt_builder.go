@@ -53,7 +53,7 @@ func NewPromptBuilder(p *Planner) *PromptBuilder {
 		cogniService:       p.cogniService,
 		beliefContext:      p.beliefContext,
 		dynBudget:          p.dynContextBudget,
-		contextFilter:      p.localBrain,
+		contextFilter:      p.LocalBrain(),
 	}
 }
 

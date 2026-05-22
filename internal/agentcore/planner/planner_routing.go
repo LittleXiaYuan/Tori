@@ -99,8 +99,8 @@ func (p *Planner) selectClientWithCaps(req PlanRequest, messages []llm.Message) 
 		}
 	}
 
-	if len(requiredCaps) > 0 && p.providerReg != nil {
-		if vp := p.providerReg.SelectByCapability(requiredCaps...); vp != nil {
+	if len(requiredCaps) > 0 && p.runtimeStrategy != nil {
+		if vp := p.runtimeStrategy.SelectProviderByCapability(requiredCaps...); vp != nil {
 			slog.Info("planner: capability routing selected vision-capable provider",
 				"provider", vp.Config.ID, "model", vp.Config.Model, "caps", requiredCaps)
 			return vp.Client
