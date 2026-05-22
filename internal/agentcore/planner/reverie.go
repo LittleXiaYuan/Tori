@@ -18,6 +18,11 @@ import (
 // a continuous stream of consciousness: periodic reflection, thought generation,
 // significance filtering, and proactive delivery.
 //
+// Reverie is not the canonical post-turn reflection pipeline. It is a proactive
+// cognition/event producer: generated thoughts should feed memory, tasks,
+// user-visible nudges, or the cognikernel ReflectiveLoop as structured events,
+// while completed interaction learning remains owned by ReflectiveLoop.
+//
 // Based on Stanford's "Generative Agents" (Park et al., 2023).
 
 type Reverie struct {
@@ -107,12 +112,12 @@ func NewReverie(cfg ReverieConfig) *Reverie {
 	return r
 }
 
-func (r *Reverie) SetLLMCall(fn LLMCallFunc)                 { r.llmCall = fn }
-func (r *Reverie) SetRecall(fn func(query string) string)     { r.recall = fn }
-func (r *Reverie) SetDeliver(fn func(thought Thought))        { r.deliver = fn }
-func (r *Reverie) GetDeliver() func(Thought)                  { return r.deliver }
-func (r *Reverie) SetOnThought(fn func(Thought))              { r.onThought = fn }
-func (r *Reverie) SetEventBus(bus *ReverieEventBus)            { r.eventBus = bus }
+func (r *Reverie) SetLLMCall(fn LLMCallFunc)              { r.llmCall = fn }
+func (r *Reverie) SetRecall(fn func(query string) string) { r.recall = fn }
+func (r *Reverie) SetDeliver(fn func(thought Thought))    { r.deliver = fn }
+func (r *Reverie) GetDeliver() func(Thought)              { return r.deliver }
+func (r *Reverie) SetOnThought(fn func(Thought))          { r.onThought = fn }
+func (r *Reverie) SetEventBus(bus *ReverieEventBus)       { r.eventBus = bus }
 
 // SetKVStore enables Ledger KV-backed persistence for the thought journal.
 func (r *Reverie) SetKVStore(kvs *iledger.KVConfigStore) {
@@ -122,9 +127,13 @@ func (r *Reverie) SetKVStore(kvs *iledger.KVConfigStore) {
 	r.loadJournalFromKV()
 }
 
-func (r *Reverie) SetWriteMemory(fn func(ctx context.Context, fact string) error)        { r.writeMemory = fn }
-func (r *Reverie) SetCreateTask(fn func(ctx context.Context, title, desc string) error)   { r.createTask = fn }
-func (r *Reverie) SetUpdateProfile(fn func(ctx context.Context, key, value string) error) { r.updateProfile = fn }
+func (r *Reverie) SetWriteMemory(fn func(ctx context.Context, fact string) error) { r.writeMemory = fn }
+func (r *Reverie) SetCreateTask(fn func(ctx context.Context, title, desc string) error) {
+	r.createTask = fn
+}
+func (r *Reverie) SetUpdateProfile(fn func(ctx context.Context, key, value string) error) {
+	r.updateProfile = fn
+}
 
 func (r *Reverie) ActionLog() []ActionRecord {
 	r.mu.Lock()

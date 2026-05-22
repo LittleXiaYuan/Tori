@@ -14,6 +14,11 @@ import (
 //
 // This loop runs asynchronously after each conversation, ensuring every
 // interaction contributes to the agent's learning spiral.
+//
+// ReflectiveLoop is the canonical owner for AgentCore reflection. New
+// post-turn learning, feedback ingestion, experience extraction, or memory
+// update behavior should plug into this loop instead of adding another
+// reflection path under Planner or internal/experimental/reflect.
 type ReflectiveLoop struct {
 	reflectFn    ReflectEvalFunc
 	experienceFn ExperienceRecordFunc
