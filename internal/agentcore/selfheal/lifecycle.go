@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+
+	"yunque-agent/internal/agentcore/skillgrowth"
 )
 
 // LifecycleState represents the current state of a skill candidate.
@@ -35,6 +37,8 @@ type Candidate struct {
 }
 
 // Lifecycle manages the candidate → promote → rollback lifecycle for generated skills.
+// It is the canonical promote/rollback state owner behind the
+// internal/agentcore/skillgrowth pipeline.
 type Lifecycle struct {
 	mu         sync.RWMutex
 	healer     *Healer
@@ -56,6 +60,17 @@ func NewLifecycle(healer *Healer, dataDir string) *Lifecycle {
 	}
 	lc.load()
 	return lc
+}
+
+// GenerateSkillGrowthCandidate creates a lifecycle candidate from a canonical
+// skill-growth gap. It implements the generation stage for deployments that use
+// selfheal plugins as generated abilities.
+func (lc *Lifecycle) GenerateSkillGrowthCandidate(ctx context.Context, gap skillgrowth.Gap) (*skillgrowth.Candidate, error) {
+	candidate, err := lc.GenerateCandidate(ctx, gap.DescriptionWithContext())
+	if err != nil {
+		return nil, err
+	}
+	return CandidateToSkillGrowth(gap.CapabilityID, candidate), nil
 }
 
 // GenerateCandidate creates a new candidate skill via LLM but does NOT hot-load it.
@@ -92,6 +107,20 @@ func (lc *Lifecycle) GenerateCandidate(ctx context.Context, reason string) (*Can
 	return c, nil
 }
 
+// PromoteCandidate promotes a canonical skill-growth candidate by delegating to
+// Lifecycle.Promote.
+func (lc *Lifecycle) PromoteCandidate(ctx context.Context, candidateID string) (*skillgrowth.PromotionResult, error) {
+	if err := lc.Promote(ctx, candidateID); err != nil {
+		return nil, err
+	}
+	candidate, _ := lc.Get(candidateID)
+	result := &skillgrowth.PromotionResult{CandidateID: candidateID, Outcome: string(StatePromoted)}
+	if candidate != nil {
+		result.RegisteredName = candidate.Plugin.SkillName
+	}
+	return result, nil
+}
+
 // Promote validates and hot-loads a candidate skill into the running agent.
 func (lc *Lifecycle) Promote(ctx context.Context, candidateID string) error {
 	lc.mu.Lock()
@@ -122,6 +151,12 @@ func (lc *Lifecycle) Promote(ctx context.Context, candidateID string) error {
 	return nil
 }
 
+// RollbackCandidate rolls back a canonical skill-growth candidate by delegating
+// to Lifecycle.Rollback.
+func (lc *Lifecycle) RollbackCandidate(ctx context.Context, candidateID, reason string) error {
+	return lc.Rollback(candidateID)
+}
+
 // Reject marks a candidate as rejected without installing it.
 func (lc *Lifecycle) Reject(candidateID, reason string) error {
 	lc.mu.Lock()
@@ -140,6 +175,27 @@ func (lc *Lifecycle) Reject(candidateID, reason string) error {
 	lc.save()
 	slog.Info("lifecycle: candidate rejected", "id", candidateID, "reason", reason)
 	return nil
+}
+
+// CandidateToSkillGrowth maps a selfheal lifecycle candidate to the canonical
+// skill-growth candidate shape.
+func CandidateToSkillGrowth(capabilityID string, candidate *Candidate) *skillgrowth.Candidate {
+	if candidate == nil {
+		return nil
+	}
+	return &skillgrowth.Candidate{
+		ID:           candidate.ID,
+		CapabilityID: capabilityID,
+		Name:         candidate.Plugin.SkillName,
+		Description:  candidate.Plugin.SkillDesc,
+		Source:       "selfheal.lifecycle",
+		CreatedAt:    candidate.CreatedAt,
+		Metadata: map[string]string{
+			"plugin": candidate.Plugin.Name,
+			"state":  string(candidate.State),
+			"reason": candidate.Reason,
+		},
+	}
 }
 
 // Rollback removes a previously promoted skill from the running agent.

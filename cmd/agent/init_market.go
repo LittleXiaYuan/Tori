@@ -9,9 +9,10 @@ import (
 
 	"yunque-agent/internal/agentcore/planner"
 	agentrt "yunque-agent/internal/agentcore/runtime"
-	"yunque-agent/internal/appdir"
+	"yunque-agent/internal/agentcore/skillgrowth"
 	"yunque-agent/internal/agentcore/skillmarket"
 	"yunque-agent/internal/agentcore/websearch"
+	"yunque-agent/internal/appdir"
 	"yunque-agent/internal/controlplane/gateway"
 	"yunque-agent/internal/experimental/skillgrow"
 )
@@ -171,12 +172,22 @@ func initMarketplace(app *agentrt.App, gw *gateway.Gateway, p *planner.Planner) 
 				return name, nil
 			})
 			sg.SetGenerate(gen.Generate)
+			pipe := skillgrowth.NewPipeline(skillgrowth.DefaultPipelineConfig())
+			pipe.SetGenerator(planner.NewSkillGrowthPipelineGenerator(gen.Generate))
+			gw.SetSkillGrowthPipeline(pipe)
+			app.Set(agentrt.CompSkillGrowthPipeline, pipe)
 
 			// Wire auto-generation to the skill growth detector
 			if detRaw, ok := app.Get("skillgrow_detector"); ok {
 				if det, ok := detRaw.(*skillgrow.Detector); ok {
-					det.SetGenerateSkill(gen.Generate)
-					slog.Info("skillgrow: auto-generate wired to detector")
+					// Compatibility fallback: the detector now emits canonical
+					// skillgrowth.Gap events into the pipeline via Gateway.SetSkillGrow.
+					// Keep direct generation available only when no pipeline was
+					// registered.
+					if _, ok := app.Get(agentrt.CompSkillGrowthPipeline); !ok {
+						det.SetGenerateSkill(gen.Generate)
+						slog.Info("skillgrow: direct auto-generate wired to detector")
+					}
 				}
 			}
 

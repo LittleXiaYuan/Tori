@@ -24,11 +24,11 @@ type PromptInvalidator func()
 
 // Healer generates plugins automatically when the agent encounters tasks it cannot handle.
 type Healer struct {
-	pluginsDir  string
-	llm         LLMFunc
-	pluginReg   *plugin.Registry
-	skillReg    *skills.Registry
-	invalidate  PromptInvalidator
+	pluginsDir string
+	llm        LLMFunc
+	pluginReg  *plugin.Registry
+	skillReg   *skills.Registry
+	invalidate PromptInvalidator
 }
 
 // New creates a self-healing plugin generator.
@@ -284,8 +284,8 @@ type hotLoadedSkill struct {
 	params map[string]any
 }
 
-func (s *hotLoadedSkill) Name() string              { return s.name }
-func (s *hotLoadedSkill) Description() string       { return s.desc }
+func (s *hotLoadedSkill) Name() string               { return s.name }
+func (s *hotLoadedSkill) Description() string        { return s.desc }
 func (s *hotLoadedSkill) Parameters() map[string]any { return s.params }
 func (s *hotLoadedSkill) Execute(_ context.Context, _ map[string]any, _ *skills.Environment) (string, error) {
 	return "", fmt.Errorf("hot-loaded skill %q requires external executor", s.name)
@@ -395,7 +395,6 @@ func (h *Healer) HealGap(ctx context.Context, gap CapabilityGap) (*GeneratedPlug
 
 	return gp, nil
 }
-
 
 func orDefault(s, def string) string {
 	if s == "" {

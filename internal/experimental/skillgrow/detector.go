@@ -5,6 +5,8 @@ import (
 	"log/slog"
 	"sync"
 	"time"
+
+	"yunque-agent/internal/agentcore/skillgrowth"
 )
 
 // kvStore abstracts Ledger KV to avoid import cycles.
@@ -21,27 +23,36 @@ type ProposalCallback func(ctx context.Context, pattern, suggestion string)
 
 // Pattern tracks a detected repeated behavior.
 type Pattern struct {
-	Query     string    `json:"query"`
-	Count     int       `json:"count"`
-	Sample    string    `json:"sample"`
+	Query      string    `json:"query"`
+	Count      int       `json:"count"`
+	Sample     string    `json:"sample"`
 	DetectedAt time.Time `json:"detected_at"`
-	Proposed  bool      `json:"proposed"`
+	Proposed   bool      `json:"proposed"`
 }
 
 // GenerateSkillFunc creates and registers a Skill from a detected pattern.
 type GenerateSkillFunc func(ctx context.Context, capabilityDesc string, failureContext string) (registeredName string, err error)
 
+// GapCallback is called when a repeated pattern should enter the canonical
+// skill-growth pipeline.
+type GapCallback func(ctx context.Context, gap skillgrowth.Gap)
+
 // Detector monitors user interactions for repeated patterns
 // and proposes automatic skill creation.
+//
+// Detector owns the detect stage only. It should emit skillgrowth.Gap values
+// into the canonical pipeline; direct generation is kept as a compatibility
+// fallback while callers migrate.
 type Detector struct {
-	mu           sync.Mutex
-	memSearch    MemSearchFunc
-	onProposal   ProposalCallback
+	mu            sync.Mutex
+	memSearch     MemSearchFunc
+	onProposal    ProposalCallback
+	onGap         GapCallback
 	generateSkill GenerateSkillFunc
-	threshold    int              // minimum similar queries to trigger (default 3)
-	patterns     map[string]*Pattern
-	cooldown     time.Duration
-	kvs          kvStore
+	threshold     int // minimum similar queries to trigger (default 3)
+	patterns      map[string]*Pattern
+	cooldown      time.Duration
+	kvs           kvStore
 }
 
 // NewDetector creates a skill growth detector.
@@ -62,7 +73,12 @@ func (d *Detector) SetMemSearch(fn MemSearchFunc) { d.memSearch = fn }
 // SetOnProposal attaches the callback for when a skill creation is proposed.
 func (d *Detector) SetOnProposal(fn ProposalCallback) { d.onProposal = fn }
 
+// SetOnGap attaches the canonical pipeline callback for detected gaps.
+func (d *Detector) SetOnGap(fn GapCallback) { d.onGap = fn }
+
 // SetGenerateSkill attaches a function to auto-generate and register Skills from patterns.
+//
+// Deprecated: use SetOnGap to feed internal/agentcore/skillgrowth.Pipeline.
 func (d *Detector) SetGenerateSkill(fn GenerateSkillFunc) { d.generateSkill = fn }
 
 // SetKVStore enables Ledger KV-backed persistence for detected patterns.
@@ -146,6 +162,19 @@ func (d *Detector) Observe(ctx context.Context, query string) {
 		if d.onProposal != nil {
 			d.onProposal(ctx, key, suggestion)
 		}
+		if d.onGap != nil {
+			d.onGap(ctx, skillgrowth.Gap{
+				CapabilityID:   key,
+				Description:    query,
+				FailureContext: sample,
+				Source:         "skillgrow.detector",
+				Evidence: map[string]string{
+					"count":  itoa(count),
+					"sample": sample,
+				},
+				DetectedAt: p.DetectedAt,
+			})
+		}
 		if d.generateSkill != nil {
 			go func() {
 				genCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -205,6 +234,19 @@ func (d *Detector) ObserveActions(ctx context.Context, actions []string) {
 			slog.Info("skillgrow: action pattern detected", "action", action, "count", count)
 			if d.onProposal != nil {
 				d.onProposal(ctx, key, suggestion)
+			}
+			if d.onGap != nil {
+				d.onGap(ctx, skillgrowth.Gap{
+					CapabilityID:   key,
+					Description:    "自动化操作: " + action,
+					FailureContext: "用户频繁使用 " + action,
+					Source:         "skillgrow.action_detector",
+					Evidence: map[string]string{
+						"count":  itoa(count),
+						"action": action,
+					},
+					DetectedAt: p.DetectedAt,
+				})
 			}
 			if d.generateSkill != nil {
 				actionCopy := action

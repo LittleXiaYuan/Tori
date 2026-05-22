@@ -2,6 +2,7 @@ package skillgrow
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -9,6 +10,8 @@ import (
 
 	"yunque-agent/pkg/jsonutil"
 )
+
+var ErrNoGenerator = errors.New("skillgrow: generator not configured")
 
 // LLMFunc abstracts an LLM call for skill code generation.
 type LLMFunc func(ctx context.Context, system, user string) (string, error)
@@ -20,9 +23,9 @@ type SkillTemplate struct {
 	Description string            `json:"description"`
 	Parameters  []SkillParam      `json:"parameters"`
 	Code        string            `json:"code"`
-	Trigger     string            `json:"trigger"`  // pattern that triggers this skill
+	Trigger     string            `json:"trigger"` // pattern that triggers this skill
 	Confidence  float64           `json:"confidence"`
-	Source      string            `json:"source"`   // "skillgrow" | "user_request"
+	Source      string            `json:"source"` // "skillgrow" | "user_request"
 	CreatedAt   time.Time         `json:"created_at"`
 	Metadata    map[string]string `json:"metadata,omitempty"`
 }
@@ -39,10 +42,10 @@ type SkillParam struct {
 type FeedbackKind string
 
 const (
-	FeedbackAccept  FeedbackKind = "accept"
-	FeedbackReject  FeedbackKind = "reject"
-	FeedbackModify  FeedbackKind = "modify"
-	FeedbackIgnore  FeedbackKind = "ignore"
+	FeedbackAccept FeedbackKind = "accept"
+	FeedbackReject FeedbackKind = "reject"
+	FeedbackModify FeedbackKind = "modify"
+	FeedbackIgnore FeedbackKind = "ignore"
 )
 
 // Generator creates new skills from detected patterns.
@@ -172,4 +175,3 @@ func (g *Generator) AcceptedSkills() []SkillTemplate {
 	}
 	return out
 }
-

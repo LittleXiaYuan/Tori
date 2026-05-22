@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"yunque-agent/internal/agentcore/skillgrowth"
 )
 
 func mockLLM(_ context.Context, _, _ string) (string, error) {
@@ -261,6 +263,43 @@ func TestLifecycle_DoublePromote(t *testing.T) {
 	err := lc.Promote(context.Background(), c.ID)
 	if err == nil {
 		t.Fatal("expected error on double promote")
+	}
+}
+
+func TestLifecycleSkillGrowthAdapters(t *testing.T) {
+	dir := t.TempDir()
+	healer := New(filepath.Join(dir, "plugins"), mockLLM)
+	lc := NewLifecycle(healer, dir)
+
+	candidate, err := lc.GenerateSkillGrowthCandidate(context.Background(), skillgrowth.Gap{
+		CapabilityID:   "cap.selfheal",
+		Description:    "user needs calculator",
+		FailureContext: "missing calculator",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if candidate.CapabilityID != "cap.selfheal" {
+		t.Fatalf("unexpected capability: %s", candidate.CapabilityID)
+	}
+	if candidate.Source != "selfheal.lifecycle" {
+		t.Fatalf("unexpected source: %s", candidate.Source)
+	}
+
+	result, err := lc.PromoteCandidate(context.Background(), candidate.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.RegisteredName != "test_skill" {
+		t.Fatalf("unexpected registered name: %s", result.RegisteredName)
+	}
+
+	if err := lc.RollbackCandidate(context.Background(), candidate.ID, "test rollback"); err != nil {
+		t.Fatal(err)
+	}
+	updated, _ := lc.Get(candidate.ID)
+	if updated.State != StateRolledBack {
+		t.Fatalf("expected rolled_back, got %s", updated.State)
 	}
 }
 

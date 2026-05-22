@@ -10,7 +10,7 @@ import (
 // SkillGrowthConfig controls autonomous skill acquisition behavior.
 type SkillGrowthConfig struct {
 	Enabled        bool          `json:"enabled"`
-	AutoInstall    bool          `json:"auto_install"`    // install without user approval
+	AutoInstall    bool          `json:"auto_install"` // install without user approval
 	SearchTimeout  time.Duration `json:"search_timeout"`
 	MaxAutoInstall int           `json:"max_auto_install"` // per-session limit
 }
@@ -36,6 +36,11 @@ type SkillInstallFunc func(ctx context.Context, slug string) (registeredName str
 type SkillGenerateFunc func(ctx context.Context, capabilityDesc string, failureContext string) (registeredName string, err error)
 
 // SkillGrowth handles autonomous skill acquisition when the planner encounters missing capabilities.
+//
+// Deprecated as an ownership boundary: the canonical skill-growth flow is
+// internal/agentcore/skillgrowth.Pipeline. Keep this type as the planner's
+// runtime adapter for marketplace search/install and missing-capability
+// fallback while pipeline migration continues.
 type SkillGrowth struct {
 	config   SkillGrowthConfig
 	search   SkillSearchFunc
