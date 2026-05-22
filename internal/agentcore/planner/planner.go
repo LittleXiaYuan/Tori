@@ -61,21 +61,20 @@ type Planner struct {
 	ackEnabled             bool                       // send typing indicators / ack
 	locale                 string                     // agent locale (e.g. "zh-CN")
 	// browserDispatch removed — browser skills now handled via skill registry (browserskill package)
-	trustRecord      func(skillName string, success bool) // trust score recorder (nil = disabled)
-	trustCheck       func(skillName string) error         // trust gate: returns non-nil to block skill
-	cognitiveContext CognitiveContextFunc                 // CognitivePlugin dynamic context injector
-	beliefContext    BeliefContextFunc                    // Cognition SDK belief context injector
-	ledger           *ldg.Ledger                          // Ledger instance for ReAct/Reasoning/Eval
-	reactMode        bool                                 // if true, use ReAct mode instead of basic FC loop
-	longHorizonMode  bool                                 // if true, use DAG planner for complex multi-step tasks
-	runState         RunStateAccessor                     // per-session interrupt checking (nil = no interrupt support)
-	localBrain       *localbrain.LocalBrain               // local small model decision layer (nil = disabled)
-	agenticThinking  *localbrain.AgenticThinking          // agentic thinking engine (nil = disabled)
-	fedBridge        FederationBridge                     // OPP federation bridge for A2A delegation (nil = disabled)
-	providerReg      *llm.ProviderRegistry                // capability-aware provider registry (nil = use pool only)
-	cogniService     *CogniContextService                 // declarative Cogni activation/context boundary
-	learningSidecar  *LearningSidecar                     // post-run learning and metacognition side effects
-	skillRuntime     *SkillRuntimeService                 // skill surface scoring/recommendation/growth boundary
+	trustGate        *SkillTrustGate             // skill execution trust gate and score feedback
+	cognitiveContext CognitiveContextFunc        // CognitivePlugin dynamic context injector
+	beliefContext    BeliefContextFunc           // Cognition SDK belief context injector
+	ledger           *ldg.Ledger                 // Ledger instance for ReAct/Reasoning/Eval
+	reactMode        bool                        // if true, use ReAct mode instead of basic FC loop
+	longHorizonMode  bool                        // if true, use DAG planner for complex multi-step tasks
+	runState         RunStateAccessor            // per-session interrupt checking (nil = no interrupt support)
+	localBrain       *localbrain.LocalBrain      // local small model decision layer (nil = disabled)
+	agenticThinking  *localbrain.AgenticThinking // agentic thinking engine (nil = disabled)
+	fedBridge        FederationBridge            // OPP federation bridge for A2A delegation (nil = disabled)
+	providerReg      *llm.ProviderRegistry       // capability-aware provider registry (nil = use pool only)
+	cogniService     *CogniContextService        // declarative Cogni activation/context boundary
+	learningSidecar  *LearningSidecar            // post-run learning and metacognition side effects
+	skillRuntime     *SkillRuntimeService        // skill surface scoring/recommendation/growth boundary
 }
 
 // CogniContextFunc returns the assembled Cogni context block for the current
@@ -193,10 +192,14 @@ func (p *Planner) SetReverie(r *Reverie) { p.reverie = r }
 func (p *Planner) SetTaskFailureMonitor(m *TaskFailureMonitor) { p.taskFailureMon = m }
 
 // SetTrustRecord attaches a callback called after each skill execution to update trust scores.
-func (p *Planner) SetTrustRecord(fn func(skillName string, success bool)) { p.trustRecord = fn }
+func (p *Planner) SetTrustRecord(fn func(skillName string, success bool)) {
+	p.ensureTrustGate().SetRecord(fn)
+}
 
 // SetTrustCheck attaches a gate called before each skill execution.
-func (p *Planner) SetTrustCheck(fn func(skillName string) error) { p.trustCheck = fn }
+func (p *Planner) SetTrustCheck(fn func(skillName string) error) {
+	p.ensureTrustGate().SetCheck(fn)
+}
 
 // SetCognitiveContext attaches the CognitivePlugin dynamic context collector.
 func (p *Planner) SetCognitiveContext(fn CognitiveContextFunc) { p.cognitiveContext = fn }
@@ -274,6 +277,13 @@ func (p *Planner) ensureSkillRuntime() *SkillRuntimeService {
 		p.skillRuntime = NewSkillRuntimeService(p.registry)
 	}
 	return p.skillRuntime
+}
+
+func (p *Planner) ensureTrustGate() *SkillTrustGate {
+	if p.trustGate == nil {
+		p.trustGate = NewSkillTrustGate()
+	}
+	return p.trustGate
 }
 
 // LocalBrain returns the attached local brain (may be nil).
