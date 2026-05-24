@@ -212,9 +212,7 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 			planSteps = applied.PlanSteps
 			messages = append(messages, applied.Processed.ToolMessage)
 		}
-		recovery := p.ensureExecutionRuntime().ApplyToolFailureRecoveryForRequest(
-			p.ensureExecutionRuntime().ToolFailureRecoveryRequestForState(toolPostprocessState()),
-		)
+		recovery := p.ensureExecutionRuntime().ApplyToolFailureRecoveryForState(toolPostprocessState())
 		lastRecoveryFailedCount = recovery.LastFailedCount
 		if recovery.Applied {
 			messages = append(messages, p.ensureExecutionRuntime().RecoveryPromptMessageForRequest(RecoveryPromptMessageRequest{Prompt: recovery.Prompt}))

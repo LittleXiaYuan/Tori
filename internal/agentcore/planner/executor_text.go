@@ -446,9 +446,7 @@ func (p *Planner) runTextBased(ctx context.Context, req PlanRequest) (*PlanResul
 			results = append(results, applied.Processed.ResultLine)
 		}
 
-		recovery := p.ensureExecutionRuntime().ApplyToolFailureRecoveryForRequest(
-			p.ensureExecutionRuntime().ToolFailureRecoveryRequestForState(toolPostprocessState()),
-		)
+		recovery := p.ensureExecutionRuntime().ApplyToolFailureRecoveryForState(toolPostprocessState())
 		lastRecoveryFailedCount = recovery.LastFailedCount
 		reflection := p.ensureExecutionRuntime().BuildTextReflectionPromptForRequest(TextReflectionPromptRequest{
 			AssistantReply: reply,

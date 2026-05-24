@@ -804,8 +804,8 @@ for (const needle of [
   "extension/callback contracts",
   "runtime setter/facade split",
   "runtime service factory split",
-  "ExecutionRuntimeService.ApplyToolFailureRecoveryForRequest",
-  "tool-failure recovery post-processing",
+  "ExecutionRuntimeService.ApplyToolFailureRecoveryForState",
+  "tool-failure recovery state helper",
   "ExecutionRuntimeService.ToolPostprocessStateForRequest",
   "tool postprocess state helper",
   "ExecutionRuntimeService.CollectToolResultsInOrder",
@@ -939,6 +939,9 @@ for (const needle of [
   "tool-result postprocess application helper",
   "ToolResultPostprocessApplicationRequest",
   "ApplyToolResultPostprocessForState",
+  "第七十批",
+  "tool-failure recovery state helper",
+  "ApplyToolFailureRecoveryForState",
   "第五十五批",
   "partial-result fallback post-processing helper",
   "PartialPlanResultRequest",
@@ -988,6 +991,7 @@ for (const needle of [
   "CollectToolResultsInOrder",
   "ToolResultPostprocessApplicationRequest",
   "ApplyToolResultPostprocessForState",
+  "ApplyToolFailureRecoveryForState",
   "RuntimeContextItem",
   "RuntimeContextFilterResult",
   "RuntimeThinkRequest",
@@ -1086,9 +1090,8 @@ for (const [relPath, label] of [
     "EmitToolStartForRequest",
     "ApplyReflectRetryForRequest",
     "ApplyToolResultPostprocessForState",
-    "ApplyToolFailureRecoveryForRequest",
+    "ApplyToolFailureRecoveryForState",
     "ToolPostprocessStateForRequest",
-    "ToolFailureRecoveryRequestForState",
     "CollectToolResultsInOrder",
     "PartialPlanResultForRequest",
     "PlanResultStateForRequest",
@@ -1134,7 +1137,7 @@ for (const [relPath, label] of [
     "lastRecoveryFailedCount = summary.FailedCount",
   ]) {
     if (source.includes(forbidden)) {
-      failures.push(`${relPath} leaks tool-failure recovery post-processing detail ${JSON.stringify(forbidden)} in ${label}; use ExecutionRuntimeService.ApplyToolFailureRecoveryForRequest`);
+      failures.push(`${relPath} leaks tool-failure recovery post-processing detail ${JSON.stringify(forbidden)} in ${label}; use ExecutionRuntimeService.ApplyToolFailureRecoveryForState`);
     }
   }
   for (const forbidden of [
@@ -1179,6 +1182,7 @@ for (const [relPath, label] of [
     "processed := p.ensureExecutionRuntime().ApplyToolResultForRequest",
     "ToolResultPostprocessRequest{",
     "ToolFailureRecoveryRequest{",
+    "ToolFailureRecoveryRequestForState",
   ]) {
     if (source.includes(forbidden)) {
       failures.push(`${relPath} repeats tool postprocess request construction ${JSON.stringify(forbidden)} in ${label}; use ExecutionRuntimeService.ToolPostprocessStateForRequest and request constructors`);
@@ -1286,6 +1290,7 @@ for (const needle of [
   "type ToolFailureRecoveryRequest struct",
   "type ToolFailureRecoveryResult struct",
   "func (s *ExecutionRuntimeService) ApplyToolFailureRecoveryForRequest",
+  "func (s *ExecutionRuntimeService) ApplyToolFailureRecoveryForState",
   "type TextReflectionPromptRequest struct",
   "type TextReflectionPromptResult struct",
   "func (s *ExecutionRuntimeService) BuildTextReflectionPromptForRequest",
