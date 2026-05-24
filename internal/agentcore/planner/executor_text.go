@@ -429,18 +429,21 @@ func (p *Planner) runTextBased(ctx context.Context, req PlanRequest) (*PlanResul
 
 		var results []string
 		for i, r := range ordered {
-			processed := p.ensureExecutionRuntime().ApplyToolResultForRequest(
-				p.ensureExecutionRuntime().ToolResultPostprocessRequestForState(toolPostprocessState(), ToolResultPostprocessInput{
+			applied := p.ensureExecutionRuntime().ApplyToolResultPostprocessForState(ToolResultPostprocessApplicationRequest{
+				State: toolPostprocessState(),
+				Input: ToolResultPostprocessInput{
 					SkillName:             r.SkillName,
 					Args:                  calls[i].Args,
 					Output:                r.Output,
 					Err:                   r.Err,
 					IncludeTextResultLine: true,
-				}),
-			)
-			usedSkills = append(usedSkills, processed.UsedSkill)
-			planSteps = append(planSteps, processed.Step)
-			results = append(results, processed.ResultLine)
+				},
+				UsedSkills: usedSkills,
+				PlanSteps:  planSteps,
+			})
+			usedSkills = applied.UsedSkills
+			planSteps = applied.PlanSteps
+			results = append(results, applied.Processed.ResultLine)
 		}
 
 		recovery := p.ensureExecutionRuntime().ApplyToolFailureRecoveryForRequest(

@@ -142,6 +142,35 @@ func TestExecutionRuntimeServiceToolPostprocessRequestForState(t *testing.T) {
 	}
 }
 
+func TestExecutionRuntimeServiceApplyToolResultPostprocessForState(t *testing.T) {
+	runtime := NewExecutionRuntimeService(3)
+	applied := runtime.ApplyToolResultPostprocessForState(ToolResultPostprocessApplicationRequest{
+		State: ToolPostprocessExecutionState{
+			Request:    PlanRequest{TraceID: "trace-tool-apply"},
+			StepNumber: 1,
+			NextStepID: 2,
+		},
+		Input: ToolResultPostprocessInput{
+			SkillName:             "reader",
+			Args:                  map[string]any{"path": "README.md"},
+			Output:                "ok",
+			IncludeTextResultLine: true,
+		},
+		UsedSkills: []string{"search"},
+		PlanSteps:  []PlanStep{{ID: 1, Skill: "search", Status: StepDone}},
+	})
+
+	if len(applied.UsedSkills) != 2 || applied.UsedSkills[0] != "search" || applied.UsedSkills[1] != "reader" {
+		t.Fatalf("used skills not advanced: %#v", applied.UsedSkills)
+	}
+	if len(applied.PlanSteps) != 2 || applied.PlanSteps[1].ID != 2 || applied.PlanSteps[1].Skill != "reader" || applied.PlanSteps[1].Result != "ok" {
+		t.Fatalf("plan steps not advanced: %#v", applied.PlanSteps)
+	}
+	if applied.Processed.ResultLine != "[reader] ok" {
+		t.Fatalf("path-specific processed result not preserved: %#v", applied.Processed)
+	}
+}
+
 func TestExecutionRuntimeServiceCollectToolResultsInOrder(t *testing.T) {
 	runtime := NewExecutionRuntimeService(3)
 	ch := make(chan ToolExecutionResult, 3)
