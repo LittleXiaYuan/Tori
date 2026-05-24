@@ -808,6 +808,8 @@ for (const needle of [
   "tool-failure recovery post-processing",
   "ExecutionRuntimeService.ToolPostprocessStateForRequest",
   "tool postprocess state helper",
+  "ExecutionRuntimeService.CollectToolResultsInOrder",
+  "ordered tool-result collection helper",
   "ExecutionRuntimeService.PartialPlanResultForRequest",
   "partial-result fallback post-processing",
   "ExecutionRuntimeService.EmitToolStartForRequest",
@@ -818,6 +820,8 @@ for (const needle of [
   "plan-result state helper",
   "ExecutionRuntimeService.ToolPostprocessStateForRequest",
   "tool postprocess state helper",
+  "ExecutionRuntimeService.CollectToolResultsInOrder",
+  "ordered tool-result collection helper",
   "ChatFallbackForRequest",
   "ChatWithToolsFallbackForRequest",
   "LocalBrainRuntime",
@@ -923,6 +927,10 @@ for (const needle of [
   "ToolPostprocessStateForRequest",
   "ToolResultPostprocessRequestForState",
   "ToolFailureRecoveryRequestForState",
+  "第六十八批",
+  "ordered tool-result collection helper",
+  "ToolExecutionResult",
+  "CollectToolResultsInOrder",
   "第五十五批",
   "partial-result fallback post-processing helper",
   "PartialPlanResultRequest",
@@ -968,6 +976,8 @@ for (const needle of [
   "ToolPostprocessStateForRequest",
   "ToolResultPostprocessRequestForState",
   "ToolFailureRecoveryRequestForState",
+  "ToolExecutionResult",
+  "CollectToolResultsInOrder",
   "RuntimeContextItem",
   "RuntimeContextFilterResult",
   "RuntimeThinkRequest",
@@ -1070,6 +1080,7 @@ for (const [relPath, label] of [
     "ToolPostprocessStateForRequest",
     "ToolResultPostprocessRequestForState",
     "ToolFailureRecoveryRequestForState",
+    "CollectToolResultsInOrder",
     "PartialPlanResultForRequest",
     "PlanResultStateForRequest",
     "TaskStoppedPlanResultForRequest",
@@ -1162,6 +1173,18 @@ for (const [relPath, label] of [
     }
   }
   for (const forbidden of [
+    "type tcResult struct",
+    "type callResult struct",
+    "make([]tcResult",
+    "make([]callResult",
+    "for range toolCalls",
+    "for range calls",
+  ]) {
+    if (source.includes(forbidden)) {
+      failures.push(`${relPath} repeats ordered tool-result collection detail ${JSON.stringify(forbidden)} in ${label}; use ExecutionRuntimeService.CollectToolResultsInOrder`);
+    }
+  }
+  for (const forbidden of [
     "EventThinking",
     "thinking_delta",
     "正在思考 (第",
@@ -1239,7 +1262,9 @@ for (const needle of [
   "type ToolResultPostprocessRequest struct",
   "type ToolResultPostprocessResult struct",
   "type ToolPostprocessExecutionState struct",
+  "type ToolExecutionResult struct",
   "func (s *ExecutionRuntimeService) ToolPostprocessStateForRequest",
+  "func (s *ExecutionRuntimeService) CollectToolResultsInOrder",
   "func (s *ExecutionRuntimeService) ToolResultPostprocessRequestForState",
   "func (s *ExecutionRuntimeService) ToolFailureRecoveryRequestForState",
   "func (s *ExecutionRuntimeService) ApplyToolResultForRequest",

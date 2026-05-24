@@ -166,6 +166,19 @@ type ToolResultPostprocessInput struct {
 	IncludeTextResultLine bool
 }
 
+// ToolExecutionResult is the common ordered result envelope used by planner
+// executors after tool goroutines complete. Native-FC fills ToolCallID for the
+// model-facing tool message; text mode leaves it empty and consumes ResultLine
+// later through ToolResultPostprocessInput.
+type ToolExecutionResult struct {
+	Index      int
+	ToolCallID string
+	SkillName  string
+	Args       map[string]any
+	Output     string
+	Err        error
+}
+
 // TextReflectionPromptRequest carries text-mode tool result lines and recovery
 // state into the execution runtime. Text execution is the only path that asks
 // the model to assess free-form tool results before continuing, but the prompt
@@ -264,6 +277,23 @@ func (s *ExecutionRuntimeService) ToolPostprocessStateForRequest(req ToolPostpro
 		LastFailedCount: req.LastFailedCount,
 		SkillRuntime:    req.SkillRuntime,
 	}
+}
+
+// CollectToolResultsInOrder consumes exactly count tool results from the
+// channel and restores the original tool-call order using each result Index.
+// Executors still own launching tools; the execution runtime owns this shared
+// ordering step so native-FC and text paths do not each carry bespoke result
+// collection structs and loops.
+func (s *ExecutionRuntimeService) CollectToolResultsInOrder(results <-chan ToolExecutionResult, count int) []ToolExecutionResult {
+	if count <= 0 {
+		return nil
+	}
+	ordered := make([]ToolExecutionResult, count)
+	for range count {
+		result := <-results
+		ordered[result.Index] = result
+	}
+	return ordered
 }
 
 // TerminalPlanResultRequest carries no-evidence terminal execution state into
