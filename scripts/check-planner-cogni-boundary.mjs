@@ -1054,8 +1054,10 @@ for (const [relPath, label] of [
 
 for (const needle of [
   "type HandoffExecutionHooks struct",
+  "type HandoffExecutionHooksProvider interface",
   "type HandoffExecutionResult struct",
   "func (s *DelegationRuntimeService) HandoffTimeoutForTool",
+  "func (s *DelegationRuntimeService) HandoffHooks(provider HandoffExecutionHooksProvider) HandoffExecutionHooks",
   "func (s *DelegationRuntimeService) ExecuteHandoffForRequest",
   "func handoffInputFromArgs",
   "func emitHandoffStart",
@@ -1079,6 +1081,8 @@ for (const [relPath, label] of [
     "handoffFailureSummary(",
     "WithStepCallback(toolCtx, req.StepCallback)",
     ".RecordExecutionFailure(err != nil)",
+    "HandoffExecutionHooks{",
+    "RecordExecutionFailure: p.ensureProactiveCognition().RecordExecutionFailure",
   ]) {
     if (source.includes(forbidden)) {
       failures.push(`${relPath} leaks handoff execution detail ${JSON.stringify(forbidden)} in ${label}; use DelegationRuntimeService.ExecuteHandoffForRequest`);
@@ -1086,6 +1090,8 @@ for (const [relPath, label] of [
   }
   for (const required of [
     "HandoffTimeoutForTool",
+    "HandoffHooks",
+    "handoffHooks := delegationRuntime.HandoffHooks(p)",
     "ExecuteHandoffForRequest",
     "EmitToolStartForRequest",
     "ApplyReflectRetryForRequest",

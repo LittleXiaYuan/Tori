@@ -316,6 +316,8 @@ func (p *Planner) runTextBased(ctx context.Context, req PlanRequest) (*PlanResul
 	var planSteps []PlanStep
 	steps := 0
 	lastRecoveryFailedCount := 0
+	delegationRuntime := p.ensureDelegationRuntime()
+	handoffHooks := delegationRuntime.HandoffHooks(p)
 	resultState := func() PlanResultExecutionState {
 		return p.ensureExecutionRuntime().PlanResultStateForRequest(PlanResultStateRequest{
 			Request:       req,
@@ -390,15 +392,12 @@ func (p *Planner) runTextBased(ctx context.Context, req PlanRequest) (*PlanResul
 		for i, call := range calls {
 			idx, c := i, call // capture loop vars
 			timeout := p.perToolTimeout()
-			timeout = p.ensureDelegationRuntime().HandoffTimeoutForTool(c.Name, timeout)
+			timeout = delegationRuntime.HandoffTimeoutForTool(c.Name, timeout)
 			safeToolGo(ctx, timeout, func(toolCtx context.Context) {
 				// Check for handoff (transfer_to_*) calls first
-				handoff := p.ensureDelegationRuntime().ExecuteHandoffForRequest(
+				handoff := delegationRuntime.ExecuteHandoffForRequest(
 					toolCtx, req, c.Name, c.Args, "text", steps,
-					HandoffExecutionHooks{
-						Metrics:                p.skillMetrics,
-						RecordExecutionFailure: p.ensureProactiveCognition().RecordExecutionFailure,
-					},
+					handoffHooks,
 				)
 				if handoff.Handled {
 					if handoff.Err != nil {

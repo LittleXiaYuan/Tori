@@ -31,6 +31,8 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 	var planSteps []PlanStep
 	steps := 0
 	lastRecoveryFailedCount := 0
+	delegationRuntime := p.ensureDelegationRuntime()
+	handoffHooks := delegationRuntime.HandoffHooks(p)
 	resultState := func() PlanResultExecutionState {
 		return p.ensureExecutionRuntime().PlanResultStateForRequest(PlanResultStateRequest{
 			Request:       req,
@@ -128,7 +130,7 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 
 			// Handoff delegations and skill generation need longer timeout
 			timeout := p.perToolTimeout()
-			timeout = p.ensureDelegationRuntime().HandoffTimeoutForTool(tc.Function.Name, timeout)
+			timeout = delegationRuntime.HandoffTimeoutForTool(tc.Function.Name, timeout)
 			if tc.Function.Name == "generate_skill" {
 				timeout = 10 * time.Minute
 			}
@@ -160,12 +162,9 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 					json.Unmarshal([]byte(tc.Function.Arguments), &args)
 
 					if !req.DisableDelegation {
-						handoff := p.ensureDelegationRuntime().ExecuteHandoffForRequest(
+						handoff := delegationRuntime.ExecuteHandoffForRequest(
 							toolCtx, req, tc.Function.Name, args, "fc", steps,
-							HandoffExecutionHooks{
-								Metrics:                p.skillMetrics,
-								RecordExecutionFailure: p.ensureProactiveCognition().RecordExecutionFailure,
-							},
+							handoffHooks,
 						)
 						if handoff.Handled {
 							if handoff.Err != nil {
