@@ -166,6 +166,27 @@ type ToolResultPostprocessInput struct {
 	IncludeTextResultLine bool
 }
 
+// ToolResultPostprocessApplicationRequest carries one path-specific tool
+// result plus the shared executor-local slices that must advance after the
+// execution runtime applies common tool-result semantics. Native-FC/text
+// executors still decide how to feed the processed result back to the model.
+type ToolResultPostprocessApplicationRequest struct {
+	State      ToolPostprocessExecutionState
+	Input      ToolResultPostprocessInput
+	UsedSkills []string
+	PlanSteps  []PlanStep
+}
+
+// ToolResultPostprocessApplicationResult returns the processed tool result
+// together with the shared execution slices after UsedSkill and PlanStep are
+// appended. Path-specific consumers can still append ToolMessage or ResultLine
+// without duplicating the common state update.
+type ToolResultPostprocessApplicationResult struct {
+	Processed  ToolResultPostprocessResult
+	UsedSkills []string
+	PlanSteps  []PlanStep
+}
+
 // ToolExecutionResult is the common ordered result envelope used by planner
 // executors after tool goroutines complete. Native-FC fills ToolCallID for the
 // model-facing tool message; text mode leaves it empty and consumes ResultLine
@@ -501,6 +522,19 @@ func (s *ExecutionRuntimeService) ToolResultPostprocessRequestForState(state Too
 		IncludeToolMessage:    input.IncludeToolMessage,
 		IncludeTextResultLine: input.IncludeTextResultLine,
 		SkillRuntime:          state.SkillRuntime,
+	}
+}
+
+// ApplyToolResultPostprocessForState applies the shared tool-result
+// post-processing and advances the common executor-local result state. This
+// keeps UsedSkills/PlanSteps mutation in execution runtime while preserving
+// native-FC ToolMessage and text ResultLine handling in their executors.
+func (s *ExecutionRuntimeService) ApplyToolResultPostprocessForState(req ToolResultPostprocessApplicationRequest) ToolResultPostprocessApplicationResult {
+	processed := s.ApplyToolResultForRequest(s.ToolResultPostprocessRequestForState(req.State, req.Input))
+	return ToolResultPostprocessApplicationResult{
+		Processed:  processed,
+		UsedSkills: append(req.UsedSkills, processed.UsedSkill),
+		PlanSteps:  append(req.PlanSteps, processed.Step),
 	}
 }
 

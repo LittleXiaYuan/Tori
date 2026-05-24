@@ -195,19 +195,22 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 		// Collect results in order
 		tcResults := p.ensureExecutionRuntime().CollectToolResultsInOrder(resultsCh, len(toolCalls))
 		for _, r := range tcResults {
-			processed := p.ensureExecutionRuntime().ApplyToolResultForRequest(
-				p.ensureExecutionRuntime().ToolResultPostprocessRequestForState(toolPostprocessState(), ToolResultPostprocessInput{
+			applied := p.ensureExecutionRuntime().ApplyToolResultPostprocessForState(ToolResultPostprocessApplicationRequest{
+				State: toolPostprocessState(),
+				Input: ToolResultPostprocessInput{
 					ToolCallID:         r.ToolCallID,
 					SkillName:          r.SkillName,
 					Args:               r.Args,
 					Output:             r.Output,
 					Err:                r.Err,
 					IncludeToolMessage: true,
-				}),
-			)
-			usedSkills = append(usedSkills, processed.UsedSkill)
-			planSteps = append(planSteps, processed.Step)
-			messages = append(messages, processed.ToolMessage)
+				},
+				UsedSkills: usedSkills,
+				PlanSteps:  planSteps,
+			})
+			usedSkills = applied.UsedSkills
+			planSteps = applied.PlanSteps
+			messages = append(messages, applied.Processed.ToolMessage)
 		}
 		recovery := p.ensureExecutionRuntime().ApplyToolFailureRecoveryForRequest(
 			p.ensureExecutionRuntime().ToolFailureRecoveryRequestForState(toolPostprocessState()),
