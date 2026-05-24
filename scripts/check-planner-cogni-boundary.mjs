@@ -949,6 +949,12 @@ for (const needle of [
   "第七十二批",
   "executor-local execution runtime handle",
   "executionRuntime := p.ensureExecutionRuntime()",
+  "第七十三批",
+  "executor-local runtime handles",
+  "modelRuntime := p.ensureModelRuntime()",
+  "promptRuntime := p.ensurePromptRuntime()",
+  "skillRuntime := p.ensureSkillRuntime()",
+  "runtimeStrategy := p.ensureRuntimeStrategy()",
   "第五十五批",
   "partial-result fallback post-processing helper",
   "PartialPlanResultRequest",
@@ -1097,6 +1103,10 @@ for (const [relPath, label] of [
   }
   for (const required of [
     "executionRuntime := p.ensureExecutionRuntime()",
+    "modelRuntime := p.ensureModelRuntime()",
+    "promptRuntime := p.ensurePromptRuntime()",
+    "skillRuntime := p.ensureSkillRuntime()",
+    "runtimeStrategy := p.ensureRuntimeStrategy()",
     "HandoffTimeoutForTool",
     "HandoffHooks",
     "handoffHooks := delegationRuntime.HandoffHooks(p)",
@@ -1116,8 +1126,16 @@ for (const [relPath, label] of [
       failures.push(`${relPath} should route request-level execution helper ${required} through its runtime service`);
     }
   }
-  if (source.includes("p.ensureExecutionRuntime().")) {
-    failures.push(`${relPath} repeatedly reaches Planner execution runtime factory in ${label}; keep a local executionRuntime handle inside the executor`);
+  for (const forbiddenRuntimeReach of [
+    "p.ensureExecutionRuntime().",
+    "p.ensureModelRuntime().",
+    "p.ensurePromptRuntime().",
+    "p.ensureSkillRuntime().",
+    "p.runtimeStrategy",
+  ]) {
+    if (source.includes(forbiddenRuntimeReach)) {
+      failures.push(`${relPath} repeatedly reaches Planner runtime factory/field ${JSON.stringify(forbiddenRuntimeReach)} in ${label}; keep executor-local runtime handles inside the executor`);
+    }
   }
   const pathSpecificRequired = relPath.endsWith("executor_fc.go")
     ? [
