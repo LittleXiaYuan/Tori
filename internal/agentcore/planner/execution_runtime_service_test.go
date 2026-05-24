@@ -547,6 +547,27 @@ func TestExecutionRuntimeServiceApplyToolFailureRecoveryForRequestDoesNotRepeatF
 	}
 }
 
+func TestExecutionRuntimeServiceApplyToolFailureRecoveryForState(t *testing.T) {
+	var events []observe.AgentEvent
+	result := NewExecutionRuntimeService(3).ApplyToolFailureRecoveryForState(ToolPostprocessExecutionState{
+		Request: PlanRequest{StepCallback: func(evt observe.AgentEvent) {
+			events = append(events, evt)
+		}},
+		PlanSteps: []PlanStep{
+			{ID: 1, Skill: "web", Status: StepFailed, Error: "timeout"},
+			{ID: 2, Skill: "db", Status: StepFailed, Error: "permission denied"},
+		},
+		LastFailedCount: 1,
+	})
+
+	if !result.Applied || result.LastFailedCount != 2 || result.Prompt == "" {
+		t.Fatalf("expected recovery to apply from state, got %#v", result)
+	}
+	if len(events) != 1 || events[0].Type != observe.EventReflect {
+		t.Fatalf("expected one recovery event, got %#v", events)
+	}
+}
+
 func TestExecutionRuntimeServiceBuildTextReflectionPromptForRequest(t *testing.T) {
 	result := NewExecutionRuntimeService(3).BuildTextReflectionPromptForRequest(TextReflectionPromptRequest{
 		AssistantReply: "assistant plan",

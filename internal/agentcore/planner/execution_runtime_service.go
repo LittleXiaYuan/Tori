@@ -548,6 +548,14 @@ func (s *ExecutionRuntimeService) ToolFailureRecoveryRequestForState(state ToolP
 	}
 }
 
+// ApplyToolFailureRecoveryForState applies repeated-failure recovery directly
+// from normalized executor state. Executors still decide how to surface the
+// recovery prompt to their model path, while the execution runtime owns request
+// construction, failure detection, event emission, and failed-count state.
+func (s *ExecutionRuntimeService) ApplyToolFailureRecoveryForState(state ToolPostprocessExecutionState) ToolFailureRecoveryResult {
+	return s.ApplyToolFailureRecoveryForRequest(s.ToolFailureRecoveryRequestForState(state))
+}
+
 // ApplyToolResultForRequest normalizes a single tool execution result for
 // planner executors. Native-FC and text executors differ in how they feed
 // results back to the model, but they share PlanStep construction, friendly
