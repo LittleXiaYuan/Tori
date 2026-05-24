@@ -12,45 +12,59 @@ import (
 	"strings"
 	"time"
 
-	ctxwindow "yunque-agent/internal/agentcore/context"
-	"yunque-agent/internal/agentcore/i18n"
 	"yunque-agent/internal/agentcore/llm"
-	"yunque-agent/internal/observe"
 	"yunque-agent/pkg/skills"
 )
 
 // runNativeFC uses native LLM function calling (tool_calls in API response).
 func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult, error) {
-	env := p.buildEnv(req)
+	env := p.ensureExecutionRuntime().BuildSkillEnvironment(req, p.ensureModelRuntime(), p.contextAssembly)
 
 	messages, ctxLayers := p.BuildMessages(ctx, req)
 	userMsg := extractUserMessage(req)
 	tools := p.buildFunctionDefs(userMsg, req.TenantID, req.ChannelType, req.DisableDelegation, req.AllowedSkills)
-	p.maybeEmitCogniTrace(req)
+	if p.contextAssembly != nil {
+		p.contextAssembly.EmitCogniTraceForRequest(req)
+	}
 
 	var usedSkills []string
 	var planSteps []PlanStep
 	steps := 0
 	lastRecoveryFailedCount := 0
+	resultState := func() PlanResultExecutionState {
+		return p.ensureExecutionRuntime().PlanResultStateForRequest(PlanResultStateRequest{
+			Request:       req,
+			UsedSkills:    usedSkills,
+			Steps:         steps,
+			PlanSteps:     planSteps,
+			ContextLayers: ctxLayers,
+		})
+	}
+	toolPostprocessState := func() ToolPostprocessExecutionState {
+		return p.ensureExecutionRuntime().ToolPostprocessStateForRequest(ToolPostprocessStateRequest{
+			Request:         req,
+			StepNumber:      steps,
+			NextStepID:      len(planSteps) + 1,
+			PlanSteps:       planSteps,
+			LastFailedCount: lastRecoveryFailedCount,
+			SkillRuntime:    p.ensureSkillRuntime(),
+		})
+	}
 
-	for steps < p.maxSteps {
+	for steps < p.maxPlanSteps() {
 		steps++
 
 		// Check for mid-execution interrupts between steps
 		if shouldStop, extraMsgs := p.checkInterrupt(req, messages); shouldStop {
-			return &PlanResult{Reply: i18n.T(p.locale, "planner.task_stopped"), SkillsUsed: usedSkills, Steps: steps, Plan: planSteps, ContextLayers: ctxLayers}, nil
+			return p.ensureExecutionRuntime().TaskStoppedPlanResultForRequest(TaskStoppedPlanResultRequest{
+				State: resultState(),
+				Reply: p.ensurePromptRuntime().TaskStoppedReply(),
+			}), nil
 		} else if len(extraMsgs) > 0 {
 			messages = append(messages, extraMsgs...)
 		}
 
-		// Notify: thinking
-		if req.StepCallback != nil {
-			thinkEvt := observe.NewEvent(req.TraceID, observe.DomainPlanner, observe.EventThinking,
-				fmt.Sprintf("正在思考 (第 %d 轮)...", steps))
-			thinkEvt.Meta.TenantID = req.TenantID
-			thinkEvt.Meta.TaskID = req.TaskID
-			req.StepCallback(thinkEvt)
-		}
+		p.ensureExecutionRuntime().EmitStepThinkingForRequest(req, steps)
 
 		if steps == 1 {
 			totalChars := 0
@@ -61,44 +75,51 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 		}
 		// chatWithToolsFallback walks the pool's tier fallback chain
 		// (request tier → expert → smart → fast → local → primary) and
-		// honors session ClientOverride and capability-aware selection. A
-		// session override short-circuits the chain inside clientForRequest.
-		reply, toolCalls, lastReasoning, err := p.chatWithToolsFallback(ctx, req, messages, tools)
+		// honors session ClientOverride and capability-aware selection.
+		reply, toolCalls, lastReasoning, err := p.ensureModelRuntime().ChatWithToolsFallbackForRequest(
+			ctx, req, messages, tools, p.runtimeStrategy, p.modelReasoningEvents(req), p.modelFallbackEvents(req),
+		)
 		if err != nil {
 			if len(planSteps) > 0 {
-				return p.partialPlanResult(req, planSteps, usedSkills, steps, ctxLayers, err.Error()), nil
+				return p.ensureExecutionRuntime().PartialPlanResultForRequest(PartialPlanResultRequest{State: resultState(), RawError: err.Error()}), nil
 			}
 			return nil, fmt.Errorf("planner fc step %d: %w", steps, err)
 		}
 
 		if len(toolCalls) == 0 {
 			cleaned := p.cleanReply(reply)
-			if p.reflect != nil && steps < p.maxSteps {
+			if p.reflect != nil && steps < p.maxPlanSteps() {
 				userIntent := ""
 				if len(req.Messages) > 0 {
 					userIntent = req.Messages[len(req.Messages)-1].Content
 				}
 				if !p.reflect(ctx, userIntent, cleaned) {
 					slog.Info("planner: reflect unsatisfied, retrying", "step", steps)
-					if req.StepCallback != nil {
-						reflEvt := observe.NewEvent(req.TraceID, observe.DomainPlanner, observe.EventReflect,
-							"🔄 回答质量不够好，正在重新思考...")
-						reflEvt.Meta.TenantID = req.TenantID
-						req.StepCallback(reflEvt)
-					}
-					messages = append(messages,
-						llm.Message{Role: "assistant", Content: reply, ReasoningContent: lastReasoning},
-						llm.Message{Role: "user", Content: i18n.T(p.locale, "planner.reflect_retry")},
-					)
+					retry := p.ensureExecutionRuntime().ApplyReflectRetryForRequest(ReflectRetryRequest{
+						Request:          req,
+						AssistantReply:   reply,
+						ReasoningContent: lastReasoning,
+						RetryPrompt:      p.ensurePromptRuntime().ReflectRetryPrompt(),
+						EmitEvent:        true,
+					})
+					messages = append(messages, retry.Messages...)
 					continue
 				}
 			}
 			cleaned, nextMoves := extractNextMoves(cleaned)
-			return &PlanResult{Reply: cleaned, SkillsUsed: usedSkills, Steps: steps, Plan: planSteps, ContextLayers: ctxLayers, Suggestions: nextMoves}, nil
+			return p.ensureExecutionRuntime().SuccessfulPlanResultForRequest(SuccessfulPlanResultRequest{
+				Reply:       cleaned,
+				State:       resultState(),
+				Suggestions: nextMoves,
+			}), nil
 		}
 
 		// Append assistant message with tool calls + reasoning (required by Kimi K2.5 etc.)
-		messages = append(messages, llm.Message{Role: "assistant", Content: reply, ToolCalls: toolCalls, ReasoningContent: lastReasoning})
+		messages = append(messages, p.ensureExecutionRuntime().AssistantToolCallMessageForRequest(AssistantToolCallMessageRequest{
+			AssistantReply:   reply,
+			ToolCalls:        toolCalls,
+			ReasoningContent: lastReasoning,
+		}))
 
 		// Execute tool calls in parallel
 		type tcResult struct {
@@ -114,12 +135,8 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 			idx, tc := i, tc // capture loop vars
 
 			// Handoff delegations and skill generation need longer timeout
-			timeout := p.toolTimeout
-			if p.handoffReg != nil {
-				if _, isHandoff := p.handoffReg.IsHandoffCall(tc.Function.Name); isHandoff {
-					timeout = 90 * time.Second
-				}
-			}
+			timeout := p.perToolTimeout()
+			timeout = p.ensureDelegationRuntime().HandoffTimeoutForTool(tc.Function.Name, timeout)
 			if tc.Function.Name == "generate_skill" {
 				timeout = 10 * time.Minute
 			}
@@ -150,66 +167,30 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 					var args map[string]any
 					json.Unmarshal([]byte(tc.Function.Arguments), &args)
 
-					if p.handoffReg != nil && !req.DisableDelegation {
-						if agentName, ok := p.handoffReg.IsHandoffCall(tc.Function.Name); ok {
-							input, _ := args["input"].(string)
-							slog.Info("planner: handoff delegation (fc)", "agent", agentName, "step", steps)
-
-							if req.StepCallback != nil {
-								evt := observe.NewEvent(req.TraceID, observe.DomainAgent, observe.EventHandoffStart,
-									fmt.Sprintf("🤖 委派 [%s]：%s", agentName, truncate(input, 80)))
-								evt.Meta.TenantID = req.TenantID
-								evt.Meta.Skill = agentName
-								evt.Detail = observe.HandoffDetail{Agent: agentName, Input: truncate(input, 200)}
-								req.StepCallback(evt)
-							}
-
-							cbCtx := toolCtx
-							if req.StepCallback != nil {
-								cbCtx = WithStepCallback(toolCtx, req.StepCallback)
-							}
-
-							t0 := time.Now()
-							hr, err := p.handoffReg.Execute(cbCtx, req.TenantID, agentName, input, req.ModelOverride)
-							dur := time.Since(t0)
-							if p.skillMetrics != nil {
-								p.skillMetrics(tc.Function.Name, dur, err)
-							}
-							p.proactiveCog.RecordExecutionFailure(err != nil)
-
-							if req.StepCallback != nil {
-								doneEvt := observe.NewEvent(req.TraceID, observe.DomainAgent, observe.EventHandoffDone,
-									fmt.Sprintf("✅ [%s] 完成 (%.1fs)", agentName, dur.Seconds()))
-								doneEvt.Meta.TenantID = req.TenantID
-								doneEvt.Meta.Skill = agentName
-								detail := observe.HandoffDetail{Agent: agentName, DurMs: dur.Milliseconds()}
-								if err != nil {
-									doneEvt.Summary = handoffFailureSummary(agentName, err)
-									detail = buildHandoffFailureDetail(agentName, dur, err)
-								} else {
-									detail.Reply = truncate(hr.Reply, 200)
-								}
-								doneEvt.Detail = detail
-								req.StepCallback(doneEvt)
-							}
-
-							if err != nil {
-								resultsCh <- tcResult{idx: idx, id: tc.ID, name: tc.Function.Name, args: args, err: err}
+					if !req.DisableDelegation {
+						handoff := p.ensureDelegationRuntime().ExecuteHandoffForRequest(
+							toolCtx, req, tc.Function.Name, args, "fc", steps,
+							HandoffExecutionHooks{
+								Metrics:                p.skillMetrics,
+								RecordExecutionFailure: p.ensureProactiveCognition().RecordExecutionFailure,
+							},
+						)
+						if handoff.Handled {
+							if handoff.Err != nil {
+								resultsCh <- tcResult{idx: idx, id: tc.ID, name: tc.Function.Name, args: args, err: handoff.Err}
 							} else {
-								resultsCh <- tcResult{idx: idx, id: tc.ID, name: tc.Function.Name, args: args, output: hr.Reply}
+								resultsCh <- tcResult{idx: idx, id: tc.ID, name: tc.Function.Name, args: args, output: handoff.Reply}
 							}
 							return
 						}
 					}
 
 					slog.Info("planner: executing skill (fc/parallel)", "skill", tc.Function.Name, "step", steps)
-					if req.StepCallback != nil {
-						tsEvt := observe.NewEvent(req.TraceID, observe.DomainPlanner, observe.EventToolStart,
-							fmt.Sprintf("🔧 正在调用 [%s]...", tc.Function.Name))
-						tsEvt.Meta.Skill = tc.Function.Name
-						tsEvt.Detail = observe.ToolStartDetail{Skill: tc.Function.Name, Args: args}
-						req.StepCallback(tsEvt)
-					}
+					p.ensureExecutionRuntime().EmitToolStartForRequest(ToolStartEventRequest{
+						Request:   req,
+						SkillName: tc.Function.Name,
+						Args:      args,
+					})
 					exec := p.executeSkill(toolCtx, tc.Function.Name, args, env)
 					if exec.Err != nil {
 						resultsCh <- tcResult{idx: idx, id: tc.ID, name: exec.SkillName, args: exec.Args, err: exec.Err}
@@ -226,43 +207,26 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 			tcResults[r.idx] = r
 		}
 		for _, r := range tcResults {
-			usedSkills = append(usedSkills, r.name)
-			step := PlanStep{
-				ID:     len(planSteps) + 1,
-				Action: fmt.Sprintf("调用 %s", r.name),
-				Skill:  r.name,
-				Args:   r.args,
-				Status: StepDone,
-				Result: r.output,
-			}
-			if r.err != nil {
-				step.Status = StepFailed
-				step.Error = r.err.Error()
-				r.output = "暂未完成：" + plannerFriendlyFailureText(r.err.Error())
-			}
-			p.recordSkillRecommendationOutcome(r.name, r.err == nil)
-			planSteps = append(planSteps, step)
-			pruned := pruneToolResult(r.output, steps)
-			messages = append(messages, buildToolResultMsg(r.id, pruned))
-
-			// Notify: tool_result
-			if req.StepCallback != nil {
-				trSummary := fmt.Sprintf("✅ [%s] 完成", r.name)
-				trErr := ""
-				if r.err != nil {
-					trSummary = fmt.Sprintf("⏸️ [%s] 暂未完成：%s", r.name, plannerFriendlyFailureText(r.err.Error()))
-					trErr = plannerFriendlyFailureText(r.err.Error())
-				}
-				trEvt := observe.NewEvent(req.TraceID, observe.DomainPlanner, observe.EventToolResult, trSummary)
-				trEvt.Meta.Skill = r.name
-				trEvt.Detail = observe.ToolResultDetail{Skill: r.name, Result: truncate(r.output, 200), Error: trErr}
-				req.StepCallback(trEvt)
-			}
+			processed := p.ensureExecutionRuntime().ApplyToolResultForRequest(
+				p.ensureExecutionRuntime().ToolResultPostprocessRequestForState(toolPostprocessState(), ToolResultPostprocessInput{
+					ToolCallID:         r.id,
+					SkillName:          r.name,
+					Args:               r.args,
+					Output:             r.output,
+					Err:                r.err,
+					IncludeToolMessage: true,
+				}),
+			)
+			usedSkills = append(usedSkills, processed.UsedSkill)
+			planSteps = append(planSteps, processed.Step)
+			messages = append(messages, processed.ToolMessage)
 		}
-		if summary, ok := buildPlannerFailureSummary(planSteps); ok && summary.FailedCount > lastRecoveryFailedCount {
-			lastRecoveryFailedCount = summary.FailedCount
-			p.maybeEmitFailureRecovery(req, summary)
-			messages = append(messages, llm.Message{Role: "user", Content: formatFailureRecoveryPrompt(summary)})
+		recovery := p.ensureExecutionRuntime().ApplyToolFailureRecoveryForRequest(
+			p.ensureExecutionRuntime().ToolFailureRecoveryRequestForState(toolPostprocessState()),
+		)
+		lastRecoveryFailedCount = recovery.LastFailedCount
+		if recovery.Applied {
+			messages = append(messages, p.ensureExecutionRuntime().RecoveryPromptMessageForRequest(RecoveryPromptMessageRequest{Prompt: recovery.Prompt}))
 		}
 
 		// If the request context was cancelled (e.g. SSE disconnect) but tool
@@ -270,28 +234,39 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 		// LLM again (which would fail with "context canceled").
 		if ctx.Err() != nil {
 			if len(planSteps) > 0 {
-				return p.partialPlanResult(req, planSteps, usedSkills, steps, ctxLayers, ctx.Err().Error()), nil
+				return p.ensureExecutionRuntime().PartialPlanResultForRequest(PartialPlanResultRequest{State: resultState(), RawError: ctx.Err().Error()}), nil
 			}
-			return &PlanResult{Reply: "连接暂时中断，现场已保留；如果任务已经推进，可以从最近可恢复任务继续。", SkillsUsed: usedSkills, Steps: steps, Plan: planSteps, ContextLayers: ctxLayers}, nil
+			return p.ensureExecutionRuntime().TerminalPlanResultForRequest(TerminalPlanResultRequest{
+				State:  resultState(),
+				Reason: TerminalPlanResultContextCanceled,
+			}), nil
 		}
 	}
 
-	messages = append(messages, llm.Message{Role: "user", Content: "你已执行了足够多的步骤。请根据以上所有工具结果，直接给出最终回答。"})
+	finalPrompt := p.ensureExecutionRuntime().BuildFinalAnswerPromptForRequest(FinalAnswerPromptRequest{Request: req})
+	if finalPrompt.HasMessage {
+		messages = append(messages, finalPrompt.Message)
+	}
 
-	client := p.clientForRequest(req)
-	reply, _, err := client.ChatWithTools(ctx, messages, tools, 0.7)
+	reply, _, err := p.ensureModelRuntime().ChatWithToolsForRequest(ctx, req, messages, tools, 0.7)
 	if err != nil {
 		if len(planSteps) > 0 {
-			return p.partialPlanResult(req, planSteps, usedSkills, steps, ctxLayers, err.Error()), nil
+			return p.ensureExecutionRuntime().PartialPlanResultForRequest(PartialPlanResultRequest{State: resultState(), RawError: err.Error()}), nil
 		}
-		return &PlanResult{Reply: "任务已执行 " + fmt.Sprintf("%d", steps) + " 步，现场已保留。", SkillsUsed: usedSkills, Steps: steps, Plan: planSteps, ContextLayers: ctxLayers}, nil
+		return p.ensureExecutionRuntime().TerminalPlanResultForRequest(TerminalPlanResultRequest{
+			State:  resultState(),
+			Reason: TerminalPlanResultFinalSynthesisFailed,
+		}), nil
 	}
 
 	if len(usedSkills) > 0 {
 		p.ensureSkillRuntime().RecordRecent(usedSkills)
 	}
 
-	return &PlanResult{Reply: p.cleanReply(reply), SkillsUsed: usedSkills, Steps: steps, Plan: planSteps, ContextLayers: ctxLayers}, nil
+	return p.ensureExecutionRuntime().SuccessfulPlanResultForRequest(SuccessfulPlanResultRequest{
+		Reply: p.cleanReply(reply),
+		State: resultState(),
+	}), nil
 }
 
 // buildFunctionDefs converts skill definitions to LLM FunctionDef format.
@@ -334,15 +309,10 @@ func (p *Planner) buildFunctionDefs(userMessage, tenantID, channelType string, d
 	}
 
 	// Cogni surface filter — narrows the tool list to the union of every
-	// activated cogni's ToolSurface. The hook returns the input unchanged
-	// when no cogni activates, so the previous behaviour is preserved.
-	if p.contextAssembly != nil && p.contextAssembly.HasCogniSkillFilter() && !disableDelegation && len(allowedSkills) == 0 {
-		before := len(allSkills)
-		allSkills = p.contextAssembly.FilterCogniSkills(userMessage, tenantID, channelType, allSkills)
-		if after := len(allSkills); after != before {
-			slog.Info("buildFunctionDefs: cogni surface filter applied",
-				"before", before, "after", after, "msg_prefix", truncate(userMessage, 50))
-		}
+	// activated cogni's ToolSurface. The service returns input unchanged when
+	// no cogni activates, so previous behaviour is preserved.
+	if p.contextAssembly != nil && !disableDelegation && len(allowedSkills) == 0 {
+		allSkills = p.contextAssembly.ApplyCogniSkillFilter(userMessage, tenantID, channelType, allSkills)
 	}
 
 	cats := p.registry.Categories()
@@ -353,8 +323,8 @@ func (p *Planner) buildFunctionDefs(userMessage, tenantID, channelType string, d
 	}
 
 	// Delegation mode: planner only sees handoff tools + direct tools, exec agents handle the rest
-	if !disableDelegation && p.handoffReg != nil && len(p.handoffReg.List()) >= 4 {
-		hdDefs := p.handoffReg.ToolDefinitions()
+	if !disableDelegation && p.delegationRuntime.HasHandoffAgents(4) {
+		hdDefs := p.delegationRuntime.HandoffToolDefinitions()
 		defs := make([]llm.FunctionDef, 0, len(hdDefs)+2)
 		for _, hd := range hdDefs {
 			fn, _ := hd["function"].(map[string]any)
@@ -409,8 +379,8 @@ func (p *Planner) buildFunctionDefs(userMessage, tenantID, channelType string, d
 					Parameters:  s.Parameters(),
 				})
 			}
-			if p.handoffReg != nil && !disableDelegation {
-				for _, hd := range p.handoffReg.ToolDefinitions() {
+			if !disableDelegation {
+				for _, hd := range p.delegationRuntime.HandoffToolDefinitions() {
 					fn, _ := hd["function"].(map[string]any)
 					if fn == nil {
 						continue
@@ -436,8 +406,8 @@ func (p *Planner) buildFunctionDefs(userMessage, tenantID, channelType string, d
 		})
 	}
 
-	if p.handoffReg != nil && !disableDelegation {
-		for _, hd := range p.handoffReg.ToolDefinitions() {
+	if !disableDelegation {
+		for _, hd := range p.delegationRuntime.HandoffToolDefinitions() {
 			fn, _ := hd["function"].(map[string]any)
 			if fn == nil {
 				continue
@@ -463,46 +433,4 @@ func extractUserMessage(req PlanRequest) string {
 		}
 	}
 	return ""
-}
-
-// pruneToolResult applies progressive compression to tool outputs.
-// Later steps get more budget since they're closer to the final answer.
-func pruneToolResult(output string, stepNum int) string {
-	maxBytes := 12000
-	switch {
-	case stepNum <= 2:
-		maxBytes = 8000
-	case stepNum <= 5:
-		maxBytes = 5000
-	case stepNum <= 8:
-		maxBytes = 3000
-	default:
-		maxBytes = 2000
-	}
-	if len(output) <= maxBytes {
-		return output
-	}
-	return ctxwindow.PruneToolOutput(output, maxBytes)
-}
-
-// buildToolResultMsg creates a tool result message. If the output contains
-// a "_screenshot_b64" field, it builds a multimodal message (text + image)
-// so vision-capable models can "see" the page. Non-vision models auto-strip
-// images via the existing stripImages fallback in functions.go.
-func buildToolResultMsg(toolCallID, output string) llm.Message {
-	var parsed map[string]string
-	if json.Unmarshal([]byte(output), &parsed) == nil {
-		if b64, ok := parsed["_screenshot_b64"]; ok && b64 != "" {
-			text := parsed["text"]
-			return llm.Message{
-				Role:       "tool",
-				ToolCallID: toolCallID,
-				ContentParts: []llm.ContentPart{
-					{Type: "text", Text: text},
-					{Type: "image_url", ImageURL: &llm.MediaURL{URL: "data:image/jpeg;base64," + b64}},
-				},
-			}
-		}
-	}
-	return llm.ToolResultMessage(toolCallID, output)
 }
