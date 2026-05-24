@@ -306,7 +306,11 @@ func (p *Planner) fuzzyMatchSkill(raw string) string {
 // Decompose → Execute (parallel) → Reflect → Synthesize.
 func (p *Planner) runTextBased(ctx context.Context, req PlanRequest) (*PlanResult, error) {
 	executionRuntime := p.ensureExecutionRuntime()
-	env := executionRuntime.BuildSkillEnvironment(req, p.ensureModelRuntime(), p.contextAssembly)
+	modelRuntime := p.ensureModelRuntime()
+	promptRuntime := p.ensurePromptRuntime()
+	skillRuntime := p.ensureSkillRuntime()
+	runtimeStrategy := p.ensureRuntimeStrategy()
+	env := executionRuntime.BuildSkillEnvironment(req, modelRuntime, p.contextAssembly)
 
 	messages, ctxLayers := p.BuildMessages(ctx, req)
 	if p.contextAssembly != nil {
@@ -335,7 +339,7 @@ func (p *Planner) runTextBased(ctx context.Context, req PlanRequest) (*PlanResul
 			NextStepID:      len(planSteps) + 1,
 			PlanSteps:       planSteps,
 			LastFailedCount: lastRecoveryFailedCount,
-			SkillRuntime:    p.ensureSkillRuntime(),
+			SkillRuntime:    skillRuntime,
 		})
 	}
 
@@ -346,13 +350,13 @@ func (p *Planner) runTextBased(ctx context.Context, req PlanRequest) (*PlanResul
 		if shouldStop, extraMsgs := p.checkInterrupt(req, messages); shouldStop {
 			return executionRuntime.TaskStoppedPlanResultForRequest(TaskStoppedPlanResultRequest{
 				State: resultState(),
-				Reply: p.ensurePromptRuntime().TaskStoppedReply(),
+				Reply: promptRuntime.TaskStoppedReply(),
 			}), nil
 		} else if len(extraMsgs) > 0 {
 			messages = append(messages, extraMsgs...)
 		}
 
-		reply, err := p.ensureModelRuntime().ChatFallbackForRequest(ctx, req, messages, p.runtimeStrategy, p.modelFallbackEvents(req))
+		reply, err := modelRuntime.ChatFallbackForRequest(ctx, req, messages, runtimeStrategy, p.modelFallbackEvents(req))
 		if err != nil {
 			if len(planSteps) > 0 {
 				return executionRuntime.PartialPlanResultForRequest(PartialPlanResultRequest{State: resultState(), RawError: err.Error()}), nil
@@ -458,7 +462,7 @@ func (p *Planner) runTextBased(ctx context.Context, req PlanRequest) (*PlanResul
 	}
 
 	streamCB := executionRuntime.ReasoningDeltaCallbackForRequest(req)
-	finalResult, err := p.ensureModelRuntime().ChatFallbackFullForRequest(ctx, req, messages, p.runtimeStrategy, p.modelFallbackEvents(req), streamCB)
+	finalResult, err := modelRuntime.ChatFallbackFullForRequest(ctx, req, messages, runtimeStrategy, p.modelFallbackEvents(req), streamCB)
 	if err != nil {
 		if len(planSteps) > 0 {
 			return executionRuntime.PartialPlanResultForRequest(PartialPlanResultRequest{State: resultState(), RawError: err.Error()}), nil

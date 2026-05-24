@@ -19,7 +19,11 @@ import (
 // runNativeFC uses native LLM function calling (tool_calls in API response).
 func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult, error) {
 	executionRuntime := p.ensureExecutionRuntime()
-	env := executionRuntime.BuildSkillEnvironment(req, p.ensureModelRuntime(), p.contextAssembly)
+	modelRuntime := p.ensureModelRuntime()
+	promptRuntime := p.ensurePromptRuntime()
+	skillRuntime := p.ensureSkillRuntime()
+	runtimeStrategy := p.ensureRuntimeStrategy()
+	env := executionRuntime.BuildSkillEnvironment(req, modelRuntime, p.contextAssembly)
 
 	messages, ctxLayers := p.BuildMessages(ctx, req)
 	userMsg := extractUserMessage(req)
@@ -50,7 +54,7 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 			NextStepID:      len(planSteps) + 1,
 			PlanSteps:       planSteps,
 			LastFailedCount: lastRecoveryFailedCount,
-			SkillRuntime:    p.ensureSkillRuntime(),
+			SkillRuntime:    skillRuntime,
 		})
 	}
 
@@ -61,7 +65,7 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 		if shouldStop, extraMsgs := p.checkInterrupt(req, messages); shouldStop {
 			return executionRuntime.TaskStoppedPlanResultForRequest(TaskStoppedPlanResultRequest{
 				State: resultState(),
-				Reply: p.ensurePromptRuntime().TaskStoppedReply(),
+				Reply: promptRuntime.TaskStoppedReply(),
 			}), nil
 		} else if len(extraMsgs) > 0 {
 			messages = append(messages, extraMsgs...)
@@ -79,8 +83,8 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 		// chatWithToolsFallback walks the pool's tier fallback chain
 		// (request tier → expert → smart → fast → local → primary) and
 		// honors session ClientOverride and capability-aware selection.
-		reply, toolCalls, lastReasoning, err := p.ensureModelRuntime().ChatWithToolsFallbackForRequest(
-			ctx, req, messages, tools, p.runtimeStrategy, p.modelReasoningEvents(req), p.modelFallbackEvents(req),
+		reply, toolCalls, lastReasoning, err := modelRuntime.ChatWithToolsFallbackForRequest(
+			ctx, req, messages, tools, runtimeStrategy, p.modelReasoningEvents(req), p.modelFallbackEvents(req),
 		)
 		if err != nil {
 			if len(planSteps) > 0 {
@@ -102,7 +106,7 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 						Request:          req,
 						AssistantReply:   reply,
 						ReasoningContent: lastReasoning,
-						RetryPrompt:      p.ensurePromptRuntime().ReflectRetryPrompt(),
+						RetryPrompt:      promptRuntime.ReflectRetryPrompt(),
 						EmitEvent:        true,
 					})
 					messages = append(messages, retry.Messages...)
@@ -237,7 +241,7 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 		messages = append(messages, finalPrompt.Message)
 	}
 
-	reply, _, err := p.ensureModelRuntime().ChatWithToolsForRequest(ctx, req, messages, tools, 0.7)
+	reply, _, err := modelRuntime.ChatWithToolsForRequest(ctx, req, messages, tools, 0.7)
 	if err != nil {
 		if len(planSteps) > 0 {
 			return executionRuntime.PartialPlanResultForRequest(PartialPlanResultRequest{State: resultState(), RawError: err.Error()}), nil
@@ -249,7 +253,7 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 	}
 
 	if len(usedSkills) > 0 {
-		p.ensureSkillRuntime().RecordRecent(usedSkills)
+		skillRuntime.RecordRecent(usedSkills)
 	}
 
 	return executionRuntime.SuccessfulPlanResultForRequest(SuccessfulPlanResultRequest{
