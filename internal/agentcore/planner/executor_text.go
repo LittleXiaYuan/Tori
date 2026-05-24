@@ -305,7 +305,8 @@ func (p *Planner) fuzzyMatchSkill(raw string) string {
 // runTextBased: multi-step planning loop using text-parsed skill calls.
 // Decompose → Execute (parallel) → Reflect → Synthesize.
 func (p *Planner) runTextBased(ctx context.Context, req PlanRequest) (*PlanResult, error) {
-	env := p.ensureExecutionRuntime().BuildSkillEnvironment(req, p.ensureModelRuntime(), p.contextAssembly)
+	executionRuntime := p.ensureExecutionRuntime()
+	env := executionRuntime.BuildSkillEnvironment(req, p.ensureModelRuntime(), p.contextAssembly)
 
 	messages, ctxLayers := p.BuildMessages(ctx, req)
 	if p.contextAssembly != nil {
@@ -319,7 +320,7 @@ func (p *Planner) runTextBased(ctx context.Context, req PlanRequest) (*PlanResul
 	delegationRuntime := p.ensureDelegationRuntime()
 	handoffHooks := delegationRuntime.HandoffHooks(p)
 	resultState := func() PlanResultExecutionState {
-		return p.ensureExecutionRuntime().PlanResultStateForRequest(PlanResultStateRequest{
+		return executionRuntime.PlanResultStateForRequest(PlanResultStateRequest{
 			Request:       req,
 			UsedSkills:    usedSkills,
 			Steps:         steps,
@@ -328,7 +329,7 @@ func (p *Planner) runTextBased(ctx context.Context, req PlanRequest) (*PlanResul
 		})
 	}
 	toolPostprocessState := func() ToolPostprocessExecutionState {
-		return p.ensureExecutionRuntime().ToolPostprocessStateForRequest(ToolPostprocessStateRequest{
+		return executionRuntime.ToolPostprocessStateForRequest(ToolPostprocessStateRequest{
 			Request:         req,
 			StepNumber:      steps,
 			NextStepID:      len(planSteps) + 1,
@@ -343,7 +344,7 @@ func (p *Planner) runTextBased(ctx context.Context, req PlanRequest) (*PlanResul
 
 		// Check for mid-execution interrupts between steps
 		if shouldStop, extraMsgs := p.checkInterrupt(req, messages); shouldStop {
-			return p.ensureExecutionRuntime().TaskStoppedPlanResultForRequest(TaskStoppedPlanResultRequest{
+			return executionRuntime.TaskStoppedPlanResultForRequest(TaskStoppedPlanResultRequest{
 				State: resultState(),
 				Reply: p.ensurePromptRuntime().TaskStoppedReply(),
 			}), nil
@@ -354,7 +355,7 @@ func (p *Planner) runTextBased(ctx context.Context, req PlanRequest) (*PlanResul
 		reply, err := p.ensureModelRuntime().ChatFallbackForRequest(ctx, req, messages, p.runtimeStrategy, p.modelFallbackEvents(req))
 		if err != nil {
 			if len(planSteps) > 0 {
-				return p.ensureExecutionRuntime().PartialPlanResultForRequest(PartialPlanResultRequest{State: resultState(), RawError: err.Error()}), nil
+				return executionRuntime.PartialPlanResultForRequest(PartialPlanResultRequest{State: resultState(), RawError: err.Error()}), nil
 			}
 			return nil, fmt.Errorf("planner step %d: %w", steps, err)
 		}
@@ -370,7 +371,7 @@ func (p *Planner) runTextBased(ctx context.Context, req PlanRequest) (*PlanResul
 				}
 				if !p.reflect(ctx, userIntent, cleaned) {
 					slog.Info("planner: reflect unsatisfied, retrying", "step", steps)
-					retry := p.ensureExecutionRuntime().ApplyReflectRetryForRequest(ReflectRetryRequest{
+					retry := executionRuntime.ApplyReflectRetryForRequest(ReflectRetryRequest{
 						Request:        req,
 						AssistantReply: reply,
 					})
@@ -380,7 +381,7 @@ func (p *Planner) runTextBased(ctx context.Context, req PlanRequest) (*PlanResul
 			}
 
 			cleaned, nextMoves := extractNextMoves(cleaned)
-			return p.ensureExecutionRuntime().SuccessfulPlanResultForRequest(SuccessfulPlanResultRequest{
+			return executionRuntime.SuccessfulPlanResultForRequest(SuccessfulPlanResultRequest{
 				Reply:       cleaned,
 				State:       resultState(),
 				Suggestions: nextMoves,
@@ -409,7 +410,7 @@ func (p *Planner) runTextBased(ctx context.Context, req PlanRequest) (*PlanResul
 				}
 
 				slog.Info("planner: executing skill", "skill", c.Name, "step", steps, "parallel", len(calls) > 1)
-				p.ensureExecutionRuntime().EmitToolStartForRequest(ToolStartEventRequest{
+				executionRuntime.EmitToolStartForRequest(ToolStartEventRequest{
 					Request:   req,
 					SkillName: c.Name,
 					Args:      c.Args,
@@ -424,11 +425,11 @@ func (p *Planner) runTextBased(ctx context.Context, req PlanRequest) (*PlanResul
 		}
 
 		// Collect results preserving order
-		ordered := p.ensureExecutionRuntime().CollectToolResultsInOrder(ch, len(calls))
+		ordered := executionRuntime.CollectToolResultsInOrder(ch, len(calls))
 
 		var results []string
 		for i, r := range ordered {
-			applied := p.ensureExecutionRuntime().ApplyToolResultPostprocessForState(ToolResultPostprocessApplicationRequest{
+			applied := executionRuntime.ApplyToolResultPostprocessForState(ToolResultPostprocessApplicationRequest{
 				State: toolPostprocessState(),
 				Input: ToolResultPostprocessInput{
 					SkillName:             r.SkillName,
@@ -445,9 +446,9 @@ func (p *Planner) runTextBased(ctx context.Context, req PlanRequest) (*PlanResul
 			results = append(results, applied.Processed.ResultLine)
 		}
 
-		recovery := p.ensureExecutionRuntime().ApplyToolFailureRecoveryForState(toolPostprocessState())
+		recovery := executionRuntime.ApplyToolFailureRecoveryForState(toolPostprocessState())
 		lastRecoveryFailedCount = recovery.LastFailedCount
-		reflection := p.ensureExecutionRuntime().BuildTextReflectionPromptForRequest(TextReflectionPromptRequest{
+		reflection := executionRuntime.BuildTextReflectionPromptForRequest(TextReflectionPromptRequest{
 			AssistantReply: reply,
 			Results:        results,
 			RecoveryPrompt: recovery.Prompt,
@@ -456,15 +457,15 @@ func (p *Planner) runTextBased(ctx context.Context, req PlanRequest) (*PlanResul
 		messages = append(messages, reflection.Messages...)
 	}
 
-	streamCB := p.ensureExecutionRuntime().ReasoningDeltaCallbackForRequest(req)
+	streamCB := executionRuntime.ReasoningDeltaCallbackForRequest(req)
 	finalResult, err := p.ensureModelRuntime().ChatFallbackFullForRequest(ctx, req, messages, p.runtimeStrategy, p.modelFallbackEvents(req), streamCB)
 	if err != nil {
 		if len(planSteps) > 0 {
-			return p.ensureExecutionRuntime().PartialPlanResultForRequest(PartialPlanResultRequest{State: resultState(), RawError: err.Error()}), nil
+			return executionRuntime.PartialPlanResultForRequest(PartialPlanResultRequest{State: resultState(), RawError: err.Error()}), nil
 		}
 		return nil, fmt.Errorf("planner final: %w", err)
 	}
-	return p.ensureExecutionRuntime().SuccessfulPlanResultForRequest(SuccessfulPlanResultRequest{
+	return executionRuntime.SuccessfulPlanResultForRequest(SuccessfulPlanResultRequest{
 		Reply:            p.cleanReply(finalResult.Content),
 		ReasoningContent: finalResult.ReasoningContent,
 		State:            resultState(),

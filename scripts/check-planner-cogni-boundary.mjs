@@ -942,6 +942,13 @@ for (const needle of [
   "第七十批",
   "tool-failure recovery state helper",
   "ApplyToolFailureRecoveryForState",
+  "第七十一批",
+  "handoff hook provider",
+  "HandoffExecutionHooksProvider",
+  "HandoffHooks",
+  "第七十二批",
+  "executor-local execution runtime handle",
+  "executionRuntime := p.ensureExecutionRuntime()",
   "第五十五批",
   "partial-result fallback post-processing helper",
   "PartialPlanResultRequest",
@@ -1089,6 +1096,7 @@ for (const [relPath, label] of [
     }
   }
   for (const required of [
+    "executionRuntime := p.ensureExecutionRuntime()",
     "HandoffTimeoutForTool",
     "HandoffHooks",
     "handoffHooks := delegationRuntime.HandoffHooks(p)",
@@ -1107,6 +1115,9 @@ for (const [relPath, label] of [
     if (!source.includes(required)) {
       failures.push(`${relPath} should route request-level execution helper ${required} through its runtime service`);
     }
+  }
+  if (source.includes("p.ensureExecutionRuntime().")) {
+    failures.push(`${relPath} repeatedly reaches Planner execution runtime factory in ${label}; keep a local executionRuntime handle inside the executor`);
   }
   const pathSpecificRequired = relPath.endsWith("executor_fc.go")
     ? [

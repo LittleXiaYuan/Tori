@@ -18,7 +18,8 @@ import (
 
 // runNativeFC uses native LLM function calling (tool_calls in API response).
 func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult, error) {
-	env := p.ensureExecutionRuntime().BuildSkillEnvironment(req, p.ensureModelRuntime(), p.contextAssembly)
+	executionRuntime := p.ensureExecutionRuntime()
+	env := executionRuntime.BuildSkillEnvironment(req, p.ensureModelRuntime(), p.contextAssembly)
 
 	messages, ctxLayers := p.BuildMessages(ctx, req)
 	userMsg := extractUserMessage(req)
@@ -34,7 +35,7 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 	delegationRuntime := p.ensureDelegationRuntime()
 	handoffHooks := delegationRuntime.HandoffHooks(p)
 	resultState := func() PlanResultExecutionState {
-		return p.ensureExecutionRuntime().PlanResultStateForRequest(PlanResultStateRequest{
+		return executionRuntime.PlanResultStateForRequest(PlanResultStateRequest{
 			Request:       req,
 			UsedSkills:    usedSkills,
 			Steps:         steps,
@@ -43,7 +44,7 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 		})
 	}
 	toolPostprocessState := func() ToolPostprocessExecutionState {
-		return p.ensureExecutionRuntime().ToolPostprocessStateForRequest(ToolPostprocessStateRequest{
+		return executionRuntime.ToolPostprocessStateForRequest(ToolPostprocessStateRequest{
 			Request:         req,
 			StepNumber:      steps,
 			NextStepID:      len(planSteps) + 1,
@@ -58,7 +59,7 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 
 		// Check for mid-execution interrupts between steps
 		if shouldStop, extraMsgs := p.checkInterrupt(req, messages); shouldStop {
-			return p.ensureExecutionRuntime().TaskStoppedPlanResultForRequest(TaskStoppedPlanResultRequest{
+			return executionRuntime.TaskStoppedPlanResultForRequest(TaskStoppedPlanResultRequest{
 				State: resultState(),
 				Reply: p.ensurePromptRuntime().TaskStoppedReply(),
 			}), nil
@@ -66,7 +67,7 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 			messages = append(messages, extraMsgs...)
 		}
 
-		p.ensureExecutionRuntime().EmitStepThinkingForRequest(req, steps)
+		executionRuntime.EmitStepThinkingForRequest(req, steps)
 
 		if steps == 1 {
 			totalChars := 0
@@ -83,7 +84,7 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 		)
 		if err != nil {
 			if len(planSteps) > 0 {
-				return p.ensureExecutionRuntime().PartialPlanResultForRequest(PartialPlanResultRequest{State: resultState(), RawError: err.Error()}), nil
+				return executionRuntime.PartialPlanResultForRequest(PartialPlanResultRequest{State: resultState(), RawError: err.Error()}), nil
 			}
 			return nil, fmt.Errorf("planner fc step %d: %w", steps, err)
 		}
@@ -97,7 +98,7 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 				}
 				if !p.reflect(ctx, userIntent, cleaned) {
 					slog.Info("planner: reflect unsatisfied, retrying", "step", steps)
-					retry := p.ensureExecutionRuntime().ApplyReflectRetryForRequest(ReflectRetryRequest{
+					retry := executionRuntime.ApplyReflectRetryForRequest(ReflectRetryRequest{
 						Request:          req,
 						AssistantReply:   reply,
 						ReasoningContent: lastReasoning,
@@ -109,7 +110,7 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 				}
 			}
 			cleaned, nextMoves := extractNextMoves(cleaned)
-			return p.ensureExecutionRuntime().SuccessfulPlanResultForRequest(SuccessfulPlanResultRequest{
+			return executionRuntime.SuccessfulPlanResultForRequest(SuccessfulPlanResultRequest{
 				Reply:       cleaned,
 				State:       resultState(),
 				Suggestions: nextMoves,
@@ -117,7 +118,7 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 		}
 
 		// Append assistant message with tool calls + reasoning (required by Kimi K2.5 etc.)
-		messages = append(messages, p.ensureExecutionRuntime().AssistantToolCallMessageForRequest(AssistantToolCallMessageRequest{
+		messages = append(messages, executionRuntime.AssistantToolCallMessageForRequest(AssistantToolCallMessageRequest{
 			AssistantReply:   reply,
 			ToolCalls:        toolCalls,
 			ReasoningContent: lastReasoning,
@@ -177,7 +178,7 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 					}
 
 					slog.Info("planner: executing skill (fc/parallel)", "skill", tc.Function.Name, "step", steps)
-					p.ensureExecutionRuntime().EmitToolStartForRequest(ToolStartEventRequest{
+					executionRuntime.EmitToolStartForRequest(ToolStartEventRequest{
 						Request:   req,
 						SkillName: tc.Function.Name,
 						Args:      args,
@@ -192,9 +193,9 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 			}(toolParentCtx, timeout, idx, tc)
 		}
 		// Collect results in order
-		tcResults := p.ensureExecutionRuntime().CollectToolResultsInOrder(resultsCh, len(toolCalls))
+		tcResults := executionRuntime.CollectToolResultsInOrder(resultsCh, len(toolCalls))
 		for _, r := range tcResults {
-			applied := p.ensureExecutionRuntime().ApplyToolResultPostprocessForState(ToolResultPostprocessApplicationRequest{
+			applied := executionRuntime.ApplyToolResultPostprocessForState(ToolResultPostprocessApplicationRequest{
 				State: toolPostprocessState(),
 				Input: ToolResultPostprocessInput{
 					ToolCallID:         r.ToolCallID,
@@ -211,10 +212,10 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 			planSteps = applied.PlanSteps
 			messages = append(messages, applied.Processed.ToolMessage)
 		}
-		recovery := p.ensureExecutionRuntime().ApplyToolFailureRecoveryForState(toolPostprocessState())
+		recovery := executionRuntime.ApplyToolFailureRecoveryForState(toolPostprocessState())
 		lastRecoveryFailedCount = recovery.LastFailedCount
 		if recovery.Applied {
-			messages = append(messages, p.ensureExecutionRuntime().RecoveryPromptMessageForRequest(RecoveryPromptMessageRequest{Prompt: recovery.Prompt}))
+			messages = append(messages, executionRuntime.RecoveryPromptMessageForRequest(RecoveryPromptMessageRequest{Prompt: recovery.Prompt}))
 		}
 
 		// If the request context was cancelled (e.g. SSE disconnect) but tool
@@ -222,16 +223,16 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 		// LLM again (which would fail with "context canceled").
 		if ctx.Err() != nil {
 			if len(planSteps) > 0 {
-				return p.ensureExecutionRuntime().PartialPlanResultForRequest(PartialPlanResultRequest{State: resultState(), RawError: ctx.Err().Error()}), nil
+				return executionRuntime.PartialPlanResultForRequest(PartialPlanResultRequest{State: resultState(), RawError: ctx.Err().Error()}), nil
 			}
-			return p.ensureExecutionRuntime().TerminalPlanResultForRequest(TerminalPlanResultRequest{
+			return executionRuntime.TerminalPlanResultForRequest(TerminalPlanResultRequest{
 				State:  resultState(),
 				Reason: TerminalPlanResultContextCanceled,
 			}), nil
 		}
 	}
 
-	finalPrompt := p.ensureExecutionRuntime().BuildFinalAnswerPromptForRequest(FinalAnswerPromptRequest{Request: req})
+	finalPrompt := executionRuntime.BuildFinalAnswerPromptForRequest(FinalAnswerPromptRequest{Request: req})
 	if finalPrompt.HasMessage {
 		messages = append(messages, finalPrompt.Message)
 	}
@@ -239,9 +240,9 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 	reply, _, err := p.ensureModelRuntime().ChatWithToolsForRequest(ctx, req, messages, tools, 0.7)
 	if err != nil {
 		if len(planSteps) > 0 {
-			return p.ensureExecutionRuntime().PartialPlanResultForRequest(PartialPlanResultRequest{State: resultState(), RawError: err.Error()}), nil
+			return executionRuntime.PartialPlanResultForRequest(PartialPlanResultRequest{State: resultState(), RawError: err.Error()}), nil
 		}
-		return p.ensureExecutionRuntime().TerminalPlanResultForRequest(TerminalPlanResultRequest{
+		return executionRuntime.TerminalPlanResultForRequest(TerminalPlanResultRequest{
 			State:  resultState(),
 			Reason: TerminalPlanResultFinalSynthesisFailed,
 		}), nil
@@ -251,7 +252,7 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 		p.ensureSkillRuntime().RecordRecent(usedSkills)
 	}
 
-	return p.ensureExecutionRuntime().SuccessfulPlanResultForRequest(SuccessfulPlanResultRequest{
+	return executionRuntime.SuccessfulPlanResultForRequest(SuccessfulPlanResultRequest{
 		Reply: p.cleanReply(reply),
 		State: resultState(),
 	}), nil
