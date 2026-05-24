@@ -142,6 +142,23 @@ func TestExecutionRuntimeServiceToolPostprocessRequestForState(t *testing.T) {
 	}
 }
 
+func TestExecutionRuntimeServiceCollectToolResultsInOrder(t *testing.T) {
+	runtime := NewExecutionRuntimeService(3)
+	ch := make(chan ToolExecutionResult, 3)
+	ch <- ToolExecutionResult{Index: 2, SkillName: "third", Output: "c"}
+	ch <- ToolExecutionResult{Index: 0, SkillName: "first", Output: "a"}
+	ch <- ToolExecutionResult{Index: 1, SkillName: "second", Output: "b"}
+
+	ordered := runtime.CollectToolResultsInOrder(ch, 3)
+	if len(ordered) != 3 || ordered[0].SkillName != "first" || ordered[1].SkillName != "second" || ordered[2].SkillName != "third" {
+		t.Fatalf("results not restored in order: %#v", ordered)
+	}
+
+	if empty := runtime.CollectToolResultsInOrder(ch, 0); empty != nil {
+		t.Fatalf("zero count should return nil, got %#v", empty)
+	}
+}
+
 func TestExecutionRuntimeServiceTaskStoppedPlanResultForRequest(t *testing.T) {
 	result := NewExecutionRuntimeService(3).TaskStoppedPlanResultForRequest(TaskStoppedPlanResultRequest{
 		Reply: "Task stopped.",

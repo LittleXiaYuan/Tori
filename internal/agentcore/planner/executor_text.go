@@ -386,13 +386,7 @@ func (p *Planner) runTextBased(ctx context.Context, req PlanRequest) (*PlanResul
 		}
 
 		// Execute tool calls in parallel
-		type callResult struct {
-			idx    int
-			name   string
-			output string
-			err    error
-		}
-		ch := make(chan callResult, len(calls))
+		ch := make(chan ToolExecutionResult, len(calls))
 		for i, call := range calls {
 			idx, c := i, call // capture loop vars
 			timeout := p.perToolTimeout()
@@ -408,9 +402,9 @@ func (p *Planner) runTextBased(ctx context.Context, req PlanRequest) (*PlanResul
 				)
 				if handoff.Handled {
 					if handoff.Err != nil {
-						ch <- callResult{idx: idx, name: c.Name, err: handoff.Err}
+						ch <- ToolExecutionResult{Index: idx, SkillName: c.Name, Err: handoff.Err}
 					} else {
-						ch <- callResult{idx: idx, name: c.Name, output: handoff.Reply}
+						ch <- ToolExecutionResult{Index: idx, SkillName: c.Name, Output: handoff.Reply}
 					}
 					return
 				}
@@ -423,28 +417,24 @@ func (p *Planner) runTextBased(ctx context.Context, req PlanRequest) (*PlanResul
 				})
 				exec := p.executeSkill(toolCtx, c.Name, c.Args, env)
 				if exec.Err != nil {
-					ch <- callResult{idx: idx, name: exec.SkillName, err: exec.Err}
+					ch <- ToolExecutionResult{Index: idx, SkillName: exec.SkillName, Err: exec.Err}
 				} else {
-					ch <- callResult{idx: idx, name: exec.SkillName, output: exec.Output}
+					ch <- ToolExecutionResult{Index: idx, SkillName: exec.SkillName, Output: exec.Output}
 				}
 			})
 		}
 
 		// Collect results preserving order
-		ordered := make([]callResult, len(calls))
-		for range calls {
-			r := <-ch
-			ordered[r.idx] = r
-		}
+		ordered := p.ensureExecutionRuntime().CollectToolResultsInOrder(ch, len(calls))
 
 		var results []string
 		for i, r := range ordered {
 			processed := p.ensureExecutionRuntime().ApplyToolResultForRequest(
 				p.ensureExecutionRuntime().ToolResultPostprocessRequestForState(toolPostprocessState(), ToolResultPostprocessInput{
-					SkillName:             r.name,
+					SkillName:             r.SkillName,
 					Args:                  calls[i].Args,
-					Output:                r.output,
-					Err:                   r.err,
+					Output:                r.Output,
+					Err:                   r.Err,
 					IncludeTextResultLine: true,
 				}),
 			)

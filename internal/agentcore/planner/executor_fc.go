@@ -122,15 +122,7 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 		}))
 
 		// Execute tool calls in parallel
-		type tcResult struct {
-			idx    int
-			id     string
-			name   string
-			args   map[string]any
-			output string
-			err    error
-		}
-		resultsCh := make(chan tcResult, len(toolCalls))
+		resultsCh := make(chan ToolExecutionResult, len(toolCalls))
 		for i, tc := range toolCalls {
 			idx, tc := i, tc // capture loop vars
 
@@ -152,7 +144,7 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 				defer func() {
 					if r := recover(); r != nil {
 						slog.Error("planner: tool goroutine panic", "panic", r, "skill", tc.Function.Name)
-						resultsCh <- tcResult{idx: idx, id: tc.ID, name: tc.Function.Name, err: fmt.Errorf("tool panic: %v", r)}
+						resultsCh <- ToolExecutionResult{Index: idx, ToolCallID: tc.ID, SkillName: tc.Function.Name, Err: fmt.Errorf("tool panic: %v", r)}
 					}
 				}()
 				var toolCtx context.Context
@@ -177,9 +169,9 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 						)
 						if handoff.Handled {
 							if handoff.Err != nil {
-								resultsCh <- tcResult{idx: idx, id: tc.ID, name: tc.Function.Name, args: args, err: handoff.Err}
+								resultsCh <- ToolExecutionResult{Index: idx, ToolCallID: tc.ID, SkillName: tc.Function.Name, Args: args, Err: handoff.Err}
 							} else {
-								resultsCh <- tcResult{idx: idx, id: tc.ID, name: tc.Function.Name, args: args, output: handoff.Reply}
+								resultsCh <- ToolExecutionResult{Index: idx, ToolCallID: tc.ID, SkillName: tc.Function.Name, Args: args, Output: handoff.Reply}
 							}
 							return
 						}
@@ -193,27 +185,23 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 					})
 					exec := p.executeSkill(toolCtx, tc.Function.Name, args, env)
 					if exec.Err != nil {
-						resultsCh <- tcResult{idx: idx, id: tc.ID, name: exec.SkillName, args: exec.Args, err: exec.Err}
+						resultsCh <- ToolExecutionResult{Index: idx, ToolCallID: tc.ID, SkillName: exec.SkillName, Args: exec.Args, Err: exec.Err}
 					} else {
-						resultsCh <- tcResult{idx: idx, id: tc.ID, name: exec.SkillName, args: exec.Args, output: exec.Output}
+						resultsCh <- ToolExecutionResult{Index: idx, ToolCallID: tc.ID, SkillName: exec.SkillName, Args: exec.Args, Output: exec.Output}
 					}
 				}(toolCtx)
 			}(toolParentCtx, timeout, idx, tc)
 		}
 		// Collect results in order
-		tcResults := make([]tcResult, len(toolCalls))
-		for range toolCalls {
-			r := <-resultsCh
-			tcResults[r.idx] = r
-		}
+		tcResults := p.ensureExecutionRuntime().CollectToolResultsInOrder(resultsCh, len(toolCalls))
 		for _, r := range tcResults {
 			processed := p.ensureExecutionRuntime().ApplyToolResultForRequest(
 				p.ensureExecutionRuntime().ToolResultPostprocessRequestForState(toolPostprocessState(), ToolResultPostprocessInput{
-					ToolCallID:         r.id,
-					SkillName:          r.name,
-					Args:               r.args,
-					Output:             r.output,
-					Err:                r.err,
+					ToolCallID:         r.ToolCallID,
+					SkillName:          r.SkillName,
+					Args:               r.Args,
+					Output:             r.Output,
+					Err:                r.Err,
 					IncludeToolMessage: true,
 				}),
 			)
