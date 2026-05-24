@@ -10,10 +10,6 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
-	"time"
-
-	"yunque-agent/internal/agentcore/llm"
-	"yunque-agent/internal/observe"
 )
 
 type skillCall struct {
@@ -309,30 +305,54 @@ func (p *Planner) fuzzyMatchSkill(raw string) string {
 // runTextBased: multi-step planning loop using text-parsed skill calls.
 // Decompose → Execute (parallel) → Reflect → Synthesize.
 func (p *Planner) runTextBased(ctx context.Context, req PlanRequest) (*PlanResult, error) {
-	env := p.buildEnv(req)
+	env := p.ensureExecutionRuntime().BuildSkillEnvironment(req, p.ensureModelRuntime(), p.contextAssembly)
 
 	messages, ctxLayers := p.BuildMessages(ctx, req)
-	p.maybeEmitCogniTrace(req)
+	if p.contextAssembly != nil {
+		p.contextAssembly.EmitCogniTraceForRequest(req)
+	}
 
 	var usedSkills []string
 	var planSteps []PlanStep
 	steps := 0
 	lastRecoveryFailedCount := 0
+	resultState := func() PlanResultExecutionState {
+		return p.ensureExecutionRuntime().PlanResultStateForRequest(PlanResultStateRequest{
+			Request:       req,
+			UsedSkills:    usedSkills,
+			Steps:         steps,
+			PlanSteps:     planSteps,
+			ContextLayers: ctxLayers,
+		})
+	}
+	toolPostprocessState := func() ToolPostprocessExecutionState {
+		return p.ensureExecutionRuntime().ToolPostprocessStateForRequest(ToolPostprocessStateRequest{
+			Request:         req,
+			StepNumber:      steps,
+			NextStepID:      len(planSteps) + 1,
+			PlanSteps:       planSteps,
+			LastFailedCount: lastRecoveryFailedCount,
+			SkillRuntime:    p.ensureSkillRuntime(),
+		})
+	}
 
-	for steps < p.maxSteps {
+	for steps < p.maxPlanSteps() {
 		steps++
 
 		// Check for mid-execution interrupts between steps
 		if shouldStop, extraMsgs := p.checkInterrupt(req, messages); shouldStop {
-			return &PlanResult{Reply: "已停止当前任务。", SkillsUsed: usedSkills, Steps: steps, Plan: planSteps, ContextLayers: ctxLayers}, nil
+			return p.ensureExecutionRuntime().TaskStoppedPlanResultForRequest(TaskStoppedPlanResultRequest{
+				State: resultState(),
+				Reply: p.ensurePromptRuntime().TaskStoppedReply(),
+			}), nil
 		} else if len(extraMsgs) > 0 {
 			messages = append(messages, extraMsgs...)
 		}
 
-		reply, err := p.chatFallback(ctx, req, messages)
+		reply, err := p.ensureModelRuntime().ChatFallbackForRequest(ctx, req, messages, p.runtimeStrategy, p.modelFallbackEvents(req))
 		if err != nil {
 			if len(planSteps) > 0 {
-				return p.partialPlanResult(req, planSteps, usedSkills, steps, ctxLayers, err.Error()), nil
+				return p.ensureExecutionRuntime().PartialPlanResultForRequest(PartialPlanResultRequest{State: resultState(), RawError: err.Error()}), nil
 			}
 			return nil, fmt.Errorf("planner step %d: %w", steps, err)
 		}
@@ -341,23 +361,28 @@ func (p *Planner) runTextBased(ctx context.Context, req PlanRequest) (*PlanResul
 		if len(calls) == 0 {
 			cleaned := p.cleanReply(reply)
 
-			if p.reflect != nil && steps < p.maxSteps {
+			if p.reflect != nil && steps < p.maxPlanSteps() {
 				userIntent := ""
 				if len(req.Messages) > 0 {
 					userIntent = req.Messages[len(req.Messages)-1].Content
 				}
 				if !p.reflect(ctx, userIntent, cleaned) {
 					slog.Info("planner: reflect unsatisfied, retrying", "step", steps)
-					messages = append(messages,
-						llm.Message{Role: "assistant", Content: reply},
-						llm.Message{Role: "user", Content: "你的回答质量不够好，请重新组织更完善的回答。"},
-					)
+					retry := p.ensureExecutionRuntime().ApplyReflectRetryForRequest(ReflectRetryRequest{
+						Request:        req,
+						AssistantReply: reply,
+					})
+					messages = append(messages, retry.Messages...)
 					continue
 				}
 			}
 
 			cleaned, nextMoves := extractNextMoves(cleaned)
-			return &PlanResult{Reply: cleaned, SkillsUsed: usedSkills, Steps: steps, Plan: planSteps, ContextLayers: ctxLayers, Suggestions: nextMoves}, nil
+			return p.ensureExecutionRuntime().SuccessfulPlanResultForRequest(SuccessfulPlanResultRequest{
+				Reply:       cleaned,
+				State:       resultState(),
+				Suggestions: nextMoves,
+			}), nil
 		}
 
 		// Execute tool calls in parallel
@@ -370,79 +395,32 @@ func (p *Planner) runTextBased(ctx context.Context, req PlanRequest) (*PlanResul
 		ch := make(chan callResult, len(calls))
 		for i, call := range calls {
 			idx, c := i, call // capture loop vars
-			timeout := p.toolTimeout
-			if p.handoffReg != nil {
-				if _, isHandoff := p.handoffReg.IsHandoffCall(c.Name); isHandoff {
-					timeout = 90 * time.Second
-				}
-			}
+			timeout := p.perToolTimeout()
+			timeout = p.ensureDelegationRuntime().HandoffTimeoutForTool(c.Name, timeout)
 			safeToolGo(ctx, timeout, func(toolCtx context.Context) {
 				// Check for handoff (transfer_to_*) calls first
-				if p.handoffReg != nil {
-					if agentName, ok := p.handoffReg.IsHandoffCall(c.Name); ok {
-						input, _ := c.Args["input"].(string)
-						if input == "" {
-							// Fallback: use first string arg as input
-							for _, v := range c.Args {
-								if s, ok := v.(string); ok && s != "" {
-									input = s
-									break
-								}
-							}
-						}
-						slog.Info("planner: handoff delegation (text)", "agent", agentName, "step", steps)
-						if req.StepCallback != nil {
-							evt := observe.NewEvent(req.TraceID, observe.DomainAgent, observe.EventHandoffStart,
-								fmt.Sprintf("🤖 委派 [%s]：%s", agentName, truncate(input, 80)))
-							evt.Meta.TenantID = req.TenantID
-							evt.Meta.Skill = agentName
-							evt.Detail = observe.HandoffDetail{Agent: agentName, Input: truncate(input, 200)}
-							req.StepCallback(evt)
-						}
-						cbCtx := toolCtx
-						if req.StepCallback != nil {
-							cbCtx = WithStepCallback(toolCtx, req.StepCallback)
-						}
-						t0 := time.Now()
-						hr, err := p.handoffReg.Execute(cbCtx, req.TenantID, agentName, input, req.ModelOverride)
-						dur := time.Since(t0)
-						if p.skillMetrics != nil {
-							p.skillMetrics(c.Name, dur, err)
-						}
-						p.proactiveCog.RecordExecutionFailure(err != nil)
-						if req.StepCallback != nil {
-							doneEvt := observe.NewEvent(req.TraceID, observe.DomainAgent, observe.EventHandoffDone,
-								fmt.Sprintf("✅ [%s] 完成 (%.1fs)", agentName, dur.Seconds()))
-							doneEvt.Meta.TenantID = req.TenantID
-							doneEvt.Meta.Skill = agentName
-							detail := observe.HandoffDetail{Agent: agentName, DurMs: dur.Milliseconds()}
-							if err != nil {
-								doneEvt.Summary = handoffFailureSummary(agentName, err)
-								detail = buildHandoffFailureDetail(agentName, dur, err)
-							} else {
-								detail.Reply = truncate(hr.Reply, 200)
-							}
-							doneEvt.Detail = detail
-							req.StepCallback(doneEvt)
-						}
-						if err != nil {
-							ch <- callResult{idx: idx, name: c.Name, err: err}
-						} else {
-							ch <- callResult{idx: idx, name: c.Name, output: hr.Reply}
-						}
-						return
+				handoff := p.ensureDelegationRuntime().ExecuteHandoffForRequest(
+					toolCtx, req, c.Name, c.Args, "text", steps,
+					HandoffExecutionHooks{
+						Metrics:                p.skillMetrics,
+						RecordExecutionFailure: p.ensureProactiveCognition().RecordExecutionFailure,
+					},
+				)
+				if handoff.Handled {
+					if handoff.Err != nil {
+						ch <- callResult{idx: idx, name: c.Name, err: handoff.Err}
+					} else {
+						ch <- callResult{idx: idx, name: c.Name, output: handoff.Reply}
 					}
+					return
 				}
 
 				slog.Info("planner: executing skill", "skill", c.Name, "step", steps, "parallel", len(calls) > 1)
-				if req.StepCallback != nil {
-					tsEvt := observe.NewEvent(req.TraceID, observe.DomainPlanner, observe.EventToolStart,
-						fmt.Sprintf("🔧 正在调用 [%s]...", c.Name))
-					tsEvt.Meta.Skill = c.Name
-					tsEvt.Meta.TenantID = req.TenantID
-					tsEvt.Detail = observe.ToolStartDetail{Skill: c.Name, Args: c.Args}
-					req.StepCallback(tsEvt)
-				}
+				p.ensureExecutionRuntime().EmitToolStartForRequest(ToolStartEventRequest{
+					Request:   req,
+					SkillName: c.Name,
+					Args:      c.Args,
+				})
 				exec := p.executeSkill(toolCtx, c.Name, c.Args, env)
 				if exec.Err != nil {
 					ch <- callResult{idx: idx, name: exec.SkillName, err: exec.Err}
@@ -461,74 +439,44 @@ func (p *Planner) runTextBased(ctx context.Context, req PlanRequest) (*PlanResul
 
 		var results []string
 		for i, r := range ordered {
-			usedSkills = append(usedSkills, r.name)
-			step := PlanStep{
-				ID:     len(planSteps) + 1,
-				Action: fmt.Sprintf("调用 %s", r.name),
-				Skill:  r.name,
-				Args:   calls[i].Args,
-				Status: StepDone,
-				Result: r.output,
-			}
-			if r.err != nil {
-				step.Status = StepFailed
-				step.Error = r.err.Error()
-				results = append(results, fmt.Sprintf("[%s] 暂未完成：%s", r.name, plannerFriendlyFailureText(r.err.Error())))
-			} else {
-				results = append(results, fmt.Sprintf("[%s] %s", r.name, r.output))
-			}
-			p.recordSkillRecommendationOutcome(r.name, r.err == nil)
-			planSteps = append(planSteps, step)
-			if req.StepCallback != nil {
-				trSummary := fmt.Sprintf("✅ [%s] 完成", r.name)
-				detail := observe.ToolResultDetail{Skill: r.name, Result: truncate(r.output, 200)}
-				if r.err != nil {
-					friendly := plannerFriendlyFailureText(r.err.Error())
-					trSummary = fmt.Sprintf("⏸️ [%s] 暂未完成：%s", r.name, friendly)
-					detail = observe.ToolResultDetail{Skill: r.name, Error: friendly}
-				}
-				trEvt := observe.NewEvent(req.TraceID, observe.DomainPlanner, observe.EventToolResult, trSummary)
-				trEvt.Meta.Skill = r.name
-				trEvt.Meta.TenantID = req.TenantID
-				trEvt.Detail = detail
-				req.StepCallback(trEvt)
-			}
+			processed := p.ensureExecutionRuntime().ApplyToolResultForRequest(
+				p.ensureExecutionRuntime().ToolResultPostprocessRequestForState(toolPostprocessState(), ToolResultPostprocessInput{
+					SkillName:             r.name,
+					Args:                  calls[i].Args,
+					Output:                r.output,
+					Err:                   r.err,
+					IncludeTextResultLine: true,
+				}),
+			)
+			usedSkills = append(usedSkills, processed.UsedSkill)
+			planSteps = append(planSteps, processed.Step)
+			results = append(results, processed.ResultLine)
 		}
 
-		// Build reflection prompt: show results and ask LLM to assess + continue
-		reflectPrompt := "工具调用结果:\n" + strings.Join(results, "\n\n")
-		if summary, ok := buildPlannerFailureSummary(planSteps); ok && summary.FailedCount > lastRecoveryFailedCount {
-			lastRecoveryFailedCount = summary.FailedCount
-			p.maybeEmitFailureRecovery(req, summary)
-			reflectPrompt += "\n\n" + formatFailureRecoveryPrompt(summary)
-		}
-		if steps < p.maxSteps-1 && len(planSteps) > 0 {
-			reflectPrompt += "\n\n请评估以上结果：如果信息充足，直接给出最终回答；如果还需要更多信息，继续调用工具。"
-		}
-
-		messages = append(messages,
-			llm.Message{Role: "assistant", Content: reply},
-			llm.Message{Role: "user", Content: reflectPrompt},
+		recovery := p.ensureExecutionRuntime().ApplyToolFailureRecoveryForRequest(
+			p.ensureExecutionRuntime().ToolFailureRecoveryRequestForState(toolPostprocessState()),
 		)
+		lastRecoveryFailedCount = recovery.LastFailedCount
+		reflection := p.ensureExecutionRuntime().BuildTextReflectionPromptForRequest(TextReflectionPromptRequest{
+			AssistantReply: reply,
+			Results:        results,
+			RecoveryPrompt: recovery.Prompt,
+			ShouldContinue: steps < p.maxPlanSteps()-1 && len(planSteps) > 0,
+		})
+		messages = append(messages, reflection.Messages...)
 	}
 
-	var streamCB llm.StreamDeltaFunc
-	if req.StepCallback != nil {
-		streamCB = func(contentDelta, reasoningDelta string) {
-			if reasoningDelta != "" {
-				evt := observe.NewEvent(req.TraceID, observe.DomainPlanner, observe.EventThinking, reasoningDelta)
-				evt.Meta.TenantID = req.TenantID
-				evt.Detail = map[string]string{"stream_type": "thinking_delta"}
-				req.StepCallback(evt)
-			}
-		}
-	}
-	finalResult, err := p.chatFallbackFull(ctx, req, messages, streamCB)
+	streamCB := p.ensureExecutionRuntime().ReasoningDeltaCallbackForRequest(req)
+	finalResult, err := p.ensureModelRuntime().ChatFallbackFullForRequest(ctx, req, messages, p.runtimeStrategy, p.modelFallbackEvents(req), streamCB)
 	if err != nil {
 		if len(planSteps) > 0 {
-			return p.partialPlanResult(req, planSteps, usedSkills, steps, ctxLayers, err.Error()), nil
+			return p.ensureExecutionRuntime().PartialPlanResultForRequest(PartialPlanResultRequest{State: resultState(), RawError: err.Error()}), nil
 		}
 		return nil, fmt.Errorf("planner final: %w", err)
 	}
-	return &PlanResult{Reply: p.cleanReply(finalResult.Content), ReasoningContent: finalResult.ReasoningContent, SkillsUsed: usedSkills, Steps: steps, Plan: planSteps, ContextLayers: ctxLayers}, nil
+	return p.ensureExecutionRuntime().SuccessfulPlanResultForRequest(SuccessfulPlanResultRequest{
+		Reply:            p.cleanReply(finalResult.Content),
+		ReasoningContent: finalResult.ReasoningContent,
+		State:            resultState(),
+	}), nil
 }
