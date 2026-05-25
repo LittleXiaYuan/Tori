@@ -51,6 +51,7 @@ const allowedCogniInternals = new Set([
 
 const modelRuntimeRel = "internal/agentcore/planner/model_runtime_service.go";
 const modelRuntimeTasksRel = "internal/agentcore/planner/model_runtime_tasks.go";
+const longHorizonRel = "internal/agentcore/planner/long_horizon.go";
 const runtimeStrategyRel = "internal/agentcore/planner/runtime_strategy_service.go";
 const runtimeStrategySelectionRel = "internal/agentcore/planner/runtime_strategy_selection.go";
 const runtimeClassificationApplicationRel = "internal/agentcore/planner/runtime_classification_application.go";
@@ -72,6 +73,7 @@ const executionRuntimeRel = "internal/agentcore/planner/execution_runtime_servic
 const delegationRuntimeRel = "internal/agentcore/planner/delegation_runtime_service.go";
 const allowedDirectModelCallFiles = new Set([
   modelRuntimeRel,
+  modelRuntimeTasksRel,
   executionRuntimeRel,
 ]);
 
@@ -309,6 +311,29 @@ for (const needle of [
 ]) {
   if (!runtimeStrategy.includes(needle)) {
     failures.push(`${runtimeStrategyRel} missing required LocalBrain DTO boundary ${JSON.stringify(needle)}`);
+  }
+}
+
+const longHorizonSource = read(longHorizonRel);
+for (const forbidden of [
+  '"yunque-agent/internal/agentcore/llm"',
+  "[]llm.Message{",
+  ".ChatForRequest(ctx, req, []llm.Message{",
+  ".ChatForRequestTier(ctx, req,",
+]) {
+  if (longHorizonSource.includes(forbidden)) {
+    failures.push(`${longHorizonRel} leaks long-horizon model prompt/call detail ${JSON.stringify(forbidden)}; keep it in ${modelRuntimeTasksRel}`);
+  }
+}
+
+for (const needle of [
+  "func (s *ModelRuntimeService) DecomposeLongHorizonDAG(ctx context.Context, req PlanRequest, skillList, goal string) ([]plan.PlanStep, error)",
+  "func (s *ModelRuntimeService) ReviseLongHorizonDAG(ctx context.Context, req PlanRequest, goal, status string, failedStep int) ([]plan.PlanStep, error)",
+  "func (s *ModelRuntimeService) ExecuteLongHorizonReasoningStep(ctx context.Context, req PlanRequest, tier, prompt string) (string, error)",
+  "func (s *ModelRuntimeService) SynthesizeLongHorizonResult(ctx context.Context, req PlanRequest, goal, results string) (string, error)",
+]) {
+  if (!read(modelRuntimeTasksRel).includes(needle)) {
+    failures.push(`${modelRuntimeTasksRel} missing long-horizon model runtime task boundary ${JSON.stringify(needle)}`);
   }
 }
 

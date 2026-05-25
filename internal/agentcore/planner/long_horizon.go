@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"yunque-agent/internal/agentcore/llm"
 	"yunque-agent/internal/agentcore/plan"
 	"yunque-agent/internal/observe"
 )
@@ -216,42 +215,18 @@ func (p *Planner) emitResumedLongHorizonCheckpoint(req PlanRequest, source LongH
 }
 
 func (p *Planner) buildDecomposeDAG(req PlanRequest) plan.DecomposeDAGFunc {
+	modelRuntime := p.ensureModelRuntime()
 	return func(ctx context.Context, goal string) ([]plan.PlanStep, error) {
 		skillList := p.buildSkillListForDecomposeWithAllow(allowedSkillSet(req.AllowedSkills))
-		prompt := fmt.Sprintf(`将目标分解为步骤。可用工具：
-%s
-目标：%s
-返回 JSON 数组：[{"description":"","skill":"","args":{},"depends_on":[]}]
-规则：独立步骤不加依赖，3-8步，只返回JSON`, skillList, goal)
-
-		reply, err := p.ensureModelRuntime().ChatForRequest(ctx, req, []llm.Message{
-			{Role: "system", Content: "你是任务规划器，只输出 JSON 数组。"},
-			{Role: "user", Content: prompt},
-		}, 0.3)
-		if err != nil {
-			return nil, err
-		}
-		steps, err := parseDAGSteps(reply)
-		if err != nil {
-			return nil, err
-		}
-		return ensureInitialDAGMinimumSteps(steps), nil
+		return modelRuntime.DecomposeLongHorizonDAG(ctx, req, skillList, goal)
 	}
 }
 
 func (p *Planner) buildReviseFunc(req PlanRequest) plan.ReviseFunc {
+	modelRuntime := p.ensureModelRuntime()
 	return func(ctx context.Context, goal string, current *plan.Plan, failedStep int) ([]plan.PlanStep, error) {
 		status := friendlyPlanStepSummary(current)
-		prompt := fmt.Sprintf("任务: %s\n状态:\n%s\n步骤 %d 失败，重新规划剩余部分。返回JSON数组。",
-			goal, status, failedStep)
-		reply, err := p.ensureModelRuntime().ChatForRequest(ctx, req, []llm.Message{
-			{Role: "system", Content: "你是任务规划器，根据失败提出替代方案，只输出JSON数组。"},
-			{Role: "user", Content: prompt},
-		}, 0.4)
-		if err != nil {
-			return nil, err
-		}
-		return parseDAGSteps(reply)
+		return modelRuntime.ReviseLongHorizonDAG(ctx, req, goal, status, failedStep)
 	}
 }
 
@@ -279,12 +254,13 @@ func friendlyPlanStepSummary(pl *plan.Plan) string {
 }
 
 func (p *Planner) buildStepExecutor(req PlanRequest) plan.ExecuteStepFunc {
-	env := p.ensureExecutionRuntime().BuildSkillEnvironment(req, p.ensureModelRuntime(), p.contextAssembly)
+	modelRuntime := p.ensureModelRuntime()
+	env := p.ensureExecutionRuntime().BuildSkillEnvironment(req, modelRuntime, p.contextAssembly)
 	allowed := allowedSkillSet(req.AllowedSkills)
 	return func(ctx context.Context, pl *plan.Plan, stepIndex int) (string, []string, error) {
 		step := pl.Steps[stepIndex]
 		if step.Skill == "" {
-			return p.executeReasoningStep(ctx, req, pl, stepIndex)
+			return p.executeReasoningStep(ctx, req, modelRuntime, pl, stepIndex)
 		}
 		if len(allowed) > 0 && !allowed[step.Skill] {
 			return "", []string{step.Skill}, fmt.Errorf("skill %q is not in the allowed tool surface", step.Skill)
@@ -338,7 +314,7 @@ func completedDependencyEvidence(pl *plan.Plan, step plan.PlanStep) string {
 	return b.String()
 }
 
-func (p *Planner) executeReasoningStep(ctx context.Context, req PlanRequest, pl *plan.Plan, stepIndex int) (string, []string, error) {
+func (p *Planner) executeReasoningStep(ctx context.Context, req PlanRequest, modelRuntime *ModelRuntimeService, pl *plan.Plan, stepIndex int) (string, []string, error) {
 	step := pl.Steps[stepIndex]
 	prompt := step.Description
 	for _, dep := range step.DependsOn {
@@ -365,10 +341,7 @@ func (p *Planner) executeReasoningStep(ctx context.Context, req PlanRequest, pl 
 		}
 	}
 
-	reply, err := p.ensureModelRuntime().ChatForRequestTier(ctx, req, selectedTier, []llm.Message{
-		{Role: "system", Content: "基于信息完成分析，直接给出结果。"},
-		{Role: "user", Content: prompt},
-	}, 0.7)
+	reply, err := modelRuntime.ExecuteLongHorizonReasoningStep(ctx, req, selectedTier, prompt)
 	if err != nil {
 		return "", nil, err
 	}
@@ -376,6 +349,11 @@ func (p *Planner) executeReasoningStep(ctx context.Context, req PlanRequest, pl 
 }
 
 func (p *Planner) synthesizePlanResult(ctx context.Context, req PlanRequest, pl *plan.Plan) string {
+	modelRuntime := p.ensureModelRuntime()
+	return synthesizePlanResultWithModelRuntime(ctx, req, modelRuntime, pl)
+}
+
+func synthesizePlanResultWithModelRuntime(ctx context.Context, req PlanRequest, modelRuntime *ModelRuntimeService, pl *plan.Plan) string {
 	var results string
 	for _, s := range pl.Steps {
 		if s.Status == plan.StepCompleted && s.Output != "" {
@@ -389,10 +367,7 @@ func (p *Planner) synthesizePlanResult(ctx context.Context, req PlanRequest, pl 
 	if results == "" {
 		return "任务已执行完毕。"
 	}
-	reply, err := p.ensureModelRuntime().ChatForRequest(ctx, req, []llm.Message{
-		{Role: "system", Content: "根据执行结果给出完整回复。Markdown格式。"},
-		{Role: "user", Content: fmt.Sprintf("目标: %s\n结果:\n%s", pl.Task, results)},
-	}, 0.7)
+	reply, err := modelRuntime.SynthesizeLongHorizonResult(ctx, req, pl.Task, results)
 	if err != nil {
 		return "任务已完成。\n\n" + results
 	}

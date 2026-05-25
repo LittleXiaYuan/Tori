@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"yunque-agent/internal/agentcore/llm"
+	"yunque-agent/internal/agentcore/plan"
 	"yunque-agent/pkg/jsonutil"
 )
 
@@ -103,6 +104,64 @@ func (s *ModelRuntimeService) ParseMissionIntent(ctx context.Context, descriptio
 		}
 	}
 	return result, nil
+}
+
+// DecomposeLongHorizonDAG asks the model runtime to turn a goal into a bounded
+// DAG. Planner owns orchestration; model runtime owns the long-horizon prompt
+// and request-level LLM call for decomposition.
+func (s *ModelRuntimeService) DecomposeLongHorizonDAG(ctx context.Context, req PlanRequest, skillList, goal string) ([]plan.PlanStep, error) {
+	prompt := fmt.Sprintf(`将目标分解为步骤。可用工具：
+%s
+目标：%s
+返回 JSON 数组：[{"description":"","skill":"","args":{},"depends_on":[]}]
+规则：独立步骤不加依赖，3-8步，只返回JSON`, skillList, goal)
+
+	reply, err := s.ChatForRequest(ctx, req, []llm.Message{
+		{Role: "system", Content: "你是任务规划器，只输出 JSON 数组。"},
+		{Role: "user", Content: prompt},
+	}, 0.3)
+	if err != nil {
+		return nil, err
+	}
+	steps, err := parseDAGSteps(reply)
+	if err != nil {
+		return nil, err
+	}
+	return ensureInitialDAGMinimumSteps(steps), nil
+}
+
+// ReviseLongHorizonDAG asks the model runtime to re-plan the remaining DAG
+// after a failed step. Planner supplies the current plan snapshot and owns the
+// retry lifecycle; model runtime owns the prompt and LLM call shape.
+func (s *ModelRuntimeService) ReviseLongHorizonDAG(ctx context.Context, req PlanRequest, goal, status string, failedStep int) ([]plan.PlanStep, error) {
+	prompt := fmt.Sprintf("任务: %s\n状态:\n%s\n步骤 %d 失败，重新规划剩余部分。返回JSON数组。",
+		goal, status, failedStep)
+	reply, err := s.ChatForRequest(ctx, req, []llm.Message{
+		{Role: "system", Content: "你是任务规划器，根据失败提出替代方案，只输出JSON数组。"},
+		{Role: "user", Content: prompt},
+	}, 0.4)
+	if err != nil {
+		return nil, err
+	}
+	return parseDAGSteps(reply)
+}
+
+// ExecuteLongHorizonReasoningStep runs a reasoning-only DAG step through the
+// model runtime. Skill steps still execute through the execution runtime.
+func (s *ModelRuntimeService) ExecuteLongHorizonReasoningStep(ctx context.Context, req PlanRequest, tier, prompt string) (string, error) {
+	return s.ChatForRequestTier(ctx, req, tier, []llm.Message{
+		{Role: "system", Content: "基于信息完成分析，直接给出结果。"},
+		{Role: "user", Content: prompt},
+	}, 0.7)
+}
+
+// SynthesizeLongHorizonResult turns completed DAG outputs into a final reply.
+// If the model path is unavailable, callers can use the returned fallback text.
+func (s *ModelRuntimeService) SynthesizeLongHorizonResult(ctx context.Context, req PlanRequest, goal, results string) (string, error) {
+	return s.ChatForRequest(ctx, req, []llm.Message{
+		{Role: "system", Content: "根据执行结果给出完整回复。Markdown格式。"},
+		{Role: "user", Content: fmt.Sprintf("目标: %s\n结果:\n%s", goal, results)},
+	}, 0.7)
 }
 
 func clipRunes(s string, n int) string {
