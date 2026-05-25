@@ -1210,6 +1210,7 @@ for (const needle of [
   "AfterRun",
   "ReAct-local `learningSidecar` handle",
   "tool-free context trace local `contextAssembly` handle",
+  "text-executor context local `contextAssembly` handle",
   "planner_runtime_setters.go",
   "planner_runtime_facades.go",
   "planner_runtime_services.go",
@@ -1438,6 +1439,9 @@ for (const needle of [
   "第九十六批",
   "tool-free context trace local handle",
   "contextAssembly.EmitCogniTraceForRequest",
+  "第九十七批",
+  "text-executor context local handle",
+  "env := executionRuntime.BuildSkillEnvironment(req, modelRuntime, contextAssembly)",
   "第五十五批",
   "partial-result fallback post-processing helper",
   "PartialPlanResultRequest",
@@ -1548,6 +1552,20 @@ for (const [relPath, label] of [
       failures.push(`${relPath} leaks model request fallback assembly detail ${JSON.stringify(forbidden)} in ${label}; use ModelRuntimeService request fallback wrappers`);
     }
   }
+}
+
+const textExecutor = read("internal/agentcore/planner/executor_text.go");
+for (const required of [
+  "contextAssembly := p.ensureContextAssembly()",
+  "env := executionRuntime.BuildSkillEnvironment(req, modelRuntime, contextAssembly)",
+  "contextAssembly.EmitCogniTraceForRequest(req)",
+]) {
+  if (!textExecutor.includes(required)) {
+    failures.push(`internal/agentcore/planner/executor_text.go should use a text-executor context local handle ${JSON.stringify(required)}`);
+  }
+}
+if (textExecutor.includes("p.contextAssembly")) {
+  failures.push("internal/agentcore/planner/executor_text.go should not read raw p.contextAssembly; use a text-executor context local handle");
 }
 
 for (const needle of [
