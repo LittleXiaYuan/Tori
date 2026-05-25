@@ -14,7 +14,8 @@ import (
 )
 
 func (p *Planner) SetMemory(fn MemorySearchFunc) {
-	p.ensureContextAssembly().SetMemory(fn)
+	contextAssembly := p.ensureContextAssembly()
+	contextAssembly.SetMemory(fn)
 }
 
 func (p *Planner) SetReflect(fn ReflectFunc) { p.reflect = fn }
@@ -23,7 +24,8 @@ func (p *Planner) SetReflect(fn ReflectFunc) { p.reflect = fn }
 // When set, the planner checks for reasoning anomalies (loops, stalls,
 // drift) and injects correction hints into subsequent prompts.
 func (p *Planner) SetMetaCogBridge(b *iledger.MetaCogBridge) {
-	p.ensureLearningSidecar().SetMetaCogBridge(b)
+	learningSidecar := p.ensureLearningSidecar()
+	learningSidecar.SetMetaCogBridge(b)
 }
 
 func (p *Planner) SetPersonaPrompt(fn func() string) {
@@ -33,34 +35,40 @@ func (p *Planner) SetPersonaPrompt(fn func() string) {
 
 // SetGraphContext replaces the graph context source used by dynamic context assembly.
 func (p *Planner) SetGraphContext(fn func(query string) string) {
-	p.ensureContextAssembly().SetGraphContext(fn)
+	contextAssembly := p.ensureContextAssembly()
+	contextAssembly.SetGraphContext(fn)
 }
 
 // AppendGraphContext adds a graph/context source while preserving any source already wired.
 func (p *Planner) AppendGraphContext(fn func(query string) string) {
-	p.ensureContextAssembly().AppendGraphContext(fn)
+	contextAssembly := p.ensureContextAssembly()
+	contextAssembly.AppendGraphContext(fn)
 }
 
 // SetBrowser is a no-op kept for backward compatibility — browser skills are now in the skill registry.
 
 // SetCodeContext: fn(query) returns formatted code snippets from repo-type knowledge.
 func (p *Planner) SetCodeContext(fn func(query string) string) {
-	p.ensureContextAssembly().SetCodeContext(fn)
+	contextAssembly := p.ensureContextAssembly()
+	contextAssembly.SetCodeContext(fn)
 }
 
 func (p *Planner) SetStateContext(fn func() string) {
-	p.ensureContextAssembly().SetStateContext(fn)
+	contextAssembly := p.ensureContextAssembly()
+	contextAssembly.SetStateContext(fn)
 }
 
 func (p *Planner) SetStrategyContext(fn func() string) {
-	p.ensureContextAssembly().SetStrategyContext(fn)
+	contextAssembly := p.ensureContextAssembly()
+	contextAssembly.SetStrategyContext(fn)
 }
 
 // SetStrategyContextFor attaches a query-aware reflection strategy provider.
 // The legacy SetStrategyContext callback remains as a fallback for callers that
 // cannot cheaply scope strategy context to the current user message.
 func (p *Planner) SetStrategyContextFor(fn func(query string) string) {
-	p.ensureContextAssembly().SetStrategyContextFor(fn)
+	contextAssembly := p.ensureContextAssembly()
+	contextAssembly.SetStrategyContextFor(fn)
 }
 
 func (p *Planner) SetDynContextBudget(tokens int) {
@@ -79,18 +87,21 @@ func (p *Planner) SetNativeFC(enabled bool) {
 }
 
 func (p *Planner) SetWindowConfig(cfg ctxwindow.WindowConfig) {
-	p.ensureContextWindowRuntime().SetWindowConfig(cfg)
+	contextWindowRuntime := p.ensureContextWindowRuntime()
+	contextWindowRuntime.SetWindowConfig(cfg)
 }
 
 func (p *Planner) SetContextManager(mgr *ctxwindow.Manager) {
-	p.ensureContextWindowRuntime().SetManager(mgr)
+	contextWindowRuntime := p.ensureContextWindowRuntime()
+	contextWindowRuntime.SetManager(mgr)
 }
 
 func (p *Planner) SetSkillMetrics(fn SkillMetricsFunc) { p.skillMetrics = fn }
 
 // SetSkillScorer sets the Ledger-derived skill scoring data for intent-based routing.
 func (p *Planner) SetSkillScorer(scorer *skills.SkillScorer) {
-	p.ensureSkillRuntime().SetScorer(scorer)
+	skillRuntime := p.ensureSkillRuntime()
+	skillRuntime.SetScorer(scorer)
 }
 
 // SetSkillRecommendationEngine attaches the experience-distilled recommender
@@ -98,7 +109,8 @@ func (p *Planner) SetSkillScorer(scorer *skills.SkillScorer) {
 // with the registry's current skills immediately and re-synced when the
 // registry version changes.
 func (p *Planner) SetSkillRecommendationEngine(engine *recommend.Engine) {
-	p.ensureSkillRuntime().SetRecommendationEngine(engine)
+	skillRuntime := p.ensureSkillRuntime()
+	skillRuntime.SetRecommendationEngine(engine)
 }
 
 // SetSkillIndex provides the L2 index: skills listed by name+description in the prompt,
@@ -118,42 +130,50 @@ func (p *Planner) SetLLMPool(pool *llm.Pool) {
 // SetHandoffRegistry attaches a handoff registry for subagent delegation.
 // Handoff tools (transfer_to_*) are automatically added to LLM function definitions.
 func (p *Planner) SetHandoffRegistry(hr *subagent.HandoffRegistry) {
-	p.ensureDelegationRuntime().SetHandoffRegistry(hr)
+	delegationRuntime := p.ensureDelegationRuntime()
+	delegationRuntime.SetHandoffRegistry(hr)
 }
 
 // SetSkillOptimizer attaches a skill optimizer for usage analytics-driven hints.
 func (p *Planner) SetSkillOptimizer(opt *SkillOptimizer) {
-	p.ensureSkillRuntime().SetOptimizer(opt)
+	skillRuntime := p.ensureSkillRuntime()
+	skillRuntime.SetOptimizer(opt)
 }
 
 // SetReverie attaches the background inner monologue system.
 func (p *Planner) SetReverie(r *Reverie) {
-	p.ensureProactiveCognition().SetReverie(r)
+	proactiveCognition := p.ensureProactiveCognition()
+	proactiveCognition.SetReverie(r)
 }
 
 // SetTaskFailureMonitor attaches a monitor that emits Reverie events on skill failure spikes.
 func (p *Planner) SetTaskFailureMonitor(m *TaskFailureMonitor) {
-	p.ensureProactiveCognition().SetTaskFailureMonitor(m)
+	proactiveCognition := p.ensureProactiveCognition()
+	proactiveCognition.SetTaskFailureMonitor(m)
 }
 
 // SetTrustRecord attaches a callback called after each skill execution to update trust scores.
 func (p *Planner) SetTrustRecord(fn func(skillName string, success bool)) {
-	p.ensureTrustGate().SetRecord(fn)
+	trustGate := p.ensureTrustGate()
+	trustGate.SetRecord(fn)
 }
 
 // SetTrustCheck attaches a gate called before each skill execution.
 func (p *Planner) SetTrustCheck(fn func(skillName string) error) {
-	p.ensureTrustGate().SetCheck(fn)
+	trustGate := p.ensureTrustGate()
+	trustGate.SetCheck(fn)
 }
 
 // SetCognitiveContext attaches the CognitivePlugin dynamic context collector.
 func (p *Planner) SetCognitiveContext(fn CognitiveContextFunc) {
-	p.ensureContextAssembly().SetCognitiveContext(fn)
+	contextAssembly := p.ensureContextAssembly()
+	contextAssembly.SetCognitiveContext(fn)
 }
 
 // SetBeliefContext attaches the Cognition SDK dynamic context collector.
 func (p *Planner) SetBeliefContext(fn BeliefContextFunc) {
-	p.ensureContextAssembly().SetBeliefContext(fn)
+	contextAssembly := p.ensureContextAssembly()
+	contextAssembly.SetBeliefContext(fn)
 }
 
 // SetLedger attaches a Ledger instance for ReAct mode, reasoning traces, and self-evaluation.
@@ -188,12 +208,14 @@ func (p *Planner) SetAgenticThinking(at AgenticThinkerRuntime) {
 
 // SetSkillGrowth attaches the autonomous skill acquisition module.
 func (p *Planner) SetSkillGrowth(sg *SkillGrowth) {
-	p.ensureSkillRuntime().SetGrowth(sg)
+	skillRuntime := p.ensureSkillRuntime()
+	skillRuntime.SetGrowth(sg)
 }
 
 // SetDataCollector attaches the training data collector for LoRA pipeline.
 func (p *Planner) SetDataCollector(dc *DataCollector) {
-	p.ensureLearningSidecar().SetDataCollector(dc)
+	learningSidecar := p.ensureLearningSidecar()
+	learningSidecar.SetDataCollector(dc)
 }
 
 // SetProviderRegistry attaches the capability-aware provider registry for dynamic model routing.
@@ -205,7 +227,8 @@ func (p *Planner) SetProviderRegistry(reg *llm.ProviderRegistry) {
 // SetCogniContext attaches a declarative Cogni context injector. The callback
 // is invoked once per turn from the prompt builder; nil disables the layer.
 func (p *Planner) SetCogniContext(fn CogniContextFunc) {
-	p.ensureContextAssembly().SetCogniContext(fn)
+	contextAssembly := p.ensureContextAssembly()
+	contextAssembly.SetCogniContext(fn)
 }
 
 // SetCogniSkillFilter attaches a declarative Cogni surface filter. The
@@ -213,13 +236,15 @@ func (p *Planner) SetCogniContext(fn CogniContextFunc) {
 // the union of every activated cogni's ToolSurface; nil keeps the full
 // skill set.
 func (p *Planner) SetCogniSkillFilter(fn CogniSkillFilterFunc) {
-	p.ensureContextAssembly().SetCogniSkillFilter(fn)
+	contextAssembly := p.ensureContextAssembly()
+	contextAssembly.SetCogniSkillFilter(fn)
 }
 
 // SetCogniTrace attaches a declarative Cogni observability callback. Nil keeps
 // Cogni internal-only and preserves prior behaviour.
 func (p *Planner) SetCogniTrace(fn CogniTraceFunc) {
-	p.ensureContextAssembly().SetCogniTrace(fn)
+	contextAssembly := p.ensureContextAssembly()
+	contextAssembly.SetCogniTrace(fn)
 }
 
 // SetToolTimeout sets the per-tool execution timeout. Default is 60s.
