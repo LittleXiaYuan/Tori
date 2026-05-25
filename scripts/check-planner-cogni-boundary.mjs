@@ -809,6 +809,29 @@ for (const required of [
   }
 }
 
+const longHorizonRuntime = read(longHorizonRel);
+for (const required of [
+  "executionRuntime := p.ensureExecutionRuntime()",
+  "modelRuntime := p.ensureModelRuntime()",
+  "runtimeStrategy := p.ensureRuntimeStrategy()",
+  "env := executionRuntime.BuildSkillEnvironment(req, modelRuntime, p.contextAssembly)",
+  "runtimeStrategy.SelectLongHorizonReasoningTier(ctx, LongHorizonReasoningTierRequest{",
+  "modelRuntime.ExecuteLongHorizonReasoningStep(ctx, req, selectedTier, prompt)",
+]) {
+  if (!longHorizonRuntime.includes(required)) {
+    failures.push(`${longHorizonRel} should route long-horizon runtime helper ${required} through executor-local runtime handles`);
+  }
+}
+for (const forbiddenRuntimeReach of [
+  "p.ensureExecutionRuntime().",
+  "p.ensureModelRuntime().ExecuteLongHorizonReasoningStep",
+  "p.runtimeStrategy",
+]) {
+  if (longHorizonRuntime.includes(forbiddenRuntimeReach)) {
+    failures.push(`${longHorizonRel} repeatedly reaches Planner runtime factory/field ${JSON.stringify(forbiddenRuntimeReach)}; keep long-horizon-local runtime handles inside buildStepExecutor/executeReasoningStep`);
+  }
+}
+
 for (const forbiddenRuntimeReach of [
   "p.ensureExecutionRuntime().",
   "p.ensureModelRuntime().",
@@ -1055,6 +1078,10 @@ for (const needle of [
   "promptRuntime := p.ensurePromptRuntime()",
   "contextAssembly := p.ensureContextAssembly()",
   "contextWindowRuntime := p.ensureContextWindowRuntime()",
+  "第八十一批",
+  "long_horizon.go",
+  "long-horizon runtime 本地句柄",
+  "env := executionRuntime.BuildSkillEnvironment(req, modelRuntime, p.contextAssembly)",
   "第五十五批",
   "partial-result fallback post-processing helper",
   "PartialPlanResultRequest",
