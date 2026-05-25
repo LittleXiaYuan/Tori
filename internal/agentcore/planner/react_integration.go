@@ -13,9 +13,8 @@ import (
 	"yunque-agent/pkg/safego"
 
 	"yunque-agent/internal/agentcore/llm"
-	"yunque-agent/internal/agentcore/localbrain"
-	ageval "yunque-agent/internal/experimental/eval"
 	agreact "yunque-agent/internal/cognicore/react"
+	ageval "yunque-agent/internal/experimental/eval"
 	"yunque-agent/internal/observe"
 )
 
@@ -28,7 +27,7 @@ func (p *Planner) runReAct(ctx context.Context, req PlanRequest) (*PlanResult, e
 		return p.runNativeFC(ctx, req)
 	}
 
-	env := p.buildEnv(req)
+	env := p.ensureExecutionRuntime().BuildSkillEnvironment(req, p.ensureModelRuntime(), p.contextAssembly)
 	_, ctxLayers := p.BuildMessages(ctx, req)
 
 	taskID := req.TaskID
@@ -44,7 +43,7 @@ func (p *Planner) runReAct(ctx context.Context, req PlanRequest) (*PlanResult, e
 	toolsDesc := p.buildToolsDescription(req.AllowedSkills)
 
 	cfg := ldg.ReActConfig{
-		MaxSteps:        p.maxSteps,
+		MaxSteps:        p.maxPlanSteps(),
 		MinConfidence:   0.3,
 		BacktrackOnFail: true,
 		Actor:           "planner",
@@ -74,7 +73,7 @@ func (p *Planner) runReAct(ctx context.Context, req PlanRequest) (*PlanResult, e
 				}
 			}
 
-			thinkReq := localbrain.ThinkRequest{
+			thinkReq := RuntimeThinkRequest{
 				TaskID:           taskID,
 				TenantID:         req.TenantID,
 				Query:            initialObs,
@@ -97,9 +96,7 @@ func (p *Planner) runReAct(ctx context.Context, req PlanRequest) (*PlanResult, e
 
 		// 第二阶段：用选定层级的 LLM 执行思考
 		messages := p.buildReActMessages(ctx, req, history, toolsDesc)
-		client := p.LLMClientFor(selectedTier)
-
-		reply, err := client.Chat(ctx, messages, 0.7)
+		reply, err := p.ensureModelRuntime().ChatForRequestTier(ctx, req, selectedTier, messages, 0.7)
 		if err != nil {
 			return nil, fmt.Errorf("LLM chat: %w", err)
 		}
@@ -260,10 +257,8 @@ func (p *Planner) buildToolsDescription(allowedSkills []string) string {
 // buildReActMessages constructs the LLM prompt for the next ReAct step.
 func (p *Planner) buildReActMessages(ctx context.Context, req PlanRequest, history []ldg.ReActStep, toolsDesc string) []llm.Message {
 	sysPrompt := p.buildSystemPrompt()
-	if p.personaPrompt != nil {
-		if pp := p.personaPrompt(); pp != "" {
-			sysPrompt += "\n\n" + pp
-		}
+	if pp := p.ensurePromptRuntime().PersonaPrompt(); pp != "" {
+		sysPrompt += "\n\n" + pp
 	}
 
 	reactInstructions := `
@@ -421,11 +416,11 @@ func (p *Planner) parseReActResponse(reply string) (*ldg.ThinkResult, error) {
 	return result, nil
 }
 
-// convertToStepSummary converts Ledger ReActSteps to localbrain StepSummary format.
-func convertToStepSummary(steps []ldg.ReActStep) []localbrain.StepSummary {
-	summaries := make([]localbrain.StepSummary, 0, len(steps))
+// convertToStepSummary converts Ledger ReActSteps to runtime thinking summaries.
+func convertToStepSummary(steps []ldg.ReActStep) []RuntimeThinkStepSummary {
+	summaries := make([]RuntimeThinkStepSummary, 0, len(steps))
 	for _, s := range steps {
-		summary := localbrain.StepSummary{
+		summary := RuntimeThinkStepSummary{
 			Success: s.Result == nil || s.Result.Error == "",
 		}
 		if s.Action != nil {

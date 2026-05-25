@@ -228,22 +228,22 @@ func TestPlannerSetters(t *testing.T) {
 	p := NewPlanner(client, skills.NewRegistry(), 8)
 
 	p.SetNativeFC(true)
-	if !p.useNativeFC {
+	if p.promptRuntime == nil || !p.promptRuntime.NativeFC() {
 		t.Error("SetNativeFC failed")
 	}
 
 	p.SetToolTimeout(45 * time.Second)
-	if p.toolTimeout != 45*time.Second {
-		t.Errorf("SetToolTimeout failed: %v", p.toolTimeout)
+	if got := p.perToolTimeout(); got != 45*time.Second {
+		t.Errorf("SetToolTimeout failed: %v", got)
 	}
 
-	p.maxSteps = 20
-	if p.maxSteps != 20 {
-		t.Errorf("maxSteps set failed: %d", p.maxSteps)
+	p.ensureExecutionRuntime().SetMaxSteps(20)
+	if got := p.maxPlanSteps(); got != 20 {
+		t.Errorf("maxSteps set failed: %d", got)
 	}
 }
 
-func TestPlannerLLMClientFor(t *testing.T) {
+func TestPlannerModelRuntimeFacades(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{
@@ -257,14 +257,14 @@ func TestPlannerLLMClientFor(t *testing.T) {
 	client := llm.NewClient(srv.URL, "test-key", "test-model")
 	p := NewPlanner(client, skills.NewRegistry(), 8)
 
-	got := p.LLMClientFor("")
-	if got == nil {
-		t.Error("LLMClientFor('') should return primary client")
+	if got := p.ModelIDForTier(""); got != "test-model" {
+		t.Fatalf("expected default model id, got %q", got)
 	}
-
-	got = p.LLMClientFor("unknown-tier")
-	if got == nil {
-		t.Error("LLMClientFor with unknown tier should still return a client")
+	if health := p.ModelRuntimeHealth(); !health.Configured || health.BreakerState != "closed" {
+		t.Fatalf("expected configured closed model runtime health, got %#v", health)
+	}
+	if stats := p.LLMResponseCacheStats(); stats == nil || stats["size"] == nil {
+		t.Fatalf("expected response cache stats, got %#v", stats)
 	}
 }
 

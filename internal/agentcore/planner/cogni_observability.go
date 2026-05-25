@@ -3,8 +3,6 @@ package planner
 import (
 	"fmt"
 	"strings"
-
-	"yunque-agent/internal/observe"
 )
 
 // CogniTraceDetail is the planner-facing, UI-safe subset of pkg/cogni.Trace.
@@ -43,19 +41,4 @@ func (d CogniTraceDetail) summary() string {
 		return fmt.Sprintf("Cogni 已激活：%s，注入上下文 %d 字节", names, d.ContextBytes)
 	}
 	return fmt.Sprintf("Cogni 已激活：%s", names)
-}
-
-func (p *Planner) maybeEmitCogniTrace(req PlanRequest) {
-	if p == nil || p.contextAssembly == nil || !p.contextAssembly.HasCogniTrace() || req.StepCallback == nil {
-		return
-	}
-	detail, ok := p.contextAssembly.CogniTrace(extractUserMessage(req), req.TenantID, req.ChannelType)
-	if !ok || !detail.hasVisibleEffect() {
-		return
-	}
-	evt := observe.NewEvent(req.TraceID, observe.DomainPlanner, observe.EventPlan, detail.summary())
-	evt.Meta.TenantID = req.TenantID
-	evt.Meta.TaskID = req.TaskID
-	evt.Detail = detail
-	req.StepCallback(evt)
 }

@@ -3,8 +3,6 @@ package planner
 import (
 	"fmt"
 	"strings"
-
-	"yunque-agent/internal/observe"
 )
 
 // PlannerFailureSummary is a compact, user-visible recovery note generated
@@ -189,16 +187,4 @@ func formatFailureRecoveryPrompt(summary PlannerFailureSummary) string {
 	b.WriteString(summary.NextStep)
 	b.WriteString("\n如果已有信息足够，请直接给出阶段性结论；否则选择不同工具或更小步骤继续。")
 	return b.String()
-}
-
-func (p *Planner) maybeEmitFailureRecovery(req PlanRequest, summary PlannerFailureSummary) {
-	if req.StepCallback == nil {
-		return
-	}
-	evt := observe.NewEvent(req.TraceID, observe.DomainPlanner, observe.EventReflect,
-		"检测到连续失败，正在切换执行策略")
-	evt.Meta.TenantID = req.TenantID
-	evt.Meta.TaskID = req.TaskID
-	evt.Detail = summary
-	req.StepCallback(evt)
 }

@@ -551,7 +551,7 @@ func TestEmitCogniTraceEventCarriesSurfaceDetail(t *testing.T) {
 			got = evt
 		},
 	}
-	p.maybeEmitCogniTrace(req)
+	p.contextAssembly.EmitCogniTraceForRequest(req)
 	if got.Type != observe.EventPlan || got.Meta.TaskID != "task-a" {
 		t.Fatalf("unexpected event: %#v", got)
 	}
@@ -576,7 +576,7 @@ func TestEmitCogniTraceEventSkipsNoVisibleEffect(t *testing.T) {
 			called = true
 		},
 	}
-	p.maybeEmitCogniTrace(req)
+	p.contextAssembly.EmitCogniTraceForRequest(req)
 	if called {
 		t.Fatal("empty Cogni trace should not emit a user-visible event")
 	}
@@ -1598,11 +1598,11 @@ func TestBuildPlannerFailureSummaryIgnoresSingleFailure(t *testing.T) {
 
 func TestSetNativeFC(t *testing.T) {
 	p := NewPlanner(nil, nil, 8)
-	if p.useNativeFC {
+	if p.promptRuntime != nil && p.promptRuntime.NativeFC() {
 		t.Fatal("should default to false")
 	}
 	p.SetNativeFC(true)
-	if !p.useNativeFC {
+	if p.promptRuntime == nil || !p.promptRuntime.NativeFC() {
 		t.Fatal("should be true after set")
 	}
 }
@@ -1800,11 +1800,11 @@ func (s *mockSkill) Execute(ctx context.Context, args map[string]any, env *skill
 func TestPlannerDefaults(t *testing.T) {
 	client := mockLLMServer(t, func(_ []llm.Message) string { return "hi" })
 	p := NewPlanner(client, skills.NewRegistry(), 0)
-	if p.maxSteps != 15 {
-		t.Errorf("expected default maxSteps=15, got %d", p.maxSteps)
+	if got := p.maxPlanSteps(); got != 15 {
+		t.Errorf("expected default maxSteps=15, got %d", got)
 	}
-	if p.toolTimeout != 60*time.Second {
-		t.Errorf("expected default toolTimeout=60s, got %v", p.toolTimeout)
+	if got := p.perToolTimeout(); got != 60*time.Second {
+		t.Errorf("expected default toolTimeout=60s, got %v", got)
 	}
 }
 
@@ -2318,8 +2318,8 @@ func TestSetToolTimeout(t *testing.T) {
 	client := mockLLMServer(t, func(_ []llm.Message) string { return "ok" })
 	p := NewPlanner(client, skills.NewRegistry(), 8)
 	p.SetToolTimeout(30 * time.Second)
-	if p.toolTimeout != 30*time.Second {
-		t.Errorf("expected 30s, got %v", p.toolTimeout)
+	if got := p.perToolTimeout(); got != 30*time.Second {
+		t.Errorf("expected 30s, got %v", got)
 	}
 }
 
