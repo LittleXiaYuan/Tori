@@ -6,125 +6,24 @@ package planner
 // and related text manipulation helpers.
 
 import (
-	"bytes"
 	"embed"
-	"encoding/json"
-	"fmt"
-	"log/slog"
 	"strings"
-	"text/template"
 )
 
 //go:embed prompts/*/*.tmpl
 var promptFiles embed.FS
 
 // InvalidatePromptCache forces rebuild of the cached system prompt on next call.
-func (p *Planner) InvalidatePromptCache() { p.sysPromptVer++ }
+func (p *Planner) InvalidatePromptCache() {
+	p.ensurePromptRuntime().InvalidatePromptCache()
+}
 
 func (p *Planner) buildSystemPrompt() string {
-	currentVer := p.registry.Version()
-	if p.cachedSysPrompt != "" && p.sysPromptVer == currentVer {
-		return p.cachedSysPrompt
-	}
-
-	// Determine locale path
-	loc := p.locale
-	if loc == "" {
-		loc = "zh-CN" // default for yunque
-	}
-	path := fmt.Sprintf("prompts/%s/system.tmpl", loc)
-
-	// Check if file exists in embed, else fallback to English
-	content, err := promptFiles.ReadFile(path)
-	if err != nil {
-		slog.Warn("planner: prompt locale not found, falling back to English", "locale", loc)
-		content, err = promptFiles.ReadFile("prompts/en/system.tmpl")
-		if err != nil {
-			// Extremely unlikely unless embed is broken, but provide a tiny fallback just in case
-			p.cachedSysPrompt = "You are an AI assistant. Use the provided tools."
-			return p.cachedSysPrompt
-		}
-	}
-
-	tmpl, err := template.New("system").Parse(string(content))
-	if err != nil {
-		slog.Error("planner: failed to parse prompt template", "err", err)
-		return string(content)
-	}
-
-	// ── L1: Core tools ──
-	defs := p.registry.Definitions()
-	defsJSON, _ := json.MarshalIndent(defs, "", "  ")
-
-	// ── L2: Installed skill index ──
-	var indexItems []SkillIndexEntry
-	if p.skillIndex != nil {
-		indexItems = p.skillIndex()
-	}
-
-	// ── Category flags: drive template sections from registry state ──
-	categories := p.registry.Categories()
-	catMap := make(map[string]bool, len(categories))
-	for _, c := range categories {
-		catMap[c.ID] = len(c.SkillNames) > 0
-	}
-
-	// Execute template
-	data := map[string]any{
-		"SkillDefinitions": string(defsJSON),
-		"SkillIndex":       indexItems,
-		"NativeFC":         p.useNativeFC,
-		"Categories":       catMap,
-	}
-
-	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, data); err != nil {
-		slog.Error("planner: failed to execute prompt template", "err", err)
-		return string(content)
-	}
-
-	p.cachedSysPrompt = buf.String()
-	p.sysPromptVer = currentVer
-
-	hasBrowserSection := strings.Contains(p.cachedSysPrompt, "browser_navigate")
-	slog.Info("buildSystemPrompt", "len", len(p.cachedSysPrompt), "has_browser", hasBrowserSection, "catMap", catMap, "ver", currentVer)
-
-	return p.cachedSysPrompt
+	return p.ensurePromptRuntime().BuildSystemPrompt(p.registry)
 }
 
 func (p *Planner) buildSubagentSystemPrompt() string {
-	loc := p.locale
-	if loc == "" {
-		loc = "zh-CN"
-	}
-	content, err := promptFiles.ReadFile(fmt.Sprintf("prompts/%s/system.tmpl", loc))
-	if err != nil {
-		content, _ = promptFiles.ReadFile("prompts/en/system.tmpl")
-	}
-	if len(content) == 0 {
-		return "You are an AI execution agent. Use the provided tools to complete the task."
-	}
-
-	tmpl, err := template.New("subagent").Parse(string(content))
-	if err != nil {
-		return string(content)
-	}
-
-	defs := p.registry.Definitions()
-	defsJSON, _ := json.MarshalIndent(defs, "", "  ")
-
-	data := map[string]any{
-		"SkillDefinitions": string(defsJSON),
-		"SkillIndex":       []SkillIndexEntry{},
-		"NativeFC":         false,
-		"Categories":       map[string]bool{},
-	}
-
-	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, data); err != nil {
-		return string(content)
-	}
-	return buf.String()
+	return p.ensurePromptRuntime().BuildSubagentSystemPrompt(p.registry)
 }
 
 // cleanReply removes internal artifacts from LLM output before presenting to users.

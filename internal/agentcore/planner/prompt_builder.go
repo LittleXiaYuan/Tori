@@ -9,7 +9,6 @@ import (
 
 	ctxwindow "yunque-agent/internal/agentcore/context"
 	"yunque-agent/internal/agentcore/emotion"
-	"yunque-agent/internal/agentcore/localbrain"
 	"yunque-agent/pkg/safego"
 )
 
@@ -27,7 +26,7 @@ type PromptBuilder struct {
 	proactiveCog    *ProactiveCognitionService
 	skillRuntime    *SkillRuntimeService
 	dynBudget       int
-	contextFilter   *localbrain.LocalBrain // System 1 context filter (nil = disabled)
+	runtimeStrategy *RuntimeStrategyService // System 1 context filtering and runtime decisions
 }
 
 // NewPromptBuilder creates a PromptBuilder from Planner's callbacks.
@@ -36,8 +35,8 @@ func NewPromptBuilder(p *Planner) *PromptBuilder {
 		contextAssembly: p.contextAssembly,
 		proactiveCog:    p.proactiveCog,
 		skillRuntime:    p.skillRuntime,
-		dynBudget:       p.dynContextBudget,
-		contextFilter:   p.LocalBrain(),
+		dynBudget:       p.dynamicContextBudget(),
+		runtimeStrategy: p.runtimeStrategy,
 	}
 }
 
@@ -141,7 +140,7 @@ func (pb *PromptBuilder) BuildDynamicContext(ctx context.Context, req DynamicCon
 	if pb.contextAssembly != nil && pb.contextAssembly.graphContext != nil && !skipRetrieval {
 		pending++
 		safego.Go("prompt-graph-context", func() {
-			if graphCtx := pb.contextAssembly.graphContext(req.LastMessage); graphCtx != "" {
+			if graphCtx := pb.contextAssembly.GraphContextFor(req.LastMessage); graphCtx != "" {
 				results <- layerResult{"graph", ctxwindow.LayerPriorityRetrieval, "## 知识图谱\n", graphCtx}
 			} else {
 				results <- layerResult{}
@@ -171,15 +170,15 @@ func (pb *PromptBuilder) BuildDynamicContext(ctx context.Context, req DynamicCon
 	// System 1 Filter: if LocalBrain is available, use it to score and filter
 	// retrieval results before injecting them as context layers.
 	// High-importance items bypass the filter (旁路 in the cognitive architecture).
-	if pb.contextFilter != nil && len(rawRetrieval) > 0 {
-		var filterItems []localbrain.ContextItem
+	if pb.runtimeStrategy != nil && pb.runtimeStrategy.HasContextFilter() && len(rawRetrieval) > 0 {
+		var filterItems []RuntimeContextItem
 		for _, r := range rawRetrieval {
-			filterItems = append(filterItems, localbrain.ContextItem{
+			filterItems = append(filterItems, RuntimeContextItem{
 				Source:  r.name,
 				Content: r.content,
 			})
 		}
-		filtered, err := pb.contextFilter.FilterContext(ctx, req.LastMessage, filterItems, 6)
+		filtered, err := pb.runtimeStrategy.FilterContext(ctx, req.LastMessage, filterItems, 6)
 		if err != nil {
 			slog.Warn("prompt_builder: context filter failed, using unfiltered", "err", err)
 			for _, r := range rawRetrieval {
@@ -240,8 +239,8 @@ func (pb *PromptBuilder) BuildDynamicContext(ctx context.Context, req DynamicCon
 	// P3.6: Declarative Cogni context — assembled from cogni.Registry.Active()
 	// declarations whose ActivationRules match the current message/tenant/channel.
 	// The hook (pkg/cogni.Hook) handles evaluation, exclusivity, and rendering.
-	if pb.contextAssembly != nil && pb.contextAssembly.cogniService != nil {
-		if cgCtx := pb.contextAssembly.cogniService.Context(ctx, req.LastMessage, req.TenantID, req.Channel); cgCtx != "" {
+	if pb.contextAssembly != nil {
+		if cgCtx := pb.contextAssembly.CogniContext(ctx, req.LastMessage, req.TenantID, req.Channel); cgCtx != "" {
 			layers = append(layers, ctxwindow.Layer{
 				Name:     "cogni",
 				Priority: ctxwindow.LayerPriorityRetrieval,

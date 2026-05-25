@@ -2,13 +2,10 @@ package planner
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"regexp"
 	"strings"
-
-	"yunque-agent/internal/agentcore/llm"
 )
 
 // UploadAnalysis is the LLM interpretation of an uploaded file (template vs data, etc.).
@@ -22,45 +19,10 @@ type UploadAnalysis struct {
 
 // AnalyzeUploadedFile runs a small structured JSON task on a text snippet of the file.
 func (p *Planner) AnalyzeUploadedFile(ctx context.Context, filename, textSnippet string) (*UploadAnalysis, error) {
-	if p == nil || p.llm == nil {
+	if p == nil || p.modelRuntime == nil || p.modelRuntime.DefaultClient() == nil {
 		return nil, fmt.Errorf("planner or llm not configured")
 	}
-	snippet := textSnippet
-	if len([]rune(snippet)) > 8000 {
-		snippet = string([]rune(snippet)[:8000])
-	}
-	system := `你是文件分析助手。只输出一段合法 JSON，不要 markdown 代码块。格式：
-{"file_kind":"xlsx|docx|csv|pdf|txt|other","is_template":true/false,"summary":"一句话说明文件用途与结构","suggestions":["可选的后续动作短句"]}
-is_template：是否为表单/模板/需用户填写的范式文件。`
-	user := fmt.Sprintf("文件名: %s\n\n内容预览:\n%s", filename, snippet)
-	msgs := []llm.Message{{Role: "system", Content: system}, {Role: "user", Content: user}}
-	raw, err := p.llm.Chat(ctx, msgs, 0.2)
-	if err != nil {
-		return nil, err
-	}
-	raw = strings.TrimSpace(raw)
-	if i := strings.Index(raw, "{"); i >= 0 {
-		raw = raw[i:]
-	}
-	if j := strings.LastIndex(raw, "}"); j >= 0 {
-		raw = raw[:j+1]
-	}
-	var a UploadAnalysis
-	if err := json.Unmarshal([]byte(raw), &a); err != nil {
-		a = UploadAnalysis{
-			FileKind:   "unknown",
-			Summary:    "无法自动解析元数据，可直接描述你的目标。",
-			IsTemplate: strings.Contains(strings.ToLower(filename), "模板"),
-		}
-	}
-
-	// Detect {{placeholder}} patterns in file content — works regardless of LLM analysis
-	a.Placeholders = detectPlaceholders(snippet)
-	if len(a.Placeholders) > 0 {
-		a.IsTemplate = true
-	}
-
-	return &a, nil
+	return p.ensureModelRuntime().AnalyzeUploadedFile(ctx, filename, textSnippet)
 }
 
 // AnalysisToActions builds interactive actions for the upload response flow.

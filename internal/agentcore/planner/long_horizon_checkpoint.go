@@ -238,7 +238,7 @@ func longHorizonCheckpointDedupKey(cp LongHorizonCheckpoint) string {
 }
 
 func (p *Planner) SetLongHorizonCheckpointStore(store LongHorizonCheckpointStore) {
-	p.longHorizonCheckpoints = store
+	p.ensureRuntimeStrategy().SetLongHorizonCheckpointStore(store)
 }
 
 // RecentLongHorizonCheckpoints returns newest-first recoverable DAG snapshots
@@ -246,25 +246,27 @@ func (p *Planner) SetLongHorizonCheckpointStore(store LongHorizonCheckpointStore
 // should treat an empty slice as "nothing to recover" rather than a fatal
 // planner state.
 func (p *Planner) RecentLongHorizonCheckpoints(ctx context.Context, limit int) ([]LongHorizonCheckpoint, error) {
-	if p == nil || p.longHorizonCheckpoints == nil {
+	store := p.longHorizonCheckpointStore()
+	if store == nil {
 		return nil, nil
 	}
-	return p.longHorizonCheckpoints.Recent(ctx, limit)
+	return store.Recent(ctx, limit)
 }
 
 func (p *Planner) RecentLongHorizonCheckpointsForTenant(ctx context.Context, tenantID string, limit int) ([]LongHorizonCheckpoint, error) {
-	if p == nil || p.longHorizonCheckpoints == nil {
+	store := p.longHorizonCheckpointStore()
+	if store == nil {
 		return nil, nil
 	}
 	tenantID = strings.TrimSpace(tenantID)
-	if scoped, ok := p.longHorizonCheckpoints.(tenantScopedLongHorizonCheckpointStore); ok {
+	if scoped, ok := store.(tenantScopedLongHorizonCheckpointStore); ok {
 		return scoped.RecentForTenant(ctx, tenantID, limit)
 	}
 	scanLimit := limit
 	if scanLimit < 100 {
 		scanLimit = 100
 	}
-	checkpoints, err := p.longHorizonCheckpoints.Recent(ctx, scanLimit)
+	checkpoints, err := store.Recent(ctx, scanLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -280,11 +282,19 @@ func (p *Planner) RecentLongHorizonCheckpointsForTenant(ctx context.Context, ten
 	return out, nil
 }
 
+func (p *Planner) longHorizonCheckpointStore() LongHorizonCheckpointStore {
+	if p == nil || p.runtimeStrategy == nil {
+		return nil
+	}
+	return p.runtimeStrategy.LongHorizonCheckpointStore()
+}
+
 func (p *Planner) persistLongHorizonCheckpoint(req PlanRequest, cp LongHorizonCheckpoint) {
-	if p.longHorizonCheckpoints == nil || cp.PlanID == "" {
+	store := p.longHorizonCheckpointStore()
+	if store == nil || cp.PlanID == "" {
 		return
 	}
-	if err := p.longHorizonCheckpoints.Save(context.Background(), cp); err != nil {
+	if err := store.Save(context.Background(), cp); err != nil {
 		// Persistence is best-effort; never fail the planner because the local
 		// recovery log is temporarily unavailable.
 	}

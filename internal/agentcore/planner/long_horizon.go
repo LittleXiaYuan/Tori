@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"yunque-agent/internal/agentcore/llm"
-	"yunque-agent/internal/agentcore/localbrain"
 	"yunque-agent/internal/agentcore/plan"
 	"yunque-agent/internal/observe"
 )
@@ -47,7 +46,7 @@ func (p *Planner) runLongHorizon(ctx context.Context, req PlanRequest) (*PlanRes
 		req.StepCallback(evt)
 	})
 
-	budget := plan.Budget{MaxSteps: p.maxSteps * 3, MaxRevisions: 3, MaxDuration: 5 * time.Minute}
+	budget := plan.Budget{MaxSteps: p.maxPlanSteps() * 3, MaxRevisions: 3, MaxDuration: 5 * time.Minute}
 	pl, err := mgr.CreateDAG(ctx, extractGoal(req), budget)
 	if err != nil {
 		slog.Warn("planner: DAG decompose failed, falling back", "err", err)
@@ -138,10 +137,7 @@ func (p *Planner) ResumeLongHorizonCheckpoint(ctx context.Context, req PlanReque
 		req.StepCallback(evt)
 	})
 
-	maxSteps := p.maxSteps
-	if maxSteps <= 0 {
-		maxSteps = 15
-	}
+	maxSteps := p.maxPlanSteps()
 	budget := plan.Budget{
 		MaxSteps:      cp.StepsUsed + maxSteps*3,
 		MaxRevisions:  3,
@@ -228,8 +224,7 @@ func (p *Planner) buildDecomposeDAG(req PlanRequest) plan.DecomposeDAGFunc {
 返回 JSON 数组：[{"description":"","skill":"","args":{},"depends_on":[]}]
 规则：独立步骤不加依赖，3-8步，只返回JSON`, skillList, goal)
 
-		client := p.clientForRequest(req)
-		reply, err := client.Chat(ctx, []llm.Message{
+		reply, err := p.ensureModelRuntime().ChatForRequest(ctx, req, []llm.Message{
 			{Role: "system", Content: "你是任务规划器，只输出 JSON 数组。"},
 			{Role: "user", Content: prompt},
 		}, 0.3)
@@ -249,8 +244,7 @@ func (p *Planner) buildReviseFunc(req PlanRequest) plan.ReviseFunc {
 		status := friendlyPlanStepSummary(current)
 		prompt := fmt.Sprintf("任务: %s\n状态:\n%s\n步骤 %d 失败，重新规划剩余部分。返回JSON数组。",
 			goal, status, failedStep)
-		client := p.clientForRequest(req)
-		reply, err := client.Chat(ctx, []llm.Message{
+		reply, err := p.ensureModelRuntime().ChatForRequest(ctx, req, []llm.Message{
 			{Role: "system", Content: "你是任务规划器，根据失败提出替代方案，只输出JSON数组。"},
 			{Role: "user", Content: prompt},
 		}, 0.4)
@@ -285,7 +279,7 @@ func friendlyPlanStepSummary(pl *plan.Plan) string {
 }
 
 func (p *Planner) buildStepExecutor(req PlanRequest) plan.ExecuteStepFunc {
-	env := p.buildEnv(req)
+	env := p.ensureExecutionRuntime().BuildSkillEnvironment(req, p.ensureModelRuntime(), p.contextAssembly)
 	allowed := allowedSkillSet(req.AllowedSkills)
 	return func(ctx context.Context, pl *plan.Plan, stepIndex int) (string, []string, error) {
 		step := pl.Steps[stepIndex]
@@ -360,7 +354,7 @@ func (p *Planner) executeReasoningStep(ctx context.Context, req PlanRequest, pl 
 	// AgenticThinking: 自适应选择模型层级
 	selectedTier := req.ModelOverride
 	if selectedTier == "" && p.runtimeStrategy != nil {
-		thinkReq := localbrain.ThinkRequest{
+		thinkReq := RuntimeThinkRequest{
 			TaskID:    pl.ID,
 			TenantID:  req.TenantID,
 			Query:     step.Description,
@@ -371,13 +365,7 @@ func (p *Planner) executeReasoningStep(ctx context.Context, req PlanRequest, pl 
 		}
 	}
 
-	var client *llm.Client
-	if req.ClientOverride != nil {
-		client = req.ClientOverride
-	} else {
-		client = p.LLMClientFor(selectedTier)
-	}
-	reply, err := client.Chat(ctx, []llm.Message{
+	reply, err := p.ensureModelRuntime().ChatForRequestTier(ctx, req, selectedTier, []llm.Message{
 		{Role: "system", Content: "基于信息完成分析，直接给出结果。"},
 		{Role: "user", Content: prompt},
 	}, 0.7)
@@ -401,11 +389,7 @@ func (p *Planner) synthesizePlanResult(ctx context.Context, req PlanRequest, pl 
 	if results == "" {
 		return "任务已执行完毕。"
 	}
-	client := p.clientForRequest(req)
-	if client == nil {
-		return "任务已完成。\n\n" + results
-	}
-	reply, err := client.Chat(ctx, []llm.Message{
+	reply, err := p.ensureModelRuntime().ChatForRequest(ctx, req, []llm.Message{
 		{Role: "system", Content: "根据执行结果给出完整回复。Markdown格式。"},
 		{Role: "user", Content: fmt.Sprintf("目标: %s\n结果:\n%s", pl.Task, results)},
 	}, 0.7)

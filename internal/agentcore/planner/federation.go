@@ -12,20 +12,18 @@ import (
 	"yunque-agent/pkg/opp"
 )
 
-// FederationBridge abstracts the OPP federation layer so the planner
-// can delegate tasks to remote agents without importing the federation package.
-type FederationBridge interface {
-	// Delegate sends a task to the best matching remote agent via model-aware routing.
-	Delegate(ctx context.Context, dp opp.DelegatePayload, timeout time.Duration) (*opp.DelegateResultPayload, error)
-	// LocalCaps returns the local agent's capabilities.
-	LocalCaps() opp.CapabilitiesPayload
+// SetFederationBridge attaches the OPP federation bridge for A2A task delegation.
+func (p *Planner) SetFederationBridge(fb FederationBridge) {
+	p.ensureDelegationRuntime().SetFederationBridge(fb)
 }
 
-// SetFederationBridge attaches the OPP federation bridge for A2A task delegation.
-func (p *Planner) SetFederationBridge(fb FederationBridge) { p.fedBridge = fb }
-
 // FederationBridgeRef returns the current bridge (may be nil).
-func (p *Planner) FederationBridgeRef() FederationBridge { return p.fedBridge }
+func (p *Planner) FederationBridgeRef() FederationBridge {
+	if p.delegationRuntime == nil {
+		return nil
+	}
+	return p.delegationRuntime.FederationBridge()
+}
 
 // federationToolDef returns the LLM function definition for `opp_delegate`.
 // This tool allows the LLM to autonomously delegate sub-tasks to remote agents.
@@ -70,7 +68,8 @@ func federationToolDef() llm.FunctionDef {
 
 // executeFederationDelegate handles the opp_delegate tool call within the FC loop.
 func (p *Planner) executeFederationDelegate(ctx context.Context, args map[string]any, req PlanRequest) (string, error) {
-	if p.fedBridge == nil {
+	bridge := p.FederationBridgeRef()
+	if bridge == nil {
 		return "", fmt.Errorf("federation bridge not configured")
 	}
 
@@ -112,7 +111,7 @@ func (p *Planner) executeFederationDelegate(ctx context.Context, args map[string
 		req.StepCallback(evt)
 	}
 
-	result, err := p.fedBridge.Delegate(ctx, dp, 30*time.Second)
+	result, err := bridge.Delegate(ctx, dp, 30*time.Second)
 	if err != nil {
 		slog.Warn("planner: federation delegation failed", "intent", intentName, "err", err)
 		return "", err

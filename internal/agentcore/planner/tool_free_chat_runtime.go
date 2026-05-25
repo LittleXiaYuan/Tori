@@ -1,0 +1,20 @@
+package planner
+
+import (
+	"context"
+	"fmt"
+)
+
+func (p *Planner) runToolFreeChat(ctx context.Context, req PlanRequest, errPrefix string, steps int) (*PlanResult, error) {
+	messages, layers := p.BuildMessages(ctx, req)
+	if p.contextAssembly != nil {
+		p.contextAssembly.EmitCogniTraceForRequest(req)
+	}
+	reply, err := p.ensureModelRuntime().ChatFallbackForRequest(ctx, req, messages, p.runtimeStrategy, p.modelFallbackEvents(req))
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", errPrefix, err)
+	}
+	cleaned := p.cleanReply(reply)
+	cleaned, nextMoves := extractNextMoves(cleaned)
+	return &PlanResult{Reply: cleaned, Steps: steps, ContextLayers: layers, Suggestions: nextMoves}, nil
+}

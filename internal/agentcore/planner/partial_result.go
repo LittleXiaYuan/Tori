@@ -9,32 +9,6 @@ import (
 
 const partialPlanResultIntro = "任务已部分执行，现场已保留，可先查看阶段结果或继续恢复。"
 
-func (p *Planner) partialPlanResult(req PlanRequest, planSteps []PlanStep, usedSkills []string, steps int, ctxLayers []string, rawErr string) *PlanResult {
-	if steps <= 0 {
-		steps = len(planSteps)
-	}
-	p.maybeEmitPartialResult(req, planSteps, rawErr)
-	return &PlanResult{
-		Reply:         buildPartialPlanReply(planSteps, rawErr),
-		SkillsUsed:    usedSkills,
-		Steps:         steps,
-		Plan:          planSteps,
-		ContextLayers: ctxLayers,
-	}
-}
-
-func (p *Planner) maybeEmitPartialResult(req PlanRequest, planSteps []PlanStep, rawErr string) {
-	if req.StepCallback == nil || len(planSteps) == 0 {
-		return
-	}
-	evt := observe.NewEvent(req.TraceID, observe.DomainPlanner, observe.EventPartial,
-		"已返回阶段结果，现场已保留，可继续恢复")
-	evt.Meta.TenantID = req.TenantID
-	evt.Meta.TaskID = req.TaskID
-	evt.Detail = buildPartialResultDetail(planSteps, rawErr)
-	req.StepCallback(evt)
-}
-
 func buildPartialResultDetail(planSteps []PlanStep, rawErr string) observe.PartialResultDetail {
 	detail := observe.PartialResultDetail{
 		Recoverable: true,

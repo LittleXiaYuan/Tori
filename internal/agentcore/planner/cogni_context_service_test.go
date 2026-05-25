@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"yunque-agent/internal/observe"
 	"yunque-agent/pkg/skills"
 )
 
@@ -32,21 +33,28 @@ func TestPlannerSetCogniCallbacksUsesService(t *testing.T) {
 		return in[:1]
 	})
 	p.SetCogniTrace(func(message, tenantID, channel string) (CogniTraceDetail, bool) {
-		return CogniTraceDetail{Activated: []string{"demo"}}, true
+		return CogniTraceDetail{Activated: []string{"demo"}, ContextBytes: 5}, true
 	})
 
-	if p.contextAssembly == nil || p.contextAssembly.cogniService == nil {
-		t.Fatal("expected context assembly cogni service to be initialized")
+	if p.contextAssembly == nil {
+		t.Fatal("expected context assembly to be initialized")
 	}
-	if got := p.contextAssembly.cogniService.Context(context.Background(), "hello", "tenant", "web"); got != "cogni:hello" {
+	if got := p.contextAssembly.CogniContext(context.Background(), "hello", "tenant", "web"); got != "cogni:hello" {
 		t.Fatalf("context = %q, want cogni:hello", got)
 	}
-	filtered := p.contextAssembly.FilterCogniSkills("hello", "tenant", "web", []skills.Skill{dummyPlannerSkill("a"), dummyPlannerSkill("b")})
+	filtered := p.contextAssembly.ApplyCogniSkillFilter("hello", "tenant", "web", []skills.Skill{dummyPlannerSkill("a"), dummyPlannerSkill("b")})
 	if len(filtered) != 1 || filtered[0].Name() != "a" {
 		t.Fatalf("unexpected filtered skills: %#v", filtered)
 	}
-	trace, ok := p.contextAssembly.CogniTrace("hello", "tenant", "web")
-	if !ok || len(trace.Activated) != 1 || trace.Activated[0] != "demo" {
-		t.Fatalf("unexpected trace: %#v ok=%v", trace, ok)
+	var emitted bool
+	p.contextAssembly.EmitCogniTrace("hello", "tenant", "web", "trace-id", "task-id", func(evt observe.AgentEvent) {
+		detail, ok := evt.Detail.(CogniTraceDetail)
+		if !ok || len(detail.Activated) != 1 || detail.Activated[0] != "demo" {
+			t.Fatalf("unexpected trace detail: %#v", evt.Detail)
+		}
+		emitted = true
+	})
+	if !emitted {
+		t.Fatal("expected cogni trace to be emitted")
 	}
 }
