@@ -6,12 +6,11 @@ import (
 )
 
 func (p *Planner) runToolFreeChat(ctx context.Context, req PlanRequest, errPrefix string, steps int) (*PlanResult, error) {
+	contextAssembly := p.ensureContextAssembly()
 	modelRuntime := p.ensureModelRuntime()
 	runtimeStrategy := p.ensureRuntimeStrategy()
 	messages, layers := p.BuildMessages(ctx, req)
-	if p.contextAssembly != nil {
-		p.contextAssembly.EmitCogniTraceForRequest(req)
-	}
+	contextAssembly.EmitCogniTraceForRequest(req)
 	reply, err := modelRuntime.ChatFallbackForRequest(ctx, req, messages, runtimeStrategy, p.modelFallbackEvents(req))
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", errPrefix, err)
