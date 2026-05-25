@@ -844,6 +844,31 @@ if (promptFacade.includes("p.ensurePromptRuntime().")) {
   failures.push(`${promptRel} should not chain p.ensurePromptRuntime().*; keep prompt-facade-local runtime handles`);
 }
 
+for (const required of [
+  "executionRuntime := p.ensureExecutionRuntime()",
+  "modelRuntime := p.ensureModelRuntime()",
+  "executionRuntime.MaxSteps()",
+  "executionRuntime.ToolTimeout()",
+  "executionRuntime.DynContextBudget()",
+  "modelRuntime.ModelIDForTier(tier)",
+  "modelRuntime.DefaultResponseCacheStats()",
+  "modelRuntime.Health()",
+  "modelRuntime.GenerateConversationTitle(ctx, userMsg, assistReply)",
+  "modelRuntime.ParseMissionIntent(ctx, description)",
+]) {
+  if (!plannerRuntimeFacades.includes(required)) {
+    failures.push(`${plannerRuntimeFacadesRel} should route runtime facade helper through a local runtime handle ${JSON.stringify(required)}`);
+  }
+}
+for (const forbidden of [
+  "p.ensureExecutionRuntime().",
+  "p.ensureModelRuntime().",
+]) {
+  if (plannerRuntimeFacades.includes(forbidden)) {
+    failures.push(`${plannerRuntimeFacadesRel} should not chain ${JSON.stringify(forbidden)}; keep facade-local runtime handles`);
+  }
+}
+
 const templateDetect = read(templateDetectRel);
 for (const required of [
   "func (p *Planner) AnalyzeUploadedFile(ctx context.Context, filename, textSnippet string) (*UploadAnalysis, error)",
@@ -1164,6 +1189,9 @@ for (const needle of [
   "第八十六批",
   "runtime_strategy_selection.go",
   "execution-mode selection 本地句柄",
+  "第八十七批",
+  "planner_runtime_facades.go",
+  "runtime facade 本地句柄",
   "第五十五批",
   "partial-result fallback post-processing helper",
   "PartialPlanResultRequest",
