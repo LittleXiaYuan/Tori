@@ -801,8 +801,10 @@ const reactIntegration = read("internal/agentcore/planner/react_integration.go")
 for (const required of [
   "executionRuntime := p.ensureExecutionRuntime()",
   "modelRuntime := p.ensureModelRuntime()",
+  "promptRuntime := p.ensurePromptRuntime()",
   "runtimeStrategy := p.ensureRuntimeStrategy()",
   "env := executionRuntime.BuildSkillEnvironment(req, modelRuntime, p.contextAssembly)",
+  "promptRuntime.PersonaPrompt()",
   "runtimeStrategy.SelectTierFromThinking(ctx, thinkReq)",
   "modelRuntime.ChatForRequestTier(ctx, req, selectedTier, messages, 0.7)",
 ]) {
@@ -868,6 +870,7 @@ if (longHorizonCheckpoint.includes("p.runtimeStrategy")) {
 for (const forbiddenRuntimeReach of [
   "p.ensureExecutionRuntime().",
   "p.ensureModelRuntime().",
+  "p.ensurePromptRuntime().",
   "p.runtimeStrategy",
 ]) {
   if (reactIntegration.includes(forbiddenRuntimeReach)) {
@@ -1121,6 +1124,9 @@ for (const needle of [
   "第八十三批",
   "template_detect.go",
   "upload analysis facade 本地句柄",
+  "第八十四批",
+  "buildReActMessages",
+  "ReAct prompt runtime 本地句柄",
   "第五十五批",
   "partial-result fallback post-processing helper",
   "PartialPlanResultRequest",
