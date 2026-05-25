@@ -29,10 +29,10 @@ type MicroAgent struct {
 	Name        string            `json:"name"`
 	Description string            `json:"description,omitempty"`
 	Scope       Scope             `json:"scope"`
-	Trigger     string            `json:"trigger,omitempty"`   // keyword trigger (empty = always active)
-	Content     string            `json:"content"`              // the prompt content
+	Trigger     string            `json:"trigger,omitempty"` // keyword trigger (empty = always active)
+	Content     string            `json:"content"`           // the prompt content
 	Enabled     bool              `json:"enabled"`
-	Priority    int               `json:"priority"`             // higher = injected first
+	Priority    int               `json:"priority"` // higher = injected first
 	Tags        []string          `json:"tags,omitempty"`
 	Metadata    map[string]string `json:"metadata,omitempty"`
 }
