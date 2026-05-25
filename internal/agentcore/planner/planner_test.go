@@ -525,7 +525,7 @@ func TestBuildFunctionDefsSubagentHonorsAllowedSkills(t *testing.T) {
 	})
 	p.SetHandoffRegistry(subagent.NewHandoffRegistry(subagent.NewManager()))
 
-	defs := p.buildFunctionDefs("读取 docx", "", "", true, []string{" file_open ", "file_search", ""})
+	defs := p.buildFunctionDefs("读取 docx", "", "", true, []string{" file_open ", "file_search", ""}, p.ensureContextAssembly(), p.ensureDelegationRuntime(), p.ensureSkillRuntime())
 	got := map[string]bool{}
 	for _, d := range defs {
 		got[d.Name] = true
