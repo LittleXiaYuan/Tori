@@ -25,11 +25,11 @@ type Predictor struct {
 
 // PredictionRecord logs a prediction and its actual outcome for learning.
 type PredictionRecord struct {
-	Action        string           `json:"action"`
+	Action        string            `json:"action"`
 	Prediction    *ImpactPrediction `json:"prediction"`
-	ActualOutcome string           `json:"actual_outcome,omitempty"`
-	Accurate      *bool            `json:"accurate,omitempty"`
-	Timestamp     time.Time        `json:"timestamp"`
+	ActualOutcome string            `json:"actual_outcome,omitempty"`
+	Accurate      *bool             `json:"accurate,omitempty"`
+	Timestamp     time.Time         `json:"timestamp"`
 }
 
 // RippleEffect describes a cascading consequence of an action.
@@ -43,13 +43,13 @@ type RippleEffect struct {
 
 // DeepImpact is an LLM-enhanced impact prediction with ripple effects.
 type DeepImpact struct {
-	Action        string         `json:"action"`
-	DirectEffects []RippleEffect `json:"direct_effects"`
-	Cascading     []RippleEffect `json:"cascading_effects"`
-	RiskLevel     string         `json:"risk_level"`
-	RiskScore     float64        `json:"risk_score"`     // 0.0~1.0
-	Recommendation string       `json:"recommendation"` // proceed/caution/block
-	Reasoning     string         `json:"reasoning"`
+	Action         string         `json:"action"`
+	DirectEffects  []RippleEffect `json:"direct_effects"`
+	Cascading      []RippleEffect `json:"cascading_effects"`
+	RiskLevel      string         `json:"risk_level"`
+	RiskScore      float64        `json:"risk_score"`     // 0.0~1.0
+	Recommendation string         `json:"recommendation"` // proceed/caution/block
+	Reasoning      string         `json:"reasoning"`
 }
 
 // NewPredictor creates an impact predictor.
@@ -171,11 +171,11 @@ func (p *Predictor) buildStateContext(keys []string) string {
 // convertBasicPrediction converts a basic ImpactPrediction to DeepImpact.
 func (p *Predictor) convertBasicPrediction(pred *ImpactPrediction) *DeepImpact {
 	impact := &DeepImpact{
-		Action:    pred.Action,
-		RiskLevel: pred.RiskLevel,
-		RiskScore: riskToScore(pred.RiskLevel),
+		Action:         pred.Action,
+		RiskLevel:      pred.RiskLevel,
+		RiskScore:      riskToScore(pred.RiskLevel),
 		Recommendation: "proceed",
-		Reasoning: "basic prediction (no LLM available)",
+		Reasoning:      "basic prediction (no LLM available)",
 	}
 	for _, pp := range pred.Predictions {
 		impact.DirectEffects = append(impact.DirectEffects, RippleEffect{
@@ -212,4 +212,3 @@ func truncateStr(s string, max int) string {
 	}
 	return string(r[:max]) + "..."
 }
-
