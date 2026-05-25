@@ -111,6 +111,14 @@ for (const abs of goFiles) {
     failures.push(`${file} chains a Planner service factory call; bind a local service/runtime handle before invoking service methods`);
   }
 
+  if (!file.endsWith("_test.go") && file !== plannerRuntimeServicesRel) {
+    const rawPlannerServiceField = /\bp\.(contextAssembly|learningSidecar|skillRuntime|trustGate|proactiveCog|delegationRuntime|runtimeStrategy|promptRuntime|executionRuntime|contextWindowRuntime|modelRuntime)\b/;
+    const match = text.match(rawPlannerServiceField);
+    if (match) {
+      failures.push(`${file} reads raw Planner runtime/service field ${match[0]}; use an ensure* local handle or runtime service boundary instead`);
+    }
+  }
+
   for (const removedModelWrapper of [
     "func (p *Planner) chatFallback(",
     "func (p *Planner) chatFallbackFull(",
@@ -1245,6 +1253,7 @@ for (const needle of [
   "ReAct and long-horizon skill environment construction",
   "Native-FC execution should bind native-FC local service handles",
   "PromptBuilder construction should bind local service handles",
+  "Non-test Planner runtime/helper files should not read raw Planner runtime or service fields directly",
   "planner_runtime_setters.go",
   "planner_runtime_facades.go",
   "planner_runtime_services.go",
@@ -1485,6 +1494,9 @@ for (const needle of [
   "第一百批",
   "PromptBuilder-local service handles",
   "proactiveCognition := p.ensureProactiveCognition()",
+  "第一百零一批",
+  "禁止直接读取 raw Planner runtime/service fields",
+  "当前扫描无输出",
   "第五十五批",
   "partial-result fallback post-processing helper",
   "PartialPlanResultRequest",
