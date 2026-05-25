@@ -283,10 +283,14 @@ func (p *Planner) RecentLongHorizonCheckpointsForTenant(ctx context.Context, ten
 }
 
 func (p *Planner) longHorizonCheckpointStore() LongHorizonCheckpointStore {
-	if p == nil || p.runtimeStrategy == nil {
+	if p == nil {
 		return nil
 	}
-	return p.runtimeStrategy.LongHorizonCheckpointStore()
+	runtimeStrategy := p.ensureRuntimeStrategy()
+	if runtimeStrategy == nil {
+		return nil
+	}
+	return runtimeStrategy.LongHorizonCheckpointStore()
 }
 
 func (p *Planner) persistLongHorizonCheckpoint(req PlanRequest, cp LongHorizonCheckpoint) {

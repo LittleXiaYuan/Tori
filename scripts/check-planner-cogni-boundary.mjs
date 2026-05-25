@@ -52,6 +52,7 @@ const allowedCogniInternals = new Set([
 const modelRuntimeRel = "internal/agentcore/planner/model_runtime_service.go";
 const modelRuntimeTasksRel = "internal/agentcore/planner/model_runtime_tasks.go";
 const longHorizonRel = "internal/agentcore/planner/long_horizon.go";
+const longHorizonCheckpointRel = "internal/agentcore/planner/long_horizon_checkpoint.go";
 const runtimeStrategyRel = "internal/agentcore/planner/runtime_strategy_service.go";
 const runtimeStrategySelectionRel = "internal/agentcore/planner/runtime_strategy_selection.go";
 const runtimeClassificationApplicationRel = "internal/agentcore/planner/runtime_classification_application.go";
@@ -832,6 +833,20 @@ for (const forbiddenRuntimeReach of [
   }
 }
 
+const longHorizonCheckpoint = read(longHorizonCheckpointRel);
+for (const required of [
+  "func (p *Planner) longHorizonCheckpointStore() LongHorizonCheckpointStore",
+  "runtimeStrategy := p.ensureRuntimeStrategy()",
+  "runtimeStrategy.LongHorizonCheckpointStore()",
+]) {
+  if (!longHorizonCheckpoint.includes(required)) {
+    failures.push(`${longHorizonCheckpointRel} should route checkpoint store access through a local runtime strategy handle ${JSON.stringify(required)}`);
+  }
+}
+if (longHorizonCheckpoint.includes("p.runtimeStrategy")) {
+  failures.push(`${longHorizonCheckpointRel} should not read raw p.runtimeStrategy; use a checkpoint-store-local runtime strategy handle`);
+}
+
 for (const forbiddenRuntimeReach of [
   "p.ensureExecutionRuntime().",
   "p.ensureModelRuntime().",
@@ -1082,6 +1097,9 @@ for (const needle of [
   "long_horizon.go",
   "long-horizon runtime 本地句柄",
   "env := executionRuntime.BuildSkillEnvironment(req, modelRuntime, p.contextAssembly)",
+  "第八十二批",
+  "long_horizon_checkpoint.go",
+  "checkpoint store runtime 本地句柄",
   "第五十五批",
   "partial-result fallback post-processing helper",
   "PartialPlanResultRequest",
