@@ -68,6 +68,7 @@ const plannerRuntimeServicesRel = "internal/agentcore/planner/planner_runtime_se
 const toolFreeChatRuntimeRel = "internal/agentcore/planner/tool_free_chat_runtime.go";
 const toolExecutionAsyncRel = "internal/agentcore/planner/tool_execution_async.go";
 const executionModeDispatchRel = "internal/agentcore/planner/execution_mode_dispatch.go";
+const promptRel = "internal/agentcore/planner/prompt.go";
 const promptBuilderRel = "internal/agentcore/planner/prompt_builder.go";
 const promptRuntimeRel = "internal/agentcore/planner/prompt_runtime_service.go";
 const contextWindowRuntimeRel = "internal/agentcore/planner/context_window_runtime_service.go";
@@ -813,6 +814,24 @@ for (const required of [
   }
 }
 
+const promptFacade = read(promptRel);
+for (const required of [
+  "func (p *Planner) InvalidatePromptCache()",
+  "func (p *Planner) buildSystemPrompt() string",
+  "func (p *Planner) buildSubagentSystemPrompt() string",
+  "promptRuntime := p.ensurePromptRuntime()",
+  "promptRuntime.InvalidatePromptCache()",
+  "promptRuntime.BuildSystemPrompt(p.registry)",
+  "promptRuntime.BuildSubagentSystemPrompt(p.registry)",
+]) {
+  if (!promptFacade.includes(required)) {
+    failures.push(`${promptRel} should route prompt facade helper through a local prompt runtime handle ${JSON.stringify(required)}`);
+  }
+}
+if (promptFacade.includes("p.ensurePromptRuntime().")) {
+  failures.push(`${promptRel} should not chain p.ensurePromptRuntime().*; keep prompt-facade-local runtime handles`);
+}
+
 const templateDetect = read(templateDetectRel);
 for (const required of [
   "func (p *Planner) AnalyzeUploadedFile(ctx context.Context, filename, textSnippet string) (*UploadAnalysis, error)",
@@ -1127,6 +1146,9 @@ for (const needle of [
   "第八十四批",
   "buildReActMessages",
   "ReAct prompt runtime 本地句柄",
+  "第八十五批",
+  "prompt.go",
+  "prompt facade 本地句柄",
   "第五十五批",
   "partial-result fallback post-processing helper",
   "PartialPlanResultRequest",
