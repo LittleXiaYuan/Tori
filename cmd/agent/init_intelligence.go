@@ -8,9 +8,9 @@ import (
 
 	"yunque-agent/internal/agentcore/localbrain"
 	agentrt "yunque-agent/internal/agentcore/runtime"
+	"yunque-agent/internal/agentcore/tasksched/rlsched"
 	"yunque-agent/internal/cognicore/microagent"
 	"yunque-agent/internal/cognicore/recommend"
-	"yunque-agent/internal/experimental/rlsched"
 	iledger "yunque-agent/internal/ledger"
 )
 

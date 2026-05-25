@@ -96,17 +96,6 @@ const allowedMainlineExperimentalImports = new Map([
     },
   ],
   [
-    "rlsched",
-    {
-      reason: "task scheduling policy; should move after task runtime owner is decided",
-      files: [
-        "cmd/agent/init_intelligence.go",
-        "cmd/agent/init_task_engine.go",
-        "cmd/agent/init_tasks.go",
-      ],
-    },
-  ],
-  [
     "skillgrow",
     {
       reason: "detect/generate adapter for canonical internal/agentcore/skillgrowth pipeline",
@@ -177,6 +166,12 @@ if (exists("internal/experimental/circuit")) {
 if (!exists("internal/agentcore/runtime/circuit")) {
   failures.push("runtime circuit breaker missing from internal/agentcore/runtime/circuit");
 }
+if (exists("internal/experimental/rlsched")) {
+  failures.push("task scheduler policy still exists under internal/experimental/rlsched");
+}
+if (!exists("internal/agentcore/tasksched/rlsched")) {
+  failures.push("task scheduler policy missing from internal/agentcore/tasksched/rlsched");
+}
 
 const cognicoreDoc = read("internal/cognicore/doc.go");
 for (const pkg of promotedPackages) {
@@ -199,12 +194,14 @@ for (const needle of [
   "internal/cognicore/microagent",
   "internal/cognicore/metacog",
   "internal/agentcore/runtime/circuit",
+  "internal/agentcore/tasksched/rlsched",
   "deterministic Bayesian success-rate",
   "post-task learning/evaluation",
   "soul-layer cognition modules",
   "scoped prompt-enhancement registry",
   "real-time reasoning anomaly monitor",
   "LLM/runtime resilience infrastructure",
+  "task scheduling policy",
   "remaining `internal/experimental/*` packages",
 ]) {
   if (!conceptMap.includes(needle)) {
@@ -222,6 +219,7 @@ for (const needle of [
   "microagent",
   "metacog",
   "internal/agentcore/runtime/circuit",
+  "internal/agentcore/tasksched/rlsched",
   "TestRecommendCandidatesDeterministicVisibleRanking",
   "Bayesian success-rate score",
 ]) {

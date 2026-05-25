@@ -182,9 +182,9 @@ func (q *QLearner) Epsilon() float64 {
 
 // PolicySnapshot returns the learned policy: for each known state, the best action.
 type PolicyEntry struct {
-	State   string  `json:"state"`
-	Action  string  `json:"action"`
-	QValue  float64 `json:"q_value"`
+	State  string  `json:"state"`
+	Action string  `json:"action"`
+	QValue float64 `json:"q_value"`
 }
 
 // Policy returns the current learned policy.
@@ -245,7 +245,7 @@ func (se *StateEncoder) Encode(features map[string]float64) string {
 				break
 			}
 		}
-		parts = append(parts, name + "=" + bucketLabel(bin, boundaries))
+		parts = append(parts, name+"="+bucketLabel(bin, boundaries))
 	}
 	sort.Strings(parts)
 	result := ""
