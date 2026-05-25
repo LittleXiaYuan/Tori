@@ -10,6 +10,23 @@ import (
 	"yunque-agent/pkg/skills"
 )
 
+type stubCogniRuntime struct {
+	context string
+	trace   CogniTraceDetail
+}
+
+func (s stubCogniRuntime) BuildContext(_ context.Context, message, _, _ string) string {
+	return s.context + ":" + message
+}
+
+func (s stubCogniRuntime) FilterSkills(_ string, _ string, _ string, in []skills.Skill) []skills.Skill {
+	return in[:1]
+}
+
+func (s stubCogniRuntime) Trace(_ string, _ string, _ string) (CogniTraceDetail, bool) {
+	return s.trace, true
+}
+
 func TestContextAssemblyServiceMemoryAndGraph(t *testing.T) {
 	service := NewContextAssemblyService()
 	service.SetMemory(func(_ context.Context, tenantID, query string) string {
@@ -73,6 +90,37 @@ func TestContextAssemblyServiceCogniBoundary(t *testing.T) {
 	detail, ok := emitted.Detail.(CogniTraceDetail)
 	if !ok || len(detail.Activated) != 1 || detail.Activated[0] != "demo" {
 		t.Fatalf("unexpected trace detail: %#v", emitted.Detail)
+	}
+}
+
+func TestContextAssemblyServiceCogniRuntimeBoundary(t *testing.T) {
+	service := NewContextAssemblyService()
+	service.SetCogniRuntime(stubCogniRuntime{
+		context: "runtime",
+		trace:   CogniTraceDetail{Activated: []string{"runtime-cogni"}, ContextBytes: 8},
+	})
+
+	if got := service.CogniContext(context.Background(), "hello", "tenant", "web"); got != "runtime:hello" {
+		t.Fatalf("unexpected cogni runtime context: %q", got)
+	}
+	filtered := service.ApplyCogniSkillFilter("hello", "tenant", "web", []skills.Skill{dummyPlannerSkill("a"), dummyPlannerSkill("b")})
+	if len(filtered) != 1 || filtered[0].Name() != "a" {
+		t.Fatalf("unexpected runtime-filtered skills: %#v", filtered)
+	}
+	var emitted observe.AgentEvent
+	service.EmitCogniTraceForRequest(PlanRequest{
+		Messages:    []llm.Message{{Role: "user", Content: "hello"}},
+		TenantID:    "tenant",
+		ChannelType: "web",
+		TraceID:     "trace-id",
+		TaskID:      "task-id",
+		StepCallback: func(evt observe.AgentEvent) {
+			emitted = evt
+		},
+	})
+	detail, ok := emitted.Detail.(CogniTraceDetail)
+	if !ok || detail.ContextBytes != 8 || len(detail.Activated) != 1 || detail.Activated[0] != "runtime-cogni" {
+		t.Fatalf("unexpected runtime trace detail: %#v", emitted.Detail)
 	}
 }
 

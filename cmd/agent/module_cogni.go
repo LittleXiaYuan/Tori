@@ -29,6 +29,70 @@ import (
 // per-module so it can be turned off without disabling the API.
 const cogniHookEnabled = true
 
+type plannerCogniRuntime struct {
+	enabled func() bool
+	hook    *cogni.Hook
+}
+
+func (r plannerCogniRuntime) active() bool {
+	return r.hook != nil && (r.enabled == nil || r.enabled())
+}
+
+func (r plannerCogniRuntime) request(message, tenantID, channel string) cogni.ContextRequest {
+	return cogni.ContextRequest{Message: message, TenantID: tenantID, Channel: channel}
+}
+
+func (r plannerCogniRuntime) BuildContext(_ context.Context, message, tenantID, channel string) string {
+	if !r.active() {
+		return ""
+	}
+	return r.hook.BuildContext(r.request(message, tenantID, channel))
+}
+
+func (r plannerCogniRuntime) FilterSkills(message, tenantID, channel string, in []skills.Skill) []skills.Skill {
+	if !r.active() {
+		return in
+	}
+	return r.hook.FilterSkills(r.request(message, tenantID, channel), in)
+}
+
+func (r plannerCogniRuntime) Trace(message, tenantID, channel string) (planner.CogniTraceDetail, bool) {
+	if !r.active() {
+		return planner.CogniTraceDetail{}, false
+	}
+	trace, ok := r.hook.TraceSnapshot(r.request(message, tenantID, channel))
+	if !ok {
+		return planner.CogniTraceDetail{}, false
+	}
+	return plannerCogniTraceDetail(trace), true
+}
+
+func plannerCogniTraceDetail(trace cogni.Trace) planner.CogniTraceDetail {
+	detail := planner.CogniTraceDetail{
+		ContextBytes:      trace.Context.Bytes,
+		TemplateFallbacks: trace.Context.TemplateFallbacks,
+		MessageHash:       trace.MessageHash,
+		DurationMs:        trace.DurationMs,
+	}
+	for _, activation := range trace.Activations {
+		if !activation.Activated {
+			continue
+		}
+		if activation.DisplayName != "" {
+			detail.Activated = append(detail.Activated, activation.DisplayName)
+		} else {
+			detail.Activated = append(detail.Activated, activation.ID)
+		}
+	}
+	if filter := trace.ToolFilter; filter != nil {
+		detail.ToolBefore = filter.Before
+		detail.ToolAfter = filter.After
+		detail.Removed = append([]string(nil), filter.Removed...)
+		detail.FellBackToInput = filter.FellBackToInput
+	}
+	return detail
+}
+
 // cogniModule wires the hot-pluggable Cogni Registry into the runtime.
 //
 // Boot behaviour:
@@ -323,60 +387,9 @@ func (m *cogniModule) Init(ctx context.Context, app *agentrt.App) error {
 		hook.SetExperienceProvider(func(cogniID string) *cogni.ExperienceStore {
 			return m.experiences[cogniID]
 		})
-		app.Planner.SetCogniContext(func(_ context.Context, message, tenantID, channel string) string {
-			if !m.cogniKernelPackEnabled() {
-				return ""
-			}
-			return hook.BuildContext(cogni.ContextRequest{
-				Message:  message,
-				TenantID: tenantID,
-				Channel:  channel,
-			})
-		})
-		app.Planner.SetCogniSkillFilter(func(message, tenantID, channel string, in []skills.Skill) []skills.Skill {
-			if !m.cogniKernelPackEnabled() {
-				return in
-			}
-			return hook.FilterSkills(cogni.ContextRequest{
-				Message:  message,
-				TenantID: tenantID,
-				Channel:  channel,
-			}, in)
-		})
-		app.Planner.SetCogniTrace(func(message, tenantID, channel string) (planner.CogniTraceDetail, bool) {
-			if !m.cogniKernelPackEnabled() {
-				return planner.CogniTraceDetail{}, false
-			}
-			trace, ok := hook.TraceSnapshot(cogni.ContextRequest{
-				Message:  message,
-				TenantID: tenantID,
-				Channel:  channel,
-			})
-			if !ok {
-				return planner.CogniTraceDetail{}, false
-			}
-			detail := planner.CogniTraceDetail{
-				ContextBytes:      trace.Context.Bytes,
-				TemplateFallbacks: trace.Context.TemplateFallbacks,
-				MessageHash:       trace.MessageHash,
-				DurationMs:        trace.DurationMs,
-			}
-			for _, a := range trace.Activations {
-				if a.Activated {
-					if a.DisplayName != "" {
-						detail.Activated = append(detail.Activated, a.DisplayName)
-					} else {
-						detail.Activated = append(detail.Activated, a.ID)
-					}
-				}
-			}
-			if tf := trace.ToolFilter; tf != nil {
-				detail.ToolBefore = tf.Before
-				detail.ToolAfter = tf.After
-				detail.Removed = append([]string(nil), tf.Removed...)
-				detail.FellBackToInput = tf.FellBackToInput
-			}
-			return detail, true
+		app.Planner.SetCogniRuntime(plannerCogniRuntime{
+			enabled: m.cogniKernelPackEnabled,
+			hook:    hook,
 		})
 		// Wire cost tracking + bus routing on activation
 		{

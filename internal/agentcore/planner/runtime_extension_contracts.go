@@ -39,6 +39,16 @@ type CogniSkillFilterFunc func(message, tenantID, channel string, in []skills.Sk
 // thinking/tool events, instead of hiding it only behind admin endpoints.
 type CogniTraceFunc func(message, tenantID, channel string) (CogniTraceDetail, bool)
 
+// CogniRuntime is the planner-facing runtime boundary for declarative Cogni
+// activation. Implementations own declaration evaluation, context rendering,
+// tool-surface filtering, and trace snapshot conversion. Planner only passes
+// request data through this interface and consumes the rendered outputs.
+type CogniRuntime interface {
+	BuildContext(ctx context.Context, message, tenantID, channel string) string
+	FilterSkills(message, tenantID, channel string, in []skills.Skill) []skills.Skill
+	Trace(message, tenantID, channel string) (CogniTraceDetail, bool)
+}
+
 type MemorySearchFunc func(ctx context.Context, tenantID, query string) string
 
 type ReflectFunc func(ctx context.Context, intent, reply string) bool
