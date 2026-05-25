@@ -85,6 +85,26 @@ func TestRecommendCandidatesRestrictsToCurrentSurface(t *testing.T) {
 	}
 }
 
+func TestRecommendCandidatesDeterministicVisibleRanking(t *testing.T) {
+	e := NewEngine()
+	e.RegisterItem(ItemProfile{ID: "web_search", Category: "research", Tags: []string{"web", "search", "information"}})
+	e.RegisterItem(ItemProfile{ID: "file_read", Category: "file", Tags: []string{"file", "document"}})
+
+	for i := 0; i < 5; i++ {
+		e.RecordOutcome("file_read", 1.0, true)
+	}
+
+	for i := 0; i < 25; i++ {
+		recs := e.RecommendCandidates(2, "please search and read the attached file", []string{"web_search", "file_read"})
+		if len(recs) != 2 {
+			t.Fatalf("expected two visible recommendations, got %d: %#v", len(recs), recs)
+		}
+		if recs[0].ItemID != "file_read" {
+			t.Fatalf("recommendation order should be stable and favor learned visible success, got %#v", recs)
+		}
+	}
+}
+
 func TestSimilarItems(t *testing.T) {
 	e := NewEngine()
 	e.RegisterItem(ItemProfile{ID: "a", Features: []float64{1, 0, 0}})

@@ -14,7 +14,7 @@ import (
 	"yunque-agent/internal/agentcore/llm"
 	"yunque-agent/internal/agentcore/localbrain"
 	"yunque-agent/internal/agentcore/subagent"
-	"yunque-agent/internal/experimental/recommend"
+	"yunque-agent/internal/cognicore/recommend"
 	iledger "yunque-agent/internal/ledger"
 	"yunque-agent/internal/observe"
 	"yunque-agent/pkg/skills"

@@ -5,16 +5,14 @@
 // Uses collaborative filtering concepts adapted for single-user agent contexts:
 //   - Item-based similarity (skills/topics) using cosine similarity
 //   - User profile vector updated incrementally from feedback signals
-//   - Thompson Sampling for exploration vs exploitation in recommendations
+//   - Deterministic Bayesian success-rate scoring for planner-stable ranking
 //
 // References:
 //   - Linden, Smith, York, "Amazon.com Recommendations", IEEE Internet Computing 2003
-//   - Chapelle, Li, "An Empirical Evaluation of Thompson Sampling", NeurIPS 2011
 package recommend
 
 import (
 	"math"
-	"math/rand"
 	"sort"
 	"strings"
 	"sync"
@@ -26,7 +24,6 @@ type Engine struct {
 	mu       sync.RWMutex
 	items    map[string]*ItemProfile
 	userPref UserPreference
-	rng      *rand.Rand
 }
 
 // ItemProfile represents a skill, topic, or response style with usage statistics.
@@ -67,7 +64,6 @@ func NewEngine() *Engine {
 			PreferredTags:       make(map[string]float64),
 			AvoidCategories:     make(map[string]float64),
 		},
-		rng: rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 }
 
@@ -123,10 +119,11 @@ func (e *Engine) RecordOutcome(itemID string, rating float64, positive bool) {
 
 // Recommend returns the top-K items ranked by predicted preference.
 // Uses a hybrid scoring approach:
-//   - Category/tag alignment with user preferences (40%)
-//   - Item success rate via Thompson Sampling (30%)
-//   - Recency decay (15%)
+//   - Category/tag alignment with user preferences (30%)
+//   - Deterministic Bayesian success-rate score (25%)
+//   - Recency decay (10%)
 //   - Novelty bonus for under-explored items (15%)
+//   - Context match against current request (20%)
 func (e *Engine) Recommend(k int, context string) []Recommendation {
 	return e.RecommendCandidates(k, context, nil)
 }
@@ -144,10 +141,14 @@ func (e *Engine) RecommendCandidates(k int, context string, candidateIDs []strin
 		return nil
 	}
 	candidates := make(map[string]bool, len(candidateIDs))
-	for _, id := range candidateIDs {
+	candidateOrder := make(map[string]int, len(candidateIDs))
+	for idx, id := range candidateIDs {
 		id = strings.TrimSpace(id)
 		if id != "" {
 			candidates[id] = true
+			if _, exists := candidateOrder[id]; !exists {
+				candidateOrder[id] = idx
+			}
 		}
 	}
 
@@ -157,6 +158,7 @@ func (e *Engine) RecommendCandidates(k int, context string, candidateIDs []strin
 		item   *ItemProfile
 		score  float64
 		reason string
+		order  int
 	}
 	var results []scored
 
@@ -165,19 +167,19 @@ func (e *Engine) RecommendCandidates(k int, context string, candidateIDs []strin
 			continue
 		}
 		prefScore := e.preferenceScore(item)
-		thompsonScore := e.thompsonScore(item)
+		successScore := e.successRateScore(item)
 		recencyScore := e.recencyScore(item)
 		noveltyScore := e.noveltyScore(item)
 		contextScore := e.contextMatch(item, contextTerms)
 
-		total := prefScore*0.30 + thompsonScore*0.25 + recencyScore*0.10 +
+		total := prefScore*0.30 + successScore*0.25 + recencyScore*0.10 +
 			noveltyScore*0.15 + contextScore*0.20
 
 		reason := "preference"
 		maxPartial := prefScore * 0.30
-		if thompsonScore*0.25 > maxPartial {
+		if successScore*0.25 > maxPartial {
 			reason = "success_rate"
-			maxPartial = thompsonScore * 0.25
+			maxPartial = successScore * 0.25
 		}
 		if contextScore*0.20 > maxPartial {
 			reason = "context_match"
@@ -187,13 +189,25 @@ func (e *Engine) RecommendCandidates(k int, context string, candidateIDs []strin
 			reason = "novelty"
 		}
 
-		results = append(results, scored{item, total, reason})
+		order := len(e.items)
+		if idx, ok := candidateOrder[item.ID]; ok {
+			order = idx
+		}
+		results = append(results, scored{item: item, score: total, reason: reason, order: order})
 	}
 	if len(results) == 0 {
 		return nil
 	}
 
-	sort.Slice(results, func(i, j int) bool { return results[i].score > results[j].score })
+	sort.SliceStable(results, func(i, j int) bool {
+		if math.Abs(results[i].score-results[j].score) > 1e-9 {
+			return results[i].score > results[j].score
+		}
+		if results[i].order != results[j].order {
+			return results[i].order < results[j].order
+		}
+		return results[i].item.ID < results[j].item.ID
+	})
 
 	if k > len(results) {
 		k = len(results)
@@ -281,10 +295,10 @@ func (e *Engine) preferenceScore(item *ItemProfile) float64 {
 	return math.Max(0, math.Min(1, (score+1)/2))
 }
 
-func (e *Engine) thompsonScore(item *ItemProfile) float64 {
+func (e *Engine) successRateScore(item *ItemProfile) float64 {
 	alpha := float64(item.Successes + 1)
 	beta := float64(item.Failures + 1)
-	return e.betaSample(alpha, beta)
+	return alpha / (alpha + beta)
 }
 
 func (e *Engine) recencyScore(item *ItemProfile) float64 {
@@ -314,42 +328,6 @@ func (e *Engine) contextMatch(item *ItemProfile, contextTerms []string) float64 
 		}
 	}
 	return float64(matches) / float64(len(contextTerms))
-}
-
-func (e *Engine) betaSample(alpha, beta float64) float64 {
-	x := e.gammaSample(alpha)
-	y := e.gammaSample(beta)
-	if x+y == 0 {
-		return 0.5
-	}
-	return x / (x + y)
-}
-
-func (e *Engine) gammaSample(shape float64) float64 {
-	if shape < 1 {
-		u := e.rng.Float64()
-		return e.gammaSample(shape+1) * math.Pow(u, 1.0/shape)
-	}
-	d := shape - 1.0/3.0
-	c := 1.0 / math.Sqrt(9.0*d)
-	for {
-		var x, v float64
-		for {
-			x = e.rng.NormFloat64()
-			v = 1.0 + c*x
-			if v > 0 {
-				break
-			}
-		}
-		v = v * v * v
-		u := e.rng.Float64()
-		if u < 1.0-0.0331*(x*x)*(x*x) {
-			return d * v
-		}
-		if math.Log(u) < 0.5*x*x+d*(1.0-v+math.Log(v)) {
-			return d * v
-		}
-	}
 }
 
 func cosineSimilarity64(a, b []float64) float64 {

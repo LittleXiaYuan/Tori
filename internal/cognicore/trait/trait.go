@@ -20,9 +20,9 @@ import (
 // Trait represents a single dimension-preference pair mined from conversation.
 type Trait struct {
 	ID         string    `json:"id"`
-	Dimension  string    `json:"dimension"`  // e.g. "communication_style", "domain_preference"
-	Preference string    `json:"preference"` // e.g. "concise", "Go programming"
-	Confidence float64   `json:"confidence"` // 0.0 - 1.0
+	Dimension  string    `json:"dimension"`        // e.g. "communication_style", "domain_preference"
+	Preference string    `json:"preference"`       // e.g. "concise", "Go programming"
+	Confidence float64   `json:"confidence"`       // 0.0 - 1.0
 	Source     string    `json:"source,omitempty"` // message that triggered mining
 	CreatedAt  time.Time `json:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at"`

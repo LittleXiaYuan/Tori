@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	"yunque-agent/internal/experimental/recommend"
+	"yunque-agent/internal/cognicore/recommend"
 	"yunque-agent/pkg/skills"
 )
 
