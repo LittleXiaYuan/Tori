@@ -14,7 +14,8 @@ import (
 
 // SetFederationBridge attaches the OPP federation bridge for A2A task delegation.
 func (p *Planner) SetFederationBridge(fb FederationBridge) {
-	p.ensureDelegationRuntime().SetFederationBridge(fb)
+	delegationRuntime := p.ensureDelegationRuntime()
+	delegationRuntime.SetFederationBridge(fb)
 }
 
 // FederationBridgeRef returns the current bridge (may be nil).
