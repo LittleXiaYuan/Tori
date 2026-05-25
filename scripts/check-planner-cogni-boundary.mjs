@@ -36,12 +36,40 @@ function stripComments(text) {
     .replace(/(^|\s)\/\/.*$/gm, "$1");
 }
 
+function plannerStructFieldCount(source) {
+  const lines = stripComments(source).split(/\r?\n/);
+  const start = lines.findIndex((line) => /^type\s+Planner\s+struct\s*\{/.test(line.trim()));
+  if (start < 0) return -1;
+
+  let count = 0;
+  let depth = 1;
+  for (let i = start + 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    if (depth === 1 && line === "}") return count;
+
+    if (depth === 1) {
+      const names = line.match(/^([A-Za-z_]\w*(?:\s*,\s*[A-Za-z_]\w*)*)\s+/);
+      count += names ? names[1].split(",").length : 1;
+    }
+
+    for (const char of line) {
+      if (char === "{") depth++;
+      if (char === "}") depth--;
+    }
+    if (depth <= 0) return count;
+  }
+  return -1;
+}
+
 const plannerDir = path.join(root, "internal/agentcore/planner");
 if (!fs.existsSync(plannerDir)) {
   failures.push("missing planner directory: internal/agentcore/planner");
 }
 
 const goFiles = fs.existsSync(plannerDir) ? walk(plannerDir) : [];
+const plannerRootRel = "internal/agentcore/planner/planner.go";
+const plannerRoot = read(plannerRootRel);
 const contextAssemblyRel = "internal/agentcore/planner/context_assembly_service.go";
 const allowedCogniInternals = new Set([
   contextAssemblyRel,
@@ -83,6 +111,13 @@ const allowedDirectModelCallFiles = new Set([
   modelRuntimeTasksRel,
   executionRuntimeRel,
 ]);
+
+const plannerFieldCount = plannerStructFieldCount(plannerRoot);
+if (plannerFieldCount < 0) {
+  failures.push(`${plannerRootRel} missing type Planner struct`);
+} else if (plannerFieldCount >= 20) {
+  failures.push(`${plannerRootRel} Planner struct field count is ${plannerFieldCount}; keep T7 runtime-shell target below 20`);
+}
 
 for (const abs of goFiles) {
   const file = rel(abs);
