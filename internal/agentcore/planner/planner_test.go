@@ -419,6 +419,89 @@ func TestInitialDAGDecomposePadsTooShortModelPlanToBlueprintMinimum(t *testing.T
 	}
 }
 
+func TestModelRuntimeServiceDecomposeLongHorizonDAGPadsMinimum(t *testing.T) {
+	reply := `[{"description":"读取技术蓝图","tool":"file_open","args":{"path":"doc"},"depends_on":[]}]`
+	client := mockLLMServer(t, func(messages []llm.Message) string {
+		if len(messages) != 2 || !strings.Contains(messages[1].Content, "可用工具") || !strings.Contains(messages[1].Content, "推进 planner") {
+			t.Fatalf("unexpected decompose messages %#v", messages)
+		}
+		return reply
+	})
+
+	steps, err := NewModelRuntimeService(client).DecomposeLongHorizonDAG(context.Background(), PlanRequest{}, "- file_open: read\n", "推进 planner")
+	if err != nil {
+		t.Fatalf("decompose via model runtime: %v", err)
+	}
+	if len(steps) != minLongHorizonDAGSteps {
+		t.Fatalf("expected model runtime decompose to pad minimum steps, got %#v", steps)
+	}
+	if steps[0].Description != "读取技术蓝图" || steps[0].Skill != "file_open" {
+		t.Fatalf("unexpected first step %#v", steps[0])
+	}
+}
+
+func TestModelRuntimeServiceReviseLongHorizonDAG(t *testing.T) {
+	reply := `[{"description":"改用阶段总结","tool":"","args":{},"depends_on":[]}]`
+	client := mockLLMServer(t, func(messages []llm.Message) string {
+		if len(messages) != 2 || !strings.Contains(messages[1].Content, "步骤 1 失败") || !strings.Contains(messages[1].Content, "状态:") {
+			t.Fatalf("unexpected revise messages %#v", messages)
+		}
+		return reply
+	})
+
+	steps, err := NewModelRuntimeService(client).ReviseLongHorizonDAG(context.Background(), PlanRequest{}, "推进 planner", "[0] failed", 1)
+	if err != nil {
+		t.Fatalf("revise via model runtime: %v", err)
+	}
+	if len(steps) != 1 || steps[0].Description != "改用阶段总结" {
+		t.Fatalf("unexpected revised steps %#v", steps)
+	}
+}
+
+func TestModelRuntimeServiceExecuteLongHorizonReasoningStepUsesTier(t *testing.T) {
+	client := mockLLMServer(t, func(messages []llm.Message) string {
+		t.Fatalf("fast tier should not be used for explicit expert reasoning, messages=%#v", messages)
+		return ""
+	})
+	expert := mockLLMServer(t, func(messages []llm.Message) string {
+		if len(messages) != 2 || !strings.Contains(messages[1].Content, "分析依赖") {
+			t.Fatalf("unexpected reasoning messages %#v", messages)
+		}
+		return "专家推理完成"
+	})
+	pool := llm.NewPool()
+	pool.Register("fast", client)
+	pool.Register("expert", expert)
+	pool.SetPrimary("fast")
+	service := NewModelRuntimeService(client)
+	service.SetPool(pool)
+
+	reply, err := service.ExecuteLongHorizonReasoningStep(context.Background(), PlanRequest{}, "expert", "分析依赖")
+	if err != nil {
+		t.Fatalf("reasoning via model runtime: %v", err)
+	}
+	if reply != "专家推理完成" {
+		t.Fatalf("expected expert tier reasoning reply, got %q", reply)
+	}
+}
+
+func TestModelRuntimeServiceSynthesizeLongHorizonResult(t *testing.T) {
+	client := mockLLMServer(t, func(messages []llm.Message) string {
+		if len(messages) != 2 || !strings.Contains(messages[1].Content, "目标: 推进 planner") || !strings.Contains(messages[1].Content, "步骤结果") {
+			t.Fatalf("unexpected synthesize messages %#v", messages)
+		}
+		return "最终总结"
+	})
+
+	reply, err := NewModelRuntimeService(client).SynthesizeLongHorizonResult(context.Background(), PlanRequest{}, "推进 planner", "- 步骤结果")
+	if err != nil {
+		t.Fatalf("synthesize via model runtime: %v", err)
+	}
+	if reply != "最终总结" {
+		t.Fatalf("unexpected synthesized reply %q", reply)
+	}
+}
+
 func TestBuildSystemPrompt(t *testing.T) {
 	reg := skills.NewRegistry()
 	p := NewPlanner(nil, reg, 8)
@@ -1077,7 +1160,7 @@ func TestLongHorizonDependencyPromptsHideRawCompletedDiagnostics(t *testing.T) {
 	} else {
 		t.Fatalf("expected friendly evidence in plan summary, got %q", got)
 	}
-	if _, _, err := p.executeReasoningStep(context.Background(), PlanRequest{}, pl, 1); err != nil {
+	if _, _, err := p.executeReasoningStep(context.Background(), PlanRequest{}, p.ensureModelRuntime(), pl, 1); err != nil {
 		t.Fatalf("reasoning step: %v", err)
 	}
 	if _, _, err := p.buildStepExecutor(PlanRequest{})(context.Background(), pl, 2); err != nil {
