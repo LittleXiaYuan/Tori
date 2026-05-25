@@ -371,12 +371,23 @@ const runtimeRequestPipeline = read(runtimeRequestPipelineRel);
 const runtimeRequestMessages = read(runtimeRequestMessagesRel);
 for (const needle of [
   "func (p *Planner) runToolFreeChat(ctx context.Context, req PlanRequest, errPrefix string, steps int) (*PlanResult, error)",
+  "modelRuntime := p.ensureModelRuntime()",
+  "runtimeStrategy := p.ensureRuntimeStrategy()",
   "EmitCogniTraceForRequest(req)",
-  "ChatFallbackForRequest(ctx, req, messages, p.runtimeStrategy, p.modelFallbackEvents(req))",
+  "modelRuntime.ChatFallbackForRequest(ctx, req, messages, runtimeStrategy, p.modelFallbackEvents(req))",
   "extractNextMoves(cleaned)",
 ]) {
   if (!toolFreeChatRuntime.includes(needle)) {
     failures.push(`${toolFreeChatRuntimeRel} missing tool-free chat runtime boundary ${JSON.stringify(needle)}`);
+  }
+}
+
+for (const forbiddenRuntimeReach of [
+  "p.ensureModelRuntime().",
+  "p.runtimeStrategy",
+]) {
+  if (toolFreeChatRuntime.includes(forbiddenRuntimeReach)) {
+    failures.push(`${toolFreeChatRuntimeRel} repeatedly reaches Planner runtime factory/field ${JSON.stringify(forbiddenRuntimeReach)}; keep tool-free runtime-local handles inside runToolFreeChat`);
   }
 }
 
@@ -1013,6 +1024,9 @@ for (const needle of [
   "第七十七批",
   "ReAct 执行入口",
   "ReAct 本地句柄",
+  "第七十八批",
+  "tool_free_chat_runtime.go",
+  "tool-free runtime 本地句柄",
   "第五十五批",
   "partial-result fallback post-processing helper",
   "PartialPlanResultRequest",
