@@ -89,6 +89,7 @@ func (p *Planner) HandoffFailureHook() func(failed bool) bool {
 		return nil
 	}
 	return func(failed bool) bool {
-		return p.ensureProactiveCognition().RecordExecutionFailure(failed)
+		proactiveCognition := p.ensureProactiveCognition()
+		return proactiveCognition.RecordExecutionFailure(failed)
 	}
 }

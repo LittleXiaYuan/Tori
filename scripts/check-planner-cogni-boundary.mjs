@@ -62,6 +62,7 @@ const runtimeRequestPipelineRel = "internal/agentcore/planner/runtime_request_pi
 const runtimeRequestMessagesRel = "internal/agentcore/planner/runtime_request_messages.go";
 const runtimeRequestContractsRel = "internal/agentcore/planner/runtime_request_contracts.go";
 const runtimeExtensionContractsRel = "internal/agentcore/planner/runtime_extension_contracts.go";
+const federationRel = "internal/agentcore/planner/federation.go";
 const plannerExtRel = "internal/agentcore/planner/planner_ext.go";
 const plannerRuntimeSettersRel = "internal/agentcore/planner/planner_runtime_setters.go";
 const plannerRuntimeFacadesRel = "internal/agentcore/planner/planner_runtime_facades.go";
@@ -102,6 +103,10 @@ for (const abs of goFiles) {
 
   if (!allowedCogniInternals.has(file) && text.includes(".cogniService")) {
     failures.push(`${file} reaches into ContextAssemblyService.cogniService directly`);
+  }
+
+  if (!file.endsWith("_test.go") && /p\.ensure[A-Za-z]+\(\)\./.test(text)) {
+    failures.push(`${file} chains a Planner service factory call; bind a local service/runtime handle before invoking service methods`);
   }
 
   for (const removedModelWrapper of [
@@ -690,6 +695,33 @@ for (const needle of [
   }
 }
 
+for (const required of [
+  "func (p *Planner) HandoffFailureHook() func(failed bool) bool",
+  "proactiveCognition := p.ensureProactiveCognition()",
+  "return proactiveCognition.RecordExecutionFailure(failed)",
+]) {
+  if (!plannerRuntimeServices.includes(required)) {
+    failures.push(`${plannerRuntimeServicesRel} should route handoff failure hook through a local proactive cognition handle ${JSON.stringify(required)}`);
+  }
+}
+if (plannerRuntimeServices.includes("p.ensureProactiveCognition().RecordExecutionFailure")) {
+  failures.push(`${plannerRuntimeServicesRel} should not chain p.ensureProactiveCognition().RecordExecutionFailure; keep handoff failure hooks behind a local proactive cognition handle`);
+}
+
+const federation = read(federationRel);
+for (const required of [
+  "func (p *Planner) SetFederationBridge(fb FederationBridge)",
+  "delegationRuntime := p.ensureDelegationRuntime()",
+  "delegationRuntime.SetFederationBridge(fb)",
+]) {
+  if (!federation.includes(required)) {
+    failures.push(`${federationRel} should route federation bridge setter through a local delegation runtime handle ${JSON.stringify(required)}`);
+  }
+}
+if (federation.includes("p.ensureDelegationRuntime().")) {
+  failures.push(`${federationRel} should not chain p.ensureDelegationRuntime().*; keep federation setter behind a local delegation runtime handle`);
+}
+
 const plannerSourceForServiceFactorySplit = read("internal/agentcore/planner/planner.go");
 for (const forbidden of [
   "func (p *Planner) ensureContextAssembly(",
@@ -1096,6 +1128,7 @@ for (const needle of [
   "runtime_request_contracts.go",
   "runtime_extension_contracts.go",
   "planner_ext.go",
+  "federation.go",
   "planner_runtime_setters.go",
   "planner_runtime_facades.go",
   "planner_runtime_services.go",
@@ -1300,6 +1333,10 @@ for (const needle of [
   "complete setter-local service handles",
   "contextAssembly := p.ensureContextAssembly()",
   "skillRuntime := p.ensureSkillRuntime()",
+  "第九十批",
+  "federation bridge setter",
+  "handoff failure hook",
+  "no chained Planner service factory calls",
   "第五十五批",
   "partial-result fallback post-processing helper",
   "PartialPlanResultRequest",
