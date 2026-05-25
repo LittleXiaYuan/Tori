@@ -27,11 +27,12 @@ func (p *Planner) runReAct(ctx context.Context, req PlanRequest) (*PlanResult, e
 		return p.runNativeFC(ctx, req)
 	}
 
+	contextAssembly := p.ensureContextAssembly()
 	executionRuntime := p.ensureExecutionRuntime()
 	learningSidecar := p.ensureLearningSidecar()
 	modelRuntime := p.ensureModelRuntime()
 	runtimeStrategy := p.ensureRuntimeStrategy()
-	env := executionRuntime.BuildSkillEnvironment(req, modelRuntime, p.contextAssembly)
+	env := executionRuntime.BuildSkillEnvironment(req, modelRuntime, contextAssembly)
 	_, ctxLayers := p.BuildMessages(ctx, req)
 
 	taskID := req.TaskID
