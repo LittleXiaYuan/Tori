@@ -27,7 +27,8 @@ func (p *Planner) SetMetaCogBridge(b *iledger.MetaCogBridge) {
 }
 
 func (p *Planner) SetPersonaPrompt(fn func() string) {
-	p.ensurePromptRuntime().SetPersonaPrompt(fn)
+	promptRuntime := p.ensurePromptRuntime()
+	promptRuntime.SetPersonaPrompt(fn)
 }
 
 // SetGraphContext replaces the graph context source used by dynamic context assembly.
@@ -63,15 +64,18 @@ func (p *Planner) SetStrategyContextFor(fn func(query string) string) {
 }
 
 func (p *Planner) SetDynContextBudget(tokens int) {
-	p.ensureExecutionRuntime().SetDynContextBudget(tokens)
+	executionRuntime := p.ensureExecutionRuntime()
+	executionRuntime.SetDynContextBudget(tokens)
 }
 
 func (p *Planner) SetDomainPrompt(prompt string) {
-	p.ensurePromptRuntime().SetDomainPrompt(prompt)
+	promptRuntime := p.ensurePromptRuntime()
+	promptRuntime.SetDomainPrompt(prompt)
 }
 
 func (p *Planner) SetNativeFC(enabled bool) {
-	p.ensurePromptRuntime().SetNativeFC(enabled)
+	promptRuntime := p.ensurePromptRuntime()
+	promptRuntime.SetNativeFC(enabled)
 }
 
 func (p *Planner) SetWindowConfig(cfg ctxwindow.WindowConfig) {
@@ -100,13 +104,15 @@ func (p *Planner) SetSkillRecommendationEngine(engine *recommend.Engine) {
 // SetSkillIndex provides the L2 index: skills listed by name+description in the prompt,
 // loaded on demand via use_skill(slug).
 func (p *Planner) SetSkillIndex(fn SkillIndexFunc) {
-	p.ensurePromptRuntime().SetSkillIndex(fn)
+	promptRuntime := p.ensurePromptRuntime()
+	promptRuntime.SetSkillIndex(fn)
 }
 
 // SetLLMPool attaches a multi-model LLM pool for dynamic model selection.
 // When set, ModelOverride in PlanRequest selects a pool client by key.
 func (p *Planner) SetLLMPool(pool *llm.Pool) {
-	p.ensureModelRuntime().SetPool(pool)
+	modelRuntime := p.ensureModelRuntime()
+	modelRuntime.SetPool(pool)
 }
 
 // SetHandoffRegistry attaches a handoff registry for subagent delegation.
@@ -155,12 +161,14 @@ func (p *Planner) SetLedger(l *ldg.Ledger) { p.ledger = l }
 
 // SetReActMode enables the Ledger-powered ReAct reasoning loop.
 func (p *Planner) SetReActMode(enabled bool) {
-	p.ensureRuntimeStrategy().SetReActMode(enabled)
+	runtimeStrategy := p.ensureRuntimeStrategy()
+	runtimeStrategy.SetReActMode(enabled)
 }
 
 // SetLongHorizonMode enables the DAG-based long-horizon planner for complex tasks.
 func (p *Planner) SetLongHorizonMode(enabled bool) {
-	p.ensureRuntimeStrategy().SetLongHorizonMode(enabled)
+	runtimeStrategy := p.ensureRuntimeStrategy()
+	runtimeStrategy.SetLongHorizonMode(enabled)
 }
 
 // SetRunStateAccessor attaches the per-session interrupt checking function.
@@ -168,12 +176,14 @@ func (p *Planner) SetRunStateAccessor(fn RunStateAccessor) { p.runState = fn }
 
 // SetLocalBrain attaches the local small model decision layer.
 func (p *Planner) SetLocalBrain(lb LocalBrainRuntime) {
-	p.ensureRuntimeStrategy().SetLocalBrain(lb)
+	runtimeStrategy := p.ensureRuntimeStrategy()
+	runtimeStrategy.SetLocalBrain(lb)
 }
 
 // SetAgenticThinking attaches the agentic thinking engine.
 func (p *Planner) SetAgenticThinking(at AgenticThinkerRuntime) {
-	p.ensureRuntimeStrategy().SetAgenticThinking(at)
+	runtimeStrategy := p.ensureRuntimeStrategy()
+	runtimeStrategy.SetAgenticThinking(at)
 }
 
 // SetSkillGrowth attaches the autonomous skill acquisition module.
@@ -188,7 +198,8 @@ func (p *Planner) SetDataCollector(dc *DataCollector) {
 
 // SetProviderRegistry attaches the capability-aware provider registry for dynamic model routing.
 func (p *Planner) SetProviderRegistry(reg *llm.ProviderRegistry) {
-	p.ensureRuntimeStrategy().SetProviderRegistry(reg)
+	runtimeStrategy := p.ensureRuntimeStrategy()
+	runtimeStrategy.SetProviderRegistry(reg)
 }
 
 // SetCogniContext attaches a declarative Cogni context injector. The callback
@@ -213,5 +224,6 @@ func (p *Planner) SetCogniTrace(fn CogniTraceFunc) {
 
 // SetToolTimeout sets the per-tool execution timeout. Default is 60s.
 func (p *Planner) SetToolTimeout(d time.Duration) {
-	p.ensureExecutionRuntime().SetToolTimeout(d)
+	executionRuntime := p.ensureExecutionRuntime()
+	executionRuntime.SetToolTimeout(d)
 }

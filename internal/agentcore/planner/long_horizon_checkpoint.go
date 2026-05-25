@@ -238,7 +238,8 @@ func longHorizonCheckpointDedupKey(cp LongHorizonCheckpoint) string {
 }
 
 func (p *Planner) SetLongHorizonCheckpointStore(store LongHorizonCheckpointStore) {
-	p.ensureRuntimeStrategy().SetLongHorizonCheckpointStore(store)
+	runtimeStrategy := p.ensureRuntimeStrategy()
+	runtimeStrategy.SetLongHorizonCheckpointStore(store)
 }
 
 // RecentLongHorizonCheckpoints returns newest-first recoverable DAG snapshots
