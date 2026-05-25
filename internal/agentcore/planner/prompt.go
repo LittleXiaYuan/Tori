@@ -15,15 +15,18 @@ var promptFiles embed.FS
 
 // InvalidatePromptCache forces rebuild of the cached system prompt on next call.
 func (p *Planner) InvalidatePromptCache() {
-	p.ensurePromptRuntime().InvalidatePromptCache()
+	promptRuntime := p.ensurePromptRuntime()
+	promptRuntime.InvalidatePromptCache()
 }
 
 func (p *Planner) buildSystemPrompt() string {
-	return p.ensurePromptRuntime().BuildSystemPrompt(p.registry)
+	promptRuntime := p.ensurePromptRuntime()
+	return promptRuntime.BuildSystemPrompt(p.registry)
 }
 
 func (p *Planner) buildSubagentSystemPrompt() string {
-	return p.ensurePromptRuntime().BuildSubagentSystemPrompt(p.registry)
+	promptRuntime := p.ensurePromptRuntime()
+	return promptRuntime.BuildSubagentSystemPrompt(p.registry)
 }
 
 // cleanReply removes internal artifacts from LLM output before presenting to users.
