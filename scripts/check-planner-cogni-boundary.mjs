@@ -65,6 +65,7 @@ const runtimeExtensionContractsRel = "internal/agentcore/planner/runtime_extensi
 const federationRel = "internal/agentcore/planner/federation.go";
 const plannerExtRel = "internal/agentcore/planner/planner_ext.go";
 const skillExecRel = "internal/agentcore/planner/skill_exec.go";
+const skillRecommendationRel = "internal/agentcore/planner/skill_recommendation.go";
 const plannerRuntimeSettersRel = "internal/agentcore/planner/planner_runtime_setters.go";
 const plannerRuntimeFacadesRel = "internal/agentcore/planner/planner_runtime_facades.go";
 const plannerRuntimeServicesRel = "internal/agentcore/planner/planner_runtime_services.go";
@@ -746,6 +747,28 @@ for (const forbidden of [
   }
 }
 
+const skillRecommendation = read(skillRecommendationRel);
+for (const required of [
+  "func (p *Planner) rankSkillsByRecommendation(userMessage string, candidates []skills.Skill) []skills.Skill",
+  "func (p *Planner) recordSkillRecommendationOutcome(skillName string, success bool)",
+  "skillRuntime := p.ensureSkillRuntime()",
+  "skillRuntime.RankByRecommendation(userMessage, candidates)",
+  "skillRuntime.RecordRecommendationOutcome(skillName, success)",
+]) {
+  if (!skillRecommendation.includes(required)) {
+    failures.push(`${skillRecommendationRel} should route recommendation helpers through a local skill runtime handle ${JSON.stringify(required)}`);
+  }
+}
+for (const forbidden of [
+  "p.skillRuntime == nil",
+  "p.skillRuntime.RankByRecommendation",
+  "p.skillRuntime.RecordRecommendationOutcome",
+]) {
+  if (skillRecommendation.includes(forbidden)) {
+    failures.push(`${skillRecommendationRel} should not read raw Planner skillRuntime ${JSON.stringify(forbidden)}; use recommendation-local skill runtime handles`);
+  }
+}
+
 const plannerSourceForServiceFactorySplit = read("internal/agentcore/planner/planner.go");
 for (const forbidden of [
   "func (p *Planner) ensureContextAssembly(",
@@ -1154,6 +1177,7 @@ for (const needle of [
   "planner_ext.go",
   "federation.go",
   "skill_exec.go",
+  "skill_recommendation.go",
   "planner_runtime_setters.go",
   "planner_runtime_facades.go",
   "planner_runtime_services.go",
@@ -1366,6 +1390,9 @@ for (const needle of [
   "skill execution trust/proactive hooks",
   "trustGate := p.ensureTrustGate()",
   "proactiveCognition := p.ensureProactiveCognition()",
+  "第九十二批",
+  "recommendation-local skill runtime handle",
+  "skillRuntime.RankByRecommendation",
   "第五十五批",
   "partial-result fallback post-processing helper",
   "PartialPlanResultRequest",
