@@ -28,6 +28,7 @@ func (p *Planner) runReAct(ctx context.Context, req PlanRequest) (*PlanResult, e
 	}
 
 	executionRuntime := p.ensureExecutionRuntime()
+	learningSidecar := p.ensureLearningSidecar()
 	modelRuntime := p.ensureModelRuntime()
 	runtimeStrategy := p.ensureRuntimeStrategy()
 	env := executionRuntime.BuildSkillEnvironment(req, modelRuntime, p.contextAssembly)
@@ -60,7 +61,7 @@ func (p *Planner) runReAct(ctx context.Context, req PlanRequest) (*PlanResult, e
 	thinkFn := func(ctx context.Context, history []ldg.ReActStep) (*ldg.ThinkResult, error) {
 		// MetaCog escalation: force expert tier when critical anomalies accumulate
 		selectedTier := req.ModelOverride
-		if p.learningSidecar != nil && taskID != "" && p.learningSidecar.ShouldEscalate(taskID) && selectedTier == "" {
+		if taskID != "" && learningSidecar.ShouldEscalate(taskID) && selectedTier == "" {
 			selectedTier = "expert"
 			slog.Info("planner: metacog escalation → expert tier", "task", taskID)
 		}
@@ -98,7 +99,7 @@ func (p *Planner) runReAct(ctx context.Context, req PlanRequest) (*PlanResult, e
 		}
 
 		// 第二阶段：用选定层级的 LLM 执行思考
-		messages := p.buildReActMessages(ctx, req, history, toolsDesc)
+		messages := p.buildReActMessages(ctx, req, history, toolsDesc, learningSidecar)
 		reply, err := modelRuntime.ChatForRequestTier(ctx, req, selectedTier, messages, 0.7)
 		if err != nil {
 			return nil, fmt.Errorf("LLM chat: %w", err)
@@ -258,7 +259,7 @@ func (p *Planner) buildToolsDescription(allowedSkills []string) string {
 }
 
 // buildReActMessages constructs the LLM prompt for the next ReAct step.
-func (p *Planner) buildReActMessages(ctx context.Context, req PlanRequest, history []ldg.ReActStep, toolsDesc string) []llm.Message {
+func (p *Planner) buildReActMessages(ctx context.Context, req PlanRequest, history []ldg.ReActStep, toolsDesc string, learningSidecar *LearningSidecar) []llm.Message {
 	promptRuntime := p.ensurePromptRuntime()
 	sysPrompt := p.buildSystemPrompt()
 	if pp := promptRuntime.PersonaPrompt(); pp != "" {
@@ -332,8 +333,8 @@ func (p *Planner) buildReActMessages(ctx context.Context, req PlanRequest, histo
 	}
 
 	// MetaCog correction hints: inject anomaly-based guidance when detected
-	if p.learningSidecar != nil && req.TaskID != "" {
-		if hint := p.learningSidecar.CorrectionHint(req.TaskID); hint != "" {
+	if req.TaskID != "" {
+		if hint := learningSidecar.CorrectionHint(req.TaskID); hint != "" {
 			msgs = append(msgs, llm.Message{
 				Role:    "system",
 				Content: hint,
