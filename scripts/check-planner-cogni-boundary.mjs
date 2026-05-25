@@ -64,6 +64,7 @@ const runtimeRequestContractsRel = "internal/agentcore/planner/runtime_request_c
 const runtimeExtensionContractsRel = "internal/agentcore/planner/runtime_extension_contracts.go";
 const federationRel = "internal/agentcore/planner/federation.go";
 const plannerExtRel = "internal/agentcore/planner/planner_ext.go";
+const skillExecRel = "internal/agentcore/planner/skill_exec.go";
 const plannerRuntimeSettersRel = "internal/agentcore/planner/planner_runtime_setters.go";
 const plannerRuntimeFacadesRel = "internal/agentcore/planner/planner_runtime_facades.go";
 const plannerRuntimeServicesRel = "internal/agentcore/planner/planner_runtime_services.go";
@@ -722,6 +723,29 @@ if (federation.includes("p.ensureDelegationRuntime().")) {
   failures.push(`${federationRel} should not chain p.ensureDelegationRuntime().*; keep federation setter behind a local delegation runtime handle`);
 }
 
+const skillExec = read(skillExecRel);
+for (const required of [
+  "func (p *Planner) executeSkill(ctx context.Context, name string, args map[string]any, env *skills.Environment) (res skillExecutionResult)",
+  "trustGate := p.ensureTrustGate()",
+  "proactiveCognition := p.ensureProactiveCognition()",
+  "trustGate.Check(execName)",
+  "proactiveCognition.RecordExecutionFailure(res.Err != nil)",
+  "trustGate.Record(execName, res.Err == nil)",
+]) {
+  if (!skillExec.includes(required)) {
+    failures.push(`${skillExecRel} should route skill execution trust/proactive hooks through local service handles ${JSON.stringify(required)}`);
+  }
+}
+for (const forbidden of [
+  "p.trustGate.Check(",
+  "p.trustGate.Record(",
+  "p.proactiveCog.RecordExecutionFailure(",
+]) {
+  if (skillExec.includes(forbidden)) {
+    failures.push(`${skillExecRel} should not read raw Planner service field ${JSON.stringify(forbidden)}; use executeSkill-local service handles`);
+  }
+}
+
 const plannerSourceForServiceFactorySplit = read("internal/agentcore/planner/planner.go");
 for (const forbidden of [
   "func (p *Planner) ensureContextAssembly(",
@@ -1129,6 +1153,7 @@ for (const needle of [
   "runtime_extension_contracts.go",
   "planner_ext.go",
   "federation.go",
+  "skill_exec.go",
   "planner_runtime_setters.go",
   "planner_runtime_facades.go",
   "planner_runtime_services.go",
@@ -1337,6 +1362,10 @@ for (const needle of [
   "federation bridge setter",
   "handoff failure hook",
   "no chained Planner service factory calls",
+  "第九十一批",
+  "skill execution trust/proactive hooks",
+  "trustGate := p.ensureTrustGate()",
+  "proactiveCognition := p.ensureProactiveCognition()",
   "第五十五批",
   "partial-result fallback post-processing helper",
   "PartialPlanResultRequest",
