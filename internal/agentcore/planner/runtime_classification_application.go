@@ -12,10 +12,11 @@ type AppliedRuntimeClassification struct {
 
 func (p *Planner) applyRuntimeClassification(ctx context.Context, req PlanRequest) AppliedRuntimeClassification {
 	applied := AppliedRuntimeClassification{Request: req}
-	if p.runtimeStrategy == nil {
+	runtimeStrategy := p.ensureRuntimeStrategy()
+	if runtimeStrategy == nil {
 		return applied
 	}
-	classified, err := p.runtimeStrategy.ClassifyRequest(ctx, req, extractGoal(req))
+	classified, err := runtimeStrategy.ClassifyRequest(ctx, req, extractGoal(req))
 	if err != nil || classified == nil || classified.Decision == nil {
 		return applied
 	}
