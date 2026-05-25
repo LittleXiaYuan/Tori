@@ -409,13 +409,28 @@ if (!runtimeRequestPipeline.includes('runToolFreeChat(ctx, req, "planner tool-fr
 
 for (const needle of [
   "func (p *Planner) BuildMessages(ctx context.Context, req PlanRequest) ([]llm.Message, []string)",
-  "BuildStablePrefix(req.DisableDelegation, req.GroupSystemPrompt, p.buildSystemPrompt, p.buildSubagentSystemPrompt)",
-  "AppendDynamicContextMessage(ctx, msgs, DynamicContextAssemblyRequest{",
-  "PrepareConversationMessages(req.Messages, time.Now())",
-  "FitMessagesForRequest(ctx, msgs, p.ensureModelRuntime().ClientForRequest(req))",
+  "promptRuntime := p.ensurePromptRuntime()",
+  "contextAssembly := p.ensureContextAssembly()",
+  "contextWindowRuntime := p.ensureContextWindowRuntime()",
+  "modelRuntime := p.ensureModelRuntime()",
+  "promptRuntime.BuildStablePrefix(req.DisableDelegation, req.GroupSystemPrompt, p.buildSystemPrompt, p.buildSubagentSystemPrompt)",
+  "contextAssembly.AppendDynamicContextMessage(ctx, msgs, DynamicContextAssemblyRequest{",
+  "promptRuntime.PrepareConversationMessages(req.Messages, time.Now())",
+  "contextWindowRuntime.FitMessagesForRequest(ctx, msgs, modelRuntime.ClientForRequest(req))",
 ]) {
   if (!runtimeRequestMessages.includes(needle)) {
     failures.push(`${runtimeRequestMessagesRel} missing request message assembly boundary ${JSON.stringify(needle)}`);
+  }
+}
+
+for (const forbiddenRuntimeReach of [
+  "p.ensurePromptRuntime().",
+  "p.ensureContextAssembly().",
+  "p.ensureContextWindowRuntime().",
+  "p.ensureModelRuntime().",
+]) {
+  if (runtimeRequestMessages.includes(forbiddenRuntimeReach)) {
+    failures.push(`${runtimeRequestMessagesRel} repeatedly reaches Planner runtime factory ${JSON.stringify(forbiddenRuntimeReach)}; keep request-message-local runtime handles inside BuildMessages`);
   }
 }
 
@@ -1034,6 +1049,12 @@ for (const needle of [
   "第七十九批",
   "classification application",
   "runtimeStrategy := p.ensureRuntimeStrategy()",
+  "第八十批",
+  "runtime_request_messages.go",
+  "request message runtime 本地句柄",
+  "promptRuntime := p.ensurePromptRuntime()",
+  "contextAssembly := p.ensureContextAssembly()",
+  "contextWindowRuntime := p.ensureContextWindowRuntime()",
   "第五十五批",
   "partial-result fallback post-processing helper",
   "PartialPlanResultRequest",
