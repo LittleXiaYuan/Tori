@@ -20,10 +20,11 @@ func (p *Planner) SetFederationBridge(fb FederationBridge) {
 
 // FederationBridgeRef returns the current bridge (may be nil).
 func (p *Planner) FederationBridgeRef() FederationBridge {
-	if p.delegationRuntime == nil {
+	if p == nil {
 		return nil
 	}
-	return p.delegationRuntime.FederationBridge()
+	delegationRuntime := p.ensureDelegationRuntime()
+	return delegationRuntime.FederationBridge()
 }
 
 // federationToolDef returns the LLM function definition for `opp_delegate`.
