@@ -7,6 +7,9 @@
 //   - react: Ledger-backed ReAct / Plan-Execute-Reflect loops,
 //   - taskdistill: post-task experience distillation,
 //   - eval: task-quality evaluation and distillation trigger decisions.
+//   - causal: failure/root-cause reasoning over Ledger events,
+//   - curiosity: idle knowledge-gap and failure-review exploration,
+//   - world: tracked external state and action-impact prediction.
 //
 // Packages that still live under internal/experimental are either true lab
 // work or compatibility adapters waiting for a canonical owner.

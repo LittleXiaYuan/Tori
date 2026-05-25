@@ -5,28 +5,14 @@ import path from "node:path";
 const root = process.cwd();
 const failures = [];
 
-const promotedPackages = ["trait", "recommend", "react", "taskdistill", "eval"];
+const promotedPackages = ["trait", "recommend", "react", "taskdistill", "eval", "causal", "curiosity", "world"];
 
 const allowedMainlineExperimentalImports = new Map([
-  [
-    "causal",
-    {
-      reason: "cognitive lab module still wired through init_soul; canonical owner not decided",
-      files: ["cmd/agent/init_soul.go"],
-    },
-  ],
   [
     "circuit",
     {
       reason: "LLM/runtime circuit breaker; should move after runtime policy owner is decided",
       files: ["cmd/agent/init_llm.go", "internal/agentcore/runtime/app.go"],
-    },
-  ],
-  [
-    "curiosity",
-    {
-      reason: "cognitive lab module still wired through init_soul; canonical owner not decided",
-      files: ["cmd/agent/init_soul.go"],
     },
   ],
   [
@@ -154,13 +140,6 @@ const allowedMainlineExperimentalImports = new Map([
       ],
     },
   ],
-  [
-    "world",
-    {
-      reason: "world-model lab module still wired through init_soul; canonical owner not decided",
-      files: ["cmd/agent/init_soul.go"],
-    },
-  ],
 ]);
 
 function rel(abs) {
@@ -228,8 +207,12 @@ for (const needle of [
   "internal/cognicore/react",
   "internal/cognicore/taskdistill",
   "internal/cognicore/eval",
+  "internal/cognicore/causal",
+  "internal/cognicore/curiosity",
+  "internal/cognicore/world",
   "deterministic Bayesian success-rate",
   "post-task learning/evaluation",
+  "soul-layer cognition modules",
   "remaining `internal/experimental/*` packages",
 ]) {
   if (!conceptMap.includes(needle)) {
@@ -243,6 +226,7 @@ for (const needle of [
   "internal/cognicore",
   "trait` / `recommend` / `react",
   "taskdistill` / `eval",
+  "causal` / `curiosity` / `world",
   "TestRecommendCandidatesDeterministicVisibleRanking",
   "Bayesian success-rate score",
 ]) {
@@ -307,5 +291,5 @@ if (failures.length > 0) {
 }
 
 console.log("Experimental boundary check passed.");
-console.log("Promoted packages are under internal/cognicore: trait, recommend, react, taskdistill, eval.");
+console.log("Promoted packages are under internal/cognicore: trait, recommend, react, taskdistill, eval, causal, curiosity, world.");
 console.log(`Remaining mainline experimental imports are explicitly allow-listed: ${actualMainlineImports.length}.`);
