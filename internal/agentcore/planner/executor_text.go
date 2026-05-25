@@ -305,17 +305,16 @@ func (p *Planner) fuzzyMatchSkill(raw string) string {
 // runTextBased: multi-step planning loop using text-parsed skill calls.
 // Decompose → Execute (parallel) → Reflect → Synthesize.
 func (p *Planner) runTextBased(ctx context.Context, req PlanRequest) (*PlanResult, error) {
+	contextAssembly := p.ensureContextAssembly()
 	executionRuntime := p.ensureExecutionRuntime()
 	modelRuntime := p.ensureModelRuntime()
 	promptRuntime := p.ensurePromptRuntime()
 	skillRuntime := p.ensureSkillRuntime()
 	runtimeStrategy := p.ensureRuntimeStrategy()
-	env := executionRuntime.BuildSkillEnvironment(req, modelRuntime, p.contextAssembly)
+	env := executionRuntime.BuildSkillEnvironment(req, modelRuntime, contextAssembly)
 
 	messages, ctxLayers := p.BuildMessages(ctx, req)
-	if p.contextAssembly != nil {
-		p.contextAssembly.EmitCogniTraceForRequest(req)
-	}
+	contextAssembly.EmitCogniTraceForRequest(req)
 
 	var usedSkills []string
 	var planSteps []PlanStep
