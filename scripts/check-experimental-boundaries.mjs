@@ -9,13 +9,6 @@ const promotedPackages = ["trait", "recommend", "react", "taskdistill", "eval", 
 
 const allowedMainlineExperimentalImports = new Map([
   [
-    "circuit",
-    {
-      reason: "LLM/runtime circuit breaker; should move after runtime policy owner is decided",
-      files: ["cmd/agent/init_llm.go", "internal/agentcore/runtime/app.go"],
-    },
-  ],
-  [
     "distill",
     {
       reason: "distillation service is still exposed through gateway/bootstrap wiring",
@@ -185,6 +178,13 @@ for (const pkg of promotedPackages) {
   }
 }
 
+if (exists("internal/experimental/circuit")) {
+  failures.push("runtime circuit breaker still exists under internal/experimental/circuit");
+}
+if (!exists("internal/agentcore/runtime/circuit")) {
+  failures.push("runtime circuit breaker missing from internal/agentcore/runtime/circuit");
+}
+
 const cognicoreDoc = read("internal/cognicore/doc.go");
 for (const pkg of promotedPackages) {
   if (!cognicoreDoc.includes(pkg)) {
@@ -204,10 +204,12 @@ for (const needle of [
   "internal/cognicore/curiosity",
   "internal/cognicore/world",
   "internal/cognicore/microagent",
+  "internal/agentcore/runtime/circuit",
   "deterministic Bayesian success-rate",
   "post-task learning/evaluation",
   "soul-layer cognition modules",
   "scoped prompt-enhancement registry",
+  "LLM/runtime resilience infrastructure",
   "remaining `internal/experimental/*` packages",
 ]) {
   if (!conceptMap.includes(needle)) {
@@ -223,6 +225,7 @@ for (const needle of [
   "taskdistill` / `eval",
   "causal` / `curiosity` / `world",
   "microagent",
+  "internal/agentcore/runtime/circuit",
   "TestRecommendCandidatesDeterministicVisibleRanking",
   "Bayesian success-rate score",
 ]) {
