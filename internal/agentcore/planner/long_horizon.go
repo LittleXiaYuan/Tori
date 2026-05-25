@@ -254,10 +254,11 @@ func friendlyPlanStepSummary(pl *plan.Plan) string {
 }
 
 func (p *Planner) buildStepExecutor(req PlanRequest) plan.ExecuteStepFunc {
+	contextAssembly := p.ensureContextAssembly()
 	executionRuntime := p.ensureExecutionRuntime()
 	modelRuntime := p.ensureModelRuntime()
 	runtimeStrategy := p.ensureRuntimeStrategy()
-	env := executionRuntime.BuildSkillEnvironment(req, modelRuntime, p.contextAssembly)
+	env := executionRuntime.BuildSkillEnvironment(req, modelRuntime, contextAssembly)
 	allowed := allowedSkillSet(req.AllowedSkills)
 	return func(ctx context.Context, pl *plan.Plan, stepIndex int) (string, []string, error) {
 		step := pl.Steps[stepIndex]

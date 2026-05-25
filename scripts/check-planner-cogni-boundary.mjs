@@ -1005,12 +1005,13 @@ for (const [relPath, label] of [
 
 const reactIntegration = read("internal/agentcore/planner/react_integration.go");
 for (const required of [
+  "contextAssembly := p.ensureContextAssembly()",
   "executionRuntime := p.ensureExecutionRuntime()",
   "learningSidecar := p.ensureLearningSidecar()",
   "modelRuntime := p.ensureModelRuntime()",
   "promptRuntime := p.ensurePromptRuntime()",
   "runtimeStrategy := p.ensureRuntimeStrategy()",
-  "env := executionRuntime.BuildSkillEnvironment(req, modelRuntime, p.contextAssembly)",
+  "env := executionRuntime.BuildSkillEnvironment(req, modelRuntime, contextAssembly)",
   "learningSidecar.ShouldEscalate(taskID)",
   "promptRuntime.PersonaPrompt()",
   "learningSidecar.CorrectionHint(req.TaskID)",
@@ -1024,6 +1025,9 @@ for (const required of [
 }
 if (reactIntegration.includes("p.learningSidecar")) {
   failures.push("internal/agentcore/planner/react_integration.go should not read raw p.learningSidecar; use a ReAct-local learning sidecar handle");
+}
+if (reactIntegration.includes("p.contextAssembly")) {
+  failures.push("internal/agentcore/planner/react_integration.go should not read raw p.contextAssembly; use a ReAct context local handle");
 }
 
 const promptFacade = read(promptRel);
@@ -1088,10 +1092,11 @@ if (templateDetect.includes("p.modelRuntime")) {
 
 const longHorizonRuntime = read(longHorizonRel);
 for (const required of [
+  "contextAssembly := p.ensureContextAssembly()",
   "executionRuntime := p.ensureExecutionRuntime()",
   "modelRuntime := p.ensureModelRuntime()",
   "runtimeStrategy := p.ensureRuntimeStrategy()",
-  "env := executionRuntime.BuildSkillEnvironment(req, modelRuntime, p.contextAssembly)",
+  "env := executionRuntime.BuildSkillEnvironment(req, modelRuntime, contextAssembly)",
   "runtimeStrategy.SelectLongHorizonReasoningTier(ctx, LongHorizonReasoningTierRequest{",
   "modelRuntime.ExecuteLongHorizonReasoningStep(ctx, req, selectedTier, prompt)",
 ]) {
@@ -1103,6 +1108,7 @@ for (const forbiddenRuntimeReach of [
   "p.ensureExecutionRuntime().",
   "p.ensureModelRuntime().ExecuteLongHorizonReasoningStep",
   "p.runtimeStrategy",
+  "p.contextAssembly",
 ]) {
   if (longHorizonRuntime.includes(forbiddenRuntimeReach)) {
     failures.push(`${longHorizonRel} repeatedly reaches Planner runtime factory/field ${JSON.stringify(forbiddenRuntimeReach)}; keep long-horizon-local runtime handles inside buildStepExecutor/executeReasoningStep`);
@@ -1133,6 +1139,7 @@ for (const forbiddenRuntimeReach of [
   "p.ensureModelRuntime().",
   "p.ensurePromptRuntime().",
   "p.runtimeStrategy",
+  "p.contextAssembly",
 ]) {
   if (reactIntegration.includes(forbiddenRuntimeReach)) {
     failures.push(`internal/agentcore/planner/react_integration.go repeatedly reaches Planner runtime factory/field ${JSON.stringify(forbiddenRuntimeReach)}; keep ReAct-local runtime handles inside runReAct`);
@@ -1211,6 +1218,7 @@ for (const needle of [
   "ReAct-local `learningSidecar` handle",
   "tool-free context trace local `contextAssembly` handle",
   "text-executor context local `contextAssembly` handle",
+  "ReAct and long-horizon skill environment construction",
   "planner_runtime_setters.go",
   "planner_runtime_facades.go",
   "planner_runtime_services.go",
@@ -1442,6 +1450,9 @@ for (const needle of [
   "第九十七批",
   "text-executor context local handle",
   "env := executionRuntime.BuildSkillEnvironment(req, modelRuntime, contextAssembly)",
+  "第九十八批",
+  "ReAct context local handle",
+  "long-horizon context local handle",
   "第五十五批",
   "partial-result fallback post-processing helper",
   "PartialPlanResultRequest",
