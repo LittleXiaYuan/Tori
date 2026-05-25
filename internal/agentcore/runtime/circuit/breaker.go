@@ -34,14 +34,14 @@ type LLMCallFunc func(ctx context.Context, system, user string) (string, error)
 
 // Breaker wraps an LLM call with circuit breaker pattern + automatic model fallback.
 type Breaker struct {
-	mu            sync.Mutex
-	state         State
-	failures      int
-	successes     int
-	lastFailure   time.Time
-	threshold     int           // failures before opening
-	recoveryTime  time.Duration // how long to stay open before half-open
-	halfOpenMax   int           // successes needed in half-open to close
+	mu           sync.Mutex
+	state        State
+	failures     int
+	successes    int
+	lastFailure  time.Time
+	threshold    int           // failures before opening
+	recoveryTime time.Duration // how long to stay open before half-open
+	halfOpenMax  int           // successes needed in half-open to close
 
 	primary       LLMCallFunc
 	fallbacks     []FallbackEntry

@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"yunque-agent/internal/experimental/circuit"
 	"yunque-agent/internal/agentcore/llm"
 	agentrt "yunque-agent/internal/agentcore/runtime"
+	"yunque-agent/internal/agentcore/runtime/circuit"
 	"yunque-agent/internal/appdir"
 	iledger "yunque-agent/internal/ledger"
 )
