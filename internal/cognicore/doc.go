@@ -11,6 +11,7 @@
 //   - curiosity: idle knowledge-gap and failure-review exploration,
 //   - world: tracked external state and action-impact prediction.
 //   - microagent: scoped prompt-enhancement snippets and registry.
+//   - metacog: real-time reasoning anomaly monitor and alert bridge.
 //
 // Packages that still live under internal/experimental are either true lab
 // work or compatibility adapters waiting for a canonical owner.

@@ -5,7 +5,7 @@ import path from "node:path";
 const root = process.cwd();
 const failures = [];
 
-const promotedPackages = ["trait", "recommend", "react", "taskdistill", "eval", "causal", "curiosity", "world", "microagent"];
+const promotedPackages = ["trait", "recommend", "react", "taskdistill", "eval", "causal", "curiosity", "world", "microagent", "metacog"];
 
 const allowedMainlineExperimentalImports = new Map([
   [
@@ -63,13 +63,6 @@ const allowedMainlineExperimentalImports = new Map([
         "internal/controlplane/gateway/gateway.go",
         "internal/controlplane/gateway/gateway_setters.go",
       ],
-    },
-  ],
-  [
-    "metacog",
-    {
-      reason: "metacognition bridge still uses this package until LearningSidecar/cognikernel ownership is completed",
-      files: ["cmd/agent/init_soul.go", "internal/ledger/metacog_bridge.go", "internal/ledger/metacog_bridge_test.go"],
     },
   ],
   [
@@ -204,11 +197,13 @@ for (const needle of [
   "internal/cognicore/curiosity",
   "internal/cognicore/world",
   "internal/cognicore/microagent",
+  "internal/cognicore/metacog",
   "internal/agentcore/runtime/circuit",
   "deterministic Bayesian success-rate",
   "post-task learning/evaluation",
   "soul-layer cognition modules",
   "scoped prompt-enhancement registry",
+  "real-time reasoning anomaly monitor",
   "LLM/runtime resilience infrastructure",
   "remaining `internal/experimental/*` packages",
 ]) {
@@ -225,6 +220,7 @@ for (const needle of [
   "taskdistill` / `eval",
   "causal` / `curiosity` / `world",
   "microagent",
+  "metacog",
   "internal/agentcore/runtime/circuit",
   "TestRecommendCandidatesDeterministicVisibleRanking",
   "Bayesian success-rate score",
@@ -290,5 +286,5 @@ if (failures.length > 0) {
 }
 
 console.log("Experimental boundary check passed.");
-console.log("Promoted packages are under internal/cognicore: trait, recommend, react, taskdistill, eval, causal, curiosity, world, microagent.");
+console.log("Promoted packages are under internal/cognicore: trait, recommend, react, taskdistill, eval, causal, curiosity, world, microagent, metacog.");
 console.log(`Remaining mainline experimental imports are explicitly allow-listed: ${actualMainlineImports.length}.`);
