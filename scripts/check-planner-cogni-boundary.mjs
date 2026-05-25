@@ -974,6 +974,30 @@ for (const forbidden of [
     failures.push(`${promptBuilderRel} leaks LocalBrain DTO ${JSON.stringify(forbidden)}; use runtime strategy DTOs instead`);
   }
 }
+for (const required of [
+  "contextAssembly := p.ensureContextAssembly()",
+  "proactiveCognition := p.ensureProactiveCognition()",
+  "skillRuntime := p.ensureSkillRuntime()",
+  "runtimeStrategy := p.ensureRuntimeStrategy()",
+  "contextAssembly: contextAssembly",
+  "proactiveCog:    proactiveCognition",
+  "skillRuntime:    skillRuntime",
+  "runtimeStrategy: runtimeStrategy",
+]) {
+  if (!promptBuilder.includes(required)) {
+    failures.push(`${promptBuilderRel} should construct PromptBuilder from local service handles ${JSON.stringify(required)}`);
+  }
+}
+for (const forbidden of [
+  "p.contextAssembly",
+  "p.proactiveCog",
+  "p.skillRuntime",
+  "p.runtimeStrategy",
+]) {
+  if (promptBuilder.includes(forbidden)) {
+    failures.push(`${promptBuilderRel} should not read raw Planner service field ${JSON.stringify(forbidden)}; use PromptBuilder-local service handles`);
+  }
+}
 
 for (const forbidden of [
   "func (s *RuntimeStrategyService) AgenticThinking()",
@@ -1220,6 +1244,7 @@ for (const needle of [
   "text-executor context local `contextAssembly` handle",
   "ReAct and long-horizon skill environment construction",
   "Native-FC execution should bind native-FC local service handles",
+  "PromptBuilder construction should bind local service handles",
   "planner_runtime_setters.go",
   "planner_runtime_facades.go",
   "planner_runtime_services.go",
@@ -1457,6 +1482,9 @@ for (const needle of [
   "第九十九批",
   "native-FC local service handles",
   "buildFunctionDefs` 显式接收 `contextAssembly` / `delegationRuntime` / `skillRuntime`",
+  "第一百批",
+  "PromptBuilder-local service handles",
+  "proactiveCognition := p.ensureProactiveCognition()",
   "第五十五批",
   "partial-result fallback post-processing helper",
   "PartialPlanResultRequest",

@@ -31,12 +31,17 @@ type PromptBuilder struct {
 
 // NewPromptBuilder creates a PromptBuilder from Planner's callbacks.
 func NewPromptBuilder(p *Planner) *PromptBuilder {
+	contextAssembly := p.ensureContextAssembly()
+	proactiveCognition := p.ensureProactiveCognition()
+	skillRuntime := p.ensureSkillRuntime()
+	runtimeStrategy := p.ensureRuntimeStrategy()
+
 	return &PromptBuilder{
-		contextAssembly: p.contextAssembly,
-		proactiveCog:    p.proactiveCog,
-		skillRuntime:    p.skillRuntime,
+		contextAssembly: contextAssembly,
+		proactiveCog:    proactiveCognition,
+		skillRuntime:    skillRuntime,
 		dynBudget:       p.dynamicContextBudget(),
-		runtimeStrategy: p.runtimeStrategy,
+		runtimeStrategy: runtimeStrategy,
 	}
 }
 
