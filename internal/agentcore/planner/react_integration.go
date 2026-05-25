@@ -259,8 +259,9 @@ func (p *Planner) buildToolsDescription(allowedSkills []string) string {
 
 // buildReActMessages constructs the LLM prompt for the next ReAct step.
 func (p *Planner) buildReActMessages(ctx context.Context, req PlanRequest, history []ldg.ReActStep, toolsDesc string) []llm.Message {
+	promptRuntime := p.ensurePromptRuntime()
 	sysPrompt := p.buildSystemPrompt()
-	if pp := p.ensurePromptRuntime().PersonaPrompt(); pp != "" {
+	if pp := promptRuntime.PersonaPrompt(); pp != "" {
 		sysPrompt += "\n\n" + pp
 	}
 
