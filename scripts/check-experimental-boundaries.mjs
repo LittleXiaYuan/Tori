@@ -5,7 +5,7 @@ import path from "node:path";
 const root = process.cwd();
 const failures = [];
 
-const promotedPackages = ["trait", "recommend", "react", "taskdistill", "eval", "causal", "curiosity", "world"];
+const promotedPackages = ["trait", "recommend", "react", "taskdistill", "eval", "causal", "curiosity", "world", "microagent"];
 
 const allowedMainlineExperimentalImports = new Map([
   [
@@ -77,13 +77,6 @@ const allowedMainlineExperimentalImports = new Map([
     {
       reason: "metacognition bridge still uses this package until LearningSidecar/cognikernel ownership is completed",
       files: ["cmd/agent/init_soul.go", "internal/ledger/metacog_bridge.go", "internal/ledger/metacog_bridge_test.go"],
-    },
-  ],
-  [
-    "microagent",
-    {
-      reason: "intelligence bootstrap module; canonical owner not decided",
-      files: ["cmd/agent/init_intelligence.go"],
     },
   ],
   [
@@ -210,9 +203,11 @@ for (const needle of [
   "internal/cognicore/causal",
   "internal/cognicore/curiosity",
   "internal/cognicore/world",
+  "internal/cognicore/microagent",
   "deterministic Bayesian success-rate",
   "post-task learning/evaluation",
   "soul-layer cognition modules",
+  "scoped prompt-enhancement registry",
   "remaining `internal/experimental/*` packages",
 ]) {
   if (!conceptMap.includes(needle)) {
@@ -227,6 +222,7 @@ for (const needle of [
   "trait` / `recommend` / `react",
   "taskdistill` / `eval",
   "causal` / `curiosity` / `world",
+  "microagent",
   "TestRecommendCandidatesDeterministicVisibleRanking",
   "Bayesian success-rate score",
 ]) {
@@ -291,5 +287,5 @@ if (failures.length > 0) {
 }
 
 console.log("Experimental boundary check passed.");
-console.log("Promoted packages are under internal/cognicore: trait, recommend, react, taskdistill, eval, causal, curiosity, world.");
+console.log("Promoted packages are under internal/cognicore: trait, recommend, react, taskdistill, eval, causal, curiosity, world, microagent.");
 console.log(`Remaining mainline experimental imports are explicitly allow-listed: ${actualMainlineImports.length}.`);
