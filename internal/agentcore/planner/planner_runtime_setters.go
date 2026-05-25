@@ -247,6 +247,15 @@ func (p *Planner) SetCogniTrace(fn CogniTraceFunc) {
 	contextAssembly.SetCogniTrace(fn)
 }
 
+// SetCogniRuntime attaches the declarative Cogni runtime boundary. Prefer this
+// over wiring the context/filter/trace callbacks separately: the runtime owns
+// declaration activation, context rendering, surface filtering, and trace
+// snapshot conversion while Planner stays an execution shell.
+func (p *Planner) SetCogniRuntime(runtime CogniRuntime) {
+	contextAssembly := p.ensureContextAssembly()
+	contextAssembly.SetCogniRuntime(runtime)
+}
+
 // SetToolTimeout sets the per-tool execution timeout. Default is 60s.
 func (p *Planner) SetToolTimeout(d time.Duration) {
 	executionRuntime := p.ensureExecutionRuntime()

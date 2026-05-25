@@ -564,6 +564,10 @@ for (const needle of [
   "type BeliefContextFunc func(ctx context.Context, message, tenantID, channel string) string",
   "type CogniSkillFilterFunc func(message, tenantID, channel string, in []skills.Skill) []skills.Skill",
   "type CogniTraceFunc func(message, tenantID, channel string) (CogniTraceDetail, bool)",
+  "type CogniRuntime interface",
+  "BuildContext(ctx context.Context, message, tenantID, channel string) string",
+  "FilterSkills(message, tenantID, channel string, in []skills.Skill) []skills.Skill",
+  "Trace(message, tenantID, channel string) (CogniTraceDetail, bool)",
   "type MemorySearchFunc func(ctx context.Context, tenantID, query string) string",
   "type ReflectFunc func(ctx context.Context, intent, reply string) bool",
   "const DynContextBudgetDefault = 0",
@@ -582,6 +586,7 @@ for (const forbidden of [
   "type BeliefContextFunc func",
   "type CogniSkillFilterFunc func",
   "type CogniTraceFunc func",
+  "type CogniRuntime interface",
   "type MemorySearchFunc func",
   "type ReflectFunc func",
   "const DynContextBudgetDefault",
@@ -608,6 +613,7 @@ for (const needle of [
   "func (p *Planner) SetAgenticThinking(at AgenticThinkerRuntime)",
   "func (p *Planner) SetProviderRegistry(reg *llm.ProviderRegistry)",
   "func (p *Planner) SetCogniTrace(fn CogniTraceFunc)",
+  "func (p *Planner) SetCogniRuntime(runtime CogniRuntime)",
   "func (p *Planner) SetToolTimeout(d time.Duration)",
 ]) {
   if (!plannerRuntimeSetters.includes(needle)) {
@@ -652,6 +658,7 @@ for (const required of [
   "contextAssembly.SetCogniContext(fn)",
   "contextAssembly.SetCogniSkillFilter(fn)",
   "contextAssembly.SetCogniTrace(fn)",
+  "contextAssembly.SetCogniRuntime(runtime)",
   "promptRuntime.SetPersonaPrompt(fn)",
   "executionRuntime.SetDynContextBudget(tokens)",
   "promptRuntime.SetDomainPrompt(prompt)",
@@ -1225,6 +1232,7 @@ for (const needle of [
   "func (s *ContextAssemblyService) ApplyCogniSkillFilter",
   "func (s *ContextAssemblyService) EmitCogniTrace",
   "func (s *ContextAssemblyService) EmitCogniTraceForRequest",
+  "func (s *ContextAssemblyService) SetCogniRuntime",
 ]) {
   if (!contextAssembly.includes(needle)) {
     failures.push(`${contextAssemblyRel} missing required Cogni boundary entrypoint ${JSON.stringify(needle)}`);
@@ -1240,6 +1248,31 @@ for (const removed of [
 ]) {
   if (contextAssembly.includes(removed) || read("internal/agentcore/planner/cogni_observability.go").includes(removed)) {
     failures.push(`removed Cogni boundary wrapper still exists: ${removed}`);
+  }
+}
+
+const cogniModuleRel = "cmd/agent/module_cogni.go";
+const cogniModule = read(cogniModuleRel);
+for (const needle of [
+  "type plannerCogniRuntime struct",
+  "func (r plannerCogniRuntime) BuildContext",
+  "func (r plannerCogniRuntime) FilterSkills",
+  "func (r plannerCogniRuntime) Trace",
+  "func plannerCogniTraceDetail(trace cogni.Trace) planner.CogniTraceDetail",
+  "app.Planner.SetCogniRuntime(plannerCogniRuntime{",
+]) {
+  if (!cogniModule.includes(needle)) {
+    failures.push(`${cogniModuleRel} missing Cogni runtime boundary wiring ${JSON.stringify(needle)}`);
+  }
+}
+
+for (const staleCallback of [
+  "app.Planner.SetCogniContext(func",
+  "app.Planner.SetCogniSkillFilter(func",
+  "app.Planner.SetCogniTrace(func",
+]) {
+  if (cogniModule.includes(staleCallback)) {
+    failures.push(`${cogniModuleRel} still wires split Cogni callbacks ${JSON.stringify(staleCallback)}; use Planner.SetCogniRuntime`);
   }
 }
 
@@ -1289,6 +1322,8 @@ for (const needle of [
   "Native-FC execution should bind native-FC local service handles",
   "PromptBuilder construction should bind local service handles",
   "Non-test Planner runtime/helper files should not read raw Planner runtime or service fields directly",
+  "CogniRuntime",
+  "SetCogniRuntime",
   "planner_runtime_setters.go",
   "planner_runtime_facades.go",
   "planner_runtime_services.go",
@@ -1326,6 +1361,7 @@ for (const needle of [
   "HasContextFilter",
   "ModelRuntimeService.FallbackChainForRequest",
   "rather than constructing dynamic context messages, reading raw graph callbacks from Planner, or reaching into `CogniContextService`",
+  "The Cogni declaration runtime should be injected through `CogniRuntime` / `Planner.SetCogniRuntime`",
 ]) {
   if (!conceptMap.includes(needle)) {
     failures.push(`doc/AGENTCORE-CONCEPT-MAP.md missing ${JSON.stringify(needle)}`);
@@ -1532,6 +1568,11 @@ for (const needle of [
   "第一百零一批",
   "禁止直接读取 raw Planner runtime/service fields",
   "当前扫描无输出",
+  "第一百零二批",
+  "Planner field count 为 16",
+  "第一百零三批",
+  "SetCogniRuntime",
+  "plannerCogniRuntime",
   "第五十五批",
   "partial-result fallback post-processing helper",
   "PartialPlanResultRequest",

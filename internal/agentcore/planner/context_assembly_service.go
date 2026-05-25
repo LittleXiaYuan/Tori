@@ -161,6 +161,12 @@ func (s *ContextAssemblyService) SetCogniTrace(fn CogniTraceFunc) {
 	}
 }
 
+func (s *ContextAssemblyService) SetCogniRuntime(runtime CogniRuntime) {
+	if s != nil {
+		s.ensureCogniService().SetRuntime(runtime)
+	}
+}
+
 func (s *ContextAssemblyService) CogniContext(ctx context.Context, message, tenantID, channel string) string {
 	if s == nil || s.cogniService == nil {
 		return ""
