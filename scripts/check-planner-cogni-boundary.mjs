@@ -713,8 +713,10 @@ if (plannerRuntimeServices.includes("p.ensureProactiveCognition().RecordExecutio
 const federation = read(federationRel);
 for (const required of [
   "func (p *Planner) SetFederationBridge(fb FederationBridge)",
+  "func (p *Planner) FederationBridgeRef() FederationBridge",
   "delegationRuntime := p.ensureDelegationRuntime()",
   "delegationRuntime.SetFederationBridge(fb)",
+  "return delegationRuntime.FederationBridge()",
 ]) {
   if (!federation.includes(required)) {
     failures.push(`${federationRel} should route federation bridge setter through a local delegation runtime handle ${JSON.stringify(required)}`);
@@ -722,6 +724,14 @@ for (const required of [
 }
 if (federation.includes("p.ensureDelegationRuntime().")) {
   failures.push(`${federationRel} should not chain p.ensureDelegationRuntime().*; keep federation setter behind a local delegation runtime handle`);
+}
+for (const forbidden of [
+  "p.delegationRuntime == nil",
+  "p.delegationRuntime.FederationBridge()",
+]) {
+  if (federation.includes(forbidden)) {
+    failures.push(`${federationRel} should not read raw delegationRuntime ${JSON.stringify(forbidden)}; use federation-local delegation runtime handles`);
+  }
 }
 
 const skillExec = read(skillExecRel);
@@ -1393,6 +1403,9 @@ for (const needle of [
   "第九十二批",
   "recommendation-local skill runtime handle",
   "skillRuntime.RankByRecommendation",
+  "第九十三批",
+  "FederationBridgeRef",
+  "federation-local delegation runtime handle",
   "第五十五批",
   "partial-result fallback post-processing helper",
   "PartialPlanResultRequest",
