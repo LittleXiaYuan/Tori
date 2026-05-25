@@ -21,20 +21,6 @@ const allowedMainlineExperimentalImports = new Map([
     },
   ],
   [
-    "docparse",
-    {
-      reason: "task skill surface; should move with extension/skill ownership cleanup",
-      files: ["cmd/agent/init_tasks.go"],
-    },
-  ],
-  [
-    "filegen",
-    {
-      reason: "task skill surface; should move with extension/skill ownership cleanup",
-      files: ["cmd/agent/init_tasks.go"],
-    },
-  ],
-  [
     "heartbeat",
     {
       reason: "session/heartbeat runtime module still exposed through bootstrap/gateway",
@@ -44,13 +30,6 @@ const allowedMainlineExperimentalImports = new Map([
         "internal/controlplane/gateway/gateway.go",
         "internal/controlplane/gateway/gateway_setters.go",
       ],
-    },
-  ],
-  [
-    "imagegen",
-    {
-      reason: "task skill surface; should move with extension/skill ownership cleanup",
-      files: ["cmd/agent/init_tasks.go"],
     },
   ],
   [
@@ -86,13 +65,6 @@ const allowedMainlineExperimentalImports = new Map([
         "internal/export/userdata/export.go",
         "internal/export/userdata/export_test.go",
       ],
-    },
-  ],
-  [
-    "research",
-    {
-      reason: "task skill surface; should move with extension/skill ownership cleanup",
-      files: ["cmd/agent/init_tasks.go"],
     },
   ],
   [
@@ -172,6 +144,14 @@ if (exists("internal/experimental/rlsched")) {
 if (!exists("internal/agentcore/tasksched/rlsched")) {
   failures.push("task scheduler policy missing from internal/agentcore/tasksched/rlsched");
 }
+for (const pkg of ["docparse", "filegen", "imagegen", "research"]) {
+  if (exists(`internal/experimental/${pkg}`)) {
+    failures.push(`task skill surface still exists under internal/experimental/${pkg}`);
+  }
+  if (!exists(`internal/agentcore/taskskills/${pkg}`)) {
+    failures.push(`task skill surface missing from internal/agentcore/taskskills/${pkg}`);
+  }
+}
 
 const cognicoreDoc = read("internal/cognicore/doc.go");
 for (const pkg of promotedPackages) {
@@ -195,6 +175,7 @@ for (const needle of [
   "internal/cognicore/metacog",
   "internal/agentcore/runtime/circuit",
   "internal/agentcore/tasksched/rlsched",
+  "internal/agentcore/taskskills",
   "deterministic Bayesian success-rate",
   "post-task learning/evaluation",
   "soul-layer cognition modules",
@@ -202,6 +183,7 @@ for (const needle of [
   "real-time reasoning anomaly monitor",
   "LLM/runtime resilience infrastructure",
   "task scheduling policy",
+  "task skill surface",
   "remaining `internal/experimental/*` packages",
 ]) {
   if (!conceptMap.includes(needle)) {
@@ -220,6 +202,8 @@ for (const needle of [
   "metacog",
   "internal/agentcore/runtime/circuit",
   "internal/agentcore/tasksched/rlsched",
+  "internal/agentcore/taskskills",
+  "task skill surface",
   "TestRecommendCandidatesDeterministicVisibleRanking",
   "Bayesian success-rate score",
 ]) {
@@ -285,4 +269,5 @@ if (failures.length > 0) {
 
 console.log("Experimental boundary check passed.");
 console.log("Promoted packages are under internal/cognicore: trait, recommend, react, taskdistill, eval, causal, curiosity, world, microagent, metacog.");
+console.log("Task skill surfaces are under internal/agentcore/taskskills: docparse, filegen, imagegen, research.");
 console.log(`Remaining mainline experimental imports are explicitly allow-listed: ${actualMainlineImports.length}.`);
