@@ -121,6 +121,13 @@ type PlanExecutionModeDecision struct {
 	CognitiveLoad CognitiveLoadAssessment
 }
 
+type LongHorizonReasoningTierRequest struct {
+	Request   PlanRequest
+	PlanID    string
+	Query     string
+	StepIndex int
+}
+
 // LocalBrainRuntime is the narrow runtime-strategy contract for LocalBrain.
 // Keeping the concrete *localbrain.LocalBrain behind this interface lets
 // Planner expose runtime wiring without importing the LocalBrain package.
@@ -384,6 +391,25 @@ func (s *RuntimeStrategyService) SelectExecutionMode(req PlanExecutionModeReques
 		decision.Mode = PlanExecutionNativeFC
 	}
 	return decision
+}
+
+func (s *RuntimeStrategyService) SelectLongHorizonReasoningTier(ctx context.Context, req LongHorizonReasoningTierRequest) string {
+	if req.Request.ModelOverride != "" {
+		return req.Request.ModelOverride
+	}
+	if s == nil {
+		return ""
+	}
+	thinkReq := RuntimeThinkRequest{
+		TaskID:    req.PlanID,
+		TenantID:  req.Request.TenantID,
+		Query:     req.Query,
+		StepIndex: req.StepIndex,
+	}
+	if tier, _, _ := s.SelectTierFromThinking(ctx, thinkReq); tier != "" {
+		return tier
+	}
+	return ""
 }
 
 func (s *RuntimeStrategyService) Think(ctx context.Context, req RuntimeThinkRequest) (*RuntimeThinkResult, error) {

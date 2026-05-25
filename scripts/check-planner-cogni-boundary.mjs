@@ -295,9 +295,11 @@ for (const needle of [
   "type PlanExecutionMode string",
   "type PlanExecutionModeRequest struct",
   "type PlanExecutionModeDecision struct",
+  "type LongHorizonReasoningTierRequest struct",
   "func (s *RuntimeStrategyService) Classify(ctx context.Context, query, tenantID string) (*RuntimeDecision, error)",
   "func (s *RuntimeStrategyService) ClassifyRequest(ctx context.Context, req PlanRequest, query string) (*RuntimeClassificationResult, error)",
   "func (s *RuntimeStrategyService) SelectExecutionMode(req PlanExecutionModeRequest) PlanExecutionModeDecision",
+  "func (s *RuntimeStrategyService) SelectLongHorizonReasoningTier(ctx context.Context, req LongHorizonReasoningTierRequest) string",
   "func fromLocalBrainDecision(decision *localbrain.Decision) *RuntimeDecision",
   "func (d *RuntimeDecision) IntentCategory() string",
   "func (d *RuntimeDecision) IntentComplexity() string",
@@ -320,9 +322,11 @@ for (const forbidden of [
   "[]llm.Message{",
   ".ChatForRequest(ctx, req, []llm.Message{",
   ".ChatForRequestTier(ctx, req,",
+  "RuntimeThinkRequest{",
+  ".SelectTierFromThinking(",
 ]) {
   if (longHorizonSource.includes(forbidden)) {
-    failures.push(`${longHorizonRel} leaks long-horizon model prompt/call detail ${JSON.stringify(forbidden)}; keep it in ${modelRuntimeTasksRel}`);
+    failures.push(`${longHorizonRel} leaks long-horizon model or strategy detail ${JSON.stringify(forbidden)}; keep model calls in ${modelRuntimeTasksRel} and tier selection in ${runtimeStrategyRel}`);
   }
 }
 
@@ -809,6 +813,8 @@ for (const needle of [
   "RuntimeThinkRequest",
   "RuntimeThinkStepSummary",
   "RuntimeThinkResult",
+  "LongHorizonReasoningTierRequest",
+  "SelectLongHorizonReasoningTier",
   "RuntimeIntent",
   "RuntimeDecision",
   "RuntimeClassificationResult",
@@ -1035,6 +1041,8 @@ for (const needle of [
   "RuntimeThinkRequest",
   "RuntimeThinkStepSummary",
   "RuntimeThinkResult",
+  "LongHorizonReasoningTierRequest",
+  "SelectLongHorizonReasoningTier",
   "scripts/check-planner-cogni-boundary.mjs",
 ]) {
   if (!taskLedger.includes(needle)) {

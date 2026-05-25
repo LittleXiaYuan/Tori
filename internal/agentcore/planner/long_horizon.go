@@ -255,12 +255,13 @@ func friendlyPlanStepSummary(pl *plan.Plan) string {
 
 func (p *Planner) buildStepExecutor(req PlanRequest) plan.ExecuteStepFunc {
 	modelRuntime := p.ensureModelRuntime()
+	runtimeStrategy := p.ensureRuntimeStrategy()
 	env := p.ensureExecutionRuntime().BuildSkillEnvironment(req, modelRuntime, p.contextAssembly)
 	allowed := allowedSkillSet(req.AllowedSkills)
 	return func(ctx context.Context, pl *plan.Plan, stepIndex int) (string, []string, error) {
 		step := pl.Steps[stepIndex]
 		if step.Skill == "" {
-			return p.executeReasoningStep(ctx, req, modelRuntime, pl, stepIndex)
+			return p.executeReasoningStep(ctx, req, modelRuntime, runtimeStrategy, pl, stepIndex)
 		}
 		if len(allowed) > 0 && !allowed[step.Skill] {
 			return "", []string{step.Skill}, fmt.Errorf("skill %q is not in the allowed tool surface", step.Skill)
@@ -314,7 +315,7 @@ func completedDependencyEvidence(pl *plan.Plan, step plan.PlanStep) string {
 	return b.String()
 }
 
-func (p *Planner) executeReasoningStep(ctx context.Context, req PlanRequest, modelRuntime *ModelRuntimeService, pl *plan.Plan, stepIndex int) (string, []string, error) {
+func (p *Planner) executeReasoningStep(ctx context.Context, req PlanRequest, modelRuntime *ModelRuntimeService, runtimeStrategy *RuntimeStrategyService, pl *plan.Plan, stepIndex int) (string, []string, error) {
 	step := pl.Steps[stepIndex]
 	prompt := step.Description
 	for _, dep := range step.DependsOn {
@@ -327,20 +328,12 @@ func (p *Planner) executeReasoningStep(ctx context.Context, req PlanRequest, mod
 		}
 	}
 
-	// AgenticThinking: 自适应选择模型层级
-	selectedTier := req.ModelOverride
-	if selectedTier == "" && p.runtimeStrategy != nil {
-		thinkReq := RuntimeThinkRequest{
-			TaskID:    pl.ID,
-			TenantID:  req.TenantID,
-			Query:     step.Description,
-			StepIndex: stepIndex,
-		}
-		if tier, _, _ := p.runtimeStrategy.SelectTierFromThinking(ctx, thinkReq); tier != "" {
-			selectedTier = tier
-		}
-	}
-
+	selectedTier := runtimeStrategy.SelectLongHorizonReasoningTier(ctx, LongHorizonReasoningTierRequest{
+		Request:   req,
+		PlanID:    pl.ID,
+		Query:     step.Description,
+		StepIndex: stepIndex,
+	})
 	reply, err := modelRuntime.ExecuteLongHorizonReasoningStep(ctx, req, selectedTier, prompt)
 	if err != nil {
 		return "", nil, err

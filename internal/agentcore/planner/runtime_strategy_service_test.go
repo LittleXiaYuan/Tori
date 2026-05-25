@@ -192,6 +192,55 @@ func TestRuntimeStrategyServiceSelectExecutionMode(t *testing.T) {
 	}
 }
 
+func TestRuntimeStrategyServiceSelectLongHorizonReasoningTier(t *testing.T) {
+	var nilService *RuntimeStrategyService
+	if got := nilService.SelectLongHorizonReasoningTier(context.Background(), LongHorizonReasoningTierRequest{
+		Request: PlanRequest{ModelOverride: "expert"},
+	}); got != "expert" {
+		t.Fatalf("model override should win even without runtime strategy, got %q", got)
+	}
+	if got := nilService.SelectLongHorizonReasoningTier(context.Background(), LongHorizonReasoningTierRequest{}); got != "" {
+		t.Fatalf("nil runtime strategy should select no tier, got %q", got)
+	}
+
+	service := NewRuntimeStrategyService()
+	if got := service.SelectLongHorizonReasoningTier(context.Background(), LongHorizonReasoningTierRequest{
+		Request: PlanRequest{TenantID: "tenant-1"},
+		PlanID:  "plan-1",
+		Query:   "reason about evidence",
+	}); got != "" {
+		t.Fatalf("runtime strategy without agentic thinking should select no tier, got %q", got)
+	}
+
+	thinker := &stubAgenticThinker{result: &localbrain.ThinkResult{Level: localbrain.ThinkDeep}}
+	service.SetAgenticThinking(thinker)
+	if got := service.SelectLongHorizonReasoningTier(context.Background(), LongHorizonReasoningTierRequest{
+		Request:   PlanRequest{TenantID: "tenant-1"},
+		PlanID:    "plan-1",
+		Query:     "reason about evidence",
+		StepIndex: 3,
+	}); got != "expert" {
+		t.Fatalf("expected deep thinking to select expert tier, got %q", got)
+	}
+	if len(thinker.calls) != 1 {
+		t.Fatalf("expected one thinking call, got %d", len(thinker.calls))
+	}
+	call := thinker.calls[0]
+	if call.TaskID != "plan-1" || call.TenantID != "tenant-1" || call.Query != "reason about evidence" || call.StepIndex != 3 {
+		t.Fatalf("unexpected thinking request: %#v", call)
+	}
+
+	if got := service.SelectLongHorizonReasoningTier(context.Background(), LongHorizonReasoningTierRequest{
+		Request: PlanRequest{ModelOverride: "fast"},
+		Query:   "override should bypass thinking",
+	}); got != "fast" {
+		t.Fatalf("model override should bypass agentic thinking, got %q", got)
+	}
+	if len(thinker.calls) != 1 {
+		t.Fatalf("override should not call agentic thinking, got %d calls", len(thinker.calls))
+	}
+}
+
 func TestRuntimeStrategyServiceSelectProviderByCapability(t *testing.T) {
 	reg := llm.NewProviderRegistry(llm.NewPool())
 	if err := reg.Register(llm.ProviderConfig{
@@ -237,4 +286,15 @@ func TestNilRuntimeStrategyServiceIsNoop(t *testing.T) {
 	if got := service.SelectProviderByCapability(llm.CapVision); got != nil {
 		t.Fatalf("nil service should select no provider, got %#v", got)
 	}
+}
+
+type stubAgenticThinker struct {
+	result *localbrain.ThinkResult
+	err    error
+	calls  []localbrain.ThinkRequest
+}
+
+func (s *stubAgenticThinker) Think(_ context.Context, req localbrain.ThinkRequest) (*localbrain.ThinkResult, error) {
+	s.calls = append(s.calls, req)
+	return s.result, s.err
 }

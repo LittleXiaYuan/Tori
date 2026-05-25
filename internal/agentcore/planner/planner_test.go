@@ -1160,7 +1160,7 @@ func TestLongHorizonDependencyPromptsHideRawCompletedDiagnostics(t *testing.T) {
 	} else {
 		t.Fatalf("expected friendly evidence in plan summary, got %q", got)
 	}
-	if _, _, err := p.executeReasoningStep(context.Background(), PlanRequest{}, p.ensureModelRuntime(), pl, 1); err != nil {
+	if _, _, err := p.executeReasoningStep(context.Background(), PlanRequest{}, p.ensureModelRuntime(), p.ensureRuntimeStrategy(), pl, 1); err != nil {
 		t.Fatalf("reasoning step: %v", err)
 	}
 	if _, _, err := p.buildStepExecutor(PlanRequest{})(context.Background(), pl, 2); err != nil {
