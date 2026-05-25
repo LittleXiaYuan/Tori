@@ -3,7 +3,7 @@ package planner
 import (
 	"testing"
 
-	"yunque-agent/internal/experimental/recommend"
+	"yunque-agent/internal/cognicore/recommend"
 	"yunque-agent/pkg/skills"
 )
 

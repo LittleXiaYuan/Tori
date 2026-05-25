@@ -15,7 +15,7 @@ import (
 	"yunque-agent/internal/agentcore/llm"
 	"yunque-agent/internal/agentcore/localbrain"
 	ageval "yunque-agent/internal/experimental/eval"
-	agreact "yunque-agent/internal/experimental/react"
+	agreact "yunque-agent/internal/cognicore/react"
 	"yunque-agent/internal/observe"
 )
 

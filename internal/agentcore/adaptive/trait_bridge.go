@@ -4,7 +4,7 @@ import (
 	"context"
 	"log/slog"
 
-	"yunque-agent/internal/experimental/trait"
+	"yunque-agent/internal/cognicore/trait"
 )
 
 // TraitBridge connects the trait mining system with the adaptive loop.
@@ -52,9 +52,9 @@ func (tb *TraitBridge) OnTraitMined(_ context.Context, t trait.Trait) {
 		return
 	}
 	tb.loop.RecordFeedback(Feedback{
-		Type:       FeedbackPreference,
-		Dimension:  dim,
-		Correction: t.Preference,
+		Type:        FeedbackPreference,
+		Dimension:   dim,
+		Correction:  t.Preference,
 		UserMessage: t.Source,
 	})
 }
