@@ -18,12 +18,17 @@ import (
 //   - Goal recitation inserted before last user message in multi-turn — keeps model focused
 //   - Errors preserved (append-only context) — model learns from failures
 func (p *Planner) BuildMessages(ctx context.Context, req PlanRequest) ([]llm.Message, []string) {
-	stablePrefix := p.ensurePromptRuntime().BuildStablePrefix(req.DisableDelegation, req.GroupSystemPrompt, p.buildSystemPrompt, p.buildSubagentSystemPrompt)
+	promptRuntime := p.ensurePromptRuntime()
+	contextAssembly := p.ensureContextAssembly()
+	contextWindowRuntime := p.ensureContextWindowRuntime()
+	modelRuntime := p.ensureModelRuntime()
+
+	stablePrefix := promptRuntime.BuildStablePrefix(req.DisableDelegation, req.GroupSystemPrompt, p.buildSystemPrompt, p.buildSubagentSystemPrompt)
 	msgs := []llm.Message{{Role: "system", Content: stablePrefix}}
 
 	var includedLayers []string
 	if len(req.Messages) > 0 {
-		msgs, includedLayers = p.ensureContextAssembly().AppendDynamicContextMessage(ctx, msgs, DynamicContextAssemblyRequest{
+		msgs, includedLayers = contextAssembly.AppendDynamicContextMessage(ctx, msgs, DynamicContextAssemblyRequest{
 			LastMessage: req.Messages[len(req.Messages)-1].Content,
 			TenantID:    req.TenantID,
 			Channel:     req.ChannelType,
@@ -32,7 +37,7 @@ func (p *Planner) BuildMessages(ctx context.Context, req PlanRequest) ([]llm.Mes
 		}, NewPromptBuilder(p))
 	}
 
-	msgs = append(msgs, p.ensurePromptRuntime().PrepareConversationMessages(req.Messages, time.Now())...)
-	msgs = p.ensureContextWindowRuntime().FitMessagesForRequest(ctx, msgs, p.ensureModelRuntime().ClientForRequest(req))
+	msgs = append(msgs, promptRuntime.PrepareConversationMessages(req.Messages, time.Now())...)
+	msgs = contextWindowRuntime.FitMessagesForRequest(ctx, msgs, modelRuntime.ClientForRequest(req))
 	return msgs, includedLayers
 }
