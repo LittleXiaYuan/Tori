@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"yunque-agent/internal/experimental/metacog"
+	"yunque-agent/internal/cognicore/metacog"
 	ldg "yunque-agent/internal/ledgercore"
 	lsqlite "yunque-agent/internal/ledgercore/backend/sqlite"
 )

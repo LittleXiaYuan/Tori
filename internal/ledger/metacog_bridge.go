@@ -7,7 +7,7 @@ import (
 	"strings"
 	"sync"
 
-	"yunque-agent/internal/experimental/metacog"
+	"yunque-agent/internal/cognicore/metacog"
 	ldg "yunque-agent/internal/ledgercore"
 )
 
