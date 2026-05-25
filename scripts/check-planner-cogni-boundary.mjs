@@ -346,14 +346,26 @@ for (const needle of [
 
 const runtimeStrategySelection = read(runtimeStrategySelectionRel);
 for (const needle of [
-  "func (p *Planner) executionMode(req PlanRequest) PlanExecutionModeDecision",
-  "assessCognitiveLoad(req)",
-  "plan.NeedsPlan(extractGoal(req))",
-  "SelectExecutionMode(modeReq)",
+	"func (p *Planner) executionMode(req PlanRequest) PlanExecutionModeDecision",
+	"promptRuntime := p.ensurePromptRuntime()",
+	"runtimeStrategy := p.ensureRuntimeStrategy()",
+	"assessCognitiveLoad(req)",
+	"plan.NeedsPlan(extractGoal(req))",
+	"NativeFC:             promptRuntime != nil && promptRuntime.NativeFC()",
+	"runtimeStrategy.SelectExecutionMode(modeReq)",
 ]) {
-  if (!runtimeStrategySelection.includes(needle)) {
-    failures.push(`${runtimeStrategySelectionRel} missing request-level execution-mode selection boundary ${JSON.stringify(needle)}`);
-  }
+	if (!runtimeStrategySelection.includes(needle)) {
+		failures.push(`${runtimeStrategySelectionRel} missing request-level execution-mode selection boundary ${JSON.stringify(needle)}`);
+	}
+}
+
+for (const forbidden of [
+	"p.promptRuntime",
+	"p.ensureRuntimeStrategy().SelectExecutionMode",
+]) {
+	if (runtimeStrategySelection.includes(forbidden)) {
+		failures.push(`${runtimeStrategySelectionRel} should use selection-local runtime handles instead of ${JSON.stringify(forbidden)}`);
+	}
 }
 
 const plannerSourceForMode = read("internal/agentcore/planner/planner.go");
@@ -1149,6 +1161,9 @@ for (const needle of [
   "第八十五批",
   "prompt.go",
   "prompt facade 本地句柄",
+  "第八十六批",
+  "runtime_strategy_selection.go",
+  "execution-mode selection 本地句柄",
   "第五十五批",
   "partial-result fallback post-processing helper",
   "PartialPlanResultRequest",
