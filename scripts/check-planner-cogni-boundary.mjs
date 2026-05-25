@@ -1219,6 +1219,7 @@ for (const needle of [
   "tool-free context trace local `contextAssembly` handle",
   "text-executor context local `contextAssembly` handle",
   "ReAct and long-horizon skill environment construction",
+  "Native-FC execution should bind native-FC local service handles",
   "planner_runtime_setters.go",
   "planner_runtime_facades.go",
   "planner_runtime_services.go",
@@ -1453,6 +1454,9 @@ for (const needle of [
   "第九十八批",
   "ReAct context local handle",
   "long-horizon context local handle",
+  "第九十九批",
+  "native-FC local service handles",
+  "buildFunctionDefs` 显式接收 `contextAssembly` / `delegationRuntime` / `skillRuntime`",
   "第五十五批",
   "partial-result fallback post-processing helper",
   "PartialPlanResultRequest",
@@ -1566,6 +1570,32 @@ for (const [relPath, label] of [
 }
 
 const textExecutor = read("internal/agentcore/planner/executor_text.go");
+const nativeFCExecutor = read("internal/agentcore/planner/executor_fc.go");
+for (const required of [
+  "contextAssembly := p.ensureContextAssembly()",
+  "delegationRuntime := p.ensureDelegationRuntime()",
+  "skillRuntime := p.ensureSkillRuntime()",
+  "env := executionRuntime.BuildSkillEnvironment(req, modelRuntime, contextAssembly)",
+  "p.buildFunctionDefs(userMsg, req.TenantID, req.ChannelType, req.DisableDelegation, req.AllowedSkills, contextAssembly, delegationRuntime, skillRuntime)",
+  "contextAssembly.EmitCogniTraceForRequest(req)",
+  "contextAssembly.ApplyCogniSkillFilter(userMessage, tenantID, channelType, allSkills)",
+  "delegationRuntime.HandoffToolDefinitions()",
+  "skillRuntime.ScorerWithRecent()",
+]) {
+  if (!nativeFCExecutor.includes(required)) {
+    failures.push(`internal/agentcore/planner/executor_fc.go should use native-FC local service handles ${JSON.stringify(required)}`);
+  }
+}
+for (const forbidden of [
+  "p.contextAssembly",
+  "p.delegationRuntime",
+  "p.skillRuntime",
+]) {
+  if (nativeFCExecutor.includes(forbidden)) {
+    failures.push(`internal/agentcore/planner/executor_fc.go should not read raw Planner service field ${JSON.stringify(forbidden)}; use native-FC local service handles`);
+  }
+}
+
 for (const required of [
   "contextAssembly := p.ensureContextAssembly()",
   "env := executionRuntime.BuildSkillEnvironment(req, modelRuntime, contextAssembly)",

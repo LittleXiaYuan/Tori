@@ -18,25 +18,24 @@ import (
 
 // runNativeFC uses native LLM function calling (tool_calls in API response).
 func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult, error) {
+	contextAssembly := p.ensureContextAssembly()
+	delegationRuntime := p.ensureDelegationRuntime()
 	executionRuntime := p.ensureExecutionRuntime()
 	modelRuntime := p.ensureModelRuntime()
 	promptRuntime := p.ensurePromptRuntime()
 	skillRuntime := p.ensureSkillRuntime()
 	runtimeStrategy := p.ensureRuntimeStrategy()
-	env := executionRuntime.BuildSkillEnvironment(req, modelRuntime, p.contextAssembly)
+	env := executionRuntime.BuildSkillEnvironment(req, modelRuntime, contextAssembly)
 
 	messages, ctxLayers := p.BuildMessages(ctx, req)
 	userMsg := extractUserMessage(req)
-	tools := p.buildFunctionDefs(userMsg, req.TenantID, req.ChannelType, req.DisableDelegation, req.AllowedSkills)
-	if p.contextAssembly != nil {
-		p.contextAssembly.EmitCogniTraceForRequest(req)
-	}
+	tools := p.buildFunctionDefs(userMsg, req.TenantID, req.ChannelType, req.DisableDelegation, req.AllowedSkills, contextAssembly, delegationRuntime, skillRuntime)
+	contextAssembly.EmitCogniTraceForRequest(req)
 
 	var usedSkills []string
 	var planSteps []PlanStep
 	steps := 0
 	lastRecoveryFailedCount := 0
-	delegationRuntime := p.ensureDelegationRuntime()
 	handoffHooks := delegationRuntime.HandoffHooks(p)
 	resultState := func() PlanResultExecutionState {
 		return executionRuntime.PlanResultStateForRequest(PlanResultStateRequest{
@@ -271,7 +270,7 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 // those names before any further filtering. This is driven by the Cherry
 // "tools" drawer: when a user explicitly checks a subset of skills, the
 // planner is expected to stay inside that subset.
-func (p *Planner) buildFunctionDefs(userMessage, tenantID, channelType string, disableDelegation bool, allowedSkills []string) []llm.FunctionDef {
+func (p *Planner) buildFunctionDefs(userMessage, tenantID, channelType string, disableDelegation bool, allowedSkills []string, contextAssembly *ContextAssemblyService, delegationRuntime *DelegationRuntimeService, skillRuntime *SkillRuntimeService) []llm.FunctionDef {
 	allSkills := p.registry.All()
 	if len(allowedSkills) > 0 {
 		allow := allowedSkillSet(allowedSkills)
@@ -304,8 +303,8 @@ func (p *Planner) buildFunctionDefs(userMessage, tenantID, channelType string, d
 	// Cogni surface filter — narrows the tool list to the union of every
 	// activated cogni's ToolSurface. The service returns input unchanged when
 	// no cogni activates, so previous behaviour is preserved.
-	if p.contextAssembly != nil && !disableDelegation && len(allowedSkills) == 0 {
-		allSkills = p.contextAssembly.ApplyCogniSkillFilter(userMessage, tenantID, channelType, allSkills)
+	if !disableDelegation && len(allowedSkills) == 0 {
+		allSkills = contextAssembly.ApplyCogniSkillFilter(userMessage, tenantID, channelType, allSkills)
 	}
 
 	cats := p.registry.Categories()
@@ -316,8 +315,8 @@ func (p *Planner) buildFunctionDefs(userMessage, tenantID, channelType string, d
 	}
 
 	// Delegation mode: planner only sees handoff tools + direct tools, exec agents handle the rest
-	if !disableDelegation && p.delegationRuntime.HasHandoffAgents(4) {
-		hdDefs := p.delegationRuntime.HandoffToolDefinitions()
+	if !disableDelegation && delegationRuntime.HasHandoffAgents(4) {
+		hdDefs := delegationRuntime.HandoffToolDefinitions()
 		defs := make([]llm.FunctionDef, 0, len(hdDefs)+2)
 		for _, hd := range hdDefs {
 			fn, _ := hd["function"].(map[string]any)
@@ -353,10 +352,7 @@ func (p *Planner) buildFunctionDefs(userMessage, tenantID, channelType string, d
 	// Strategy 1: Dynamic filtering by intent (threshold lowered from 25 to 10
 	// so intent-based narrowing kicks in earlier, reducing tool noise for LLMs)
 	if userMessage != "" && len(allSkills) > 10 && len(cats) > 0 && len(allowedSkills) == 0 {
-		var skillScorer *skills.SkillScorer
-		if p.skillRuntime != nil {
-			skillScorer = p.skillRuntime.ScorerWithRecent()
-		}
+		skillScorer := skillRuntime.ScorerWithRecent()
 		filtered := p.registry.FilterByIntentScored(userMessage, skillScorer)
 		if len(filtered) < len(allSkills) && len(filtered) > 0 {
 			filtered = p.rankSkillsByRecommendation(userMessage, filtered)
@@ -373,7 +369,7 @@ func (p *Planner) buildFunctionDefs(userMessage, tenantID, channelType string, d
 				})
 			}
 			if !disableDelegation {
-				for _, hd := range p.delegationRuntime.HandoffToolDefinitions() {
+				for _, hd := range delegationRuntime.HandoffToolDefinitions() {
 					fn, _ := hd["function"].(map[string]any)
 					if fn == nil {
 						continue
@@ -400,7 +396,7 @@ func (p *Planner) buildFunctionDefs(userMessage, tenantID, channelType string, d
 	}
 
 	if !disableDelegation {
-		for _, hd := range p.delegationRuntime.HandoffToolDefinitions() {
+		for _, hd := range delegationRuntime.HandoffToolDefinitions() {
 			fn, _ := hd["function"].(map[string]any)
 			if fn == nil {
 				continue
