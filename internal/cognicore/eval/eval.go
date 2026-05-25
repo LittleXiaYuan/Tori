@@ -8,7 +8,7 @@ import (
 
 	"yunque-agent/internal/ledgercore"
 
-	"yunque-agent/internal/experimental/taskdistill"
+	"yunque-agent/internal/cognicore/taskdistill"
 )
 
 // EvalResult is the structured output of a task self-evaluation.

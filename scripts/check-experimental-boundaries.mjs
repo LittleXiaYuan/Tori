@@ -5,7 +5,7 @@ import path from "node:path";
 const root = process.cwd();
 const failures = [];
 
-const promotedPackages = ["trait", "recommend", "react"];
+const promotedPackages = ["trait", "recommend", "react", "taskdistill", "eval"];
 
 const allowedMainlineExperimentalImports = new Map([
   [
@@ -46,13 +46,6 @@ const allowedMainlineExperimentalImports = new Map([
     {
       reason: "task skill surface; should move with extension/skill ownership cleanup",
       files: ["cmd/agent/init_tasks.go"],
-    },
-  ],
-  [
-    "eval",
-    {
-      reason: "ReAct evaluation adapter; should move with runtime strategy owner",
-      files: ["cmd/agent/init_soul.go", "internal/agentcore/planner/react_integration.go"],
     },
   ],
   [
@@ -162,13 +155,6 @@ const allowedMainlineExperimentalImports = new Map([
     },
   ],
   [
-    "taskdistill",
-    {
-      reason: "distillation helper still wired through eval/soul until distill owner is clarified",
-      files: ["cmd/agent/init_soul.go"],
-    },
-  ],
-  [
     "world",
     {
       reason: "world-model lab module still wired through init_soul; canonical owner not decided",
@@ -240,7 +226,10 @@ for (const needle of [
   "internal/cognicore/trait",
   "internal/cognicore/recommend",
   "internal/cognicore/react",
+  "internal/cognicore/taskdistill",
+  "internal/cognicore/eval",
   "deterministic Bayesian success-rate",
+  "post-task learning/evaluation",
   "remaining `internal/experimental/*` packages",
 ]) {
   if (!conceptMap.includes(needle)) {
@@ -253,6 +242,7 @@ for (const needle of [
   "scripts/check-experimental-boundaries.mjs",
   "internal/cognicore",
   "trait` / `recommend` / `react",
+  "taskdistill` / `eval",
   "TestRecommendCandidatesDeterministicVisibleRanking",
   "Bayesian success-rate score",
 ]) {
@@ -317,5 +307,5 @@ if (failures.length > 0) {
 }
 
 console.log("Experimental boundary check passed.");
-console.log("Promoted packages are under internal/cognicore: trait, recommend, react.");
+console.log("Promoted packages are under internal/cognicore: trait, recommend, react, taskdistill, eval.");
 console.log(`Remaining mainline experimental imports are explicitly allow-listed: ${actualMainlineImports.length}.`);
