@@ -51,6 +51,7 @@ const allowedCogniInternals = new Set([
 
 const modelRuntimeRel = "internal/agentcore/planner/model_runtime_service.go";
 const modelRuntimeTasksRel = "internal/agentcore/planner/model_runtime_tasks.go";
+const templateDetectRel = "internal/agentcore/planner/template_detect.go";
 const longHorizonRel = "internal/agentcore/planner/long_horizon.go";
 const longHorizonCheckpointRel = "internal/agentcore/planner/long_horizon_checkpoint.go";
 const runtimeStrategyRel = "internal/agentcore/planner/runtime_strategy_service.go";
@@ -810,6 +811,23 @@ for (const required of [
   }
 }
 
+const templateDetect = read(templateDetectRel);
+for (const required of [
+  "func (p *Planner) AnalyzeUploadedFile(ctx context.Context, filename, textSnippet string) (*UploadAnalysis, error)",
+  "modelRuntime := p.ensureModelRuntime()",
+  "modelRuntime.AnalyzeUploadedFile(ctx, filename, textSnippet)",
+]) {
+  if (!templateDetect.includes(required)) {
+    failures.push(`${templateDetectRel} should route upload analysis through a facade-local model runtime handle ${JSON.stringify(required)}`);
+  }
+}
+if (templateDetect.includes("p.ensureModelRuntime().AnalyzeUploadedFile")) {
+  failures.push(`${templateDetectRel} should not chain p.ensureModelRuntime().AnalyzeUploadedFile; keep a facade-local model runtime handle`);
+}
+if (templateDetect.includes("p.modelRuntime")) {
+  failures.push(`${templateDetectRel} should not read raw p.modelRuntime; validate through the facade-local model runtime handle`);
+}
+
 const longHorizonRuntime = read(longHorizonRel);
 for (const required of [
   "executionRuntime := p.ensureExecutionRuntime()",
@@ -1100,6 +1118,9 @@ for (const needle of [
   "第八十二批",
   "long_horizon_checkpoint.go",
   "checkpoint store runtime 本地句柄",
+  "第八十三批",
+  "template_detect.go",
+  "upload analysis facade 本地句柄",
   "第五十五批",
   "partial-result fallback post-processing helper",
   "PartialPlanResultRequest",
