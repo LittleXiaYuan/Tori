@@ -621,7 +621,8 @@ const runtimeClassificationApplication = read(runtimeClassificationApplicationRe
 for (const needle of [
   "type AppliedRuntimeClassification struct",
   "func (p *Planner) applyRuntimeClassification(ctx context.Context, req PlanRequest) AppliedRuntimeClassification",
-  "ClassifyRequest(ctx, req, extractGoal(req))",
+  "runtimeStrategy := p.ensureRuntimeStrategy()",
+  "runtimeStrategy.ClassifyRequest(ctx, req, extractGoal(req))",
   "classified.LogHandler",
   "classified.TraceHandler",
   "tracer.Decide(ctx, classified.TraceHandler, classified.TraceReason, classified.TraceScore, classified.TraceMeta)",
@@ -629,6 +630,9 @@ for (const needle of [
   if (!runtimeClassificationApplication.includes(needle)) {
     failures.push(`${runtimeClassificationApplicationRel} missing runtime classification application boundary ${JSON.stringify(needle)}`);
   }
+}
+if (runtimeClassificationApplication.includes("p.runtimeStrategy")) {
+  failures.push(`${runtimeClassificationApplicationRel} should use a runtime-local strategy handle instead of p.runtimeStrategy`);
 }
 
 const plannerSourceForClassification = read("internal/agentcore/planner/planner.go");
@@ -1027,6 +1031,9 @@ for (const needle of [
   "第七十八批",
   "tool_free_chat_runtime.go",
   "tool-free runtime 本地句柄",
+  "第七十九批",
+  "classification application",
+  "runtimeStrategy := p.ensureRuntimeStrategy()",
   "第五十五批",
   "partial-result fallback post-processing helper",
   "PartialPlanResultRequest",
