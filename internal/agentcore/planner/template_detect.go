@@ -19,10 +19,14 @@ type UploadAnalysis struct {
 
 // AnalyzeUploadedFile runs a small structured JSON task on a text snippet of the file.
 func (p *Planner) AnalyzeUploadedFile(ctx context.Context, filename, textSnippet string) (*UploadAnalysis, error) {
-	if p == nil || p.modelRuntime == nil || p.modelRuntime.DefaultClient() == nil {
+	if p == nil {
 		return nil, fmt.Errorf("planner or llm not configured")
 	}
-	return p.ensureModelRuntime().AnalyzeUploadedFile(ctx, filename, textSnippet)
+	modelRuntime := p.ensureModelRuntime()
+	if modelRuntime == nil || modelRuntime.DefaultClient() == nil {
+		return nil, fmt.Errorf("planner or llm not configured")
+	}
+	return modelRuntime.AnalyzeUploadedFile(ctx, filename, textSnippet)
 }
 
 // AnalysisToActions builds interactive actions for the upload response flow.
