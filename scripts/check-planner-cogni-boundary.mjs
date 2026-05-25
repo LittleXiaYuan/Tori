@@ -62,6 +62,7 @@ const runtimeRequestPipelineRel = "internal/agentcore/planner/runtime_request_pi
 const runtimeRequestMessagesRel = "internal/agentcore/planner/runtime_request_messages.go";
 const runtimeRequestContractsRel = "internal/agentcore/planner/runtime_request_contracts.go";
 const runtimeExtensionContractsRel = "internal/agentcore/planner/runtime_extension_contracts.go";
+const plannerExtRel = "internal/agentcore/planner/planner_ext.go";
 const plannerRuntimeSettersRel = "internal/agentcore/planner/planner_runtime_setters.go";
 const plannerRuntimeFacadesRel = "internal/agentcore/planner/planner_runtime_facades.go";
 const plannerRuntimeServicesRel = "internal/agentcore/planner/planner_runtime_services.go";
@@ -562,6 +563,59 @@ for (const needle of [
   }
 }
 
+for (const required of [
+  "promptRuntime := p.ensurePromptRuntime()",
+  "executionRuntime := p.ensureExecutionRuntime()",
+  "modelRuntime := p.ensureModelRuntime()",
+  "runtimeStrategy := p.ensureRuntimeStrategy()",
+  "promptRuntime.SetPersonaPrompt(fn)",
+  "executionRuntime.SetDynContextBudget(tokens)",
+  "promptRuntime.SetDomainPrompt(prompt)",
+  "promptRuntime.SetNativeFC(enabled)",
+  "promptRuntime.SetSkillIndex(fn)",
+  "modelRuntime.SetPool(pool)",
+  "runtimeStrategy.SetReActMode(enabled)",
+  "runtimeStrategy.SetLongHorizonMode(enabled)",
+  "runtimeStrategy.SetLocalBrain(lb)",
+  "runtimeStrategy.SetAgenticThinking(at)",
+  "runtimeStrategy.SetProviderRegistry(reg)",
+  "executionRuntime.SetToolTimeout(d)",
+]) {
+  if (!plannerRuntimeSetters.includes(required)) {
+    failures.push(`${plannerRuntimeSettersRel} should route runtime setter through a local runtime handle ${JSON.stringify(required)}`);
+  }
+}
+for (const forbidden of [
+  "p.ensureExecutionRuntime().",
+  "p.ensureModelRuntime().",
+  "p.ensurePromptRuntime().",
+  "p.ensureRuntimeStrategy().",
+]) {
+  if (plannerRuntimeSetters.includes(forbidden)) {
+    failures.push(`${plannerRuntimeSettersRel} should not chain ${JSON.stringify(forbidden)}; keep setter-local runtime handles`);
+  }
+}
+
+const plannerExt = read(plannerExtRel);
+for (const required of [
+  "executionRuntime := p.ensureExecutionRuntime()",
+  "executionRuntime.SetAckEnabled(enabled)",
+  "promptRuntime := p.ensurePromptRuntime()",
+  "promptRuntime.SetLocale(locale)",
+]) {
+  if (!plannerExt.includes(required)) {
+    failures.push(`${plannerExtRel} should route planner extension setter through a local runtime handle ${JSON.stringify(required)}`);
+  }
+}
+for (const forbidden of [
+  "p.ensureExecutionRuntime().",
+  "p.ensurePromptRuntime().",
+]) {
+  if (plannerExt.includes(forbidden)) {
+    failures.push(`${plannerExtRel} should not chain ${JSON.stringify(forbidden)}; keep extension-setter-local runtime handles`);
+  }
+}
+
 const plannerRuntimeFacades = read(plannerRuntimeFacadesRel);
 for (const needle of [
   "func (p *Planner) maxPlanSteps() int",
@@ -912,7 +966,9 @@ for (const forbiddenRuntimeReach of [
 const longHorizonCheckpoint = read(longHorizonCheckpointRel);
 for (const required of [
   "func (p *Planner) longHorizonCheckpointStore() LongHorizonCheckpointStore",
+  "func (p *Planner) SetLongHorizonCheckpointStore(store LongHorizonCheckpointStore)",
   "runtimeStrategy := p.ensureRuntimeStrategy()",
+  "runtimeStrategy.SetLongHorizonCheckpointStore(store)",
   "runtimeStrategy.LongHorizonCheckpointStore()",
 ]) {
   if (!longHorizonCheckpoint.includes(required)) {
@@ -921,6 +977,9 @@ for (const required of [
 }
 if (longHorizonCheckpoint.includes("p.runtimeStrategy")) {
   failures.push(`${longHorizonCheckpointRel} should not read raw p.runtimeStrategy; use a checkpoint-store-local runtime strategy handle`);
+}
+if (longHorizonCheckpoint.includes("p.ensureRuntimeStrategy().")) {
+  failures.push(`${longHorizonCheckpointRel} should not chain p.ensureRuntimeStrategy().*; keep checkpoint setter/store access behind local runtime strategy handles`);
 }
 
 for (const forbiddenRuntimeReach of [
@@ -997,12 +1056,14 @@ for (const needle of [
   "tool_free_chat_runtime.go",
   "runtime_request_contracts.go",
   "runtime_extension_contracts.go",
+  "planner_ext.go",
   "planner_runtime_setters.go",
   "planner_runtime_facades.go",
   "planner_runtime_services.go",
   "request DTO / callback / result-summary contracts",
   "extension/callback contracts",
   "runtime setter/facade split",
+  "setter-local runtime handles",
   "runtime service factory split",
   "ExecutionRuntimeService.ApplyToolFailureRecoveryForState",
   "tool-failure recovery state helper",
@@ -1192,6 +1253,10 @@ for (const needle of [
   "第八十七批",
   "planner_runtime_facades.go",
   "runtime facade 本地句柄",
+  "第八十八批",
+  "planner_runtime_setters.go",
+  "planner_ext.go",
+  "setter-local runtime handles",
   "第五十五批",
   "partial-result fallback post-processing helper",
   "PartialPlanResultRequest",
