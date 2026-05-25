@@ -394,9 +394,10 @@ const runtimeRequestPipeline = read(runtimeRequestPipelineRel);
 const runtimeRequestMessages = read(runtimeRequestMessagesRel);
 for (const needle of [
   "func (p *Planner) runToolFreeChat(ctx context.Context, req PlanRequest, errPrefix string, steps int) (*PlanResult, error)",
+  "contextAssembly := p.ensureContextAssembly()",
   "modelRuntime := p.ensureModelRuntime()",
   "runtimeStrategy := p.ensureRuntimeStrategy()",
-  "EmitCogniTraceForRequest(req)",
+  "contextAssembly.EmitCogniTraceForRequest(req)",
   "modelRuntime.ChatFallbackForRequest(ctx, req, messages, runtimeStrategy, p.modelFallbackEvents(req))",
   "extractNextMoves(cleaned)",
 ]) {
@@ -407,6 +408,7 @@ for (const needle of [
 
 for (const forbiddenRuntimeReach of [
   "p.ensureModelRuntime().",
+  "p.contextAssembly",
   "p.runtimeStrategy",
 ]) {
   if (toolFreeChatRuntime.includes(forbiddenRuntimeReach)) {
@@ -1207,6 +1209,7 @@ for (const needle of [
   "lifecycle-local `learningSidecar` handle",
   "AfterRun",
   "ReAct-local `learningSidecar` handle",
+  "tool-free context trace local `contextAssembly` handle",
   "planner_runtime_setters.go",
   "planner_runtime_facades.go",
   "planner_runtime_services.go",
@@ -1432,6 +1435,9 @@ for (const needle of [
   "ReAct-local learning sidecar handle",
   "learningSidecar.ShouldEscalate",
   "learningSidecar.CorrectionHint",
+  "第九十六批",
+  "tool-free context trace local handle",
+  "contextAssembly.EmitCogniTraceForRequest",
   "第五十五批",
   "partial-result fallback post-processing helper",
   "PartialPlanResultRequest",
