@@ -1004,17 +1004,24 @@ for (const [relPath, label] of [
 const reactIntegration = read("internal/agentcore/planner/react_integration.go");
 for (const required of [
   "executionRuntime := p.ensureExecutionRuntime()",
+  "learningSidecar := p.ensureLearningSidecar()",
   "modelRuntime := p.ensureModelRuntime()",
   "promptRuntime := p.ensurePromptRuntime()",
   "runtimeStrategy := p.ensureRuntimeStrategy()",
   "env := executionRuntime.BuildSkillEnvironment(req, modelRuntime, p.contextAssembly)",
+  "learningSidecar.ShouldEscalate(taskID)",
   "promptRuntime.PersonaPrompt()",
+  "learningSidecar.CorrectionHint(req.TaskID)",
   "runtimeStrategy.SelectTierFromThinking(ctx, thinkReq)",
+  "p.buildReActMessages(ctx, req, history, toolsDesc, learningSidecar)",
   "modelRuntime.ChatForRequestTier(ctx, req, selectedTier, messages, 0.7)",
 ]) {
   if (!reactIntegration.includes(required)) {
     failures.push(`internal/agentcore/planner/react_integration.go should route ReAct runtime helper ${required} through executor-local runtime handles`);
   }
+}
+if (reactIntegration.includes("p.learningSidecar")) {
+  failures.push("internal/agentcore/planner/react_integration.go should not read raw p.learningSidecar; use a ReAct-local learning sidecar handle");
 }
 
 const promptFacade = read(promptRel);
@@ -1199,6 +1206,7 @@ for (const needle of [
   "skill_recommendation.go",
   "lifecycle-local `learningSidecar` handle",
   "AfterRun",
+  "ReAct-local `learningSidecar` handle",
   "planner_runtime_setters.go",
   "planner_runtime_facades.go",
   "planner_runtime_services.go",
@@ -1420,6 +1428,10 @@ for (const needle of [
   "第九十四批",
   "lifecycle-local learning sidecar handle",
   "learningSidecar.AfterRun",
+  "第九十五批",
+  "ReAct-local learning sidecar handle",
+  "learningSidecar.ShouldEscalate",
+  "learningSidecar.CorrectionHint",
   "第五十五批",
   "partial-result fallback post-processing helper",
   "PartialPlanResultRequest",
