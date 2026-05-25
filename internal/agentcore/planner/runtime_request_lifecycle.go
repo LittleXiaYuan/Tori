@@ -14,9 +14,8 @@ func (p *Planner) Run(ctx context.Context, req PlanRequest) (*PlanResult, error)
 	result, err := p.runInner(ctx, req)
 	observe.EndSpan(span, err)
 
-	if p.learningSidecar != nil {
-		p.learningSidecar.AfterRun(ctx, req, result, err, p.reflect)
-	}
+	learningSidecar := p.ensureLearningSidecar()
+	learningSidecar.AfterRun(ctx, req, result, err, p.reflect)
 
 	return result, err
 }

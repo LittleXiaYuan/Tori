@@ -935,10 +935,19 @@ for (const needle of [
   "span.Attrs[\"mode\"] = string(p.executionMode(req).Mode)",
   "result, err := p.runInner(ctx, req)",
   "observe.EndSpan(span, err)",
-  "p.learningSidecar.AfterRun(ctx, req, result, err, p.reflect)",
+  "learningSidecar := p.ensureLearningSidecar()",
+  "learningSidecar.AfterRun(ctx, req, result, err, p.reflect)",
 ]) {
   if (!runtimeRequestLifecycle.includes(needle)) {
     failures.push(`${runtimeRequestLifecycleRel} missing request lifecycle token ${JSON.stringify(needle)}`);
+  }
+}
+for (const forbidden of [
+  "p.learningSidecar != nil",
+  "p.learningSidecar.AfterRun(",
+]) {
+  if (runtimeRequestLifecycle.includes(forbidden)) {
+    failures.push(`${runtimeRequestLifecycleRel} should not read raw p.learningSidecar ${JSON.stringify(forbidden)}; use lifecycle-local learning sidecar handle`);
   }
 }
 
@@ -1188,6 +1197,8 @@ for (const needle of [
   "federation.go",
   "skill_exec.go",
   "skill_recommendation.go",
+  "lifecycle-local `learningSidecar` handle",
+  "AfterRun",
   "planner_runtime_setters.go",
   "planner_runtime_facades.go",
   "planner_runtime_services.go",
@@ -1406,6 +1417,9 @@ for (const needle of [
   "第九十三批",
   "FederationBridgeRef",
   "federation-local delegation runtime handle",
+  "第九十四批",
+  "lifecycle-local learning sidecar handle",
+  "learningSidecar.AfterRun",
   "第五十五批",
   "partial-result fallback post-processing helper",
   "PartialPlanResultRequest",
