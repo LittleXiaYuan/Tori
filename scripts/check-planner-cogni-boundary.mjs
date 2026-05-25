@@ -765,6 +765,30 @@ for (const [relPath, label] of [
   }
 }
 
+const reactIntegration = read("internal/agentcore/planner/react_integration.go");
+for (const required of [
+  "executionRuntime := p.ensureExecutionRuntime()",
+  "modelRuntime := p.ensureModelRuntime()",
+  "runtimeStrategy := p.ensureRuntimeStrategy()",
+  "env := executionRuntime.BuildSkillEnvironment(req, modelRuntime, p.contextAssembly)",
+  "runtimeStrategy.SelectTierFromThinking(ctx, thinkReq)",
+  "modelRuntime.ChatForRequestTier(ctx, req, selectedTier, messages, 0.7)",
+]) {
+  if (!reactIntegration.includes(required)) {
+    failures.push(`internal/agentcore/planner/react_integration.go should route ReAct runtime helper ${required} through executor-local runtime handles`);
+  }
+}
+
+for (const forbiddenRuntimeReach of [
+  "p.ensureExecutionRuntime().",
+  "p.ensureModelRuntime().",
+  "p.runtimeStrategy",
+]) {
+  if (reactIntegration.includes(forbiddenRuntimeReach)) {
+    failures.push(`internal/agentcore/planner/react_integration.go repeatedly reaches Planner runtime factory/field ${JSON.stringify(forbiddenRuntimeReach)}; keep ReAct-local runtime handles inside runReAct`);
+  }
+}
+
 const contextAssembly = read(contextAssemblyRel);
 for (const needle of [
   "func (s *ContextAssemblyService) BuildDynamicContext",
@@ -986,6 +1010,9 @@ for (const needle of [
   "promptRuntime := p.ensurePromptRuntime()",
   "skillRuntime := p.ensureSkillRuntime()",
   "runtimeStrategy := p.ensureRuntimeStrategy()",
+  "第七十七批",
+  "ReAct 执行入口",
+  "ReAct 本地句柄",
   "第五十五批",
   "partial-result fallback post-processing helper",
   "PartialPlanResultRequest",
