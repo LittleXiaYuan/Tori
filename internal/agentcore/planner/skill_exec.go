@@ -46,6 +46,8 @@ func (p *Planner) resolveExecutableSkill(name string, args map[string]any) (skil
 }
 
 func (p *Planner) executeSkill(ctx context.Context, name string, args map[string]any, env *skills.Environment) (res skillExecutionResult) {
+	trustGate := p.ensureTrustGate()
+	proactiveCognition := p.ensureProactiveCognition()
 	if args == nil {
 		args = map[string]any{}
 	}
@@ -58,7 +60,7 @@ func (p *Planner) executeSkill(ctx context.Context, name string, args map[string
 		res.Err = fmt.Errorf("unknown skill: %s", name)
 		return res
 	}
-	if err := p.trustGate.Check(execName); err != nil {
+	if err := trustGate.Check(execName); err != nil {
 		res.Err = fmt.Errorf("blocked by trust gate: %w", err)
 		return res
 	}
@@ -72,8 +74,8 @@ func (p *Planner) executeSkill(ctx context.Context, name string, args map[string
 		if p.skillMetrics != nil {
 			p.skillMetrics(execName, res.Duration, res.Err)
 		}
-		p.proactiveCog.RecordExecutionFailure(res.Err != nil)
-		p.trustGate.Record(execName, res.Err == nil)
+		proactiveCognition.RecordExecutionFailure(res.Err != nil)
+		trustGate.Record(execName, res.Err == nil)
 	}()
 	res.Output, res.Err = skill.Execute(ctx, execArgs, env)
 	return res
