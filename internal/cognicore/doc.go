@@ -4,7 +4,9 @@
 // The first promoted modules are:
 //   - trait: durable learned preference dimensions,
 //   - recommend: runtime skill/style recommendation,
-//   - react: Ledger-backed ReAct / Plan-Execute-Reflect loops.
+//   - react: Ledger-backed ReAct / Plan-Execute-Reflect loops,
+//   - taskdistill: post-task experience distillation,
+//   - eval: task-quality evaluation and distillation trigger decisions.
 //
 // Packages that still live under internal/experimental are either true lab
 // work or compatibility adapters waiting for a canonical owner.
