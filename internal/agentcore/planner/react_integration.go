@@ -27,7 +27,10 @@ func (p *Planner) runReAct(ctx context.Context, req PlanRequest) (*PlanResult, e
 		return p.runNativeFC(ctx, req)
 	}
 
-	env := p.ensureExecutionRuntime().BuildSkillEnvironment(req, p.ensureModelRuntime(), p.contextAssembly)
+	executionRuntime := p.ensureExecutionRuntime()
+	modelRuntime := p.ensureModelRuntime()
+	runtimeStrategy := p.ensureRuntimeStrategy()
+	env := executionRuntime.BuildSkillEnvironment(req, modelRuntime, p.contextAssembly)
 	_, ctxLayers := p.BuildMessages(ctx, req)
 
 	taskID := req.TaskID
@@ -63,7 +66,7 @@ func (p *Planner) runReAct(ctx context.Context, req PlanRequest) (*PlanResult, e
 		}
 
 		// 第一阶段：Agentic Thinking 决定思考深度
-		if p.runtimeStrategy != nil && len(history) > 0 {
+		if runtimeStrategy != nil && len(history) > 0 {
 			lastObs := ""
 			if last := history[len(history)-1]; last.Result != nil {
 				if last.Result.Error != "" {
@@ -81,7 +84,7 @@ func (p *Planner) runReAct(ctx context.Context, req PlanRequest) (*PlanResult, e
 				StepIndex:        len(history),
 				StepHistory:      convertToStepSummary(history),
 			}
-			tier, stop, agResult := p.runtimeStrategy.SelectTierFromThinking(ctx, thinkReq)
+			tier, stop, agResult := runtimeStrategy.SelectTierFromThinking(ctx, thinkReq)
 			if stop && agResult != nil {
 				return &ldg.ThinkResult{
 					Thought:    agResult.Thought,
@@ -96,7 +99,7 @@ func (p *Planner) runReAct(ctx context.Context, req PlanRequest) (*PlanResult, e
 
 		// 第二阶段：用选定层级的 LLM 执行思考
 		messages := p.buildReActMessages(ctx, req, history, toolsDesc)
-		reply, err := p.ensureModelRuntime().ChatForRequestTier(ctx, req, selectedTier, messages, 0.7)
+		reply, err := modelRuntime.ChatForRequestTier(ctx, req, selectedTier, messages, 0.7)
 		if err != nil {
 			return nil, fmt.Errorf("LLM chat: %w", err)
 		}
