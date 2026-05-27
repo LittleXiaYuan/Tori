@@ -30,8 +30,8 @@ import (
 	"yunque-agent/internal/cognicore/taskdistill"
 	"yunque-agent/internal/cognicore/trait"
 	"yunque-agent/internal/cognicore/world"
-	"yunque-agent/internal/experimental/iterate"
-	"yunque-agent/internal/experimental/skillgrow"
+	"yunque-agent/internal/agentcore/selfheal/iterate"
+	"yunque-agent/internal/agentcore/skillgrowth/adapter"
 
 	"yunque-agent/internal/ledgercore"
 
@@ -314,7 +314,7 @@ func initSoulLayer(deps soulDeps) {
 	slog.Info("review: gate initialized")
 
 	// 12. SkillGrow
-	skillGrowDetector := skillgrow.NewDetector(3)
+	skillGrowDetector := adapter.NewDetector(3)
 	if typedLdg != nil {
 		skillGrowDetector.SetMemSearch(func(ctx context.Context, query string) (int, string) {
 			entries, _ := typedLdg.Memory.Search(ctx, ledger.MemoryQuery{

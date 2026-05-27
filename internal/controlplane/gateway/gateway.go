@@ -26,7 +26,7 @@ import (
 	"yunque-agent/internal/agentcore/tools"
 	"yunque-agent/internal/agentcore/trust"
 	"yunque-agent/internal/agentcore/workflow"
-	"yunque-agent/internal/experimental/skillgrow"
+	"yunque-agent/internal/agentcore/skillgrowth/adapter"
 
 	"yunque-agent/internal/agentcore/embeddings"
 	"yunque-agent/internal/agentcore/emotion"
@@ -71,7 +71,7 @@ import (
 	"yunque-agent/internal/execution/channel"
 	"yunque-agent/internal/execution/sandbox"
 	"yunque-agent/internal/execution/scheduler"
-	"yunque-agent/internal/experimental/iterate"
+	"yunque-agent/internal/agentcore/selfheal/iterate"
 	reflectpkg "yunque-agent/internal/experimental/reflect"
 	"yunque-agent/internal/integrations/mineru"
 	mcpserver "yunque-agent/internal/mcp/server"
@@ -146,7 +146,7 @@ type Gateway struct {
 	clawHub               *skillmarket.ClawHubProvider
 	toriHub               *skillmarket.ToriHubProvider
 	skillFileLoader       *skillmarket.SkillFileLoader
-	skillGrow             *skillgrow.Detector
+	skillGrow             *adapter.Detector
 	skillSuggester        *memory.SkillSuggester
 	suggestCounter        atomic.Int64
 	pendingSuggestions    map[string][]memory.SkillSuggestion

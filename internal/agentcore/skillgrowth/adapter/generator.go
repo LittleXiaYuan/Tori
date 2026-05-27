@@ -1,4 +1,4 @@
-package skillgrow
+package adapter
 
 import (
 	"context"

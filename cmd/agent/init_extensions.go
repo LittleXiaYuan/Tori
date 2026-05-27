@@ -13,8 +13,8 @@ import (
 	"yunque-agent/internal/agentcore/llm/distill"
 	"yunque-agent/internal/agentcore/review"
 	agentrt "yunque-agent/internal/agentcore/runtime"
-	"yunque-agent/internal/experimental/iterate"
-	"yunque-agent/internal/experimental/skillgrow"
+	"yunque-agent/internal/agentcore/selfheal/iterate"
+	"yunque-agent/internal/agentcore/skillgrowth/adapter"
 	"yunque-agent/internal/agentcore/speech"
 	"yunque-agent/internal/agentcore/trust"
 	"yunque-agent/internal/agentcore/websearch"
@@ -88,7 +88,7 @@ func initExtensions(app *agentrt.App) error {
 			growthThreshold = n
 		}
 	}
-	skillGrowDetector := skillgrow.NewDetector(growthThreshold)
+	skillGrowDetector := adapter.NewDetector(growthThreshold)
 	if app.Orchestrator != nil {
 		skillGrowDetector.SetMemSearch(func(ctx context.Context, query string) (int, string) {
 			compiled := app.Orchestrator.CompileContext(ctx, "system", query)

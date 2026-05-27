@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+
+# Git commit-msg hook
+# Validates commit message format according to Conventional Commits
+#
+# To enable this hook:
+#   git config core.hooksPath .githooks
+#
+# Or copy to .git/hooks/commit-msg:
+#   cp .githooks/commit-msg .git/hooks/commit-msg
+#   chmod +x .git/hooks/commit-msg
+
+commit_msg_file=$1
+commit_msg=$(cat "$commit_msg_file")
+
+# Colors
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Skip merge commits
+if echo "$commit_msg" | grep -qE "^Merge (branch|remote-tracking branch)"; then
+    exit 0
+fi
+
+# Skip revert commits
+if echo "$commit_msg" | grep -qE "^Revert "; then
+    exit 0
+fi
+
+# Valid commit types
+valid_types="feat|fix|refactor|perf|test|docs|style|chore"
+
+# Check format: type(scope): subject
+if ! echo "$commit_msg" | grep -qE "^($valid_types)(\(.+\))?!?: .+"; then
+    echo -e "${RED}✗ Invalid commit message format${NC}"
+    echo ""
+    echo "Expected format:"
+    echo -e "  ${BLUE}<type>${NC}(${BLUE}<scope>${NC}): ${BLUE}<subject>${NC}"
+    echo ""
+    echo "Valid types:"
+    echo -e "  ${GREEN}feat${NC}     - New feature"
+    echo -e "  ${GREEN}fix${NC}      - Bug fix"
+    echo -e "  ${GREEN}refactor${NC} - Code refactoring"
+    echo -e "  ${GREEN}perf${NC}     - Performance improvement"
+    echo -e "  ${GREEN}test${NC}     - Tests"
+    echo -e "  ${GREEN}docs${NC}     - Documentation"
+    echo -e "  ${GREEN}style${NC}    - Code style/formatting"
+    echo -e "  ${GREEN}chore${NC}    - Maintenance"
+    echo ""
+    echo "Examples:"
+    echo -e "  ${GREEN}feat(cogni): add reflective learning loop${NC}"
+    echo -e "  ${GREEN}fix(planner): prevent nil pointer in context assembly${NC}"
+    echo -e "  ${GREEN}refactor(planner): extract runtime boundary interface${NC}"
+    echo ""
+    echo "See docs/COMMIT-CONVENTIONS.md for full guide"
+    exit 1
+fi
+
+# Extract type and subject
+type=$(echo "$commit_msg" | sed -E 's/^([a-z]+)(\(.+\))?!?: .+/\1/')
+subject=$(echo "$commit_msg" | sed -E 's/^[a-z]+(\(.+\))?!?: (.+)/\2/')
+
+# Check subject length
+subject_length=${#subject}
+if [ $subject_length -gt 72 ]; then
+    echo -e "${YELLOW}⚠ Warning: Subject line is ${subject_length} characters (recommended: ≤72)${NC}"
+    echo "Consider shortening: $subject"
+    echo ""
+fi
+
+# Check for capital letter at start
+if echo "$subject" | grep -qE "^[A-Z]"; then
+    echo -e "${YELLOW}⚠ Warning: Subject should not start with a capital letter${NC}"
+    echo "Current: $subject"
+    echo ""
+fi
+
+# Check for period at end
+if echo "$subject" | grep -qE "\.$"; then
+    echo -e "${YELLOW}⚠ Warning: Subject should not end with a period${NC}"
+    echo "Current: $subject"
+    echo ""
+fi
+
+# Heuristic checks for potential misclassification
+case "$type" in
+    feat)
+        if echo "$subject" | grep -qiE "\b(extract|consolidate|rename|reorganize|restructure|use local|move to|promote)\b"; then
+            echo -e "${YELLOW}⚠ Warning: This might be a 'refactor' instead of 'feat'${NC}"
+            echo "Subject: $subject"
+            echo "Reason: Suggests code restructuring without new functionality"
+            echo ""
+        fi
+        ;;
+    fix)
+        if echo "$subject" | grep -qiE "\b(add|implement|introduce|create)\b" && \
+           ! echo "$subject" | grep -qiE "\b(fix|correct|resolve|bug|error|crash)\b"; then
+            echo -e "${YELLOW}⚠ Warning: This might be a 'feat' instead of 'fix'${NC}"
+            echo "Subject: $subject"
+            echo "Reason: Suggests adding new functionality, not fixing a bug"
+            echo ""
+        fi
+        ;;
+esac
+
+# Success
+echo -e "${GREEN}✓ Commit message format is valid${NC}"
+exit 0
