@@ -159,6 +159,66 @@ func (rl *ReflectiveLoop) Run(ctx context.Context, data ConversationEndData) (*R
 	return result, nil
 }
 
+// IngestFeedback feeds an already-structured feedback signal into the
+// canonical reflective loop. This is the entrypoint for user/product feedback
+// that should become immediately reusable experience (for example workload
+// findability feedback) without going through conversation quality evaluation.
+func (rl *ReflectiveLoop) IngestFeedback(ctx context.Context, data FeedbackData) (*ReflectResult, error) {
+	result := &ReflectResult{}
+	if rl.experienceFn == nil {
+		return result, nil
+	}
+
+	source := firstNonEmpty(data.Source, "feedback")
+	category := firstNonEmpty(data.Category, "feedback")
+	outcome := normalizeFeedbackOutcome(data.Outcome)
+	lesson := data.Lesson
+	if lesson == "" {
+		return result, nil
+	}
+
+	tags := append([]string{}, data.Tags...)
+	tags = append(tags, "source:"+source, "category:"+category, "outcome:"+outcome)
+	if data.SourceID != "" {
+		tags = append(tags, "source_id:"+data.SourceID)
+	}
+	if data.TenantID != "" {
+		tags = append(tags, "tenant:"+data.TenantID)
+	}
+
+	rl.experienceFn(source, category, outcome, lesson, data.Context, tags)
+	result.ExperiencesAdded = 1
+	switch outcome {
+	case "success":
+		result.Satisfied = true
+		result.Quality = 8
+	case "failure":
+		result.Satisfied = false
+		result.Quality = 3
+	default:
+		result.Satisfied = false
+		result.Quality = 6
+	}
+	result.Score = float64(result.Quality) / 10.0
+	return result, nil
+}
+
+func firstNonEmpty(value, fallback string) string {
+	if value != "" {
+		return value
+	}
+	return fallback
+}
+
+func normalizeFeedbackOutcome(outcome string) string {
+	switch outcome {
+	case "success", "failure", "partial":
+		return outcome
+	default:
+		return "partial"
+	}
+}
+
 func buildExperienceTags(data ConversationEndData, result *ReflectResult) []string {
 	tags := append([]string{}, data.SkillsUsed...)
 	tags = append(tags,

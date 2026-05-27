@@ -9,6 +9,7 @@ import {
   getWorkloadPresetById,
   parseWorkloadFeedbackEntries,
   serializeWorkloadFeedbackEntries,
+  workloadFeedbackEntryToExperience,
   WORKLOAD_PRESETS,
 } from "../workload-presets";
 
@@ -70,4 +71,23 @@ describe("workload presets", () => {
     expect(hasWorkloadFeedbackContent({ ...emptyWorkloadFeedbackDraft(), foundIn30Seconds: "no" })).toBe(true);
     expect(hasWorkloadFeedbackContent({ ...emptyWorkloadFeedbackDraft(), friction: "入口藏太深" })).toBe(true);
   });
+});
+
+it("maps workload feedback into reflection experience payloads", () => {
+  const entry = createWorkloadFeedbackEntry(WORKLOAD_PRESETS[0], {
+    triedScenario: "复盘一次浏览器回放",
+    mostUseful: "意图计划入口清楚",
+    friction: "反馈保存后换设备看不到",
+    nextStepToRemove: "不再手动复制",
+    foundIn30Seconds: "partial",
+  }, "2026-05-23T00:00:00.000Z");
+  const exp = workloadFeedbackEntryToExperience(entry);
+
+  expect(exp.source).toBe("workload_feedback");
+  expect(exp.category).toBe("workload_feedback");
+  expect(exp.outcome).toBe("partial");
+  expect(exp.source_id).toBe("browser-rpa");
+  expect(String(exp.lesson)).toContain("反馈保存后换设备看不到");
+  expect(exp.tags).toContain("workload:browser-rpa");
+  expect(exp.tags).toContain("capability:browser.intent.plan");
 });

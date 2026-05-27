@@ -154,6 +154,55 @@ func TestReflectiveLoop_LowQuality_NoDistill(t *testing.T) {
 	}
 }
 
+func TestReflectiveLoop_IngestFeedbackRecordsStructuredExperience(t *testing.T) {
+	rl := NewReflectiveLoop()
+
+	var recorded struct {
+		source   string
+		category string
+		outcome  string
+		lesson   string
+		context  string
+		tags     []string
+	}
+	rl.SetExperienceRecord(func(source, category, outcome, lesson, ctx string, tags []string) {
+		recorded.source = source
+		recorded.category = category
+		recorded.outcome = outcome
+		recorded.lesson = lesson
+		recorded.context = ctx
+		recorded.tags = tags
+	})
+
+	result, err := rl.IngestFeedback(context.Background(), FeedbackData{
+		TenantID: "default",
+		Source:   "workload_feedback",
+		SourceID: "browser-rpa",
+		Category: "workload_feedback",
+		Outcome:  "success",
+		Lesson:   "工作负载【浏览器 / RPA】体验反馈：入口 30 秒内可找到，最顺手是录制回放",
+		Context:  "能力范围：browser.intent.plan, rpa.replay.dry_run",
+		Tags:     []string{"workload:browser-rpa", "findability:yes"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.ExperiencesAdded != 1 || !result.Satisfied || result.Quality != 8 {
+		t.Fatalf("unexpected feedback result: %+v", result)
+	}
+	if recorded.source != "workload_feedback" || recorded.category != "workload_feedback" || recorded.outcome != "success" {
+		t.Fatalf("unexpected recorded feedback metadata: %+v", recorded)
+	}
+	if !strings.Contains(recorded.lesson, "浏览器 / RPA") || !strings.Contains(recorded.context, "browser.intent.plan") {
+		t.Fatalf("feedback detail was not preserved: %+v", recorded)
+	}
+	for _, want := range []string{"workload:browser-rpa", "source:workload_feedback", "category:workload_feedback", "outcome:success", "source_id:browser-rpa", "tenant:default"} {
+		if !containsString(recorded.tags, want) {
+			t.Fatalf("tags %v missing %q", recorded.tags, want)
+		}
+	}
+}
+
 func TestReflectiveLoop_SkipsExperienceWhenEvaluationUnavailable(t *testing.T) {
 	tests := []struct {
 		name string

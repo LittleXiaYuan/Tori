@@ -4,8 +4,6 @@ import (
 	"context"
 	"testing"
 	"time"
-
-	"yunque-agent/pkg/skills"
 )
 
 func TestRuntimeExtensionContracts(t *testing.T) {
@@ -35,16 +33,6 @@ func TestRuntimeExtensionContracts(t *testing.T) {
 	})
 	if got := memory(context.Background(), "tenant", "query"); got != "memory" {
 		t.Fatalf("unexpected memory result: %q", got)
-	}
-
-	filter := CogniSkillFilterFunc(func(message, tenantID, channel string, in []skills.Skill) []skills.Skill {
-		if message != "msg" || tenantID != "tenant" || channel != "chat" {
-			t.Fatalf("unexpected filter input: %q %q %q", message, tenantID, channel)
-		}
-		return in
-	})
-	if out := filter("msg", "tenant", "chat", nil); out != nil {
-		t.Fatalf("expected nil skill slice to round-trip, got %#v", out)
 	}
 
 	if DynContextBudgetDefault != 0 {

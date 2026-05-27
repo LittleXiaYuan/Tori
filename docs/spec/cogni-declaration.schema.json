@@ -1,0 +1,267 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://yunque.ai/schemas/cogni-declaration.schema.json",
+  "title": "Yunque Cogni Declaration",
+  "description": "Language-neutral schema for a Yunque Cogni declaration. Mirrors the public JSON/YAML shape of pkg/cogni.Declaration.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+      "description": "Stable Cogni identifier. Used by registry, traces, bundles, APIs, and SDKs."
+    },
+    "display_name": {
+      "type": "string",
+      "description": "User-facing label."
+    },
+    "description": {
+      "type": "string",
+      "description": "Short summary of what this Cogni activates for."
+    },
+    "capsule": {
+      "type": "string",
+      "description": "Capsule ID this Cogni binds to. Empty or omitted means free-standing."
+    },
+    "activation": {
+      "$ref": "#/$defs/activationRules"
+    },
+    "surface": {
+      "$ref": "#/$defs/toolSurface"
+    },
+    "context": {
+      "$ref": "#/$defs/contextInjection"
+    },
+    "mcp": {
+      "$ref": "#/$defs/mcpConfig"
+    },
+    "workflows": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/workflowDef" }
+    },
+    "experience": {
+      "$ref": "#/$defs/experienceConfig"
+    },
+    "economics": {
+      "$ref": "#/$defs/economicsConfig"
+    },
+    "memory": {
+      "$ref": "#/$defs/memoryPolicy"
+    },
+    "priority": {
+      "type": "integer",
+      "description": "Tie-break priority when multiple Cognis activate. Lower number means higher priority. Default runtime value is 100."
+    },
+    "exclusive": {
+      "type": "string",
+      "description": "Exclusive group. When set, only the best matching Cogni in the same group should remain active."
+    },
+    "checks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/activationCheck" },
+      "description": "Declaration self-tests used by verification/reload gates."
+    }
+  },
+  "$defs": {
+    "stringArray": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "stringMap": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "jsonObject": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "score01": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "nonNegativeNumber": {
+      "type": "number",
+      "minimum": 0
+    },
+    "nonNegativeInteger": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "activationRules": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "min_score": { "$ref": "#/$defs/score01" },
+        "keywords": { "$ref": "#/$defs/stringArray" },
+        "keyword_weight": { "$ref": "#/$defs/nonNegativeNumber" },
+        "regex": { "$ref": "#/$defs/stringArray" },
+        "regex_weight": { "$ref": "#/$defs/nonNegativeNumber" },
+        "channels": { "$ref": "#/$defs/stringArray" },
+        "tenants": { "$ref": "#/$defs/stringArray" },
+        "always_on": { "type": "boolean" },
+        "handover_on": { "$ref": "#/$defs/stringArray" },
+        "perception": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/perceptionRule" }
+        }
+      }
+    },
+    "perceptionRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["semantic", "context_chain", "file_watcher", "schedule", "webhook"],
+          "description": "Runtime perception signal type. Unknown types are ignored by the current evaluator and should be avoided in portable declarations."
+        },
+        "threshold": { "$ref": "#/$defs/score01" },
+        "window": { "$ref": "#/$defs/nonNegativeInteger" },
+        "topics": { "$ref": "#/$defs/stringArray" },
+        "patterns": { "$ref": "#/$defs/stringArray" },
+        "events": { "$ref": "#/$defs/stringArray" },
+        "cron": { "type": "string" },
+        "path": { "type": "string" },
+        "weight": { "$ref": "#/$defs/nonNegativeNumber" }
+      }
+    },
+    "toolSurface": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "only": { "$ref": "#/$defs/stringArray" },
+        "include": { "$ref": "#/$defs/stringArray" },
+        "exclude": { "$ref": "#/$defs/stringArray" },
+        "from_capsules": { "$ref": "#/$defs/stringArray" },
+        "max_tools": { "$ref": "#/$defs/nonNegativeInteger" }
+      }
+    },
+    "contextInjection": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "static": { "type": "string" },
+        "memory_query": { "type": "string" },
+        "memory_top_k": { "$ref": "#/$defs/nonNegativeInteger" },
+        "template": { "type": "string" }
+      }
+    },
+    "memoryPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "drop_all": { "type": "boolean" },
+        "drop_keys": { "$ref": "#/$defs/stringArray" },
+        "tag_all": { "$ref": "#/$defs/stringMap" },
+        "namespace": { "type": "string" }
+      }
+    },
+    "mcpConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "servers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/mcpServerDef" }
+        },
+        "tool_filter": { "$ref": "#/$defs/mcpToolFilter" }
+      }
+    },
+    "mcpServerDef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "transport": { "type": "string", "enum": ["stdio", "sse", "streamable_http"] },
+        "command": { "type": "string" },
+        "args": { "$ref": "#/$defs/stringArray" },
+        "url": { "type": "string" },
+        "env": { "$ref": "#/$defs/stringMap" },
+        "headers": { "$ref": "#/$defs/stringMap" },
+        "timeout": { "$ref": "#/$defs/nonNegativeInteger" }
+      }
+    },
+    "mcpToolFilter": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "include": { "$ref": "#/$defs/stringArray" },
+        "exclude": { "$ref": "#/$defs/stringArray" }
+      }
+    },
+    "workflowDef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "steps"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "steps": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/workflowStep" }
+        }
+      }
+    },
+    "workflowStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["skill"],
+      "properties": {
+        "name": { "type": "string" },
+        "skill": { "type": "string", "minLength": 1 },
+        "args": { "$ref": "#/$defs/jsonObject" },
+        "output": { "type": "string" },
+        "condition": { "type": "string" },
+        "timeout": { "type": "string" },
+        "on_error": { "type": "string", "enum": ["continue", "abort"] }
+      }
+    },
+    "experienceConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "store": { "type": "string" },
+        "min_confidence": { "$ref": "#/$defs/score01" },
+        "half_life_days": { "$ref": "#/$defs/nonNegativeInteger" },
+        "max_facts": { "$ref": "#/$defs/nonNegativeInteger" },
+        "auto_record": { "type": "boolean" },
+        "require_review": { "type": "boolean" }
+      }
+    },
+    "economicsConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "budget_per_run": { "$ref": "#/$defs/nonNegativeNumber" },
+        "daily_budget": { "$ref": "#/$defs/nonNegativeNumber" },
+        "priority_weight": { "$ref": "#/$defs/nonNegativeNumber" },
+        "shared_cache": { "type": "boolean" }
+      }
+    },
+    "activationCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["message"],
+      "properties": {
+        "name": { "type": "string" },
+        "message": { "type": "string" },
+        "tenant": { "type": "string" },
+        "channel": { "type": "string" },
+        "prior_handover": { "$ref": "#/$defs/stringArray" },
+        "expect_active": { "type": "boolean" },
+        "expect_score_at_least": { "$ref": "#/$defs/score01" },
+        "expect_reason_contains": { "$ref": "#/$defs/stringArray" }
+      },
+      "anyOf": [
+        { "required": ["expect_active"] },
+        { "required": ["expect_score_at_least"] },
+        { "required": ["expect_reason_contains"] }
+      ]
+    }
+  }
+}

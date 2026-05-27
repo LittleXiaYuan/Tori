@@ -3,6 +3,8 @@ package task
 import (
 	"fmt"
 	"time"
+
+	"yunque-agent/pkg/risk"
 )
 
 // ──────────────────────────────────────────────
@@ -61,12 +63,12 @@ type Task struct {
 }
 
 // RiskLevel controls review behavior for a task.
-type RiskLevel string
+type RiskLevel = risk.Level
 
 const (
-	RiskLow    RiskLevel = "low"    // async/sidecar review, don't block completion
-	RiskMedium RiskLevel = "medium" // standard blocking review (default)
-	RiskHigh   RiskLevel = "high"   // blocking review + require human approval
+	RiskLow    RiskLevel = risk.Low    // async/sidecar review, don't block completion
+	RiskMedium RiskLevel = risk.Medium // standard blocking review (default)
+	RiskHigh   RiskLevel = risk.High   // blocking review + require human approval
 )
 
 // TaskConstraints defines execution guardrails for a task.

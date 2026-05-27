@@ -5,7 +5,7 @@ import {
   createMissionsClient,
   type MissionParseResult,
   type MissionsClientOptions,
-} from "./missions.js";
+} from "./missions";
 
 export type {
   MissionParseResult,

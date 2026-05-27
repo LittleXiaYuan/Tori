@@ -56,7 +56,6 @@ const nextConfig = {
     externalDir: true,
   },
   allowedDevOrigins: ["localhost", "127.0.0.1"],
-  trailingSlash: true,
   // 关掉 dev 模式左下角的 "Rendering..."/编译状态浮标：放在桌面应用里
   // 看起来像应用 BUG，而 Tauri 已经有自己的窗口呈现机制。
   // 生产构建（output: export）本来就不会出现这个浮标，这里只影响 next dev。
@@ -65,11 +64,13 @@ const nextConfig = {
     ? {
         async rewrites() {
           const api = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:9090";
-          return [
-            { source: "/v1/:path*", destination: `${api}/v1/:path*` },
-            { source: "/api/:path*", destination: `${api}/api/:path*` },
-            { source: "/healthz", destination: `${api}/healthz` },
-          ];
+          return {
+            beforeFiles: [
+              { source: "/v1/:path*", destination: `${api}/v1/:path*` },
+              { source: "/api/:path*", destination: `${api}/api/:path*` },
+              { source: "/healthz", destination: `${api}/healthz` },
+            ],
+          };
         },
         async headers() {
           return [

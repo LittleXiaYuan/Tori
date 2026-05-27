@@ -4,6 +4,7 @@ import {
   MissionsClientError,
   createMissionsClient,
   type ExperienceListOptions,
+  type ExperienceCreateResponse,
   type ExperienceOutcome,
   type ExperienceSource,
   type ExperienceStatsOptions,
@@ -11,10 +12,13 @@ import {
   type ExperiencesResponse,
   type MissionsClientOptions,
   type ReflectExperience,
-} from "./missions.js";
+  type WorkloadFeedbackStatsOptions,
+  type WorkloadFeedbackStatsResponse,
+} from "./missions";
 
 export type {
   ExperienceListOptions as ReflectExperiencesListOptions,
+  ExperienceCreateResponse as ReflectExperienceCreateResponse,
   ExperienceOutcome,
   ExperienceSource,
   ExperienceStatsOptions as ReflectExperiencesStatsOptions,
@@ -22,6 +26,8 @@ export type {
   ExperiencesResponse as ReflectExperiencesResponse,
   MissionsClientOptions as ReflectExperiencesClientOptions,
   ReflectExperience,
+  WorkloadFeedbackStatsOptions,
+  WorkloadFeedbackStatsResponse,
 };
 
 export { MissionsClientError as ReflectExperiencesClientError };
@@ -31,7 +37,9 @@ export class ReflectExperiencesClient {
 
   constructor(options: MissionsClientOptions) { this.client = createMissionsClient(options); }
   list(options: ExperienceListOptions = {}): Promise<ExperiencesResponse> { return this.client.experiences(options); }
+  add(experience: ReflectExperience): Promise<ExperienceCreateResponse> { return this.client.addExperience(experience); }
   stats(options: ExperienceStatsOptions = {}): Promise<ExperienceStatsResponse> { return this.client.experienceStats(options); }
+  workloadFeedbackStats(options: WorkloadFeedbackStatsOptions = {}): Promise<WorkloadFeedbackStatsResponse> { return this.client.workloadFeedbackStats(options); }
 }
 
 export function createReflectExperiencesClient(options: MissionsClientOptions): ReflectExperiencesClient { return new ReflectExperiencesClient(options); }

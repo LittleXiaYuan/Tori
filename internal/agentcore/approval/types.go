@@ -2,6 +2,8 @@ package approval
 
 import (
 	"time"
+
+	"yunque-agent/pkg/risk"
 )
 
 // ──────────────────────────────────────────────
@@ -22,53 +24,53 @@ import (
 type Status string
 
 const (
-	StatusPending  Status = "pending"
-	StatusApproved Status = "approved"
-	StatusDenied   Status = "denied"
-	StatusExpired  Status = "expired"
+	StatusPending      Status = "pending"
+	StatusApproved     Status = "approved"
+	StatusDenied       Status = "denied"
+	StatusExpired      Status = "expired"
 	StatusAutoApproved Status = "auto_approved" // trust level high enough
 )
 
 // RiskLevel classifies the risk of an operation.
-type RiskLevel string
+type RiskLevel = risk.Level
 
 const (
-	RiskLow      RiskLevel = "low"      // informational, auto-approved
-	RiskMedium   RiskLevel = "medium"   // logged, may auto-approve with high trust
-	RiskHigh     RiskLevel = "high"     // requires human approval
-	RiskCritical RiskLevel = "critical" // always requires human approval, even at max trust
+	RiskLow      RiskLevel = risk.Low      // informational, auto-approved
+	RiskMedium   RiskLevel = risk.Medium   // logged, may auto-approve with high trust
+	RiskHigh     RiskLevel = risk.High     // requires human approval
+	RiskCritical RiskLevel = risk.Critical // always requires human approval, even at max trust
 )
 
 // Category classifies the type of operation.
 type Category string
 
 const (
-	CatDataMutation Category = "data_mutation"   // create/update/delete data
-	CatExternalAPI  Category = "external_api"    // call external services
-	CatCodeExec     Category = "code_execution"  // run code/commands
-	CatFinancial    Category = "financial"       // spend money / billing
-	CatCommunication Category = "communication" // send email/message
-	CatSystemConfig Category = "system_config"  // change system settings
+	CatDataMutation  Category = "data_mutation"  // create/update/delete data
+	CatExternalAPI   Category = "external_api"   // call external services
+	CatCodeExec      Category = "code_execution" // run code/commands
+	CatFinancial     Category = "financial"      // spend money / billing
+	CatCommunication Category = "communication"  // send email/message
+	CatSystemConfig  Category = "system_config"  // change system settings
 )
 
 // Request is a pending approval from the Agent runtime.
 type Request struct {
-	ID          string            `json:"id"`
-	TaskID      string            `json:"task_id,omitempty"`
-	WorkflowID  string            `json:"workflow_id,omitempty"`
-	StepIndex   int               `json:"step_index,omitempty"`
-	Category    Category          `json:"category"`
-	RiskLevel   RiskLevel         `json:"risk_level"`
-	Summary     string            `json:"summary"`       // human-readable description
-	Details     map[string]any    `json:"details"`       // structured details (skill name, params, etc.)
-	Status      Status            `json:"status"`
-	Requester   string            `json:"requester"`     // agent role / component that triggered this
-	Approver    string            `json:"approver,omitempty"`  // human who approved/denied
-	Reason      string            `json:"reason,omitempty"`    // reason for denial
-	TenantID    string            `json:"tenant_id"`
-	CreatedAt   time.Time         `json:"created_at"`
-	ResolvedAt  *time.Time        `json:"resolved_at,omitempty"`
-	ExpiresAt   time.Time         `json:"expires_at"`
+	ID         string         `json:"id"`
+	TaskID     string         `json:"task_id,omitempty"`
+	WorkflowID string         `json:"workflow_id,omitempty"`
+	StepIndex  int            `json:"step_index,omitempty"`
+	Category   Category       `json:"category"`
+	RiskLevel  RiskLevel      `json:"risk_level"`
+	Summary    string         `json:"summary"` // human-readable description
+	Details    map[string]any `json:"details"` // structured details (skill name, params, etc.)
+	Status     Status         `json:"status"`
+	Requester  string         `json:"requester"`          // agent role / component that triggered this
+	Approver   string         `json:"approver,omitempty"` // human who approved/denied
+	Reason     string         `json:"reason,omitempty"`   // reason for denial
+	TenantID   string         `json:"tenant_id"`
+	CreatedAt  time.Time      `json:"created_at"`
+	ResolvedAt *time.Time     `json:"resolved_at,omitempty"`
+	ExpiresAt  time.Time      `json:"expires_at"`
 }
 
 // IsResolved returns true if the request has been decided.
@@ -124,12 +126,12 @@ var SkillRisk = map[string]RiskLevel{
 
 // ToolPermission defines fine-grained permission for a specific tool/skill.
 type ToolPermission struct {
-	SkillName      string    `json:"skill_name"`
-	AllowedArgs    []string  `json:"allowed_args,omitempty"`    // allowed argument patterns (glob)
-	DeniedArgs     []string  `json:"denied_args,omitempty"`     // denied argument patterns (glob)
-	MaxCalls       int       `json:"max_calls,omitempty"`       // max calls per session (0=unlimited)
-	RequireApproval bool    `json:"require_approval"`          // always require approval
-	RiskOverride   RiskLevel `json:"risk_override,omitempty"`  // override default risk level
+	SkillName       string    `json:"skill_name"`
+	AllowedArgs     []string  `json:"allowed_args,omitempty"`  // allowed argument patterns (glob)
+	DeniedArgs      []string  `json:"denied_args,omitempty"`   // denied argument patterns (glob)
+	MaxCalls        int       `json:"max_calls,omitempty"`     // max calls per session (0=unlimited)
+	RequireApproval bool      `json:"require_approval"`        // always require approval
+	RiskOverride    RiskLevel `json:"risk_override,omitempty"` // override default risk level
 }
 
 // PermissionInheritance defines how permissions cascade.

@@ -526,8 +526,8 @@ export function ExecutionTrace({ events, isLive, onRecoveryPrompt }: ExecutionTr
 
       {expanded && (
         <div className="px-3.5 pb-3.5 pt-1">
-          {events.map((evt) => (
-            <TraceItem key={evt.id} event={evt} startTs={firstTs} onRecoveryPrompt={onRecoveryPrompt} />
+          {events.map((evt, idx) => (
+            <TraceItem key={`${evt.id}-${idx}`} event={evt} startTs={firstTs} onRecoveryPrompt={onRecoveryPrompt} />
           ))}
         </div>
       )}

@@ -6,7 +6,26 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	iledger "yunque-agent/internal/ledger"
+	"yunque-agent/internal/ledgercore"
+	lsqlite "yunque-agent/internal/ledgercore/backend/sqlite"
 )
+
+func newExperienceTestLedger(t *testing.T) *ledger.Ledger {
+	t.Helper()
+	backend, err := lsqlite.New(":memory:")
+	if err != nil {
+		t.Fatalf("create backend: %v", err)
+	}
+	ldg, err := ledger.Open(backend)
+	if err != nil {
+		backend.Close()
+		t.Fatalf("open ledger: %v", err)
+	}
+	t.Cleanup(func() { ldg.Close() })
+	return ldg
+}
 
 func TestExperienceStoreAddAndAll(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "exp.json")
@@ -57,6 +76,35 @@ func TestExperienceStorePersistence(t *testing.T) {
 	}
 }
 
+func TestExperienceStoreWorkloadFeedbackPersistsToLedgerKV(t *testing.T) {
+	ldg := newExperienceTestLedger(t)
+	store := NewExperienceStore(filepath.Join(t.TempDir(), "exp.json"))
+	store.SetKVStore(iledger.NewKVConfigStore(ldg, "workload_feedback"))
+
+	store.Add(Experience{
+		ID:       "wf-browser-rpa",
+		Source:   "workload_feedback",
+		SourceID: "browser-rpa",
+		Category: "workload_feedback",
+		Outcome:  "partial",
+		Lesson:   "最不顺手：反馈不能跨设备保留",
+		Context:  "能力范围：browser.intent.plan, rpa.replay.dry_run",
+		Tags:     []string{"workload:browser-rpa", "findability:partial"},
+	})
+
+	var stored []Experience
+	found, err := ldg.KV.Get(context.Background(), "workload_feedback", "data", &stored)
+	if err != nil {
+		t.Fatalf("ledger kv get workload_feedback/data: %v", err)
+	}
+	if !found || len(stored) != 1 {
+		t.Fatalf("expected workload feedback in ledger kv namespace, found=%v len=%d", found, len(stored))
+	}
+	if stored[0].Source != "workload_feedback" || stored[0].Category != "workload_feedback" {
+		t.Fatalf("unexpected workload feedback entry: %#v", stored[0])
+	}
+}
+
 func TestExperienceStoreSearch(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "exp.json")
 	s := NewExperienceStore(path)
@@ -101,6 +149,52 @@ func TestExperienceStoreStats(t *testing.T) {
 	}
 	if st.Recent != 3 {
 		t.Errorf("expected 3 recent, got %d", st.Recent)
+	}
+}
+
+func TestWorkloadFeedbackStats(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "exp.json")
+	s := NewExperienceStore(path)
+	s.Add(Experience{
+		ID:       "browser-yes",
+		Source:   "workload_feedback",
+		SourceID: "browser-rpa",
+		Category: "workload_feedback",
+		Outcome:  "success",
+		Lesson:   "工作负载【浏览器 / RPA】体验反馈\n30 秒找到入口：是\n最顺手：录制回放\n最不顺手：-",
+		Context:  "真实场景：网页资料收集",
+		Tags:     []string{"workload:browser-rpa", "findability:yes"},
+	})
+	s.Add(Experience{
+		ID:       "memory-no",
+		Source:   "workload_feedback",
+		SourceID: "memory-review",
+		Category: "workload_feedback",
+		Outcome:  "failure",
+		Lesson:   "工作负载【记忆 / 回溯】体验反馈\n30 秒找到入口：不能\n最顺手：-\n最不顺手：入口藏太深",
+		Context:  "真实场景：复盘任务",
+		Tags:     []string{"workload:memory-review", "findability:no"},
+	})
+	s.Add(Experience{ID: "ignore", Source: "task", Category: "strategy", Outcome: "success"})
+
+	stats := s.WorkloadFeedbackStats([]string{"browser-rpa", "memory-review", "wasm-workload"})
+	if stats.Total != 2 || stats.Recent7D != 2 {
+		t.Fatalf("unexpected totals: %+v", stats)
+	}
+	if stats.Workloads != 3 {
+		t.Fatalf("expected 3 known workloads, got %+v", stats)
+	}
+	if stats.ByWorkload["browser-rpa"] != 1 || stats.ByWorkload["memory-review"] != 1 || stats.ByWorkload["wasm-workload"] != 0 {
+		t.Fatalf("unexpected workload distribution: %+v", stats.ByWorkload)
+	}
+	if stats.Findability["yes"] != 1 || stats.Findability["no"] != 1 || stats.Findability["partial"] != 0 {
+		t.Fatalf("unexpected findability distribution: %+v", stats.Findability)
+	}
+	if stats.Filled != 2 || stats.FillRate != 1 {
+		t.Fatalf("unexpected fill rate: %+v", stats)
+	}
+	if stats.AveragePerActiveWorkload != 1 {
+		t.Fatalf("unexpected active workload average: %+v", stats)
 	}
 }
 

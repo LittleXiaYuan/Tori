@@ -1,0 +1,3 @@
+include README.md
+recursive-include yunque *.py
+recursive-include yunque_client *.py

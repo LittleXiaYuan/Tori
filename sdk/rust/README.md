@@ -11,11 +11,19 @@ Auto-generated Rust client for the Yunque (云雀) Agent HTTP API.
 
 ```toml
 [dependencies]
-yunque-client = { path = "../yunque-agent/sdk/rust" }
+yunque-client = "0.1"
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 ```
 
-(Path-dep for now; once published, use `cargo add yunque-client`.)
+Or run `cargo add yunque-client` after the crate is published. For local
+development before publishing, keep using a path dependency:
+
+```toml
+yunque-client = { path = "../yunque-agent/sdk/rust" }
+```
+
+The full PyPI / crates.io / npm release checklist is documented in
+[`docs/SDK-PUBLISHING.md`](../../docs/SDK-PUBLISHING.md).
 
 ## Quick start
 

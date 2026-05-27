@@ -3,8 +3,21 @@ name = "yunque-client"
 version = "0.1.0"
 edition = "2021"
 description = "Rust client for the Yunque (云雀) Agent HTTP API. Auto-generated from docs/openapi.yaml."
-license = "Apache-2.0"
-publish = false
+license = "MIT"
+repository = "https://github.com/LittleXiaYuan/yunque-agent"
+homepage = "https://github.com/LittleXiaYuan/yunque-agent"
+documentation = "https://github.com/LittleXiaYuan/yunque-agent/tree/main/docs"
+readme = "README.md"
+keywords = ["yunque", "agent", "sdk", "client"]
+categories = ["api-bindings", "web-programming::http-client"]
+include = [
+  "Cargo.toml",
+  "Cargo.lock",
+  "README.md",
+  "build.rs",
+  "src/**",
+  "../../docs/openapi.yaml",
+]
 
 [dependencies]
 progenitor-client = "0.10"

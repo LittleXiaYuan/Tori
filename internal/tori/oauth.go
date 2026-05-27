@@ -183,7 +183,7 @@ func RefreshAccessToken(cfg OAuthConfig, refreshToken string) (*TokenResponse, e
 		"refresh_token": {refreshToken},
 	}
 
-	resp, err := http.PostForm(tokenURL, form)
+	resp, err := postSafeForm(context.Background(), tokenURL, form, 10*time.Second)
 	if err != nil {
 		return nil, fmt.Errorf("POST %s: %w", tokenURL, err)
 	}
@@ -211,7 +211,7 @@ func exchangeCode(cfg OAuthConfig, code, redirectURI, verifier string) (*TokenRe
 		"code_verifier": {verifier},
 	}
 
-	resp, err := http.PostForm(tokenURL, form)
+	resp, err := postSafeForm(context.Background(), tokenURL, form, 10*time.Second)
 	if err != nil {
 		return nil, fmt.Errorf("POST %s: %w", tokenURL, err)
 	}
@@ -231,10 +231,13 @@ func exchangeCode(cfg OAuthConfig, code, redirectURI, verifier string) (*TokenRe
 
 func fetchUserInfo(cfg OAuthConfig, accessToken string) (*UserInfo, error) {
 	userinfoURL := strings.TrimRight(cfg.ToriBaseURL, "/") + "/oauth/userinfo"
-	req, _ := http.NewRequest("GET", userinfoURL, nil)
+	req, err := jsonSafeRequest(context.Background(), http.MethodGet, userinfoURL, nil, 10*time.Second)
+	if err != nil {
+		return nil, err
+	}
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := doSafeRequest(req, 10*time.Second)
 	if err != nil {
 		return nil, err
 	}
@@ -261,13 +264,13 @@ func fetchAgentToken(cfg OAuthConfig, accessToken string) (*agentTokenResult, er
 	agentTokenURL := strings.TrimRight(cfg.ToriBaseURL, "/") + "/api/oauth/agent-token"
 	slog.Debug("tori: fetching agent token", "url", agentTokenURL)
 
-	req, err := http.NewRequest("GET", agentTokenURL, nil)
+	req, err := jsonSafeRequest(context.Background(), http.MethodGet, agentTokenURL, nil, 10*time.Second)
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := doSafeRequest(req, 10*time.Second)
 	if err != nil {
 		return nil, fmt.Errorf("http do: %w", err)
 	}

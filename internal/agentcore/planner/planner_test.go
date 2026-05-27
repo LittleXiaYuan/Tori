@@ -520,8 +520,9 @@ func TestBuildFunctionDefsSubagentHonorsAllowedSkills(t *testing.T) {
 		reg.Register(dummyPlannerSkill(name))
 	}
 	p := NewPlanner(nil, reg, 8)
-	p.SetCogniSkillFilter(func(_ string, _, _ string, in []skills.Skill) []skills.Skill {
-		return []skills.Skill{dummyPlannerSkill("browser_search")}
+	p.SetCogniRuntime(stubCogniRuntime{
+		context: "cogni",
+		trace:   CogniTraceDetail{Activated: []string{"demo"}},
 	})
 	p.SetHandoffRegistry(subagent.NewHandoffRegistry(subagent.NewManager()))
 
@@ -609,11 +610,8 @@ func TestEmitCognitiveLoadEventCarriesDetail(t *testing.T) {
 
 func TestEmitCogniTraceEventCarriesSurfaceDetail(t *testing.T) {
 	p := NewPlanner(nil, skills.NewRegistry(), 8)
-	p.SetCogniTrace(func(message, tenantID, channel string) (CogniTraceDetail, bool) {
-		if message != "需要读取文档" || tenantID != "tenant-a" || channel != "web" {
-			t.Fatalf("unexpected trace lookup args: %q %q %q", message, tenantID, channel)
-		}
-		return CogniTraceDetail{
+	p.SetCogniRuntime(stubCogniRuntime{
+		trace: CogniTraceDetail{
 			Activated:       []string{"文档助手"},
 			ContextBytes:    128,
 			ToolBefore:      12,
@@ -621,7 +619,7 @@ func TestEmitCogniTraceEventCarriesSurfaceDetail(t *testing.T) {
 			Removed:         []string{"browser_search"},
 			MessageHash:     "abc123",
 			FellBackToInput: false,
-		}, true
+		},
 	})
 	var got observe.AgentEvent
 	req := PlanRequest{
@@ -649,9 +647,7 @@ func TestEmitCogniTraceEventCarriesSurfaceDetail(t *testing.T) {
 
 func TestEmitCogniTraceEventSkipsNoVisibleEffect(t *testing.T) {
 	p := NewPlanner(nil, skills.NewRegistry(), 8)
-	p.SetCogniTrace(func(_, _, _ string) (CogniTraceDetail, bool) {
-		return CogniTraceDetail{}, true
-	})
+	p.SetCogniRuntime(stubCogniRuntime{})
 	called := false
 	req := PlanRequest{
 		Messages: []llm.Message{{Role: "user", Content: "你好"}},

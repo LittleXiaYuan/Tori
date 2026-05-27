@@ -8,7 +8,7 @@ import {
   type MissionsClientOptions,
   type StrategiesOptions,
   type StrategiesResponse,
-} from "./missions.js";
+} from "./missions";
 
 export type {
   ExperienceOutcome,

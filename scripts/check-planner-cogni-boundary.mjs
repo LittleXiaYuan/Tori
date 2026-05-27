@@ -560,10 +560,7 @@ for (const needle of [
   "type SkillMetricsFunc func(skillName string, duration time.Duration, err error)",
   "type SkillIndexEntry struct",
   "type SkillIndexFunc func() []SkillIndexEntry",
-  "type CogniContextFunc func(ctx context.Context, message, tenantID, channel string) string",
   "type BeliefContextFunc func(ctx context.Context, message, tenantID, channel string) string",
-  "type CogniSkillFilterFunc func(message, tenantID, channel string, in []skills.Skill) []skills.Skill",
-  "type CogniTraceFunc func(message, tenantID, channel string) (CogniTraceDetail, bool)",
   "type CogniRuntime interface",
   "BuildContext(ctx context.Context, message, tenantID, channel string) string",
   "FilterSkills(message, tenantID, channel string, in []skills.Skill) []skills.Skill",
@@ -582,10 +579,7 @@ for (const forbidden of [
   "type SkillMetricsFunc func",
   "type SkillIndexEntry struct",
   "type SkillIndexFunc func",
-  "type CogniContextFunc func",
   "type BeliefContextFunc func",
-  "type CogniSkillFilterFunc func",
-  "type CogniTraceFunc func",
   "type CogniRuntime interface",
   "type MemorySearchFunc func",
   "type ReflectFunc func",
@@ -612,7 +606,6 @@ for (const needle of [
   "func (p *Planner) SetLocalBrain(lb LocalBrainRuntime)",
   "func (p *Planner) SetAgenticThinking(at AgenticThinkerRuntime)",
   "func (p *Planner) SetProviderRegistry(reg *llm.ProviderRegistry)",
-  "func (p *Planner) SetCogniTrace(fn CogniTraceFunc)",
   "func (p *Planner) SetCogniRuntime(runtime CogniRuntime)",
   "func (p *Planner) SetToolTimeout(d time.Duration)",
 ]) {
@@ -655,9 +648,6 @@ for (const required of [
   "contextAssembly.SetBeliefContext(fn)",
   "skillRuntime.SetGrowth(sg)",
   "learningSidecar.SetDataCollector(dc)",
-  "contextAssembly.SetCogniContext(fn)",
-  "contextAssembly.SetCogniSkillFilter(fn)",
-  "contextAssembly.SetCogniTrace(fn)",
   "contextAssembly.SetCogniRuntime(runtime)",
   "promptRuntime.SetPersonaPrompt(fn)",
   "executionRuntime.SetDynContextBudget(tokens)",
@@ -1244,10 +1234,31 @@ for (const removed of [
   "func (s *ContextAssemblyService) CogniTrace",
   "func (s *ContextAssemblyService) HasCogniSkillFilter",
   "func (s *ContextAssemblyService) FilterCogniSkills",
+  "func (s *ContextAssemblyService) SetCogniContext",
+  "func (s *ContextAssemblyService) SetCogniSkillFilter",
+  "func (s *ContextAssemblyService) SetCogniTrace",
   "func (p *Planner) maybeEmitCogniTrace",
 ]) {
   if (contextAssembly.includes(removed) || read("internal/agentcore/planner/cogni_observability.go").includes(removed)) {
     failures.push(`removed Cogni boundary wrapper still exists: ${removed}`);
+  }
+}
+
+const cogniContextServiceRel = "internal/agentcore/planner/cogni_context_service.go";
+const cogniContextService = read(cogniContextServiceRel);
+for (const forbiddenSplitCallback of [
+  "CogniContextFunc",
+  "CogniSkillFilterFunc",
+  "CogniTraceFunc",
+  "SetCogniContext(",
+  "SetCogniSkillFilter(",
+  "SetCogniTrace(",
+  "SetContext(",
+  "SetSkillFilter(",
+  "SetTrace(",
+]) {
+  if (runtimeExtensionContracts.includes(forbiddenSplitCallback) || plannerRuntimeSetters.includes(forbiddenSplitCallback) || contextAssembly.includes(forbiddenSplitCallback) || cogniContextService.includes(forbiddenSplitCallback)) {
+    failures.push(`split Cogni callback ${JSON.stringify(forbiddenSplitCallback)} still exists in planner Cogni runtime boundary; use CogniRuntime only`);
   }
 }
 
@@ -1361,7 +1372,8 @@ for (const needle of [
   "HasContextFilter",
   "ModelRuntimeService.FallbackChainForRequest",
   "rather than constructing dynamic context messages, reading raw graph callbacks from Planner, or reaching into `CogniContextService`",
-  "The Cogni declaration runtime should be injected through `CogniRuntime` / `Planner.SetCogniRuntime`",
+  "The Cogni declaration runtime should be injected only through `CogniRuntime` / `Planner.SetCogniRuntime`",
+  "The old `CogniContextFunc` / `CogniSkillFilterFunc` / `CogniTraceFunc` contracts and the split `SetCogniContext` / `SetCogniSkillFilter` / `SetCogniTrace` planner/context-assembly setters are removed",
 ]) {
   if (!conceptMap.includes(needle)) {
     failures.push(`doc/AGENTCORE-CONCEPT-MAP.md missing ${JSON.stringify(needle)}`);
@@ -1573,6 +1585,8 @@ for (const needle of [
   "第一百零三批",
   "SetCogniRuntime",
   "plannerCogniRuntime",
+  "第一百零四批",
+  "删除 `Planner.SetCogniContext` / `Planner.SetCogniSkillFilter` / `Planner.SetCogniTrace`",
   "第五十五批",
   "partial-result fallback post-processing helper",
   "PartialPlanResultRequest",

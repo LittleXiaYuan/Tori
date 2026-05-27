@@ -24,14 +24,15 @@ cd packages/yunque-client
 npm install
 ```
 
-When/if we publish to npm, install with `npm i yunque-client`.
+After release, install with `npm i yunque-client`. The cross-ecosystem
+publishing checklist lives in [`docs/SDK-PUBLISHING.md`](../../docs/SDK-PUBLISHING.md).
 
 ## Quick start
 
 For app code, use subpath imports such as `yunque-client/chat`,
 `yunque-client/packs`, `yunque-client/wasm-plugin`,
 `yunque-client/memory-time-travel`, `yunque-client/sbom-drift`,
-`yunque-client/planner-recovery`, or `yunque-client/agent-kit`.
+`yunque-client/planner-recovery`, `yunque-client/workloads`, or `yunque-client/agent-kit`.
 The package root (`yunque-client`) intentionally does **not** re-export
 hand-written focused slices; it only exposes generated OpenAPI symbols and the
 generated client bootstrap, while the subpaths act like opt-in workloads.
@@ -80,6 +81,20 @@ const channels = await kit.notify.channels();
 const search = await kit.plugin.search("incremental SDK package", 5);
 
 console.log(focus.focus, strategies.strategies, found.count, graphStats.entities, kbStats.sources, connectors.connectors.length, channels.channels.length, search.results.length);
+```
+
+### Workload preset metadata
+
+Use `yunque-client/workloads` when a desktop host, CLI, third-party frontend,
+or web page needs the same selectable workload catalog without importing the
+web-only feedback helpers or the generated SDK. The slice is local metadata and
+keeps workload preset definitions in one SDK-owned source.
+
+```ts
+import { buildWorkloadCatalogHref, listWorkloadPresets } from "yunque-client/workloads";
+
+const presets = listWorkloadPresets();
+console.log(presets.map((preset) => `${preset.title}: ${buildWorkloadCatalogHref(preset)}`));
 ```
 
 ### Full generated client
@@ -1745,6 +1760,17 @@ in only `auth`, `backup`, `packs`, `airi`, `planner-recovery`, `planner`, `plann
 slices in the same style when those surfaces need stable, lightweight
 integration APIs.
 
+## Versioning and compatibility
+
+Before publishing or changing public SDK surfaces, use the repository-wide
+[SDK versioning policy](../../docs/SDK-VERSIONING.md). In short: patch / minor / breaking
+classification applies to generated root exports, focused subpath imports, Pack
+manifest SDK entrypoints, and OpenAPI routes; breaking changes need explicit
+`BREAKING:` release notes and migration examples.
+
+`npm run check:incremental` also verifies that this policy stays discoverable
+from the TypeScript SDK package.
+
 ## Regenerating
 
 After spec changes:
@@ -2626,3 +2652,4 @@ await breaker.reset();
 | `src/rpa-replay.ts` | `yunque-client/rpa-replay` | replay / automation pack contracts |
 | `src/skill-anomaly.ts` | `yunque-client/skill-anomaly` | skill anomaly approval / bridge pack contracts |
 | `src/wasm-plugin.ts` | `yunque-client/wasm-plugin` | WASM plugin pack contracts |
+| `src/workloads.ts` | `yunque-client/workloads` | shared workload preset metadata for web, desktop, CLI, and third-party hosts |

@@ -14,7 +14,9 @@ import (
 	"yunque-agent/internal/agentcore/persona"
 	"yunque-agent/internal/agentcore/rbac"
 	"yunque-agent/internal/agentcore/task"
+	"yunque-agent/internal/cognikernel"
 	"yunque-agent/internal/execution/channel"
+	reflectpkg "yunque-agent/internal/experimental/reflect"
 )
 
 // --- Wiring methods ---
@@ -160,14 +162,12 @@ func (g *Gateway) WireAgentCommands() {
 
 	// Wire /mission — NL mission creation
 	ac.CreateMission = func(description string) (string, error) {
-		// Call the mission parse handler logic directly
-		client := g.planner.LLMClientFor("fast")
-		if client == nil {
-			return "", fmt.Errorf("LLM client unavailable")
+		if g.planner == nil {
+			return "", fmt.Errorf("planner unavailable")
 		}
 
 		ctx := context.Background()
-		result, err := parseMissionIntent(ctx, client, description)
+		result, err := g.planner.ParseMissionIntent(ctx, description)
 		if err != nil {
 			return "", err
 		}
@@ -355,7 +355,24 @@ func (g *Gateway) WireReverieActions() {
 // This closes the feedback loop: tasks run → experiences recorded → strategies compiled
 // → strategies guide future conversations → better outcomes → better experiences.
 func (g *Gateway) WireReflectionLoop() {
-	if g.experienceStore == nil || g.planner == nil {
+	if g.experienceStore == nil {
+		return
+	}
+	if g.reflectiveLoop == nil {
+		rl := cognikernel.NewReflectiveLoop()
+		rl.SetExperienceRecord(func(source, category, outcome, lesson, lctx string, tags []string) {
+			g.experienceStore.Add(reflectpkg.Experience{
+				Source:   source,
+				Category: category,
+				Outcome:  outcome,
+				Lesson:   lesson,
+				Context:  lctx,
+				Tags:     tags,
+			})
+		})
+		g.reflectiveLoop = rl
+	}
+	if g.planner == nil {
 		return
 	}
 	g.planner.SetStrategyContext(func() string {

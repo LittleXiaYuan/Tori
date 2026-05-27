@@ -4,6 +4,24 @@ Lightweight Python SDK for Yunque Agent plugins, sidecars, CLIs, and automation
 scripts. Use this `yunque` package when you want small direct helpers instead of
 the generated `yunque_client` full OpenAPI surface.
 
+## Install
+
+After release, install with:
+
+```bash
+pip install yunque
+```
+
+For local development before publishing:
+
+```bash
+python -m pip install -e sdk/python
+```
+
+The package includes both the lightweight `yunque` helpers and the generated
+`yunque_client` OpenAPI client. The PyPI / crates.io / npm release checklist is
+documented in [`docs/SDK-PUBLISHING.md`](../../docs/SDK-PUBLISHING.md).
+
 ## Environment
 
 ```powershell

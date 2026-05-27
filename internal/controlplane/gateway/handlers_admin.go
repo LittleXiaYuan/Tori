@@ -57,11 +57,15 @@ func (g *Gateway) handleListTenants(w http.ResponseWriter, r *http.Request) {
 
 func (g *Gateway) handleSystemInfo(w http.ResponseWriter, r *http.Request) {
 	info := sandbox.SystemInfo()
-	breaker := g.planner.LLMBreaker()
+	modelHealth := g.planner.ModelRuntimeHealth()
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
-		"system":  info,
-		"breaker": map[string]any{"state": breaker.State(), "failures": breaker.Failures()},
+		"system": info,
+		"breaker": map[string]any{
+			"state":      modelHealth.BreakerState,
+			"failures":   modelHealth.Failures,
+			"configured": modelHealth.Configured,
+		},
 	})
 }
 
@@ -82,8 +86,10 @@ func (g *Gateway) handleSystemStats(w http.ResponseWriter, r *http.Request) {
 func (g *Gateway) handleCacheStats(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	stats := map[string]any{}
-	if g.planner != nil && g.planner.LLMClient() != nil && g.planner.LLMClient().Cache() != nil {
-		stats["llm_response_cache"] = g.planner.LLMClient().Cache().Stats()
+	if g.planner != nil {
+		if cacheStats := g.planner.LLMResponseCacheStats(); cacheStats != nil {
+			stats["llm_response_cache"] = cacheStats
+		}
 	}
 	json.NewEncoder(w).Encode(stats)
 }

@@ -57,6 +57,7 @@ import (
 	"yunque-agent/internal/agentcore/trigger"
 	"yunque-agent/internal/agentcore/websearch"
 	"yunque-agent/internal/apperror"
+	"yunque-agent/internal/cognikernel"
 	"yunque-agent/internal/connectors"
 	"yunque-agent/internal/controlplane/gateway/connectorapi"
 	"yunque-agent/internal/controlplane/gateway/costapi"
@@ -231,6 +232,7 @@ type Gateway struct {
 	iterateEngine   *iterate.Engine
 	distiller       *distill.Distiller
 	experienceStore *reflectpkg.ExperienceStore
+	reflectiveLoop  *cognikernel.ReflectiveLoop
 	runtimePool     *agentrt.Pool
 	bindingRouter   *agentrt.Router
 

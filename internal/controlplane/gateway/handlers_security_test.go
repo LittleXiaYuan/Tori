@@ -3,6 +3,7 @@ package gateway
 import (
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"testing"
@@ -147,5 +148,60 @@ func TestToolExecDisabledByDefault(t *testing.T) {
 
 	if w.Code != http.StatusForbidden {
 		t.Fatalf("expected 403 when ENABLE_TOOLS_EXEC not set, got %d", w.Code)
+	}
+}
+
+// ── Test 11: shared SSRF guard rejects loopback / metadata URLs ──
+
+func TestValidateSSRFTargetRejectsPrivateTargets(t *testing.T) {
+	cases := []string{
+		"http://127.0.0.1:8080/metadata",
+		"http://localhost:8080/metadata",
+		"http://169.254.169.254/latest/meta-data/",
+		"http://10.0.0.5/internal",
+	}
+	for _, raw := range cases {
+		u, err := url.Parse(raw)
+		if err != nil {
+			t.Fatalf("parse %q: %v", raw, err)
+		}
+		if err := validateSSRFTarget(u); err == nil {
+			t.Fatalf("expected %q to be rejected by SSRF guard", raw)
+		}
+	}
+}
+
+// ── Test 12: Tori bind URL uses the shared SSRF guard ──
+
+func TestValidateToriURLRejectsMetadataTarget(t *testing.T) {
+	if _, err := validateToriURL("http://169.254.169.254/latest/meta-data/"); err == nil {
+		t.Fatal("expected metadata Tori URL to be rejected")
+	}
+}
+
+// ── Test 13: knowledge repo import is rooted under explicit import roots ──
+
+func TestResolveKBRepoPathRejectsPathOutsideRoots(t *testing.T) {
+	t.Setenv("KB_IMPORT_ALLOW_ANY", "")
+	root := t.TempDir()
+	outside := t.TempDir()
+	if _, err := resolveKBRepoPath(root, outside); err == nil {
+		t.Fatal("expected repo import outside configured roots to be rejected")
+	}
+}
+
+func TestResolveKBRepoPathAllowsPathInsideOutputDir(t *testing.T) {
+	t.Setenv("KB_IMPORT_ALLOW_ANY", "")
+	root := t.TempDir()
+	inside := filepath.Join(root, "repo")
+	if err := os.MkdirAll(inside, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	resolved, err := resolveKBRepoPath(root, inside)
+	if err != nil {
+		t.Fatalf("expected repo import inside output dir to be allowed: %v", err)
+	}
+	if resolved == "" {
+		t.Fatal("expected resolved path")
 	}
 }

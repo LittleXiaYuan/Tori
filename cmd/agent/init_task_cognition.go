@@ -107,9 +107,9 @@ func initCognitionWiring(
 
 	if typedLdg != nil {
 		migrator := iledger.NewKVMigrator(typedLdg)
-		_ = migrator.MigrateFile("experience", "data", cfg.DataPath("experience.json"))
-		experienceStore.SetKVStore(iledger.NewKVConfigStore(typedLdg, "experience"))
-		slog.Info("experience store wired to Ledger KV")
+		_ = migrator.MigrateFile("workload_feedback", "data", cfg.DataPath("experience.json"))
+		experienceStore.SetKVStore(iledger.NewKVConfigStore(typedLdg, "workload_feedback"))
+		slog.Info("experience store wired to Ledger KV", "namespace", "workload_feedback")
 	}
 
 	packDir := cfg.DataPath("cognisdk")

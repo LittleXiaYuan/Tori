@@ -16,6 +16,11 @@ const checks = [
     args: ["scripts/check-pack-runtime-completion.mjs"],
   },
   {
+    name: "Planner Cogni boundary",
+    command: process.execPath,
+    args: ["scripts/check-planner-cogni-boundary.mjs"],
+  },
+  {
     name: "Pack manifest/backend/frontend contract",
     command: process.execPath,
     args: ["scripts/check-pack-contract.mjs"],
@@ -29,6 +34,11 @@ const checks = [
     name: "Pack manifest schema",
     command: process.execPath,
     args: ["scripts/check-pack-manifest-schema.mjs"],
+  },
+  {
+    name: "Official pack description style",
+    command: process.execPath,
+    args: ["scripts/check-pack-description-style.mjs"],
   },
   {
     name: "Pack scaffold contract",

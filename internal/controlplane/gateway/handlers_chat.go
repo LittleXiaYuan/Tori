@@ -149,41 +149,10 @@ func friendlyChatPipelineError(err error) string {
 
 // generateConversationTitle uses a fast LLM call to generate a short title for the conversation.
 func (g *Gateway) generateConversationTitle(ctx context.Context, userMsg, assistReply string) string {
-	client := g.planner.LLMClientFor("fast")
-	if client == nil {
-		client = g.planner.LLMClientFor("")
-	}
-	if client == nil {
+	if g == nil || g.planner == nil {
 		return ""
 	}
-
-	// Truncate inputs to save tokens
-	if len(userMsg) > 300 {
-		userMsg = userMsg[:300]
-	}
-	if len(assistReply) > 300 {
-		assistReply = assistReply[:300]
-	}
-
-	msgs := []llm.Message{
-		{Role: "system", Content: "你是一个对话标题生成器。根据用户的第一条消息和助手的回复，生成一个简短的对话标题（5-15个字）。只输出标题文本，不要加引号、标点或解释。"},
-		{Role: "user", Content: fmt.Sprintf("用户消息：%s\n助手回复：%s", userMsg, assistReply)},
-	}
-
-	title, err := client.Chat(ctx, msgs, 0.3)
-	if err != nil {
-		slog.Debug("auto-title generation failed", "err", err)
-		return ""
-	}
-
-	// Clean up: remove quotes, trim whitespace, limit length
-	title = strings.TrimSpace(title)
-	title = strings.Trim(title, "\"'「」《》【】")
-	title = strings.TrimSpace(title)
-	if len([]rune(title)) > 30 {
-		title = string([]rune(title)[:30])
-	}
-	return title
+	return g.planner.GenerateConversationTitle(ctx, userMsg, assistReply)
 }
 
 // storePendingSuggestions saves skill suggestions for a session.

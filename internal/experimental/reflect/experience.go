@@ -45,6 +45,21 @@ type ExperienceStats struct {
 	Recent     int            `json:"recent_7d"` // last 7 days
 }
 
+// WorkloadFeedbackStats summarizes dogfood feedback signals collected from
+// source/category=workload_feedback experiences.
+type WorkloadFeedbackStats struct {
+	Total                    int            `json:"total"`
+	Recent7D                 int            `json:"recent_7d"`
+	Workloads                int            `json:"workloads"`
+	ByWorkload               map[string]int `json:"by_workload"`
+	Findability              map[string]int `json:"findability"`
+	Filled                   int            `json:"filled"`
+	FillRate                 float64        `json:"fill_rate"`
+	AveragePerWorkload       float64        `json:"average_per_workload"`
+	AveragePerActiveWorkload float64        `json:"average_per_active_workload"`
+	LatestAt                 time.Time      `json:"latest_at,omitempty"`
+}
+
 // ExperienceStore provides persistent structured experience storage.
 type ExperienceStore struct {
 	mu   sync.RWMutex
@@ -134,6 +149,124 @@ func (s *ExperienceStore) Stats() ExperienceStats {
 		}
 	}
 	return st
+}
+
+// WorkloadFeedbackStats returns product dogfood metrics from workload feedback
+// experiences. workloadIDs should contain the currently known workload preset
+// IDs so fill rate can be measured against the product surface, not only the
+// workloads that already received feedback.
+func (s *ExperienceStore) WorkloadFeedbackStats(workloadIDs []string) WorkloadFeedbackStats {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return SummarizeWorkloadFeedback(s.data, workloadIDs)
+}
+
+// SummarizeWorkloadFeedback computes dogfood metrics from an experience slice.
+func SummarizeWorkloadFeedback(experiences []Experience, workloadIDs []string) WorkloadFeedbackStats {
+	stats := WorkloadFeedbackStats{
+		ByWorkload:  make(map[string]int),
+		Findability: map[string]int{"yes": 0, "partial": 0, "no": 0, "unknown": 0},
+	}
+	known := make(map[string]struct{}, len(workloadIDs))
+	for _, id := range workloadIDs {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		known[id] = struct{}{}
+		stats.ByWorkload[id] = 0
+	}
+
+	week := time.Now().AddDate(0, 0, -7)
+	active := make(map[string]struct{})
+	for _, exp := range experiences {
+		if exp.Source != "workload_feedback" && exp.Category != "workload_feedback" {
+			continue
+		}
+		stats.Total++
+		if !exp.CreatedAt.IsZero() {
+			if exp.CreatedAt.After(week) {
+				stats.Recent7D++
+			}
+			if exp.CreatedAt.After(stats.LatestAt) {
+				stats.LatestAt = exp.CreatedAt
+			}
+		}
+
+		workloadID := strings.TrimSpace(exp.SourceID)
+		if workloadID == "" {
+			workloadID = workloadIDFromTags(exp.Tags)
+		}
+		if workloadID != "" {
+			stats.ByWorkload[workloadID]++
+			active[workloadID] = struct{}{}
+			known[workloadID] = struct{}{}
+		}
+
+		findability := workloadFindabilityFromExperience(exp)
+		stats.Findability[findability]++
+		if workloadFeedbackFilled(exp) {
+			stats.Filled++
+		}
+	}
+
+	stats.Workloads = len(known)
+	if stats.Total > 0 {
+		stats.FillRate = float64(stats.Filled) / float64(stats.Total)
+	}
+	if stats.Workloads > 0 {
+		stats.AveragePerWorkload = float64(stats.Total) / float64(stats.Workloads)
+	}
+	if len(active) > 0 {
+		stats.AveragePerActiveWorkload = float64(stats.Total) / float64(len(active))
+	}
+	return stats
+}
+
+func workloadIDFromTags(tags []string) string {
+	for _, tag := range tags {
+		if strings.HasPrefix(tag, "workload:") {
+			return strings.TrimSpace(strings.TrimPrefix(tag, "workload:"))
+		}
+	}
+	return ""
+}
+
+func workloadFindabilityFromExperience(exp Experience) string {
+	for _, tag := range exp.Tags {
+		value, ok := strings.CutPrefix(tag, "findability:")
+		if !ok {
+			continue
+		}
+		switch value {
+		case "yes", "partial", "no", "unknown":
+			return value
+		}
+	}
+	return "unknown"
+}
+
+func workloadFeedbackFilled(exp Experience) bool {
+	for _, token := range []string{"最顺手：", "最不顺手：", "下次希望少一步：", "真实场景："} {
+		if hasNonPlaceholderLabeledLine(exp.Lesson, token) || hasNonPlaceholderLabeledLine(exp.Context, token) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasNonPlaceholderLabeledLine(text, prefix string) bool {
+	for _, line := range strings.Split(text, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, prefix) {
+			continue
+		}
+		value := strings.TrimSpace(strings.TrimPrefix(line, prefix))
+		if value != "" && value != "-" {
+			return true
+		}
+	}
+	return false
 }
 
 // CompileStrategies aggregates recent experiences into actionable strategy hints.

@@ -24,6 +24,11 @@ const maxUnpackedGrowthPerMemoryTimeTravelCapability = 3_600;
 const maxUnpackedGrowthPerWASMPluginRoute = 4_600;
 const maxUnpackedGrowthPerPackSdkHelperExport = 700;
 const maxUnpackedGrowthForPackPrepareSummaryHelperExport = 2_800;
+// Pack manifests now carry one-line + three-example public description metadata.
+// Keep the added package size scoped to verified official manifests instead of
+// broadening the global base size; scripts/check-pack-description-style.mjs owns
+// the style gate.
+const maxUnpackedGrowthPerStyledOfficialPack = 600;
 const maxNonEntryFiles = 16;
 const pkg = JSON.parse(readFileSync("package.json", "utf8"));
 const packManifestPath = "../../sdk/manifest/packs-sdk.json";
@@ -38,6 +43,22 @@ const wasmPluginManifestPath = "../../sdk/manifest/wasm-plugin-pack-sdk.json";
 const wasmPluginManifest = existsSync(wasmPluginManifestPath)
   ? JSON.parse(readFileSync(wasmPluginManifestPath, "utf8"))
   : { routes: [] };
+const officialPackManifests = [
+  "../../packs/official/backup-pack/pack.json",
+  "../../packs/official/browser-intent-pack/pack.json",
+  "../../packs/official/chaos-probe-pack/pack.json",
+  "../../packs/official/cogni-kernel-pack/pack.json",
+  "../../packs/official/cognitive-canary-pack/pack.json",
+  "../../packs/official/guardrail-fuzzer-pack/pack.json",
+  "../../packs/official/lora-pack/pack.json",
+  "../../packs/official/memory-time-travel-pack/pack.json",
+  "../../packs/official/rpa-replay-pack/pack.json",
+  "../../packs/official/sbom-drift-pack/pack.json",
+  "../../packs/official/skill-anomaly-pack/pack.json",
+  "../../packs/official/wasm-plugin-pack/pack.json",
+]
+  .filter(existsSync)
+  .map((path) => JSON.parse(readFileSync(path, "utf8")));
 const packsSource = existsSync("src/packs.ts") ? readFileSync("src/packs.ts", "utf8") : "";
 const rootIndexSource = existsSync("src/index.ts") ? readFileSync("src/index.ts", "utf8") : "";
 
@@ -149,13 +170,15 @@ const wasmPluginRouteCount = Array.isArray(wasmPluginManifest.routes)
   : 0;
 const packSdkHelperExports = (packsSource.match(/export function (summarizeCatalogSourceReports|hasCatalogSourceIssues)\b/g) ?? []).length;
 const packSdkPrepareSummaryHelperExports = (packsSource.match(/export function summarizeCapabilityPrepare\b/g) ?? []).length;
+const styledOfficialPackCount = officialPackManifests.filter((manifest) => manifest.metadata?.descriptionStyle === "one-line-plus-three-examples").length;
 const maxUnpackedSize = baseUnpackedSize
   + Math.max(0, exportedFiles.size - baseExportedFiles) * maxUnpackedGrowthPerExport
   + Math.max(0, manifestCapabilityCount - baseManifestCapabilities) * maxUnpackedGrowthPerManifestCapability
   + Math.max(0, memoryTimeTravelCapabilityCount - 20) * maxUnpackedGrowthPerMemoryTimeTravelCapability
   + Math.max(0, wasmPluginRouteCount - 13) * maxUnpackedGrowthPerWASMPluginRoute
   + Math.max(0, packSdkHelperExports - basePackSdkHelperExports) * maxUnpackedGrowthPerPackSdkHelperExport
-  + packSdkPrepareSummaryHelperExports * maxUnpackedGrowthForPackPrepareSummaryHelperExport;
+  + packSdkPrepareSummaryHelperExports * maxUnpackedGrowthForPackPrepareSummaryHelperExport
+  + styledOfficialPackCount * maxUnpackedGrowthPerStyledOfficialPack;
 if (pack.unpackedSize > maxUnpackedSize) {
   console.error(`pack unpacked size ${pack.unpackedSize} exceeds dynamic budget ${maxUnpackedSize}`);
   process.exit(1);

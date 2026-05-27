@@ -9,8 +9,8 @@ package approval
 
 // Evaluator checks operations against risk policy.
 type Evaluator struct {
-	policy   Policy
-	riskMap  map[string]RiskLevel
+	policy  Policy
+	riskMap map[string]RiskLevel
 }
 
 // NewEvaluator creates an evaluator with the given policy.
@@ -31,11 +31,11 @@ func (e *Evaluator) SetRisk(skillName string, level RiskLevel) {
 
 // EvalInput describes the operation to evaluate.
 type EvalInput struct {
-	SkillName  string
-	TaskID     string
-	StepIndex  int
-	Params     map[string]any
-	TenantID   string
+	SkillName string
+	TaskID    string
+	StepIndex int
+	Params    map[string]any
+	TenantID  string
 }
 
 // Evaluate checks if the operation needs human approval.
@@ -64,7 +64,7 @@ func (e *Evaluator) Evaluate(input EvalInput) *Request {
 	}
 
 	// Below threshold and not always-required
-	if risk < e.policy.MinRiskLevel && !alwaysRequired {
+	if !risk.AtLeast(e.policy.MinRiskLevel) && !alwaysRequired {
 		return nil
 	}
 

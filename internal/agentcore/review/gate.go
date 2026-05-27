@@ -4,28 +4,18 @@ import (
 	"context"
 	"fmt"
 	"strings"
+
+	"yunque-agent/pkg/risk"
 )
 
 // Risk classifies operation risk.
-type Risk int
+type Risk = risk.Level
 
 const (
-	RiskLow  Risk = iota // query, translate, chat → pass through
-	RiskMed              // write file, call installed skill → quick LLM review
-	RiskHigh             // install skill, modify persona, shell, network → full review + user confirm
+	RiskLow  Risk = risk.Low    // query, translate, chat → pass through
+	RiskMed  Risk = risk.Medium // write file, call installed skill → quick LLM review
+	RiskHigh Risk = risk.High   // install skill, modify persona, shell, network → full review + user confirm
 )
-
-func (r Risk) String() string {
-	switch r {
-	case RiskLow:
-		return "low"
-	case RiskMed:
-		return "medium"
-	case RiskHigh:
-		return "high"
-	}
-	return "unknown"
-}
 
 // Verdict is the result of a review.
 type Verdict struct {

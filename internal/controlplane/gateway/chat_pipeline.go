@@ -175,7 +175,7 @@ func (g *Gateway) ExecuteChatPipeline(ctx context.Context, req *ChatRequest) (*C
 				totalChars += len([]rune(p.Text))
 			}
 		}
-		model := g.planner.LLMClientFor(routedTier).Model()
+		model := g.planner.ModelIDForTier(routedTier)
 		if g.costTracker.WouldExceedBudget(model, totalChars/3+50, 500) {
 			observe.EndSpan(traceSpan, fmt.Errorf("budget exceeded"))
 			return nil, fmt.Errorf("cost budget would be exceeded")

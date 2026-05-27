@@ -73,6 +73,7 @@ function describePath(pathname: string | null) {
   if (path.startsWith("/dashboard")) return "概览";
   if (path.startsWith("/missions")) return "任务中心";
   if (path.startsWith("/plugins")) return "插件";
+  if (path.startsWith("/packs")) return "能力包";
   return path;
 }
 

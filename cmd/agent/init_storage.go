@@ -23,6 +23,21 @@ func initStorage(app *agentrt.App) error {
 
 	ldg, err := iledger.InitLedgerAt(dbPath)
 	if err != nil {
+		if os.Getenv("YUNQUE_LEDGER_AUTO_RECOVER") == "true" {
+			recovered, report, recoverErr := iledger.InitLedgerAtRecovering(dbPath, app.Config.DataPath("ledger", "quarantine"), nil)
+			if recoverErr == nil {
+				ldg = recovered
+				slog.Error("ledger SQLite was unhealthy and has been quarantined; started with fresh Ledger. Restore latest backup-pack archive to recover prior state.",
+					"reason", report.Reason,
+					"quarantine_dir", report.QuarantineDir,
+					"files", report.Files)
+				err = nil
+			} else {
+				slog.Error("ledger auto-recovery failed", "err", recoverErr)
+			}
+		}
+	}
+	if err != nil {
 		if os.Getenv("ALLOW_EPHEMERAL") == "true" {
 			slog.Error("╔══════════════════════════════════════════════════════════╗")
 			slog.Error("║ LEDGER INIT FAILED - running in EPHEMERAL mode          ║")
