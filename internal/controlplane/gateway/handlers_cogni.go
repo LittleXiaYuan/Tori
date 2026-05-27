@@ -2,7 +2,9 @@ package gateway
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -23,6 +25,8 @@ import (
 //	POST   /v1/cognis/{id}/enable  → enable
 //	POST   /v1/cognis/{id}/disable → disable
 //	POST   /v1/cognis/reload       → re-scan the cognis directory on disk
+//	POST   /v1/cognis/import       → import a bundle (persists added/updated to disk)
+//	GET    /v1/cognis/export       → export declarations as a bundle
 //	GET    /v1/cognis/traces       → recent per-turn evaluation traces
 //	GET    /v1/cognis/stats        → activation counts per cogni
 //	GET    /v1/cognis/health       → health metrics for every cogni seen recently
@@ -200,6 +204,14 @@ func (g *Gateway) cogniExportBundle(w http.ResponseWriter, r *http.Request) {
 	_ = enc.Encode(bundle)
 }
 
+// cogniImportBundle imports a bundle of Cogni declarations into the registry.
+// Successfully imported cognis (added and updated) are automatically persisted
+// to disk in the cogniDir as {id}.json files, ensuring they survive restarts.
+// Skipped and failed cognis are not persisted.
+//
+// Query parameters:
+//   - overwrite=true: replace existing declarations with the same ID
+//   - overwrite=false (default): skip existing declarations
 func (g *Gateway) cogniImportBundle(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "POST only")
@@ -220,6 +232,34 @@ func (g *Gateway) cogniImportBundle(w http.ResponseWriter, r *http.Request) {
 		apperror.WriteCode(w, apperror.CodeBadRequest, err.Error())
 		return
 	}
+
+	// Persist successfully imported cognis to disk
+	if g.cogniDir != "" {
+		// Ensure the directory exists
+		if err := os.MkdirAll(g.cogniDir, 0o755); err != nil {
+			slog.Warn("cogni: failed to create directory", "dir", g.cogniDir, "err", err)
+		} else {
+			// Save added cognis
+			for _, id := range summary.Added {
+				if decl, ok := g.cogniRegistry.Get(id); ok {
+					savePath := filepath.Join(g.cogniDir, id+".json")
+					if err := cogni.SaveDeclaration(decl, savePath); err != nil {
+						slog.Warn("cogni: failed to save imported declaration", "id", id, "path", savePath, "err", err)
+					}
+				}
+			}
+			// Save updated cognis
+			for _, id := range summary.Updated {
+				if decl, ok := g.cogniRegistry.Get(id); ok {
+					savePath := filepath.Join(g.cogniDir, id+".json")
+					if err := cogni.SaveDeclaration(decl, savePath); err != nil {
+						slog.Warn("cogni: failed to save updated declaration", "id", id, "path", savePath, "err", err)
+					}
+				}
+			}
+		}
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(summary)
 }
