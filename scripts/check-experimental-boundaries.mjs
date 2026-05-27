@@ -9,30 +9,6 @@ const promotedPackages = ["trait", "recommend", "react", "taskdistill", "eval", 
 
 const allowedMainlineExperimentalImports = new Map([
   [
-    "distill",
-    {
-      reason: "distillation service is still exposed through gateway/bootstrap wiring",
-      files: [
-        "cmd/agent/init_extensions.go",
-        "cmd/agent/init_soul.go",
-        "internal/controlplane/gateway/gateway.go",
-        "internal/controlplane/gateway/gateway_setters.go",
-      ],
-    },
-  ],
-  [
-    "heartbeat",
-    {
-      reason: "session/heartbeat runtime module still exposed through bootstrap/gateway",
-      files: [
-        "cmd/agent/init_session_auth.go",
-        "cmd/agent/module_heartbeat.go",
-        "internal/controlplane/gateway/gateway.go",
-        "internal/controlplane/gateway/gateway_setters.go",
-      ],
-    },
-  ],
-  [
     "iterate",
     {
       reason: "iteration service still exposed through gateway/bootstrap wiring",
@@ -143,6 +119,18 @@ if (exists("internal/experimental/rlsched")) {
 }
 if (!exists("internal/agentcore/tasksched/rlsched")) {
   failures.push("task scheduler policy missing from internal/agentcore/tasksched/rlsched");
+}
+if (exists("internal/experimental/heartbeat")) {
+  failures.push("heartbeat runtime module still exists under internal/experimental/heartbeat");
+}
+if (!exists("internal/agentcore/runtime/heartbeat")) {
+  failures.push("heartbeat runtime module missing from internal/agentcore/runtime/heartbeat");
+}
+if (exists("internal/experimental/distill")) {
+  failures.push("distillation service still exists under internal/experimental/distill");
+}
+if (!exists("internal/agentcore/llm/distill")) {
+  failures.push("distillation service missing from internal/agentcore/llm/distill");
 }
 for (const pkg of ["docparse", "filegen", "imagegen", "research"]) {
   if (exists(`internal/experimental/${pkg}`)) {

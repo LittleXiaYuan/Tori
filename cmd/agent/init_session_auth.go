@@ -13,12 +13,12 @@ import (
 	"yunque-agent/internal/agentcore/llm"
 	"yunque-agent/internal/agentcore/planner"
 	agentrt "yunque-agent/internal/agentcore/runtime"
+	"yunque-agent/internal/agentcore/runtime/heartbeat"
 	"yunque-agent/internal/agentcore/session"
 	"yunque-agent/internal/config"
 	"yunque-agent/internal/controlplane/gateway"
 	"yunque-agent/internal/execution/channel"
 	"yunque-agent/internal/execution/scheduler"
-	"yunque-agent/internal/experimental/heartbeat"
 	iledger "yunque-agent/internal/ledger"
 
 	"yunque-agent/internal/ledgercore"

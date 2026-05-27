@@ -14,6 +14,7 @@ import (
 	"time"
 
 	iforestpkg "yunque-agent/internal/agentcore/anomaly"
+	"yunque-agent/internal/agentcore/llm/distill"
 	"yunque-agent/internal/agentcore/multiagent"
 	"yunque-agent/internal/agentcore/planner"
 	"yunque-agent/internal/agentcore/review"
@@ -29,7 +30,6 @@ import (
 	"yunque-agent/internal/cognicore/taskdistill"
 	"yunque-agent/internal/cognicore/trait"
 	"yunque-agent/internal/cognicore/world"
-	"yunque-agent/internal/experimental/distill"
 	"yunque-agent/internal/experimental/iterate"
 	"yunque-agent/internal/experimental/skillgrow"
 
