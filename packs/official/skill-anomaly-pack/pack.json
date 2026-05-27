@@ -2,7 +2,7 @@
   "id": "yunque.pack.skill-anomaly",
   "name": "Skill Anomaly Pack",
   "version": "0.1.0",
-  "description": "将 skill 行为基线、异常评分、NeedsApproval 计划、audit-hook / Trust mutation 计划、pack-local Approval queue 写回、Approval Manager bridge plan 和证据包导出作为可选治理能力包暴露。",
+  "description": "技能异常审批的可选治理能力包。",
   "requiresCore": ">=0.1.0",
   "optional": true,
   "defaultState": "disabled",
@@ -120,13 +120,11 @@
   "metadata": {
     "blueprint": "doc/SKILL-ANOMALY-DETECTION.md",
     "stage": "pack-shell-before-audit-hook",
-    "sync": "backend-registry-drives-frontend"
+    "sync": "backend-registry-drives-frontend",
+    "descriptionStyle": "one-line-plus-three-examples",
+    "example1": "采集技能事件并维护行为画像。",
+    "example2": "运行异常检测并生成 NeedsApproval 计划。",
+    "example3": "写入 pack-local 审批队列并导出证据包。"
   },
-  "distribution": {
-    "manifestUrl": "https://packs.yunque.local/skill-anomaly-pack/pack.json",
-    "packageUrl": "https://packs.yunque.local/skill-anomaly-pack/skill-anomaly-pack-0.1.0.tgz",
-    "frontendUrl": "https://packs.yunque.local/skill-anomaly-pack/frontend/remoteEntry.js",
-    "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-    "sizeBytes": 4096
-  }
+  "status": "alpha"
 }
