@@ -10,11 +10,13 @@ import {
 import {
   Key, Save, Check, AlertTriangle, RefreshCw, Settings, Cpu, Layers,
   Shield, Plug, Database, Eye, EyeOff, Rocket, FolderOpen, FolderCheck,
-  Smile, Heart, ExternalLink, Cloud, Search,
+  Smile, Heart, ExternalLink, Cloud, Search, User,
 } from "lucide-react";
+import { PreferencesPanel } from "@/components/preferences-panel";
 import Link from "next/link";
 
 const groupMeta: Record<string, { icon: React.ElementType; color: string }> = {
+  preferences: { icon: User,       color: "var(--yunque-accent)" },
   core:        { icon: Cpu,        color: "var(--yunque-accent)" },
   multimodel:  { icon: Layers,     color: "#8b5cf6" },
   advanced:    { icon: Settings,   color: "#f59e0b" },
@@ -46,6 +48,7 @@ export default function SettingsPage() {
   useEffect(() => { setClientKey(getApiKey()); loadConfig(); }, []);
 
   const providerGroups = new Set(["core", "multimodel"]);
+  const preferencesGroup = { key: "preferences", label: "个性化", label_zh: "个性化", fields: [] };
 
   const loadConfig = useCallback(async () => {
     setLoading(true);
@@ -55,9 +58,10 @@ export default function SettingsPage() {
         api.getConfig().catch(() => ({ values: {} as Record<string, string> })),
       ]);
       const filtered = s.groups.filter(g => !providerGroups.has(g.key));
-      setSchema(filtered);
+      const withPreferences = [preferencesGroup, ...filtered];
+      setSchema(withPreferences);
       setValues(c.values);
-      if (filtered.length && !activeGroup) setActiveGroup(filtered[0].key);
+      if (withPreferences.length && !activeGroup) setActiveGroup("preferences");
       try { const chk = await api.checkSetup(); setSetupNeeded(chk.setup_needed); } catch { /* no auth */ }
     } finally { setLoading(false); }
   }, [activeGroup]);
@@ -242,7 +246,10 @@ export default function SettingsPage() {
 
           {/* Right content */}
           <div className="settings-content">
-            {currentGroup && (
+            {currentGroup && currentGroup.key === "preferences" && (
+              <PreferencesPanel />
+            )}
+            {currentGroup && currentGroup.key !== "preferences" && (
               <>
                 <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", marginBottom: "var(--sp-5)", paddingBottom: "var(--sp-3)", borderBottom: "1px solid var(--yunque-border)" }}>
                   {(() => { const M = (groupMeta[currentGroup.key] || groupMeta.other); const I = M.icon; return <I size={17} style={{ color: M.color }} />; })()}

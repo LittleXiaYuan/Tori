@@ -10,9 +10,11 @@
 //	yunque stop <name>        — deactivate a running Cognifile
 //	yunque rm   <name>        — uninstall a Cognifile
 //	yunque init <name>        — scaffold a new Cognifile template
+//	yunque export             — export readable user data
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -21,6 +23,7 @@ import (
 	"time"
 
 	"yunque-agent/internal/appdir"
+	userexport "yunque-agent/internal/export/userdata"
 	"yunque-agent/pkg/cogni"
 	"yunque-agent/pkg/cognifile"
 )
@@ -42,12 +45,14 @@ const usage = `用法: yunque <command> [arguments]
   stop <name>        停止运行中的 Cognifile
   rm   <name>        卸载 Cognifile
   init <name>        创建新的 Cognifile 模板
+  export             导出可读的记忆 / 对话 / feedback
 
 示例:
   yunque pull ./legal-advisor.cognifile.yaml
   yunque run  legal-advisor
   yunque list
   yunque init my-agent
+  yunque export --out ./exports
 `
 
 func main() {
@@ -80,6 +85,8 @@ func main() {
 		err = cmdRemove(registry, args)
 	case "init":
 		err = cmdInit(args)
+	case "export":
+		err = cmdExport(dataDir, args)
 	case "help", "--help", "-h":
 		fmt.Print(banner)
 		fmt.Print(usage)
@@ -95,6 +102,50 @@ func main() {
 		fmt.Fprintf(os.Stderr, "错误: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+func cmdExport(defaultDataDir string, args []string) error {
+	dataDir := defaultDataDir
+	outDir := ""
+
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--data-dir":
+			i++
+			if i >= len(args) {
+				return fmt.Errorf("用法: yunque export [--data-dir <dir>] [--out <dir>]")
+			}
+			dataDir = args[i]
+		case "--out", "-o":
+			i++
+			if i >= len(args) {
+				return fmt.Errorf("用法: yunque export [--data-dir <dir>] [--out <dir>]")
+			}
+			outDir = args[i]
+		case "--help", "-h":
+			fmt.Println("用法: yunque export [--data-dir <dir>] [--out <dir>]")
+			fmt.Println("  导出 memory.md、conversations.md、feedback.md、manifest.json 与 raw/ 原始副本。")
+			return nil
+		default:
+			return fmt.Errorf("未知参数 %q；用法: yunque export [--data-dir <dir>] [--out <dir>]", args[i])
+		}
+	}
+
+	report, err := userexport.Export(context.Background(), userexport.Options{
+		DataDir: dataDir,
+		OutDir:  outDir,
+	})
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("✓ 用户数据已导出: %s\n", report.ExportDir)
+	fmt.Printf("  记忆: %d  对话: %d  Feedback: %d  原始文件: %d\n",
+		report.MemoryCount, report.SessionCount, report.FeedbackCount, len(report.RawFiles))
+	if len(report.Warnings) > 0 {
+		fmt.Printf("  注意: %d 条警告已写入 README.md / manifest.json\n", len(report.Warnings))
+	}
+	return nil
 }
 
 func cmdPull(registry *cognifile.LocalRegistry, args []string) error {

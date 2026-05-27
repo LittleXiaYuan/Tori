@@ -74,8 +74,8 @@ func initPlanner(app *agentrt.App) error {
 
 	// ── Reflect Engine v2: intent-aware quality evaluation ──
 	reflectEngine.SetMode(app.Config.ReflectMode)
-	if app.Config.ReflectModel != "" && p.LLMPool() != nil {
-		reflectEngine.SetEvalModel(p.LLMPool(), app.Config.ReflectModel)
+	if app.Config.ReflectModel != "" && app.LLMPool != nil {
+		reflectEngine.SetEvalModel(app.LLMPool, app.Config.ReflectModel)
 	}
 	slog.Info("reflect engine configured", "mode", app.Config.ReflectMode, "eval_model", app.Config.ReflectModel)
 
@@ -192,8 +192,11 @@ func initPlanner(app *agentrt.App) error {
 	slog.Info("reverie initialized", "enabled", reverieCfg.Enabled, "interval", reverieCfg.Interval, "event_triggers", true)
 
 	app.Metrics.SetBreakerStatus(func() (string, int) {
-		b := p.LLMBreaker()
-		return b.State(), b.Failures()
+		health := p.ModelRuntimeHealth()
+		if !health.Configured {
+			return "unconfigured", 0
+		}
+		return health.BreakerState, health.Failures
 	})
 
 	// Learning loop

@@ -31,7 +31,7 @@ type Manager struct {
 	waiters   map[string]chan struct{} // id → signal channel
 	listeners []Listener
 	policy    Policy
-	rules     *RuleStore  // persistent allow/deny rules
+	rules     *RuleStore // persistent allow/deny rules
 }
 
 // NewManager creates an approval manager with the given policy.
@@ -347,7 +347,7 @@ func (m *Manager) shouldAutoApprove(req *Request) bool {
 		return true
 	}
 	// Below policy threshold
-	if req.RiskLevel < m.policy.MinRiskLevel {
+	if !req.RiskLevel.AtLeast(m.policy.MinRiskLevel) {
 		return true
 	}
 	return false

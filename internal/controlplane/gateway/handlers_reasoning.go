@@ -7,10 +7,12 @@ import (
 	"math/rand/v2"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"yunque-agent/internal/agentcore/state"
 	"yunque-agent/internal/apperror"
+	"yunque-agent/internal/cognikernel"
 	"yunque-agent/internal/execution/channel"
 	reflectpkg "yunque-agent/internal/experimental/reflect"
 )
@@ -342,12 +344,17 @@ func (g *Gateway) PreAckReact(ctx context.Context, channelType, target, messageI
 // 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 func (g *Gateway) handleExperiences(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET only")
+	if r.Method != http.MethodGet && r.Method != http.MethodPost {
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET or POST only")
 		return
 	}
 	if g.experienceStore == nil {
 		apperror.WriteCode(w, apperror.CodeNotFound, "experience store not initialized")
+		return
+	}
+
+	if r.Method == http.MethodPost {
+		g.handleExperienceCreate(w, r)
 		return
 	}
 
@@ -361,7 +368,14 @@ func (g *Gateway) handleExperiences(w http.ResponseWriter, r *http.Request) {
 	// for scoped counters without fetching the full experience list.
 	if r.URL.Query().Get("stats") == "true" {
 		all := g.experienceStore.All()
-		st := summarizeReflectExperiences(filterReflectExperiences(all, source, category, outcome, tag))
+		filtered := filterReflectExperiences(all, source, category, outcome, tag)
+		if r.URL.Query().Get("kind") == "workload_feedback" {
+			st := reflectpkg.SummarizeWorkloadFeedback(filtered, reflectWorkloadIDsFromQuery(r))
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(st)
+			return
+		}
+		st := summarizeReflectExperiences(filtered)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(st)
 		return
@@ -392,6 +406,85 @@ func (g *Gateway) handleExperiences(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]any{"experiences": all, "total": len(all)})
 }
 
+func (g *Gateway) handleExperienceCreate(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Experience *reflectpkg.Experience `json:"experience"`
+		ID         string                 `json:"id"`
+		Source     string                 `json:"source"`
+		SourceID   string                 `json:"source_id"`
+		Category   string                 `json:"category"`
+		Outcome    string                 `json:"outcome"`
+		Lesson     string                 `json:"lesson"`
+		Context    string                 `json:"context"`
+		Tags       []string               `json:"tags"`
+		CreatedAt  time.Time              `json:"created_at"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		apperror.WriteCode(w, apperror.CodeBadRequest, "invalid JSON body")
+		return
+	}
+	exp := reflectpkg.Experience{
+		ID:        req.ID,
+		Source:    req.Source,
+		SourceID:  req.SourceID,
+		Category:  req.Category,
+		Outcome:   req.Outcome,
+		Lesson:    req.Lesson,
+		Context:   req.Context,
+		Tags:      req.Tags,
+		CreatedAt: req.CreatedAt,
+	}
+	if req.Experience != nil {
+		exp = *req.Experience
+	}
+	exp.Source = strings.TrimSpace(exp.Source)
+	exp.Category = strings.TrimSpace(exp.Category)
+	exp.Outcome = strings.TrimSpace(exp.Outcome)
+	exp.Lesson = strings.TrimSpace(exp.Lesson)
+	exp.Context = strings.TrimSpace(exp.Context)
+	exp.SourceID = strings.TrimSpace(exp.SourceID)
+	if exp.Source == "" {
+		exp.Source = "interaction"
+	}
+	if exp.Category == "" {
+		exp.Category = "workload_feedback"
+	}
+	if exp.Outcome == "" {
+		exp.Outcome = "partial"
+	}
+	if exp.Lesson == "" {
+		apperror.WriteCode(w, apperror.CodeBadRequest, "experience lesson is required")
+		return
+	}
+	if isReflectiveLoopFeedback(exp) && g.reflectiveLoop != nil {
+		if result, err := g.reflectiveLoop.IngestFeedback(r.Context(), cognikernel.FeedbackData{
+			Source:    exp.Source,
+			SourceID:  exp.SourceID,
+			Category:  exp.Category,
+			Outcome:   exp.Outcome,
+			Lesson:    exp.Lesson,
+			Context:   exp.Context,
+			Tags:      exp.Tags,
+			CreatedAt: exp.CreatedAt,
+		}); err == nil && result != nil && result.ExperiencesAdded > 0 {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]any{"experience": exp, "status": "stored", "ingested_by": "reflective_loop"})
+			return
+		} else if err != nil {
+			slog.Warn("reflective loop feedback ingestion failed; storing directly", "err", err)
+		}
+	}
+
+	g.experienceStore.Add(exp)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{"experience": exp, "status": "stored"})
+}
+
+func isReflectiveLoopFeedback(exp reflectpkg.Experience) bool {
+	return exp.Source == "workload_feedback" || exp.Category == "workload_feedback"
+}
+
 func reflectExperienceLimit(r *http.Request, fallback int) int {
 	raw := r.URL.Query().Get("limit")
 	if raw == "" {
@@ -405,6 +498,24 @@ func reflectExperienceLimit(r *http.Request, fallback int) int {
 		return 200
 	}
 	return limit
+}
+
+func reflectWorkloadIDsFromQuery(r *http.Request) []string {
+	raw := r.URL.Query().Get("workloads")
+	if raw == "" {
+		return nil
+	}
+	parts := strings.FieldsFunc(raw, func(r rune) bool {
+		return r == ',' || r == '\n' || r == ' '
+	})
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			out = append(out, part)
+		}
+	}
+	return out
 }
 
 func filterReflectExperiences(experiences []reflectpkg.Experience, source, category, outcome, tag string) []reflectpkg.Experience {

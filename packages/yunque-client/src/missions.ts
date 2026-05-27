@@ -16,8 +16,23 @@ export type ReflectExperience = {
   [key: string]: unknown;
 };
 export type ExperiencesResponse = { experiences: ReflectExperience[]; total: number; [key: string]: unknown };
+export type ExperienceCreateResponse = { experience: ReflectExperience; status: string; [key: string]: unknown };
 export type ExperienceStatsOptions = { source?: ExperienceSource; category?: string; outcome?: ExperienceOutcome; tag?: string };
 export type ExperienceStatsResponse = { total?: number; by_source?: Record<string, number>; by_category?: Record<string, number>; by_outcome?: Record<string, number>; recent_7d?: number; [key: string]: unknown };
+export type WorkloadFeedbackStatsResponse = {
+  total?: number;
+  recent_7d?: number;
+  workloads?: number;
+  by_workload?: Record<string, number>;
+  findability?: Record<string, number>;
+  filled?: number;
+  fill_rate?: number;
+  average_per_workload?: number;
+  average_per_active_workload?: number;
+  latest_at?: string;
+  [key: string]: unknown;
+};
+export type WorkloadFeedbackStatsOptions = { workloads?: string[] };
 export type StrategiesOptions = { q?: string; source?: ExperienceSource; category?: string; outcome?: ExperienceOutcome; tag?: string; limit?: number };
 export type StrategiesResponse = { strategies: string; [key: string]: unknown };
 export type MissionsClientOptions = { baseUrl: string; token?: string; apiKey?: string; headers?: HeadersInit; fetch?: typeof fetch };
@@ -56,7 +71,9 @@ export class MissionsClient {
 
   parse(description: string): Promise<MissionParseResult> { return this.json<MissionParseResult>("/v1/missions/parse", { method: "POST", body: JSON.stringify({ description }) }); }
   experiences(options: ExperienceListOptions = {}): Promise<ExperiencesResponse> { const url = new URL(`${this.baseUrl}/v1/reflect/experiences`); setOptionalQuery(url, "q", options.q); setOptionalQuery(url, "source", options.source); setOptionalQuery(url, "category", options.category); setOptionalQuery(url, "outcome", options.outcome); setOptionalQuery(url, "tag", options.tag); setOptionalNumberQuery(url, "limit", options.limit); return this.json<ExperiencesResponse>(url); }
+  addExperience(experience: ReflectExperience): Promise<ExperienceCreateResponse> { return this.json<ExperienceCreateResponse>("/v1/reflect/experiences", { method: "POST", body: JSON.stringify({ experience }) }); }
   experienceStats(options: ExperienceStatsOptions = {}): Promise<ExperienceStatsResponse> { const url = new URL(`${this.baseUrl}/v1/reflect/experiences`); url.searchParams.set("stats", "true"); setOptionalQuery(url, "source", options.source); setOptionalQuery(url, "category", options.category); setOptionalQuery(url, "outcome", options.outcome); setOptionalQuery(url, "tag", options.tag); return this.json<ExperienceStatsResponse>(url); }
+  workloadFeedbackStats(options: WorkloadFeedbackStatsOptions = {}): Promise<WorkloadFeedbackStatsResponse> { const url = new URL(`${this.baseUrl}/v1/reflect/experiences`); url.searchParams.set("stats", "true"); url.searchParams.set("kind", "workload_feedback"); url.searchParams.set("source", "workload_feedback"); url.searchParams.set("category", "workload_feedback"); if (options.workloads?.length) url.searchParams.set("workloads", options.workloads.join(",")); return this.json<WorkloadFeedbackStatsResponse>(url); }
   strategies(options: StrategiesOptions = {}): Promise<StrategiesResponse> { const url = new URL(`${this.baseUrl}/v1/reflect/strategies`); setOptionalQuery(url, "q", options.q); setOptionalQuery(url, "source", options.source); setOptionalQuery(url, "category", options.category); setOptionalQuery(url, "outcome", options.outcome); setOptionalQuery(url, "tag", options.tag); setOptionalNumberQuery(url, "limit", options.limit); return this.json<StrategiesResponse>(url); }
 
   private authHeaders(extra?: HeadersInit): Headers { const headers = mergeHeaders(this.headers, extra); if (this.token && !headers.has("authorization")) headers.set("Authorization", `Bearer ${this.token}`); if (this.apiKey && !headers.has("x-api-key")) headers.set("X-API-Key", this.apiKey); return headers; }

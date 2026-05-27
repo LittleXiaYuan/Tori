@@ -61,38 +61,6 @@ func TestContextAssemblyServiceAppendGraphContext(t *testing.T) {
 	}
 }
 
-func TestContextAssemblyServiceCogniBoundary(t *testing.T) {
-	service := NewContextAssemblyService()
-	service.SetCogniContext(func(_ context.Context, message, _, _ string) string {
-		return "ctx:" + message
-	})
-	service.SetCogniSkillFilter(func(_ string, _, _ string, in []skills.Skill) []skills.Skill {
-		return in[:1]
-	})
-	service.SetCogniTrace(func(_ string, _, _ string) (CogniTraceDetail, bool) {
-		return CogniTraceDetail{Activated: []string{"demo"}, ContextBytes: 3}, true
-	})
-
-	if got := service.CogniContext(context.Background(), "hello", "tenant", "web"); got != "ctx:hello" {
-		t.Fatalf("unexpected cogni context: %q", got)
-	}
-	filtered := service.ApplyCogniSkillFilter("hello", "tenant", "web", []skills.Skill{dummyPlannerSkill("a"), dummyPlannerSkill("b")})
-	if len(filtered) != 1 || filtered[0].Name() != "a" {
-		t.Fatalf("unexpected filtered skills: %#v", filtered)
-	}
-	var emitted observe.AgentEvent
-	service.EmitCogniTrace("hello", "tenant", "web", "trace-id", "task-id", func(evt observe.AgentEvent) {
-		emitted = evt
-	})
-	if emitted.Summary == "" || emitted.Meta.TenantID != "tenant" || emitted.Meta.TaskID != "task-id" {
-		t.Fatalf("expected cogni trace event, got %#v", emitted)
-	}
-	detail, ok := emitted.Detail.(CogniTraceDetail)
-	if !ok || len(detail.Activated) != 1 || detail.Activated[0] != "demo" {
-		t.Fatalf("unexpected trace detail: %#v", emitted.Detail)
-	}
-}
-
 func TestContextAssemblyServiceCogniRuntimeBoundary(t *testing.T) {
 	service := NewContextAssemblyService()
 	service.SetCogniRuntime(stubCogniRuntime{

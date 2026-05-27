@@ -143,24 +143,6 @@ func (s *ContextAssemblyService) ensureCogniService() *CogniContextService {
 	return s.cogniService
 }
 
-func (s *ContextAssemblyService) SetCogniContext(fn CogniContextFunc) {
-	if s != nil {
-		s.ensureCogniService().SetContext(fn)
-	}
-}
-
-func (s *ContextAssemblyService) SetCogniSkillFilter(fn CogniSkillFilterFunc) {
-	if s != nil {
-		s.ensureCogniService().SetSkillFilter(fn)
-	}
-}
-
-func (s *ContextAssemblyService) SetCogniTrace(fn CogniTraceFunc) {
-	if s != nil {
-		s.ensureCogniService().SetTrace(fn)
-	}
-}
-
 func (s *ContextAssemblyService) SetCogniRuntime(runtime CogniRuntime) {
 	if s != nil {
 		s.ensureCogniService().SetRuntime(runtime)

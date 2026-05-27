@@ -15,7 +15,7 @@ import { I18nProvider } from "@/lib/i18n";
 import { DragRegion } from "@/components/title-bar";
 
 const NO_SIDEBAR_PATHS = ["/login", "/setup"];
-const BARE_PATHS = ["/floating-ball", "/floating-panel"];
+const BARE_PATHS: string[] = [];
 
 function PageFallback() {
   return (
@@ -118,13 +118,22 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <div style={{
             width: zenMode ? 0 : "var(--rail-w, 64px)",
             minWidth: zenMode ? 0 : "var(--rail-w, 64px)",
+            height: "100vh",
+            position: "fixed",
+            left: 0,
+            top: 0,
             overflow: "hidden",
             transition: "width 0.3s cubic-bezier(.22,1,.36,1), min-width 0.3s cubic-bezier(.22,1,.36,1)",
+            zIndex: 100,
           }}>
             <AccountRail />
           </div>
         )}
-        <main id="main-content" className="flex min-h-screen flex-1 flex-col overflow-hidden" style={{ opacity: "var(--yunque-content-opacity, 1)" }}>
+        <main id="main-content" className="flex min-h-screen flex-1 flex-col overflow-hidden" style={{
+          opacity: "var(--yunque-content-opacity, 1)",
+          marginLeft: !onAuthPath && !zenMode ? "var(--rail-w, 64px)" : 0,
+          transition: "margin-left 0.3s cubic-bezier(.22,1,.36,1)",
+        }}>
           <Suspense fallback={<PageFallback />}>
             {children}
           </Suspense>

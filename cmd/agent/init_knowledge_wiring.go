@@ -130,16 +130,8 @@ func initKnowledgeWiring(app *agentrt.App, gw *gateway.Gateway, embedRes *embedd
 }
 
 func wireKnowledgeToPlanner(p *planner.Planner, ks *knowledge.Store) {
-	prevGraph := p.GraphContext()
-
-	p.SetGraphContext(func(query string) string {
+	p.AppendGraphContext(func(query string) string {
 		var parts []string
-
-		if prevGraph != nil {
-			if ledgerCtx := prevGraph(query); ledgerCtx != "" {
-				parts = append(parts, ledgerCtx)
-			}
-		}
 
 		scored := ks.HybridSearchReranked(context.Background(), query, DefaultKnowledgeTopK)
 		if len(scored) > 0 {

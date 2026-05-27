@@ -45,6 +45,7 @@ import (
 	"yunque-agent/internal/agentcore/trust"
 	"yunque-agent/internal/agentcore/websearch"
 	"yunque-agent/internal/agentcore/workflow"
+	"yunque-agent/internal/cognikernel"
 	"yunque-agent/internal/connectors"
 	"yunque-agent/internal/execution/channel"
 	"yunque-agent/internal/execution/scheduler"
@@ -365,6 +366,10 @@ func (g *Gateway) SetStateKernel(sk *state.Kernel) { g.stateKernel = sk }
 
 // SetExperienceStore attaches the reflection experience store.
 func (g *Gateway) SetExperienceStore(es *reflectpkg.ExperienceStore) { g.experienceStore = es }
+
+// SetReflectiveLoop attaches the canonical reflection loop used for explicit
+// feedback ingestion and post-turn learning.
+func (g *Gateway) SetReflectiveLoop(rl *cognikernel.ReflectiveLoop) { g.reflectiveLoop = rl }
 
 // SetTemplateStore attaches the task template store.
 func (g *Gateway) SetTemplateStore(ts *task.TemplateStore) { g.templateStore = ts }

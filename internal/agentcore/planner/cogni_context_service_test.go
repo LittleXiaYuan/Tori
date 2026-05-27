@@ -24,16 +24,11 @@ func TestCogniContextServiceDefaultsToNoop(t *testing.T) {
 	}
 }
 
-func TestPlannerSetCogniCallbacksUsesService(t *testing.T) {
+func TestPlannerSetCogniRuntimeUsesService(t *testing.T) {
 	p := &Planner{}
-	p.SetCogniContext(func(ctx context.Context, message, tenantID, channel string) string {
-		return "cogni:" + message
-	})
-	p.SetCogniSkillFilter(func(message, tenantID, channel string, in []skills.Skill) []skills.Skill {
-		return in[:1]
-	})
-	p.SetCogniTrace(func(message, tenantID, channel string) (CogniTraceDetail, bool) {
-		return CogniTraceDetail{Activated: []string{"demo"}, ContextBytes: 5}, true
+	p.SetCogniRuntime(stubCogniRuntime{
+		context: "cogni",
+		trace:   CogniTraceDetail{Activated: []string{"demo"}, ContextBytes: 5},
 	})
 
 	if p.contextAssembly == nil {

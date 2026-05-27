@@ -44,11 +44,14 @@ func (g *Gateway) handleReadyz(w http.ResponseWriter, r *http.Request) {
 	allReady := true
 
 	if g.planner != nil {
-		breaker := g.planner.LLMBreaker()
-		if breaker.State() == "open" {
-			checks["llm"] = checkDegraded("circuit breaker open (failures=" + strconv.Itoa(breaker.Failures()) + ")")
+		modelHealth := g.planner.ModelRuntimeHealth()
+		if !modelHealth.Configured {
+			checks["llm"] = checkDown("model runtime not configured")
+			allReady = false
+		} else if modelHealth.BreakerState == "open" {
+			checks["llm"] = checkDegraded("circuit breaker open (failures=" + strconv.Itoa(modelHealth.Failures) + ")")
 		} else {
-			checks["llm"] = checkOK("breaker=" + breaker.State())
+			checks["llm"] = checkOK("breaker=" + modelHealth.BreakerState)
 		}
 	} else {
 		checks["llm"] = checkDown("planner not initialized")
@@ -117,14 +120,18 @@ func (g *Gateway) handleCognitiveHealth(w http.ResponseWriter, r *http.Request) 
 
 	// ── LLM Circuit Breaker ──
 	if g.planner != nil {
-		breaker := g.planner.LLMBreaker()
-		switch breaker.State() {
-		case "open":
-			record("llm_breaker", checkDegraded("open — LLM calls blocked (failures="+strconv.Itoa(breaker.Failures())+")"))
-		case "half-open":
-			record("llm_breaker", checkDegraded("half-open — probing recovery"))
-		default:
-			record("llm_breaker", checkOK("closed"))
+		modelHealth := g.planner.ModelRuntimeHealth()
+		if !modelHealth.Configured {
+			record("llm_breaker", checkDown("model runtime not configured"))
+		} else {
+			switch modelHealth.BreakerState {
+			case "open":
+				record("llm_breaker", checkDegraded("open — LLM calls blocked (failures="+strconv.Itoa(modelHealth.Failures)+")"))
+			case "half-open":
+				record("llm_breaker", checkDegraded("half-open — probing recovery"))
+			default:
+				record("llm_breaker", checkOK("closed"))
+			}
 		}
 	} else {
 		record("llm_breaker", checkDown("planner not initialized"))

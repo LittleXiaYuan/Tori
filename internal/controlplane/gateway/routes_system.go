@@ -18,14 +18,17 @@ func (g *Gateway) registerSystemRoutes() {
 
 	// /healthz — backward-compatible simple probe (returns 200 always)
 	g.mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
-		breaker := g.planner.LLMBreaker()
+		modelHealth := g.planner.ModelRuntimeHealth()
 		health := map[string]any{
 			"status":        "ok",
 			"version":       version.Version,
-			"breaker_state": breaker.State(),
+			"breaker_state": modelHealth.BreakerState,
 			"uptime_sec":    int(time.Since(g.startTime).Seconds()),
 		}
-		if breaker.State() == "open" {
+		if !modelHealth.Configured {
+			health["status"] = "degraded"
+			health["breaker_state"] = "unconfigured"
+		} else if modelHealth.BreakerState == "open" {
 			health["status"] = "degraded"
 		}
 		w.Header().Set("Content-Type", "application/json")

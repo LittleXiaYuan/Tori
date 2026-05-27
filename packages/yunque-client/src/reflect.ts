@@ -13,7 +13,7 @@ import {
   type ReflectExperience,
   type ExperienceOutcome,
   type ExperienceSource,
-} from "./missions.js";
+} from "./missions";
 
 export type {
   ExperienceListOptions as ReflectExperienceListOptions,

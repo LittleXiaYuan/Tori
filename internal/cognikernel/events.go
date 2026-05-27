@@ -29,14 +29,30 @@ type Event struct {
 // ConversationEndData carries context from a completed conversation
 // into the reflective loop.
 type ConversationEndData struct {
-	TenantID   string   `json:"tenant_id"`
-	SessionID  string   `json:"session_id"`
-	UserIntent string   `json:"user_intent"`
-	AgentReply string   `json:"agent_reply"`
-	SkillsUsed []string `json:"skills_used"`
-	ModelTier  string   `json:"model_tier"`
-	TaskID     string   `json:"task_id,omitempty"`
+	TenantID   string        `json:"tenant_id"`
+	SessionID  string        `json:"session_id"`
+	UserIntent string        `json:"user_intent"`
+	AgentReply string        `json:"agent_reply"`
+	SkillsUsed []string      `json:"skills_used"`
+	ModelTier  string        `json:"model_tier"`
+	TaskID     string        `json:"task_id,omitempty"`
 	Duration   time.Duration `json:"duration"`
+}
+
+// FeedbackData carries explicit user/product feedback into the canonical
+// reflective loop. Unlike ConversationEndData it is already an evaluated signal:
+// the loop should ingest it as structured experience without asking the
+// conversation quality evaluator to reinterpret it.
+type FeedbackData struct {
+	TenantID  string    `json:"tenant_id,omitempty"`
+	Source    string    `json:"source"`
+	SourceID  string    `json:"source_id,omitempty"`
+	Category  string    `json:"category"`
+	Outcome   string    `json:"outcome"`
+	Lesson    string    `json:"lesson"`
+	Context   string    `json:"context,omitempty"`
+	Tags      []string  `json:"tags,omitempty"`
+	CreatedAt time.Time `json:"created_at,omitempty"`
 }
 
 // IdleData carries context for idle-triggered events.
@@ -115,10 +131,10 @@ func (b *EventBus) Publish(event Event) {
 	for _, h := range handlers {
 		func() {
 			defer func() {
-			if r := recover(); r != nil {
-				slog.Error("cognikernel: event handler panicked",
-					"event_type", event.Type, "recover", r)
-			}
+				if r := recover(); r != nil {
+					slog.Error("cognikernel: event handler panicked",
+						"event_type", event.Type, "recover", r)
+				}
 			}()
 			h(event)
 		}()

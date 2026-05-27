@@ -68,15 +68,17 @@ type TaskHandler func(ctx context.Context, entry *TaskEntry) (result string, err
 
 // TaskQueue manages an ordered pipeline of tasks for a single session.
 type TaskQueue struct {
-	mu        sync.Mutex
-	sessionID string
-	queue     []*TaskEntry       // ordered task list
-	handler   TaskHandler        // execution callback
-	listeners []QueueEventListener
-	running   bool               // is the queue processor active
-	cancel    context.CancelFunc // cancel the processor
-	wakeup    chan struct{}       // signal new work
-	maxSize   int                // max pending tasks (0=unlimited)
+	mu            sync.Mutex
+	sessionID     string
+	queue         []*TaskEntry       // ordered task list
+	handler       TaskHandler        // execution callback
+	listeners     []QueueEventListener
+	running       bool               // is the queue processor active
+	cancel        context.CancelFunc // cancel the processor
+	wakeup        chan struct{}       // signal new work
+	maxSize       int                // max pending tasks (0=unlimited)
+	maxConcurrent int                // max concurrent tasks (1=serial, 3-5=concurrent)
+	runningTasks  map[string]*TaskEntry // currently executing tasks
 }
 
 // NewTaskQueue creates a task queue for a session.
@@ -85,11 +87,23 @@ func NewTaskQueue(sessionID string, handler TaskHandler, maxSize int) *TaskQueue
 		maxSize = 100
 	}
 	return &TaskQueue{
-		sessionID: sessionID,
-		handler:   handler,
-		wakeup:    make(chan struct{}, 1),
-		maxSize:   maxSize,
+		sessionID:     sessionID,
+		handler:       handler,
+		wakeup:        make(chan struct{}, 1),
+		maxSize:       maxSize,
+		maxConcurrent: 1, // default: serial execution (backward compatible)
+		runningTasks:  make(map[string]*TaskEntry),
 	}
+}
+
+// SetMaxConcurrent configures the concurrency level (1=serial, 3-5=concurrent).
+func (q *TaskQueue) SetMaxConcurrent(n int) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	if n < 1 {
+		n = 1
+	}
+	q.maxConcurrent = n
 }
 
 // OnEvent registers a listener for queue state changes.
@@ -102,7 +116,6 @@ func (q *TaskQueue) OnEvent(fn QueueEventListener) {
 // Enqueue adds a task to the queue. Returns error if queue is full.
 func (q *TaskQueue) Enqueue(entry *TaskEntry) error {
 	q.mu.Lock()
-	defer q.mu.Unlock()
 
 	pending := 0
 	for _, t := range q.queue {
@@ -111,6 +124,7 @@ func (q *TaskQueue) Enqueue(entry *TaskEntry) error {
 		}
 	}
 	if pending >= q.maxSize {
+		q.mu.Unlock()
 		return fmt.Errorf("session %s: task queue full (%d pending)", q.sessionID, pending)
 	}
 
@@ -119,13 +133,16 @@ func (q *TaskQueue) Enqueue(entry *TaskEntry) error {
 	entry.CreatedAt = time.Now()
 	q.queue = append(q.queue, entry)
 
-	q.emit(QueueEvent{
+	event := QueueEvent{
 		Type:      "enqueued",
 		TaskID:    entry.ID,
 		SessionID: q.sessionID,
 		Position:  pending,
 		Total:     pending + 1,
-	})
+	}
+	q.mu.Unlock()
+
+	q.emit(event)
 
 	// Wake up processor
 	select {
@@ -175,21 +192,28 @@ func (q *TaskQueue) Stop() {
 // Cancel cancels a specific queued (not yet running) task.
 func (q *TaskQueue) Cancel(taskID string) bool {
 	q.mu.Lock()
-	defer q.mu.Unlock()
+	var found bool
+	var event QueueEvent
 	for _, t := range q.queue {
 		if t.ID == taskID && t.Status == TaskQueued {
 			t.Status = TaskCancelled
 			now := time.Now()
 			t.FinishedAt = &now
-			q.emit(QueueEvent{
+			event = QueueEvent{
 				Type:      "cancelled",
 				TaskID:    taskID,
 				SessionID: q.sessionID,
-			})
-			return true
+			}
+			found = true
+			break
 		}
 	}
-	return false
+	q.mu.Unlock()
+
+	if found {
+		q.emit(event)
+	}
+	return found
 }
 
 // Pending returns the number of queued (not yet started) tasks.
@@ -203,6 +227,20 @@ func (q *TaskQueue) Pending() int {
 		}
 	}
 	return count
+}
+
+// Running returns the number of currently executing tasks.
+func (q *TaskQueue) Running() int {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	return len(q.runningTasks)
+}
+
+// Concurrency returns (current, max) concurrent task counts.
+func (q *TaskQueue) Concurrency() (int, int) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	return len(q.runningTasks), q.maxConcurrent
 }
 
 // Snapshot returns a copy of the queue for visualization.
@@ -233,9 +271,17 @@ func (q *TaskQueue) History(limit int) []TaskEntry {
 }
 
 // processNext finds the next queued task and executes it.
+// Supports concurrent execution up to maxConcurrent limit.
 func (q *TaskQueue) processNext(ctx context.Context) {
 	for {
 		q.mu.Lock()
+
+		// Check if we've reached concurrency limit
+		if len(q.runningTasks) >= q.maxConcurrent {
+			q.mu.Unlock()
+			return // wait for a slot to free up
+		}
+
 		var next *TaskEntry
 		pos := 0
 		for i, t := range q.queue {
@@ -251,69 +297,80 @@ func (q *TaskQueue) processNext(ctx context.Context) {
 		}
 
 		// Check if a non-parallel task is already running
-		if !next.Parallel {
-			for _, t := range q.queue {
-				if t.Status == TaskRunning {
-					q.mu.Unlock()
-					return // wait for current task to finish
-				}
-			}
+		if !next.Parallel && len(q.runningTasks) > 0 {
+			q.mu.Unlock()
+			return // wait for current tasks to finish
 		}
 
 		next.Status = TaskRunning
 		now := time.Now()
 		next.StartedAt = &now
+		q.runningTasks[next.ID] = next
+
 		totalPending := 0
 		for _, t := range q.queue {
 			if t.Status == TaskQueued {
 				totalPending++
 			}
 		}
-		q.mu.Unlock()
 
-		q.emit(QueueEvent{
+		event := QueueEvent{
 			Type:      "started",
 			TaskID:    next.ID,
 			SessionID: q.sessionID,
 			Position:  pos,
 			Total:     totalPending,
-		})
+		}
+		q.mu.Unlock()
+
+		q.emit(event)
 
 		slog.Info("session_queue: executing",
-			"session", q.sessionID, "task", next.ID, "prompt_len", len(next.Prompt))
+			"session", q.sessionID, "task", next.ID, "prompt_len", len(next.Prompt),
+			"concurrent", len(q.runningTasks), "max", q.maxConcurrent)
 
-		// Execute the task
-		result, err := q.handler(ctx, next)
+		// Execute the task in a goroutine to support concurrency
+		go q.executeTask(ctx, next)
+	}
+}
 
-		q.mu.Lock()
-		finishedAt := time.Now()
-		next.FinishedAt = &finishedAt
-		if err != nil {
-			next.Status = TaskFailed
-			next.Error = err.Error()
-			q.mu.Unlock()
-			q.emit(QueueEvent{
-				Type:      "failed",
-				TaskID:    next.ID,
-				SessionID: q.sessionID,
-				Detail:    err.Error(),
-			})
-		} else {
-			next.Status = TaskDone
-			next.Result = result
-			q.mu.Unlock()
-			q.emit(QueueEvent{
-				Type:      "completed",
-				TaskID:    next.ID,
-				SessionID: q.sessionID,
-			})
+// executeTask runs a single task and updates its status.
+func (q *TaskQueue) executeTask(ctx context.Context, entry *TaskEntry) {
+	// Execute the task
+	result, err := q.handler(ctx, entry)
+
+	q.mu.Lock()
+	finishedAt := time.Now()
+	entry.FinishedAt = &finishedAt
+	delete(q.runningTasks, entry.ID) // free up the slot
+
+	var event QueueEvent
+	if err != nil {
+		entry.Status = TaskFailed
+		entry.Error = err.Error()
+		event = QueueEvent{
+			Type:      "failed",
+			TaskID:    entry.ID,
+			SessionID: q.sessionID,
+			Detail:    err.Error(),
 		}
-
-		// Wake up for next task
-		select {
-		case q.wakeup <- struct{}{}:
-		default:
+	} else {
+		entry.Status = TaskDone
+		entry.Result = result
+		event = QueueEvent{
+			Type:      "completed",
+			TaskID:    entry.ID,
+			SessionID: q.sessionID,
 		}
+	}
+	q.mu.Unlock()
+
+	q.emit(event)
+
+	// Wake up processor to check for more work
+	select {
+	case q.wakeup <- struct{}{}:
+	default:
 	}
 }
 

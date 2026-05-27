@@ -16,24 +16,45 @@ import (
 
 // QueueManager manages task queues for all sessions.
 type QueueManager struct {
-	mu       sync.RWMutex
-	queues   map[string]*TaskQueue // sessionID → queue
-	handler  TaskHandler            // shared task executor
-	maxSize  int
-	ctx      context.Context
-	cancel   context.CancelFunc
-	listener QueueEventListener     // global event listener
+	mu            sync.RWMutex
+	queues        map[string]*TaskQueue // sessionID → queue
+	handler       TaskHandler            // shared task executor
+	maxSize       int
+	maxConcurrent int                    // default concurrency for new queues
+	ctx           context.Context
+	cancel        context.CancelFunc
+	listener      QueueEventListener     // global event listener
 }
 
 // NewQueueManager creates a queue manager with a shared task handler.
 func NewQueueManager(handler TaskHandler, maxQueueSize int) *QueueManager {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &QueueManager{
-		queues:  make(map[string]*TaskQueue),
-		handler: handler,
-		maxSize: maxQueueSize,
-		ctx:     ctx,
-		cancel:  cancel,
+		queues:        make(map[string]*TaskQueue),
+		handler:       handler,
+		maxSize:       maxQueueSize,
+		maxConcurrent: 1, // default: serial (backward compatible)
+		ctx:           ctx,
+		cancel:        cancel,
+	}
+}
+
+// SetDefaultConcurrency sets the default concurrency for new queues.
+func (qm *QueueManager) SetDefaultConcurrency(n int) {
+	qm.mu.Lock()
+	defer qm.mu.Unlock()
+	if n < 1 {
+		n = 1
+	}
+	qm.maxConcurrent = n
+}
+
+// SetSessionConcurrency sets the concurrency for a specific session.
+func (qm *QueueManager) SetSessionConcurrency(sessionID string, n int) {
+	qm.mu.Lock()
+	defer qm.mu.Unlock()
+	if q, ok := qm.queues[sessionID]; ok {
+		q.SetMaxConcurrent(n)
 	}
 }
 
@@ -53,6 +74,7 @@ func (qm *QueueManager) GetOrCreate(sessionID string) *TaskQueue {
 	}
 
 	q := NewTaskQueue(sessionID, qm.handler, qm.maxSize)
+	q.SetMaxConcurrent(qm.maxConcurrent) // apply default concurrency
 	if qm.listener != nil {
 		q.OnEvent(qm.listener)
 	}
@@ -61,7 +83,7 @@ func (qm *QueueManager) GetOrCreate(sessionID string) *TaskQueue {
 	// Start queue processor in background
 	go q.Start(qm.ctx)
 
-	slog.Info("queue_manager: created queue", "session", sessionID)
+	slog.Info("queue_manager: created queue", "session", sessionID, "max_concurrent", qm.maxConcurrent)
 	return q
 }
 

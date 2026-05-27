@@ -18,6 +18,7 @@ import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import { buildPackNavItems, fetchEnabledPacks } from "@/lib/pack-sync";
 import { PROFILE_MODE_KEY, readProfileMode, writeProfileMode, type ProfileMode } from "@/lib/profile-mode";
+import { useNavigationPreferences } from "@/hooks/use-user-preferences";
 
 interface NavItem {
   href: string;
@@ -53,13 +54,7 @@ const categories: NavCategory[] = [
   ]},
   { id: "intelligence", label: "智能", labelEn: "Intelligence", icon: <Brain size={16} />, children: [
     { href: "/knowledge", label: "知识库", labelEn: "Knowledge", icon: <BookOpen size={16} />, tier: "easy" },
-    { href: "/memory", label: "记忆", labelEn: "Memory", icon: <Brain size={16} />, tier: "full" },
-    { href: "/graph", label: "知识图谱", labelEn: "Graph", icon: <Share2 size={16} />, tier: "full" },
-    { href: "/persona", label: "角色", labelEn: "Persona", icon: <ScanFace size={16} />, tier: "full" },
-    { href: "/emotions", label: "情绪", labelEn: "Emotions", icon: <SmilePlus size={16} />, tier: "full" },
-    { href: "/reflect", label: "反思", labelEn: "Reflection", icon: <Lightbulb size={16} />, tier: "full" },
-    { href: "/reverie", label: "思考记录", labelEn: "Reverie", icon: <BrainCircuit size={16} />, tier: "full" },
-    { href: "/heartbeat", label: "心跳", labelEn: "Heartbeat", icon: <HeartPulse size={16} />, tier: "full" },
+    { href: "/memory", label: "记忆", labelEn: "Memory", icon: <Brain size={16} />, tier: "easy" },
   ]},
   { id: "system", label: "系统", labelEn: "System", icon: <ShieldCheck size={16} />, children: [
     { href: "/models", label: "模型", labelEn: "Models", icon: <Cpu size={16} />, tier: "full" },
@@ -83,8 +78,6 @@ function resolveIcon(name: string): React.ReactNode {
   return iconMap[name.toLowerCase()] || <Puzzle size={16} />;
 }
 
-const COLLAPSED_KEY = "yunque_sidebar_collapsed";
-const EXPANDED_KEY = "yunque_sidebar_groups";
 function filterByProfile(cats: NavCategory[], mode: ProfileMode): NavCategory[] {
   if (mode === "full") return cats;
   return cats
@@ -100,26 +93,19 @@ function filterByProfile(cats: NavCategory[], mode: ProfileMode): NavCategory[] 
     });
 }
 
-function getStoredGroups(): Set<string> {
-  if (typeof window === "undefined") return new Set(["work"]);
-  try {
-    const v = localStorage.getItem(EXPANDED_KEY);
-    return v ? new Set(JSON.parse(v)) : new Set(["work"]);
-  } catch { return new Set(["work"]); }
-}
-
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { locale, setLocale } = useI18n();
-  const [collapsed, setCollapsed] = useState(false);
+  const navPrefs = useNavigationPreferences();
+  const [collapsed, setCollapsed] = useState(navPrefs.sidebarCollapsed);
   const [extItems, setExtItems] = useState<NavItem[]>([]);
   const [packItems, setPackItems] = useState<NavItem[]>([]);
   const [online, setOnline] = useState<boolean | null>(null);
   const [version, setVersion] = useState("");
   const [mobileOpen, setMobileOpen] = useState(false);
   const [, startTransition] = useTransition();
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(getStoredGroups);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(navPrefs.expandedGroups));
   const [profileMode, setProfileMode] = useState<ProfileMode>(readProfileMode);
 
   useEffect(() => {
@@ -132,27 +118,20 @@ export default function Sidebar() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const stored = localStorage.getItem(COLLAPSED_KEY);
-    if (stored !== null) setCollapsed(stored === "1");
-    else setCollapsed(window.innerWidth < 1440);
-  }, []);
+    // Initialize from preferences
+    setCollapsed(navPrefs.sidebarCollapsed);
+    setExpandedGroups(new Set(navPrefs.expandedGroups));
+  }, [navPrefs.sidebarCollapsed, navPrefs.expandedGroups]);
 
   const toggleCollapsed = useCallback(() => {
-    setCollapsed((prev) => {
-      const next = !prev;
-      localStorage.setItem(COLLAPSED_KEY, next ? "1" : "0");
-      return next;
-    });
-  }, []);
+    const next = navPrefs.toggleSidebarCollapsed();
+    setCollapsed(next);
+  }, [navPrefs]);
 
   const toggleGroup = useCallback((id: string) => {
-    setExpandedGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      localStorage.setItem(EXPANDED_KEY, JSON.stringify([...next]));
-      return next;
-    });
-  }, []);
+    const expanded = navPrefs.toggleGroupExpanded(id);
+    setExpandedGroups(new Set(expanded));
+  }, [navPrefs]);
 
   const toggleProfileMode = useCallback(() => {
     setProfileMode((prev) => {
@@ -229,17 +208,14 @@ export default function Sidebar() {
     if (!pathname) return;
     for (const cat of allCategories) {
       if (cat.children?.some((c) => pathname === c.href || pathname.startsWith(c.href + "/"))) {
-        setExpandedGroups((prev) => {
-          if (prev.has(cat.id)) return prev;
-          const next = new Set(prev);
-          next.add(cat.id);
-          localStorage.setItem(EXPANDED_KEY, JSON.stringify([...next]));
-          return next;
-        });
+        if (!expandedGroups.has(cat.id)) {
+          const expanded = navPrefs.toggleGroupExpanded(cat.id);
+          setExpandedGroups(new Set(expanded));
+        }
         break;
       }
     }
-  }, [pathname, allCategories]);
+  }, [pathname, allCategories, expandedGroups, navPrefs]);
 
   const handleLogout = useCallback(() => {
     localStorage.removeItem("yunque_token");
@@ -400,9 +376,12 @@ export default function Sidebar() {
                         className="sidebar-link"
                         data-active={childActive || undefined}
                         onClick={() => {
+                          navPrefs.toggleSidebarCollapsed();
                           setCollapsed(false);
-                          localStorage.setItem(COLLAPSED_KEY, "0");
-                          setExpandedGroups((prev) => new Set([...prev, cat.id]));
+                          if (!expandedGroups.has(cat.id)) {
+                            const expanded = navPrefs.toggleGroupExpanded(cat.id);
+                            setExpandedGroups(new Set(expanded));
+                          }
                         }}
                       >
                         <span className="sidebar-link-icon">{cat.icon}</span>

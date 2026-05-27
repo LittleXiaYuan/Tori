@@ -428,7 +428,7 @@ func (g *Gateway) handleStreamChat(w http.ResponseWriter, r *http.Request) {
 
 	// Cost tracking (use routed model)
 	if g.costTracker != nil {
-		model := g.planner.LLMClientFor(routedTier).Model()
+		model := g.planner.ModelIDForTier(routedTier)
 		cost, alert := g.costTracker.Record(model, tid, "", req.SessionID, int(estTokensIn), int(estTokensOut), time.Since(start))
 		traceSpan.Attrs["cost_usd"] = fmt.Sprintf("%.6f", cost)
 		if alert != nil {

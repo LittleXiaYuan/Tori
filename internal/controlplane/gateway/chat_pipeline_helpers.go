@@ -152,7 +152,7 @@ func (g *Gateway) recordCost(ctx context.Context, req *ChatRequest, tier string,
 	if g.costTracker == nil {
 		return
 	}
-	model := g.planner.LLMClientFor(tier).Model()
+	model := g.planner.ModelIDForTier(tier)
 	cost, alert := g.costTracker.Record(model, req.TenantID, "", req.SessionID, int(tokensIn), int(tokensOut), time.Since(start))
 	span.Attrs["cost_usd"] = fmt.Sprintf("%.6f", cost)
 	if alert != nil {
@@ -165,7 +165,7 @@ func (g *Gateway) recordRouterOutcome(tierName, modelID string, start time.Time,
 		return
 	}
 	if modelID == "" && g.planner != nil {
-		modelID = g.planner.LLMClientFor(tierName).Model()
+		modelID = g.planner.ModelIDForTier(tierName)
 	}
 	if modelID == "" {
 		return

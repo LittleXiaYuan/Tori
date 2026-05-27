@@ -224,29 +224,6 @@ func (p *Planner) SetProviderRegistry(reg *llm.ProviderRegistry) {
 	runtimeStrategy.SetProviderRegistry(reg)
 }
 
-// SetCogniContext attaches a declarative Cogni context injector. The callback
-// is invoked once per turn from the prompt builder; nil disables the layer.
-func (p *Planner) SetCogniContext(fn CogniContextFunc) {
-	contextAssembly := p.ensureContextAssembly()
-	contextAssembly.SetCogniContext(fn)
-}
-
-// SetCogniSkillFilter attaches a declarative Cogni surface filter. The
-// callback is invoked from buildFunctionDefs to narrow the tool list to
-// the union of every activated cogni's ToolSurface; nil keeps the full
-// skill set.
-func (p *Planner) SetCogniSkillFilter(fn CogniSkillFilterFunc) {
-	contextAssembly := p.ensureContextAssembly()
-	contextAssembly.SetCogniSkillFilter(fn)
-}
-
-// SetCogniTrace attaches a declarative Cogni observability callback. Nil keeps
-// Cogni internal-only and preserves prior behaviour.
-func (p *Planner) SetCogniTrace(fn CogniTraceFunc) {
-	contextAssembly := p.ensureContextAssembly()
-	contextAssembly.SetCogniTrace(fn)
-}
-
 // SetCogniRuntime attaches the declarative Cogni runtime boundary. Prefer this
 // over wiring the context/filter/trace callbacks separately: the runtime owns
 // declaration activation, context rendering, surface filtering, and trace

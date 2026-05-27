@@ -285,19 +285,11 @@ func (g *Gateway) WireGraphToPlanner() {
 		return
 	}
 	graph := g.pipeline.Graph()
-	prevGraph := g.planner.GraphContext() // preserve KB + Ledger callbacks
 
-	g.planner.SetGraphContext(func(query string) string {
+	g.planner.AppendGraphContext(func(query string) string {
 		var parts []string
 
-		// 1) Previous context (KB retrieval + Ledger recall)
-		if prevGraph != nil {
-			if prev := prevGraph(query); prev != "" {
-				parts = append(parts, prev)
-			}
-		}
-
-		// 2) Knowledge graph entity search
+		// Knowledge graph entity search
 		entities := graph.SearchEntities(query, 5)
 		for _, e := range entities {
 			ctx := graph.ContextFor(e.ID)

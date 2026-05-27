@@ -5,10 +5,12 @@ package ledger
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -53,6 +55,108 @@ func InitLedgerAt(dbPath string) (*ledger.Ledger, error) {
 	}
 
 	return ldg, nil
+}
+
+// InitLedgerAtRecovering opens a Ledger and, when the existing SQLite file is
+// unreadable or fails integrity checks, moves the broken files aside and starts
+// with a fresh database. Callers should surface the returned recovery report so
+// operators can restore from the latest backup-pack archive.
+func InitLedgerAtRecovering(dbPath string, quarantineDir string, now func() time.Time) (*ledger.Ledger, *RecoveryReport, error) {
+	ldg, err := InitLedgerAt(dbPath)
+	if err == nil {
+		if healthErr := ldg.HealthCheck(context.Background()); healthErr == nil {
+			return ldg, nil, nil
+		} else if isRecoverableLedgerError(healthErr) {
+			_ = ldg.Close()
+			err = healthErr
+		} else {
+			_ = ldg.Close()
+			return nil, nil, fmt.Errorf("ledger health check failed: %w", healthErr)
+		}
+	}
+	if !isRecoverableLedgerError(err) {
+		return nil, nil, err
+	}
+
+	report, qErr := QuarantineLedgerFiles(dbPath, quarantineDir, err, now)
+	if qErr != nil {
+		return nil, nil, qErr
+	}
+	ldg, openErr := InitLedgerAt(dbPath)
+	if openErr != nil {
+		return nil, report, openErr
+	}
+	return ldg, report, nil
+}
+
+// RecoveryReport records which damaged Ledger files were quarantined.
+type RecoveryReport struct {
+	DBPath        string    `json:"db_path"`
+	QuarantineDir string    `json:"quarantine_dir"`
+	Reason        string    `json:"reason"`
+	RecoveredAt   time.Time `json:"recovered_at"`
+	Files         []string  `json:"files"`
+}
+
+// QuarantineLedgerFiles moves the SQLite database and sidecar WAL/SHM files to
+// a timestamped quarantine directory before a fresh Ledger is created.
+func QuarantineLedgerFiles(dbPath string, quarantineDir string, cause error, now func() time.Time) (*RecoveryReport, error) {
+	if strings.TrimSpace(dbPath) == "" {
+		return nil, fmt.Errorf("ledger db path must not be empty")
+	}
+	if now == nil {
+		now = time.Now
+	}
+	if quarantineDir == "" {
+		quarantineDir = filepath.Join(filepath.Dir(dbPath), "quarantine")
+	}
+	recoveredAt := now().UTC()
+	targetDir := filepath.Join(quarantineDir, "ledger-corrupt-"+recoveredAt.Format("20060102-150405"))
+	if err := os.MkdirAll(targetDir, 0o755); err != nil {
+		return nil, fmt.Errorf("create ledger quarantine dir: %w", err)
+	}
+
+	report := &RecoveryReport{DBPath: dbPath, QuarantineDir: targetDir, RecoveredAt: recoveredAt}
+	if cause != nil {
+		report.Reason = cause.Error()
+	}
+	for _, path := range []string{dbPath, dbPath + "-wal", dbPath + "-shm"} {
+		if _, err := os.Stat(path); err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return nil, fmt.Errorf("stat ledger file %s: %w", path, err)
+		}
+		dst := filepath.Join(targetDir, filepath.Base(path))
+		if err := os.Rename(path, dst); err != nil {
+			return nil, fmt.Errorf("quarantine ledger file %s: %w", path, err)
+		}
+		report.Files = append(report.Files, dst)
+	}
+	return report, nil
+}
+
+func isRecoverableLedgerError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, ledger.ErrMigrationFailed) {
+		return true
+	}
+	msg := strings.ToLower(err.Error())
+	for _, token := range []string{
+		"file is not a database",
+		"database disk image is malformed",
+		"file is encrypted or is not a database",
+		"integrity check failed",
+		"schema version check",
+		"no such table: schema_migrations",
+	} {
+		if strings.Contains(msg, token) {
+			return true
+		}
+	}
+	return false
 }
 
 // LedgerStore adapts the standalone Ledger module to the yunque-agent

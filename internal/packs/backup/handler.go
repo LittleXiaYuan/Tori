@@ -103,6 +103,7 @@ var relDirs = []string{
 	"sessions",
 	"persona/skills",
 	"plugins",
+	"ledger",
 }
 
 // Export creates a ZIP backup and streams it to the client.

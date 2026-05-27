@@ -69,13 +69,29 @@ function Splash({ state, detail, onRetry }: { state: ServiceState; detail?: stri
   );
 }
 
+function getHealthUrl(): string {
+  const base = process.env.NEXT_PUBLIC_API_BASE;
+  if (base) return `${base}/healthz`;
+  // 在开发模式下，直接访问后端
+  // 检查是否在 localhost:3001 或 Tauri 环境
+  if (typeof window !== "undefined") {
+    const isTauriOrDev = window.location.hostname === "localhost" ||
+                         window.location.protocol === "tauri:" ||
+                         window.location.protocol.startsWith("http");
+    if (isTauriOrDev) {
+      return "http://127.0.0.1:9090/healthz";
+    }
+  }
+  return "/healthz";
+}
+
 async function checkHealth(signal?: AbortSignal): Promise<void> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), HEALTH_TIMEOUT_MS);
   const abort = () => controller.abort();
   signal?.addEventListener("abort", abort, { once: true });
   try {
-    const res = await fetch("/healthz", { cache: "no-store", signal: controller.signal });
+    const res = await fetch(getHealthUrl(), { cache: "no-store", signal: controller.signal });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
   } finally {
     clearTimeout(timer);

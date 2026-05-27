@@ -171,3 +171,45 @@ func TestBundle_JSONRoundTrip(t *testing.T) {
 		t.Fatalf("round-trip lost checks: %+v", back.Cognis[0])
 	}
 }
+
+func TestImportBundle_PersistenceIntegration(t *testing.T) {
+	// This test verifies that ImportBundle correctly identifies added/updated cognis
+	// so the gateway handler can persist them to disk
+	r := NewRegistry()
+
+	// Pre-populate with one existing cogni
+	_ = r.Add(&Declaration{ID: "existing", Description: "original"}, "test")
+
+	bundle := &Bundle{
+		Schema: BundleSchema,
+		Cognis: []*Declaration{
+			{ID: "new-cogni", Description: "brand new"},
+			{ID: "existing", Description: "updated version"},
+			{ID: "another-new", Description: "also new"},
+		},
+	}
+
+	// Import with overwrite=true
+	sum, err := r.ImportBundle(bundle, true)
+	if err != nil {
+		t.Fatalf("import failed: %v", err)
+	}
+
+	// Verify summary correctly identifies added vs updated
+	if len(sum.Added) != 2 {
+		t.Fatalf("expected 2 added, got %d: %v", len(sum.Added), sum.Added)
+	}
+	if len(sum.Updated) != 1 {
+		t.Fatalf("expected 1 updated, got %d: %v", len(sum.Updated), sum.Updated)
+	}
+	if sum.Updated[0] != "existing" {
+		t.Fatalf("expected 'existing' to be updated, got %v", sum.Updated)
+	}
+
+	// Verify all cognis are retrievable from registry
+	for _, id := range append(sum.Added, sum.Updated...) {
+		if _, ok := r.Get(id); !ok {
+			t.Fatalf("cogni %q should be in registry after import", id)
+		}
+	}
+}

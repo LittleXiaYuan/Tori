@@ -11,6 +11,17 @@ import (
 	"yunque-agent/internal/agentcore/audit"
 )
 
+// stripTrailingSlash removes trailing slashes from request paths (except for root "/").
+// This allows Next.js with trailingSlash: true to proxy to Go routes that don't expect trailing slashes.
+func stripTrailingSlash(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/" && strings.HasSuffix(r.URL.Path, "/") {
+			r.URL.Path = strings.TrimSuffix(r.URL.Path, "/")
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 // securityHeaders sets standard security response headers on every request.
 func (g *Gateway) securityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -150,6 +161,7 @@ func (g *Gateway) buildMiddlewareChain(handler http.Handler) http.Handler {
 	chain = bodySizeLimit(chain)
 	chain = g.securityHeaders(chain)
 	chain = g.corsMiddleware(chain)
+	chain = stripTrailingSlash(chain)
 	chain = g.requestTracking(chain)
 	return chain
 }

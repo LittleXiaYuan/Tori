@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -10,6 +11,82 @@ import (
 
 	reflectpkg "yunque-agent/internal/experimental/reflect"
 )
+
+func TestHandleExperiencesPostStoresWorkloadFeedback(t *testing.T) {
+	store := reflectpkg.NewExperienceStore(filepath.Join(t.TempDir(), "experiences.json"))
+	g := &Gateway{experienceStore: store}
+	body := bytes.NewBufferString(`{
+		"id":"workload-feedback-browser-rpa",
+		"source":"workload_feedback",
+		"source_id":"browser-rpa",
+		"category":"workload_feedback",
+		"outcome":"partial",
+		"lesson":"最顺手：浏览器意图能快速生成计划；最不顺手：入口还需要更明显",
+		"context":"工作负载：浏览器 / RPA\n能力范围：browser.intent.plan, rpa.replay.dry_run",
+		"tags":["workload:browser-rpa","capability:browser.intent.plan","findability:partial"]
+	}`)
+	req := httptest.NewRequest(http.MethodPost, "/v1/reflect/experiences", body)
+	rec := httptest.NewRecorder()
+
+	g.handleExperiences(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	all := store.All()
+	if len(all) != 1 {
+		t.Fatalf("expected one stored experience, got %d", len(all))
+	}
+	if all[0].Source != "workload_feedback" || all[0].Category != "workload_feedback" {
+		t.Fatalf("unexpected stored workload feedback: %#v", all[0])
+	}
+	if !strings.Contains(all[0].Lesson, "最顺手") || !reflectExperienceHasTag(all[0], "workload:browser-rpa") {
+		t.Fatalf("stored experience lost workload detail: %#v", all[0])
+	}
+}
+
+func TestHandleExperiencesPostFeedsWorkloadFeedbackThroughReflectiveLoop(t *testing.T) {
+	store := reflectpkg.NewExperienceStore(filepath.Join(t.TempDir(), "experiences.json"))
+	g := &Gateway{experienceStore: store}
+	g.WireReflectionLoop()
+
+	body := strings.NewReader(`{
+		"source":"workload_feedback",
+		"source_id":"browser-rpa",
+		"category":"workload_feedback",
+		"outcome":"success",
+		"lesson":"工作负载【浏览器 / RPA】体验反馈\n30 秒找到入口：是\n最顺手：录制回放",
+		"context":"能力范围：browser.intent.plan, rpa.replay.dry_run",
+		"tags":["workload:browser-rpa","findability:yes"]
+	}`)
+	req := httptest.NewRequest(http.MethodPost, "/v1/reflect/experiences", body)
+	rec := httptest.NewRecorder()
+
+	g.handleExperiences(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), `"ingested_by":"reflective_loop"`) {
+		t.Fatalf("expected reflective loop ingestion marker, body = %s", rec.Body.String())
+	}
+	strategies := store.CompileStrategies(5)
+	if !strings.Contains(strategies, "工作负载【浏览器 / RPA】体验反馈") {
+		t.Fatalf("reflective loop output did not reference workload feedback: %q", strategies)
+	}
+	if !strings.Contains(strategies, "推荐:") {
+		t.Fatalf("success feedback should compile as recommendation, got %q", strategies)
+	}
+	all := store.All()
+	if len(all) != 1 {
+		t.Fatalf("expected one stored feedback experience, got %d", len(all))
+	}
+	for _, want := range []string{"source:workload_feedback", "category:workload_feedback", "outcome:success", "source_id:browser-rpa"} {
+		if !reflectExperienceHasTag(all[0], want) {
+			t.Fatalf("reflective loop did not annotate feedback tag %q: %#v", want, all[0])
+		}
+	}
+}
 
 func TestHandleExperiencesSearchRespectsFilters(t *testing.T) {
 	store := reflectpkg.NewExperienceStore(filepath.Join(t.TempDir(), "experiences.json"))
@@ -307,5 +384,53 @@ func TestHandleExperienceStatsRespectsTagFilter(t *testing.T) {
 	}
 	if body.ByOutcome["partial"] != 0 {
 		t.Fatalf("stats leaked non-matching tag: %+v", body)
+	}
+}
+
+func TestHandleExperienceStatsReturnsWorkloadFeedbackDogfoodMetrics(t *testing.T) {
+	store := reflectpkg.NewExperienceStore(filepath.Join(t.TempDir(), "experiences.json"))
+	store.Add(reflectpkg.Experience{
+		ID:       "browser-yes",
+		Source:   "workload_feedback",
+		SourceID: "browser-rpa",
+		Category: "workload_feedback",
+		Outcome:  "success",
+		Lesson:   "工作负载【浏览器 / RPA】体验反馈\n30 秒找到入口：是\n最顺手：录制回放",
+		Context:  "真实场景：网页资料收集",
+		Tags:     []string{"workload:browser-rpa", "findability:yes"},
+	})
+	store.Add(reflectpkg.Experience{
+		ID:       "memory-no",
+		Source:   "workload_feedback",
+		SourceID: "memory-review",
+		Category: "workload_feedback",
+		Outcome:  "failure",
+		Lesson:   "工作负载【记忆 / 回溯】体验反馈\n30 秒找到入口：不能\n最不顺手：入口藏太深",
+		Context:  "真实场景：复盘",
+		Tags:     []string{"workload:memory-review", "findability:no"},
+	})
+	store.Add(reflectpkg.Experience{ID: "task", Source: "task", Category: "strategy", Outcome: "success"})
+
+	g := &Gateway{experienceStore: store}
+	req := httptest.NewRequest(http.MethodGet, "/v1/reflect/experiences?stats=true&kind=workload_feedback&source=workload_feedback&category=workload_feedback&workloads=browser-rpa,memory-review,wasm-workload", nil)
+	rec := httptest.NewRecorder()
+
+	g.handleExperiences(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	var body reflectpkg.WorkloadFeedbackStats
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if body.Total != 2 || body.Workloads != 3 || body.ByWorkload["wasm-workload"] != 0 {
+		t.Fatalf("unexpected workload dogfood stats: %+v", body)
+	}
+	if body.Findability["yes"] != 1 || body.Findability["no"] != 1 {
+		t.Fatalf("unexpected findability stats: %+v", body.Findability)
+	}
+	if body.Filled != 2 || body.FillRate != 1 {
+		t.Fatalf("unexpected fill stats: %+v", body)
 	}
 }

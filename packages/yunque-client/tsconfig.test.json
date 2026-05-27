@@ -376,6 +376,7 @@
     "src/rpa-replay.ts",
     "src/skill-anomaly.ts",
     "src/wasm-plugin.ts",
+    "src/workloads.ts",
     "src/**/*.test.ts"
   ]
 }

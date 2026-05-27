@@ -1,0 +1,105 @@
+name: desktop-release
+
+# Builds distributable Tauri desktop installers for all supported desktop OSes.
+# This is intentionally separate from baseline CI because Tauri bundling is
+# slower and requires platform-specific runners/toolchains.
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Package desktop (${{ matrix.label }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: windows-x64
+            os: windows-latest
+            platform_key: windows-amd64
+            goos: windows
+            goarch: amd64
+            binary_ext: .exe
+            artifact_name: yunque-desktop-windows-x64
+          - label: macos-x64
+            os: macos-13
+            platform_key: darwin-amd64
+            goos: darwin
+            goarch: amd64
+            binary_ext: ""
+            artifact_name: yunque-desktop-macos-x64
+          - label: linux-x64
+            os: ubuntu-latest
+            platform_key: linux-amd64
+            goos: linux
+            goarch: amd64
+            binary_ext: ""
+            artifact_name: yunque-desktop-linux-x64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux Tauri dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev \
+            librsvg2-dev libsoup-3.0-dev pkg-config
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          check-latest: true
+          cache: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            apps/web/package-lock.json
+            apps/desktop/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri -> target
+
+      - name: Install frontend dependencies
+        run: npm ci --prefer-offline --no-audit --no-fund
+        working-directory: apps/web
+
+      - name: Install desktop dependencies
+        run: npm ci --prefer-offline --no-audit --no-fund
+        working-directory: apps/desktop
+
+      - name: Build Go sidecar for Tauri externalBin
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="yunque-agent-${{ matrix.platform_key }}${{ matrix.binary_ext }}"
+          echo "Building ${out}"
+          CGO_ENABLED=0 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
+            go build -ldflags "-s -w" -o "${out}" ./cmd/agent
+
+      - name: Build Tauri desktop bundle
+        run: npm run build
+        working-directory: apps/desktop
+
+      - name: Upload installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: |
+            apps/desktop/src-tauri/target/release/bundle/**/*
+          if-no-files-found: error

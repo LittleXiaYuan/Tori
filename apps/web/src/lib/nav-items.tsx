@@ -39,36 +39,43 @@ export const DEFAULT_NAV_ITEM_IDS = new Set<string>([
   "nav-dashboard",
   "nav-chat",
   "nav-missions",
+  "nav-knowledge",
   "nav-memory",
   "nav-packs",
+  "nav-cognis",
   "nav-settings",
 ]);
 
 export const NAV_ITEMS: NavItem[] = [
+  // 概览 - 核心功能（easy 模式可见）
   { id: "nav-dashboard", href: "/dashboard", label: "工作台", group: "概览", layer: "core", defaultVisible: true, icon: <LayoutDashboard size={16} />, keywords: "dashboard home 主页 仪表盘 overview workspace 工作台 场景" },
   { id: "nav-chat", href: "/chat", label: "对话", group: "概览", layer: "core", defaultVisible: true, icon: <MessageCircle size={16} />, keywords: "chat 聊天 会话 行动 产物" },
 
+  // 工作 - 核心功能
   { id: "nav-missions", href: "/missions", label: "任务中心", group: "工作", layer: "core", defaultVisible: true, icon: <Zap size={16} />, keywords: "missions tasks 任务 反馈 验收" },
+
+  // 工作 - 辅助功能（full 模式）
   { id: "nav-task-run", href: "/task-run", label: "执行视图", group: "工作", layer: "core", icon: <Terminal size={16} />, keywords: "task run 执行 运行" },
   { id: "nav-projects", href: "/projects", label: "项目", group: "工作", layer: "core", icon: <FolderGit2 size={16} />, keywords: "projects 项目 repo workspace" },
   { id: "nav-workflows", href: "/workflows", label: "工作流", group: "工作", layer: "lab", icon: <Blocks size={16} />, keywords: "workflow 工作流 流程 lab 实验" },
-  { id: "nav-workflow-editor", href: "/workflow-editor", label: "工作流编辑器", group: "工作", layer: "lab", icon: <Workflow size={16} />, keywords: "workflow editor 编辑器 lab 实验" },
   { id: "nav-workers", href: "/workers", label: "Worker", group: "工作", layer: "control-plane", icon: <Cpu size={16} />, keywords: "workers worker 进程 运维" },
 
+  // 智能 - 核心功能
+  { id: "nav-knowledge", href: "/knowledge", label: "知识库", group: "智能", layer: "core", defaultVisible: true, icon: <BookOpen size={16} />, keywords: "knowledge 知识 RAG" },
   { id: "nav-memory", href: "/memory", label: "记忆", group: "智能", layer: "core", defaultVisible: true, icon: <Brain size={16} />, keywords: "memory 记忆 反馈 沉淀" },
-  { id: "nav-knowledge", href: "/knowledge", label: "知识库", group: "智能", layer: "core", icon: <BookOpen size={16} />, keywords: "knowledge 知识 RAG" },
-  { id: "nav-graph", href: "/graph", label: "知识图谱", group: "智能", layer: "lab", icon: <Share2 size={16} />, keywords: "graph 图谱 关系 知识 lab 实验" },
-  { id: "nav-persona", href: "/persona", label: "角色", group: "智能", layer: "lab", icon: <ScanFace size={16} />, keywords: "persona 人设 角色 lab 实验" },
-  { id: "nav-emotions", href: "/emotions", label: "情绪", group: "智能", layer: "lab", icon: <SmilePlus size={16} />, keywords: "emotion 情感 情绪 lab 实验" },
-  { id: "nav-reflect", href: "/reflect", label: "反思", group: "智能", layer: "lab", icon: <Lightbulb size={16} />, keywords: "reflect 反思 思考 lab 实验" },
-  { id: "nav-reverie", href: "/reverie", label: "思考记录", group: "智能", layer: "lab", icon: <BrainCircuit size={16} />, keywords: "reverie 思考 记录 lab 实验" },
-  { id: "nav-heartbeat", href: "/heartbeat", label: "心跳", group: "智能", layer: "lab", icon: <HeartPulse size={16} />, keywords: "heartbeat 心跳 lab 实验" },
 
+  // 扩展 - 核心功能
   { id: "nav-packs", href: "/packs", label: "能力包", group: "扩展", layer: "pack", defaultVisible: true, icon: <Boxes size={16} />, keywords: "packs pack runtime 增量包 能力包 热插拔 可选能力 默认入口" },
+  { id: "nav-cognis", href: "/cognis", label: "Cogni 市场", group: "扩展", layer: "core", defaultVisible: true, icon: <BrainCircuit size={16} />, keywords: "cognis cogni market 市场 认知内核" },
+
+  // 扩展 - 开发工具（full 模式）
   { id: "nav-skills", href: "/skills", label: "技能库", group: "扩展", layer: "lab", icon: <Package size={16} />, keywords: "skills 技能 运行时技能 高级入口 legacy pack 的原子能力来源" },
   { id: "nav-plugins", href: "/plugins", label: "插件宿主", group: "扩展", layer: "control-plane", icon: <Puzzle size={16} />, keywords: "plugins 插件 宿主 运行时 高级入口 legacy pack 的代码载体" },
 
+  // 系统 - 核心功能
   { id: "nav-settings", href: "/settings", label: "设置", group: "系统", layer: "core", defaultVisible: true, icon: <Settings size={16} />, keywords: "settings 偏好 设置" },
+
+  // 系统 - 控制面（full 模式）
   { id: "nav-inbox", href: "/inbox", label: "收件箱", group: "系统", layer: "control-plane", icon: <MailWarning size={16} />, keywords: "inbox 消息 通知 渠道 控制面" },
   { id: "nav-tools", href: "/tools", label: "终端", group: "系统", layer: "control-plane", icon: <Wrench size={16} />, keywords: "tools terminal shell 工具 运维" },
   { id: "nav-models", href: "/models", label: "模型", group: "系统", layer: "control-plane", icon: <Cpu size={16} />, keywords: "models 模型 LLM 控制面" },

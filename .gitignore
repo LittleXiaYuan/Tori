@@ -1,8 +1,8 @@
 # ── Build outputs ──
 *.exe
 *.exe~
-tori
-tori_*
+/tori
+/tori_*
 /agent
 /agent.exe
 /yunque.exe
