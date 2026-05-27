@@ -2,7 +2,7 @@
   "id": "yunque.pack.memory-time-travel",
   "name": "Memory Time Travel Pack",
   "version": "0.1.0",
-  "description": "将记忆快照、时间点回溯、漂移 diff、回滚计划、approved rollback write-back plan、pack-local rollback writeback store/executor handoff plan、retention dry-run/prune plan、pack-local retention prune executor、native kv_history plan/migration preview/dual-read parity/cutover readiness/cutover plan、KV audit link schema/preview gate/writeback plan/store handoff/executor handoff plan 和证据包导出作为可选记忆治理能力包暴露。",
+  "description": "可审计记忆回溯的可选治理能力包。",
   "requiresCore": ">=0.1.0",
   "optional": true,
   "defaultState": "disabled",
@@ -227,13 +227,11 @@
     "blueprint": "doc/MEMORY-TIME-TRAVEL.md",
     "stage": "pack-shell-before-ledger-kv-history",
     "risk": "memory-governance",
-    "sync": "backend-registry-drives-frontend"
+    "sync": "backend-registry-drives-frontend",
+    "descriptionStyle": "one-line-plus-three-examples",
+    "example1": "保存、查看并对比某个 namespace 的记忆快照。",
+    "example2": "生成回滚、retention prune 或 kv_history cutover 计划。",
+    "example3": "导出记忆漂移、审计链接和恢复证据包。"
   },
-  "distribution": {
-    "manifestUrl": "https://packs.yunque.local/memory-time-travel-pack/pack.json",
-    "packageUrl": "https://packs.yunque.local/memory-time-travel-pack/memory-time-travel-pack-0.1.0.tgz",
-    "frontendUrl": "https://packs.yunque.local/memory-time-travel-pack/frontend/remoteEntry.js",
-    "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-    "sizeBytes": 4096
-  }
+  "status": "alpha"
 }

@@ -2,7 +2,7 @@
   "id": "yunque.pack.guardrail-fuzzer",
   "name": "Guardrail Fuzzer Pack",
   "version": "0.1.0",
-  "description": "将对抗性 Guardrail fuzz、绕过收集、规则候选、CI gate / rule write-back / alert plan、Go native fuzz corpus sync plan、deterministic corpus manifest preview 和证据包导出作为可选安全治理能力包暴露。",
+  "description": "Guardrail 对抗 fuzz 与规则候选治理的可选安全能力包。",
   "requiresCore": ">=0.1.0",
   "optional": true,
   "defaultState": "disabled",
@@ -118,13 +118,11 @@
     "blueprint": "doc/GUARDRAIL-FUZZER.md",
     "stage": "pack-shell-before-ci-fuzz",
     "risk": "security-governance",
-    "sync": "backend-registry-drives-frontend"
+    "sync": "backend-registry-drives-frontend",
+    "descriptionStyle": "one-line-plus-three-examples",
+    "example1": "维护 fuzz corpus 并运行绕过测试。",
+    "example2": "生成 CI gate、规则写回和告警计划。",
+    "example3": "导出 guardrail fuzz 证据包。"
   },
-  "distribution": {
-    "manifestUrl": "https://packs.yunque.local/guardrail-fuzzer-pack/pack.json",
-    "packageUrl": "https://packs.yunque.local/guardrail-fuzzer-pack/guardrail-fuzzer-pack-0.1.0.tgz",
-    "frontendUrl": "https://packs.yunque.local/guardrail-fuzzer-pack/frontend/remoteEntry.js",
-    "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-    "sizeBytes": 4096
-  }
+  "status": "alpha"
 }

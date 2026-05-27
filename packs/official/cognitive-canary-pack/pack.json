@@ -2,7 +2,7 @@
   "id": "yunque.pack.cognitive-canary",
   "name": "Cognitive Canary Pack",
   "version": "0.1.0",
-  "description": "将认知质量灰度评估、场景集、deterministic local judge、SLI 汇总、promotion/block 决策、shadow response collector / judge / metrics / rollback plan、pack-local response collector writeback store、response collector pipeline plan-only handoff 和证据包导出作为可选能力包暴露。",
+  "description": "认知质量灰度放行的可选治理能力包。",
   "requiresCore": ">=0.1.0",
   "optional": true,
   "defaultState": "disabled",
@@ -125,13 +125,11 @@
     "blueprint": "doc/COGNITIVE-CANARY.md",
     "stage": "pack-shell-before-shadow-traffic",
     "risk": "cognitive-governance",
-    "sync": "backend-registry-drives-frontend"
+    "sync": "backend-registry-drives-frontend",
+    "descriptionStyle": "one-line-plus-three-examples",
+    "example1": "维护认知场景集并运行 deterministic judge。",
+    "example2": "生成 shadow response 收集与指标计划。",
+    "example3": "导出 canary 评估和回滚证据包。"
   },
-  "distribution": {
-    "manifestUrl": "https://packs.yunque.local/cognitive-canary-pack/pack.json",
-    "packageUrl": "https://packs.yunque.local/cognitive-canary-pack/cognitive-canary-pack-0.1.0.tgz",
-    "frontendUrl": "https://packs.yunque.local/cognitive-canary-pack/frontend/remoteEntry.js",
-    "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-    "sizeBytes": 4096
-  }
+  "status": "alpha"
 }

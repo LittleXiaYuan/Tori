@@ -2,7 +2,7 @@
   "id": "yunque.pack.browser-intent",
   "name": "Browser Intent Pack",
   "version": "0.1.0",
-  "description": "将浏览器连接、截图、OCR、OPP 预览和扩展场景执行作为可选浏览器意图层增量包暴露。",
+  "description": "浏览器目标执行的可选自动化能力包。",
   "requiresCore": ">=0.1.0",
   "optional": true,
   "defaultState": "enabled",
@@ -149,13 +149,11 @@
   "metadata": {
     "blueprint": "doc/BROWSER-INTENT-LAYER.md",
     "stage": "bridge-gateway-to-pack",
-    "sync": "backend-registry-drives-frontend"
+    "sync": "backend-registry-drives-frontend",
+    "descriptionStyle": "one-line-plus-three-examples",
+    "example1": "检查浏览器连接与运行配置。",
+    "example2": "把自然语言目标转成导航/点击计划。",
+    "example3": "采集页面截图、OCR 与扩展动作证据。"
   },
-  "distribution": {
-    "manifestUrl": "https://packs.yunque.local/browser-intent-pack/pack.json",
-    "packageUrl": "https://packs.yunque.local/browser-intent-pack/browser-intent-pack-0.1.0.tgz",
-    "frontendUrl": "https://packs.yunque.local/browser-intent-pack/frontend/remoteEntry.js",
-    "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-    "sizeBytes": 4096
-  }
+  "status": "beta"
 }

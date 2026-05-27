@@ -2,7 +2,7 @@
   "id": "yunque.pack.chaos-probe",
   "name": "Chaos Probe Pack",
   "version": "0.1.0",
-  "description": "将安全混沌探针、健康评分、降级建议和证据包导出作为可选运维韧性能力包暴露。",
+  "description": "安全混沌探针与降级治理的可选运维韧性能力包。",
   "requiresCore": ">=0.1.0",
   "optional": true,
   "defaultState": "disabled",
@@ -125,13 +125,11 @@
     "blueprint": "doc/CHAOS-PROBE.md",
     "stage": "pack-shell-before-scheduler",
     "risk": "ops-governance",
-    "sync": "backend-registry-drives-frontend"
+    "sync": "backend-registry-drives-frontend",
+    "descriptionStyle": "one-line-plus-three-examples",
+    "example1": "维护探针清单并执行一次安全演练。",
+    "example2": "生成调度、指标与降级写回计划。",
+    "example3": "导出本次探针运行的证据包。"
   },
-  "distribution": {
-    "manifestUrl": "https://packs.yunque.local/chaos-probe-pack/pack.json",
-    "packageUrl": "https://packs.yunque.local/chaos-probe-pack/chaos-probe-pack-0.1.0.tgz",
-    "frontendUrl": "https://packs.yunque.local/chaos-probe-pack/frontend/remoteEntry.js",
-    "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-    "sizeBytes": 4096
-  }
+  "status": "alpha"
 }

@@ -2,7 +2,7 @@
   "id": "yunque.pack.backup",
   "name": "Backup Pack",
   "version": "0.1.0",
-  "description": "将备份信息、导出和导入能力作为可选增量包暴露给后端 registry 与前端同步菜单。",
+  "description": "本地数据恢复与迁移的可选能力包。",
   "requiresCore": ">=0.1.0",
   "optional": true,
   "defaultState": "enabled",
@@ -70,13 +70,11 @@
   },
   "metadata": {
     "example": "true",
-    "sync": "backend-registry-drives-frontend"
+    "sync": "backend-registry-drives-frontend",
+    "descriptionStyle": "one-line-plus-three-examples",
+    "example1": "查看当前备份状态与存储位置。",
+    "example2": "导出一份可迁移的本地数据归档。",
+    "example3": "导入归档并保留可回滚恢复记录。"
   },
-  "distribution": {
-    "manifestUrl": "https://packs.yunque.local/backup-pack/pack.json",
-    "packageUrl": "https://packs.yunque.local/backup-pack/backup-pack-0.1.0.tgz",
-    "frontendUrl": "https://packs.yunque.local/backup-pack/frontend/remoteEntry.js",
-    "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-    "sizeBytes": 4096
-  }
+  "status": "beta"
 }

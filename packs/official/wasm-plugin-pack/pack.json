@@ -2,7 +2,7 @@
   "id": "yunque.pack.wasm-plugin",
   "name": "WASM Plugin Pack",
   "version": "0.1.0",
-  "description": "将 WASM 插件注册、生命周期、沙箱 dry-run/执行、远程安装审批队列、installer continuation handoff、下载缓存写回、缓存包签名验证写回、安全包结构检查写回与 installer registration handoff 计划作为高风险可选能力包暴露。",
+  "description": "WASM 插件受控执行的可选高风险能力包。",
   "requiresCore": ">=0.1.0",
   "optional": true,
   "defaultState": "disabled",
@@ -183,13 +183,11 @@
     "blueprint": "doc/WASM-PLUGIN-ENGINE.md",
     "stage": "pack-shell-before-runtime-hosts",
     "risk": "high",
-    "sync": "backend-registry-drives-frontend-installer-cache-signature-verification-package-inspection-and-registration-plan"
+    "sync": "backend-registry-drives-frontend-installer-cache-signature-verification-package-inspection-and-registration-plan",
+    "descriptionStyle": "one-line-plus-three-examples",
+    "example1": "安装、加载、卸载并执行 WASM 插件。",
+    "example2": "生成 ABI、远程安装和缓存验证计划。",
+    "example3": "检查安全包结构并输出 installer registration handoff。"
   },
-  "distribution": {
-    "manifestUrl": "https://packs.yunque.local/wasm-plugin-pack/pack.json",
-    "packageUrl": "https://packs.yunque.local/wasm-plugin-pack/wasm-plugin-pack-0.1.0.tgz",
-    "frontendUrl": "https://packs.yunque.local/wasm-plugin-pack/frontend/remoteEntry.js",
-    "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-    "sizeBytes": 4096
-  }
+  "status": "alpha"
 }

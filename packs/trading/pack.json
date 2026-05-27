@@ -1,0 +1,192 @@
+{
+  "id": "trading",
+  "name": "量化交易",
+  "version": "0.1.0",
+  "description": "智能量化交易系统，支持多策略、风控、实盘交易",
+  "author": "Yunque Team",
+  "category": "finance",
+  "tags": [
+    "trading",
+    "quantitative",
+    "finance",
+    "stock"
+  ],
+  "icon": "📈",
+  "capabilities": {
+    "realtime_data": true,
+    "order_execution": true,
+    "risk_management": true,
+    "strategy_backtest": true,
+    "portfolio_management": true
+  },
+  "permissions": {
+    "network": {
+      "required": true,
+      "reason": "获取实时行情数据和执行交易"
+    },
+    "storage": {
+      "required": true,
+      "reason": "存储交易记录和策略配置"
+    },
+    "approval": {
+      "required": true,
+      "reason": "所有交易需要审批"
+    }
+  },
+  "config": {
+    "broker": {
+      "type": "string",
+      "default": "simulate",
+      "options": [
+        "simulate",
+        "eastmoney",
+        "tonghuashun",
+        "xtquant"
+      ],
+      "description": "券商类型"
+    },
+    "initial_capital": {
+      "type": "number",
+      "default": 100000,
+      "description": "初始资金（元）"
+    },
+    "max_position_single": {
+      "type": "number",
+      "default": 0.2,
+      "min": 0.01,
+      "max": 1.0,
+      "description": "单只股票最大仓位比例"
+    },
+    "max_position_total": {
+      "type": "number",
+      "default": 0.8,
+      "min": 0.1,
+      "max": 1.0,
+      "description": "总仓位比例"
+    },
+    "stop_loss": {
+      "type": "number",
+      "default": 0.07,
+      "description": "止损比例"
+    },
+    "take_profit": {
+      "type": "number",
+      "default": 0.15,
+      "description": "止盈比例"
+    },
+    "max_daily_loss": {
+      "type": "number",
+      "default": 0.05,
+      "description": "单日最大亏损比例"
+    },
+    "active_strategies": {
+      "type": "array",
+      "default": [],
+      "description": "启用的策略列表（通过Cogni声明动态加载）"
+    },
+    "auto_approve_threshold": {
+      "type": "number",
+      "default": 0,
+      "description": "自动审批阈值（0=全部需要审批）"
+    }
+  },
+  "skills": [
+    {
+      "name": "analyze_stock",
+      "description": "分析股票，生成交易信号",
+      "parameters": {
+        "stock": {
+          "type": "string",
+          "required": true,
+          "description": "股票代码（如：000001.SZ）"
+        }
+      }
+    },
+    {
+      "name": "get_portfolio",
+      "description": "查询当前持仓",
+      "parameters": {}
+    },
+    {
+      "name": "get_quote",
+      "description": "获取实时行情",
+      "parameters": {
+        "stock": {
+          "type": "string",
+          "required": true,
+          "description": "股票代码"
+        }
+      }
+    },
+    {
+      "name": "execute_trade",
+      "description": "执行交易（需要审批）",
+      "parameters": {
+        "stock": {
+          "type": "string",
+          "required": true
+        },
+        "action": {
+          "type": "string",
+          "enum": [
+            "buy",
+            "sell"
+          ],
+          "required": true
+        },
+        "quantity": {
+          "type": "integer",
+          "required": true
+        }
+      }
+    },
+    {
+      "name": "backtest_strategy",
+      "description": "回测策略",
+      "parameters": {
+        "strategy": {
+          "type": "string",
+          "required": true
+        },
+        "stock": {
+          "type": "string",
+          "required": true
+        },
+        "start_date": {
+          "type": "string",
+          "required": true
+        },
+        "end_date": {
+          "type": "string",
+          "required": true
+        }
+      }
+    }
+  ],
+  "dependencies": {
+    "go_modules": [
+      "github.com/gorilla/websocket",
+      "github.com/shopspring/decimal"
+    ]
+  },
+  "integration": {
+    "cognikernel": {
+      "events": [
+        "trade_executed",
+        "stop_loss_triggered",
+        "strategy_signal",
+        "risk_alert"
+      ],
+      "beliefs": [
+        "trading.max_drawdown",
+        "trading.active_strategies",
+        "trading.lessons"
+      ]
+    },
+    "approval": {
+      "category": "financial",
+      "default_risk_level": "high"
+    }
+  },
+  "status": "stable"
+}

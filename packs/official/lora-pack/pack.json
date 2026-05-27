@@ -2,7 +2,7 @@
   "id": "yunque.pack.lora",
   "name": "LoRA / LAA Evolution Pack",
   "version": "0.1.0",
-  "description": "将 LoRA/LAA 训练状态、数据预检、触发、回滚、配置和进化快照作为可选增量包暴露。",
+  "description": "模型训练进化的可选成长能力包。",
   "requiresCore": ">=0.1.0",
   "optional": true,
   "defaultState": "disabled",
@@ -115,13 +115,11 @@
   },
   "metadata": {
     "blueprint": "doc/PACK-RUNTIME-BLUEPRINT.md",
-    "sync": "backend-registry-drives-frontend"
+    "sync": "backend-registry-drives-frontend",
+    "descriptionStyle": "one-line-plus-three-examples",
+    "example1": "查看训练状态、历史与数据预检摘要。",
+    "example2": "触发一次 LoRA/LAA 训练或回滚。",
+    "example3": "同步配置并导出进化快照。"
   },
-  "distribution": {
-    "manifestUrl": "https://packs.yunque.local/lora-pack/pack.json",
-    "packageUrl": "https://packs.yunque.local/lora-pack/lora-pack-0.1.0.tgz",
-    "frontendUrl": "https://packs.yunque.local/lora-pack/frontend/remoteEntry.js",
-    "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-    "sizeBytes": 4096
-  }
+  "status": "stable"
 }

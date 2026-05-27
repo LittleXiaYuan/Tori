@@ -2,7 +2,7 @@
   "id": "yunque.pack.cogni-kernel",
   "name": "Cogni Kernel Pack",
   "version": "0.1.0",
-  "description": "将声明式智体注册、热重载、观测、经验、进化、联邦和经济状态作为可选 CogniKernel 增量包暴露。",
+  "description": "声明式 Cogni 运行治理的可选认知内核能力包。",
   "requiresCore": ">=0.1.0",
   "optional": true,
   "defaultState": "enabled",
@@ -101,13 +101,11 @@
     "blueprint": "doc/PACK-RUNTIME-BLUEPRINT.md",
     "stage": "runtime-loop-pack-state-gate",
     "sync": "backend-registry-drives-frontend",
-    "runtimeArtifact": "cogni-runtime-pack-state.json"
+    "runtimeArtifact": "cogni-runtime-pack-state.json",
+    "descriptionStyle": "one-line-plus-three-examples",
+    "example1": "列出、重载并校验 Cogni Declaration。",
+    "example2": "查看 Cogni trace、健康状态和告警。",
+    "example3": "导出 bundle 并检查经验/经济/联邦状态。"
   },
-  "distribution": {
-    "manifestUrl": "https://packs.yunque.local/cogni-kernel-pack/pack.json",
-    "packageUrl": "https://packs.yunque.local/cogni-kernel-pack/cogni-kernel-pack-0.1.0.tgz",
-    "frontendUrl": "https://packs.yunque.local/cogni-kernel-pack/frontend/remoteEntry.js",
-    "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-    "sizeBytes": 4096
-  }
+  "status": "stable"
 }

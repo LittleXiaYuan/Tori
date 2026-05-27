@@ -2,7 +2,7 @@
   "id": "yunque.pack.sbom-drift",
   "name": "SBOM Drift Pack",
   "version": "0.1.0",
-  "description": "将 SBOM 快照、Go/npm 依赖漂移检测、artifact baseline source handoff plan、CI baseline gate pack-local write-back、CI workflow write-back handoff plan、govulncheck 预览和供应链证据包导出作为可选运维能力包暴露。",
+  "description": "供应链漂移检测的可选运维能力包。",
   "requiresCore": ">=0.1.0",
   "optional": true,
   "defaultState": "disabled",
@@ -129,13 +129,11 @@
   "metadata": {
     "blueprint": "doc/SBOM-DRIFT-DETECTION.md",
     "stage": "pack-shell-before-ci",
-    "sync": "backend-registry-drives-frontend"
+    "sync": "backend-registry-drives-frontend",
+    "descriptionStyle": "one-line-plus-three-examples",
+    "example1": "创建 Go/npm 依赖 SBOM 快照。",
+    "example2": "对比 baseline 并生成 drift diff。",
+    "example3": "导出 CycloneDX、CI gate 和供应链证据包。"
   },
-  "distribution": {
-    "manifestUrl": "https://packs.yunque.local/sbom-drift-pack/pack.json",
-    "packageUrl": "https://packs.yunque.local/sbom-drift-pack/sbom-drift-pack-0.1.0.tgz",
-    "frontendUrl": "https://packs.yunque.local/sbom-drift-pack/frontend/remoteEntry.js",
-    "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-    "sizeBytes": 4096
-  }
+  "status": "alpha"
 }

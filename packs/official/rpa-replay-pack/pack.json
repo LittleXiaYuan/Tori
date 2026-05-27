@@ -2,7 +2,7 @@
   "id": "yunque.pack.rpa-replay",
   "name": "RPA Replay Pack",
   "version": "0.1.0",
-  "description": "将 RPA 录制、轨迹存储、参数化回放计划、Browser Intent / ActionTracer executor handoff plan 和证据包导出作为可选增量包暴露。",
+  "description": "浏览器操作录制回放的可选自动化能力包。",
   "requiresCore": ">=0.1.0",
   "optional": true,
   "defaultState": "disabled",
@@ -114,13 +114,11 @@
   "metadata": {
     "blueprint": "doc/drafts/RPA-RECORD-REPLAY.md",
     "stage": "pack-shell-before-executor",
-    "sync": "backend-registry-drives-frontend"
+    "sync": "backend-registry-drives-frontend",
+    "descriptionStyle": "one-line-plus-three-examples",
+    "example1": "录制浏览器操作并保存 trace。",
+    "example2": "读取 trace 详情并生成 dry-run 回放。",
+    "example3": "生成 Browser Intent / executor handoff 计划。"
   },
-  "distribution": {
-    "manifestUrl": "https://packs.yunque.local/rpa-replay-pack/pack.json",
-    "packageUrl": "https://packs.yunque.local/rpa-replay-pack/rpa-replay-pack-0.1.0.tgz",
-    "frontendUrl": "https://packs.yunque.local/rpa-replay-pack/frontend/remoteEntry.js",
-    "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-    "sizeBytes": 4096
-  }
+  "status": "alpha"
 }
