@@ -51,9 +51,9 @@ import (
 	"yunque-agent/internal/connectors"
 	"yunque-agent/internal/execution/channel"
 	"yunque-agent/internal/execution/scheduler"
-	"yunque-agent/internal/experimental/iterate"
+	"yunque-agent/internal/agentcore/selfheal/iterate"
 	reflectpkg "yunque-agent/internal/experimental/reflect"
-	"yunque-agent/internal/experimental/skillgrow"
+	"yunque-agent/internal/agentcore/skillgrowth/adapter"
 	"yunque-agent/internal/integrations/mineru"
 	"yunque-agent/internal/observe"
 	"yunque-agent/internal/orchestrator"
@@ -244,7 +244,7 @@ func (g *Gateway) SetReviewGate(rg *review.Gate) { g.reviewGate = rg }
 
 // SetSkillGrow attaches the skill growth detector and wires its proposal
 // callback to auto-save skills into RAG and surface notifications in the frontend.
-func (g *Gateway) SetSkillGrow(sg *skillgrow.Detector) {
+func (g *Gateway) SetSkillGrow(sg *adapter.Detector) {
 	g.skillGrow = sg
 	if sg != nil {
 		sg.SetOnProposal(func(_ context.Context, pattern, suggestion string) {

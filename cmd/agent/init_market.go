@@ -14,7 +14,7 @@ import (
 	"yunque-agent/internal/agentcore/websearch"
 	"yunque-agent/internal/appdir"
 	"yunque-agent/internal/controlplane/gateway"
-	"yunque-agent/internal/experimental/skillgrow"
+	"yunque-agent/internal/agentcore/skillgrowth/adapter"
 )
 
 // initMarketplace initializes the SkillHub marketplace: ClawHub + ToriHub + GitHub providers,
@@ -179,7 +179,7 @@ func initMarketplace(app *agentrt.App, gw *gateway.Gateway, p *planner.Planner) 
 
 			// Wire auto-generation to the skill growth detector
 			if detRaw, ok := app.Get("skillgrow_detector"); ok {
-				if det, ok := detRaw.(*skillgrow.Detector); ok {
+				if det, ok := detRaw.(*adapter.Detector); ok {
 					// Compatibility fallback: the detector now emits canonical
 					// skillgrowth.Gap events into the pipeline via Gateway.SetSkillGrow.
 					// Keep direct generation available only when no pipeline was

@@ -9,18 +9,6 @@ const promotedPackages = ["trait", "recommend", "react", "taskdistill", "eval", 
 
 const allowedMainlineExperimentalImports = new Map([
   [
-    "iterate",
-    {
-      reason: "iteration service still exposed through gateway/bootstrap wiring",
-      files: [
-        "cmd/agent/init_extensions.go",
-        "cmd/agent/init_soul.go",
-        "internal/controlplane/gateway/gateway.go",
-        "internal/controlplane/gateway/gateway_setters.go",
-      ],
-    },
-  ],
-  [
     "reflect",
     {
       reason: "legacy compatibility evaluator feeding the canonical cognikernel ReflectiveLoop",
@@ -40,19 +28,6 @@ const allowedMainlineExperimentalImports = new Map([
         "internal/controlplane/gateway/handlers_reflect_experience_test.go",
         "internal/export/userdata/export.go",
         "internal/export/userdata/export_test.go",
-      ],
-    },
-  ],
-  [
-    "skillgrow",
-    {
-      reason: "detect/generate adapter for canonical internal/agentcore/skillgrowth pipeline",
-      files: [
-        "cmd/agent/init_extensions.go",
-        "cmd/agent/init_market.go",
-        "cmd/agent/init_soul.go",
-        "internal/controlplane/gateway/gateway.go",
-        "internal/controlplane/gateway/gateway_setters.go",
       ],
     },
   ],
@@ -131,6 +106,18 @@ if (exists("internal/experimental/distill")) {
 }
 if (!exists("internal/agentcore/llm/distill")) {
   failures.push("distillation service missing from internal/agentcore/llm/distill");
+}
+if (exists("internal/experimental/iterate")) {
+  failures.push("iterate service still exists under internal/experimental/iterate");
+}
+if (!exists("internal/agentcore/selfheal/iterate")) {
+  failures.push("iterate service missing from internal/agentcore/selfheal/iterate");
+}
+if (exists("internal/experimental/skillgrow")) {
+  failures.push("skillgrow adapter still exists under internal/experimental/skillgrow");
+}
+if (!exists("internal/agentcore/skillgrowth/adapter")) {
+  failures.push("skillgrow adapter missing from internal/agentcore/skillgrowth/adapter");
 }
 for (const pkg of ["docparse", "filegen", "imagegen", "research"]) {
   if (exists(`internal/experimental/${pkg}`)) {

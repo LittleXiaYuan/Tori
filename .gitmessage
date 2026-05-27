@@ -1,0 +1,87 @@
+# <type>(<scope>): <subject>
+# │       │         │
+# │       │         └─> Summary in present tense. Not capitalized. No period at the end.
+# │       │
+# │       └─> Scope: cogni|planner|gateway|session|task|approval|storage|sdk|ui|api|cli|deps|ci
+# │
+# └─> Type: feat|fix|refactor|perf|test|docs|style|chore
+
+# [optional body]
+# Explain *what* and *why* (not *how*). Wrap at 72 characters.
+
+# [optional footer]
+# Reference issues: Closes #123, Refs #456
+# Breaking changes: BREAKING CHANGE: description
+
+# ────────────────────────────────────────────────────────────────────────────
+# Commit Type Guide / 提交类型指南
+# ────────────────────────────────────────────────────────────────────────────
+#
+# feat:     New user-facing feature / 新功能
+#           ✓ Add new capability, API, component
+#           ✗ NOT for improvements to existing features
+#
+# fix:      Bug fix / 错误修复
+#           ✓ Correct incorrect behavior, crashes, data issues
+#           ✗ NOT for code cleanup or refactoring
+#
+# refactor: Code restructuring without behavior change / 代码重构
+#           ✓ Extract interfaces, rename, consolidate, reorganize
+#           ✓ Improve code quality, readability, architecture
+#           ✗ NOT for new features or bug fixes
+#
+# perf:     Performance improvement / 性能优化
+#           ✓ Improve speed, memory, latency
+#           ✗ NOT for functional changes
+#
+# test:     Add or update tests / 测试
+#           ✓ Test-only changes
+#           ✗ NOT for production code changes
+#
+# docs:     Documentation only / 文档
+#           ✓ README, guides, comments, API docs
+#
+# style:    Formatting, whitespace / 代码风格
+#           ✓ No logic changes
+#
+# chore:    Build, dependencies, tooling / 维护
+#           ✓ No production code changes
+#
+# ────────────────────────────────────────────────────────────────────────────
+# Examples / 示例
+# ────────────────────────────────────────────────────────────────────────────
+#
+# feat(cogni): add reflective learning loop
+# fix(planner): prevent nil pointer in context assembly
+# refactor(planner): extract runtime boundary interface
+# perf(kernel): optimize event dispatch with batching
+# test(approval): add evaluator edge case tests
+# docs(sdk): update TypeScript SDK installation guide
+# style(planner): fix indentation in context service
+# chore(deps): upgrade go to 1.22
+#
+# ────────────────────────────────────────────────────────────────────────────
+# Common Mistakes / 常见错误
+# ────────────────────────────────────────────────────────────────────────────
+#
+# ❌ feat(planner): use local service handles
+# ✅ refactor(planner): use local service handles
+#    → No new functionality, just internal improvement
+#
+# ❌ fix(ui): add Pack status grouping
+# ✅ feat(ui): add Pack status grouping
+#    → Adding new functionality, not fixing a bug
+#
+# ❌ feat(planner): add caching and fix race condition
+# ✅ Split into two commits:
+#    feat(planner): add prompt template caching
+#    fix(planner): resolve context assembly race condition
+#    → One purpose per commit
+#
+# ────────────────────────────────────────────────────────────────────────────
+# Goal / 目标: Achieve 4:2:1 ratio (feat:fix:refactor) over next 30 days
+# 目标：在未来 30 天内达到 4:2:1 的比例（feat:fix:refactor）
+#
+# Check distribution: node scripts/check-commit-type.mjs
+# Full guide: docs/COMMIT-CONVENTIONS.md
+# ────────────────────────────────────────────────────────────────────────────
