@@ -11,7 +11,7 @@ import (
 	"yunque-agent/internal/agentcore/inbox"
 	"yunque-agent/internal/agentcore/planner"
 	agentrt "yunque-agent/internal/agentcore/runtime"
-	"yunque-agent/internal/experimental/heartbeat"
+	"yunque-agent/internal/agentcore/runtime/heartbeat"
 )
 
 type heartbeatModule struct {
