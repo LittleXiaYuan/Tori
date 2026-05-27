@@ -50,7 +50,12 @@ export class CognisClient {
   alerts(): Promise<CogniAlertsResponse> { return this.request<CogniAlertsResponse>("GET", "/v1/cognis/alerts"); }
   scanAlerts(): Promise<CogniAlertsResponse> { return this.request<CogniAlertsResponse>("POST", "/v1/cognis/alerts/scan"); }
   generate(request: Record<string, unknown>): Promise<CogniMutationResponse> { return this.request<CogniMutationResponse>("POST", "/v1/cognis/generate", request); }
-  exportBundle(): Promise<Record<string, unknown>> { return this.request<Record<string, unknown>>("GET", "/v1/cognis/export"); }
+  exportBundle(ids?: string[], notes?: string): Promise<Record<string, unknown>> {
+    const query: Record<string, string | undefined> = {};
+    if (ids && ids.length > 0) query.ids = ids.join(",");
+    if (notes) query.notes = notes;
+    return this.request<Record<string, unknown>>("GET", "/v1/cognis/export", undefined, query);
+  }
   importBundle(bundle: Record<string, unknown>): Promise<CogniMutationResponse> { return this.request<CogniMutationResponse>("POST", "/v1/cognis/import", bundle); }
 
   workflows(id: string): Promise<Record<string, unknown>> { return this.request<Record<string, unknown>>("GET", `/v1/cognis/${enc(id)}/workflows`); }

@@ -234,7 +234,7 @@ export default function PacksPageOptimized() {
 
   function renderPackCard(pack: InstalledPack) {
     const tone = statusTone(pack.status);
-    const packBadge = packStatusBadge(pack.manifest.status);
+    const packBadge = packStatusBadge(pack.manifest.status as string | undefined);
     const manifest = pack.manifest;
     const caps = manifest.backend?.capabilities || [];
     const menus = manifest.frontend?.menus || [];
@@ -331,3 +331,4 @@ export default function PacksPageOptimized() {
       </Card>
     );
   }
+}
