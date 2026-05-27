@@ -2,7 +2,7 @@
   "name": "yunque-client",
   "version": "0.1.0",
   "description": "TypeScript client for the Yunque (云雀) Agent HTTP API: generated root client plus explicit focused subpath slices.",
-  "license": "Apache-2.0",
+  "license": "MIT",
   "type": "module",
   "main": "src/index.ts",
   "types": "src/index.ts",
