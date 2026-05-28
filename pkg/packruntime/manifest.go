@@ -17,12 +17,41 @@ type Manifest struct {
 	RequiresCore string               `json:"requiresCore,omitempty"`
 	Optional     bool                 `json:"optional"`
 	DefaultState string               `json:"defaultState,omitempty"`
+	Status       string               `json:"status,omitempty"`
+	ABI          string               `json:"abi,omitempty"`
+	PublishedAt  string               `json:"publishedAt,omitempty"`
+	Publisher    PublisherManifest    `json:"publisher,omitempty"`
+	Dependencies []ManifestDependency `json:"dependencies,omitempty"`
 	Backend      BackendManifest      `json:"backend"`
 	Frontend     FrontendManifest     `json:"frontend"`
 	SDK          SDKManifest          `json:"sdk,omitempty"`
 	Distribution DistributionManifest `json:"distribution,omitempty"`
+	Signing      *SigningManifest     `json:"signing,omitempty"`
 	Update       UpdateManifest       `json:"update,omitempty"`
 	Metadata     map[string]string    `json:"metadata,omitempty"`
+}
+
+// PublisherManifest identifies the entity that signs the pack manifest.
+// Public-key bytes themselves come from the trust root, never from the manifest.
+type PublisherManifest struct {
+	ID          string `json:"id,omitempty"`
+	PublicKeyID string `json:"publicKeyId,omitempty"`
+}
+
+// ManifestDependency declares an explicit pack-id + SemVer range another pack
+// requires. Resolution is non-transitive: enforced at install time, not auto-resolved.
+type ManifestDependency struct {
+	ID       string `json:"id"`
+	Requires string `json:"requires,omitempty"`
+}
+
+// SigningManifest carries the detached ed25519 signature material for a pack.
+// `Signature` is base64(ed25519(canonical(manifest_without_signing))).
+// `ManifestSHA256` is sha256 hex of the same canonical bytes.
+type SigningManifest struct {
+	Algorithm      string `json:"algorithm,omitempty"`
+	ManifestSHA256 string `json:"manifestSha256,omitempty"`
+	Signature      string `json:"signature,omitempty"`
 }
 
 type BackendManifest struct {
@@ -73,11 +102,21 @@ type SDKManifest struct {
 }
 
 type DistributionManifest struct {
-	ManifestURL string `json:"manifestUrl,omitempty"`
-	PackageURL  string `json:"packageUrl,omitempty"`
-	FrontendURL string `json:"frontendUrl,omitempty"`
-	SHA256      string `json:"sha256,omitempty"`
-	SizeBytes   int64  `json:"sizeBytes,omitempty"`
+	ManifestURL string             `json:"manifestUrl,omitempty"`
+	PackageURL  string             `json:"packageUrl,omitempty"`
+	FrontendURL string             `json:"frontendUrl,omitempty"`
+	SHA256      string             `json:"sha256,omitempty"`
+	SizeBytes   int64              `json:"sizeBytes,omitempty"`
+	Platforms   []string           `json:"platforms,omitempty"`
+	Mirrors     []DistributionMirror `json:"mirrors,omitempty"`
+}
+
+// DistributionMirror is one equivalent download location for the same .yqpack
+// artifact. All mirrors must serve the byte-identical artifact; kind only
+// affects UX-level ordering and labelling.
+type DistributionMirror struct {
+	Kind string `json:"kind"`
+	URL  string `json:"url"`
 }
 
 type UpdateManifest struct {
@@ -126,6 +165,32 @@ func (m Manifest) Validate() error {
 	}
 	if m.Distribution.SizeBytes < 0 {
 		return fmt.Errorf("distribution.sizeBytes must be greater than or equal to 0")
+	}
+	for i, mirror := range m.Distribution.Mirrors {
+		if strings.TrimSpace(mirror.Kind) == "" {
+			return fmt.Errorf("distribution.mirrors[%d].kind is required", i)
+		}
+		if strings.TrimSpace(mirror.URL) == "" {
+			return fmt.Errorf("distribution.mirrors[%d].url is required", i)
+		}
+	}
+	for i, plat := range m.Distribution.Platforms {
+		if !strings.Contains(plat, "/") {
+			return fmt.Errorf("distribution.platforms[%d] must be in <goos>/<goarch> form", i)
+		}
+	}
+	for i, dep := range m.Dependencies {
+		if strings.TrimSpace(dep.ID) == "" {
+			return fmt.Errorf("dependencies[%d].id is required", i)
+		}
+	}
+	if m.Signing != nil {
+		if m.Signing.Algorithm != "" && m.Signing.Algorithm != "ed25519" {
+			return fmt.Errorf("signing.algorithm must be ed25519 (got %q)", m.Signing.Algorithm)
+		}
+		if m.Signing.Signature != "" && strings.TrimSpace(m.Signing.ManifestSHA256) == "" {
+			return fmt.Errorf("signing.manifestSha256 is required when signing.signature is set")
+		}
 	}
 	return nil
 }
