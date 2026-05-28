@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Button, Card, Chip, Spinner, TextField, Input, Label } from "@heroui/react";
 import {
+  ArrowRight,
   Boxes,
   ChevronDown,
   ChevronUp,
@@ -249,52 +251,57 @@ export default function PacksPageOptimized() {
 
     return (
       <Card key={manifest.id} className="section-card p-4 hover-lift">
-        <div className="flex items-start justify-between gap-3 mb-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <PackageCheck size={16} style={{ color: "var(--yunque-accent)" }} />
-              <span className="font-semibold text-sm" style={{ color: "var(--yunque-text)" }}>{manifest.name}</span>
-              <Chip size="sm" style={{ background: tone.bg, color: tone.color }}>{tone.label}</Chip>
-              <Chip size="sm" style={{ background: packBadge.bg, color: packBadge.color }}>
-                {packBadge.icon} {packBadge.label}
-              </Chip>
-            </div>
-            <div className="text-xs mt-1 font-mono" style={{ color: "var(--yunque-text-muted)" }}>{manifest.id}</div>
-            {manifest.description && (
-              <div className="text-xs mt-2" style={{ color: "var(--yunque-text-secondary)" }}>{manifest.description}</div>
-            )}
-          </div>
-        </div>
-
-        {/* 用户友好的功能说明 */}
-        {friendlyExamples.length > 0 && (
-          <div className="mb-3 space-y-1">
-            {friendlyExamples.map((example, idx) => (
-              <div key={idx} className="flex items-start gap-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
-                <span style={{ color: "var(--yunque-accent)" }}>•</span>
-                <span>{example}</span>
+        <Link
+          href={`/packs/detail?id=${encodeURIComponent(manifest.id)}`}
+          className="block cursor-pointer"
+        >
+          <div className="flex items-start justify-between gap-3 mb-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <PackageCheck size={16} style={{ color: "var(--yunque-accent)" }} />
+                <span className="font-semibold text-sm" style={{ color: "var(--yunque-text)" }}>{manifest.name}</span>
+                <Chip size="sm" style={{ background: tone.bg, color: tone.color }}>{tone.label}</Chip>
+                <Chip size="sm" style={{ background: packBadge.bg, color: packBadge.color }}>
+                  {packBadge.icon} {packBadge.label}
+                </Chip>
               </div>
-            ))}
+              <div className="text-xs mt-1 font-mono" style={{ color: "var(--yunque-text-muted)" }}>{manifest.id}</div>
+              {manifest.description && (
+                <div className="text-xs mt-2" style={{ color: "var(--yunque-text-secondary)" }}>{manifest.description}</div>
+              )}
+            </div>
           </div>
-        )}
 
-        {/* 技术能力标签（仅在高级模式显示） */}
-        {showAdvanced && caps.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mb-3">
-            {caps.slice(0, 4).map((cap) => (
-              <Chip key={cap} size="sm" style={{ background: "rgba(59,130,246,0.08)", color: "var(--yunque-primary)" }}>
-                {cap}
-              </Chip>
-            ))}
-            {caps.length > 4 && (
-              <Chip size="sm" style={{ background: "rgba(255,255,255,0.05)", color: "var(--yunque-text-muted)" }}>
-                +{caps.length - 4}
-              </Chip>
-            )}
-          </div>
-        )}
+          {/* 用户友好的功能说明 */}
+          {friendlyExamples.length > 0 && (
+            <div className="mb-3 space-y-1">
+              {friendlyExamples.map((example, idx) => (
+                <div key={idx} className="flex items-start gap-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+                  <span style={{ color: "var(--yunque-accent)" }}>•</span>
+                  <span>{example}</span>
+                </div>
+              ))}
+            </div>
+          )}
 
-        {/* 操作按钮 */}
+          {/* 技术能力标签（仅在高级模式显示） */}
+          {showAdvanced && caps.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mb-3">
+              {caps.slice(0, 4).map((cap) => (
+                <Chip key={cap} size="sm" style={{ background: "rgba(59,130,246,0.08)", color: "var(--yunque-primary)" }}>
+                  {cap}
+                </Chip>
+              ))}
+              {caps.length > 4 && (
+                <Chip size="sm" style={{ background: "rgba(255,255,255,0.05)", color: "var(--yunque-text-muted)" }}>
+                  +{caps.length - 4}
+                </Chip>
+              )}
+            </div>
+          )}
+        </Link>
+
+        {/* 操作按钮（不在 Link 内，避免点击穿透） */}
         <div className="flex items-center gap-2">
           {pack.status === "enabled" ? (
             <Button size="sm" variant="outline" isDisabled={busy === `disable:${manifest.id}`} onPress={() => disable(manifest.id)}>
@@ -315,6 +322,11 @@ export default function PacksPageOptimized() {
               <RotateCcw size={14} /> 回滚
             </Button>
           )}
+          <Link href={`/packs/detail?id=${encodeURIComponent(manifest.id)}`} className="ml-auto">
+            <Button size="sm" variant="ghost">
+              详情 <ArrowRight size={14} />
+            </Button>
+          </Link>
         </div>
 
         {/* 展开详情 */}

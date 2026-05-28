@@ -35,7 +35,7 @@
   --yunque-glass-saturate: 1.4;
   --glass-card:    rgba(20, 20, 26, 0.55);
   --glass-sidebar: rgba(15, 15, 20, 0.50);
-  --glass-flyout:  rgba(20, 20, 26, 0.72);
+  --glass-flyout:  rgba(20, 20, 26, 0.92);
   --glass-overlay: rgba(0, 0, 0, 0.45);
   --glass-edge:    rgba(255, 255, 255, 0.10);
   --glass-edge-strong: rgba(255, 255, 255, 0.18);
@@ -625,6 +625,7 @@ button, [role="button"] { border-radius: var(--radius-md); }
   z-index: 39;
   display: flex;
   flex-direction: column;
+  overflow: hidden; /* 确保内容不会溢出容器 */
   opacity: 0;
   pointer-events: none;
   transform: translateX(-8px) scale(0.96);
@@ -657,6 +658,7 @@ button, [role="button"] { border-radius: var(--radius-md); }
 
 .account-rail-flyout-body {
   flex: 1;
+  min-height: 0; /* 确保 flex 子元素可以正确收缩和滚动 */
   overflow-y: auto;
   padding: 8px 8px 16px;
 }
