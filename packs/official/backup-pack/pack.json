@@ -68,6 +68,12 @@
     "channel": "stable",
     "rollback": true
   },
+  "distribution": {
+    "packageUrl": "https://github.com/LittleXiaYuan/Tori/releases/download/pack/backup/v0.1.0/yunque.pack.backup-0.1.0.yqpack",
+    "sha256": "11d14f99d884e41da7d359b5cd24788a5540170655f8ca6bf850e9e7e259b781",
+    "sizeBytes": 996,
+    "platforms": ["any/any"]
+  },
   "metadata": {
     "example": "true",
     "sync": "backend-registry-drives-frontend",

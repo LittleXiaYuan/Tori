@@ -34,6 +34,7 @@ const tag = argv["tag"];
 const keyPath = argv["key"];
 const publisher = argv["publisher"];
 const keyID = argv["key-id"];
+const ghRepo = argv["repo"]; // owner/repo for `gh --repo`, optional
 
 if (!packArg) usageExit("--pack is required");
 if (!tag) usageExit("--tag is required (e.g. pack/inner-life/v0.1.0)");
@@ -94,20 +95,22 @@ try {
     log("dry-run: skipping gh release create/upload");
     log(`artifact retained at: ${outPath}`);
   } else {
-    log(`gh release create (if missing): ${tag}`);
-    const create = run("gh", ["release", "view", tag], { cwd: repoRoot, capture: true, allowFail: true });
+    const repoFlags = ghRepo ? ["--repo", ghRepo] : [];
+    log(`gh release create (if missing): ${tag}${ghRepo ? ` (repo=${ghRepo})` : ""}`);
+    const create = run("gh", ["release", "view", tag, ...repoFlags], { cwd: repoRoot, capture: true, allowFail: true });
     if (create.code !== 0) {
-      run("gh", ["release", "create", tag, "--notes", `Pack release ${tag}`], { cwd: repoRoot });
+      run("gh", ["release", "create", tag, "--notes", `Pack release ${tag}`, ...repoFlags], { cwd: repoRoot });
     } else {
       log(`release ${tag} already exists — uploading asset to it`);
     }
 
     log(`gh release upload: ${outPath}`);
-    run("gh", ["release", "upload", tag, outPath, "--clobber"], { cwd: repoRoot });
+    run("gh", ["release", "upload", tag, outPath, "--clobber", ...repoFlags], { cwd: repoRoot });
 
     log(`✓ release published: ${tag}`);
     log(`  remember to point distribution.packageUrl in pack.json at:`);
-    log(`    https://github.com/<owner>/<repo>/releases/download/${tag}/${basename(outPath)}`);
+    const repoForUrl = ghRepo || "<owner>/<repo>";
+    log(`    https://github.com/${repoForUrl}/releases/download/${tag}/${basename(outPath)}`);
   }
 } finally {
   rmSync(stagingRoot, { recursive: true, force: true });
@@ -202,7 +205,7 @@ function fatal(msg) {
 function usageExit(msg) {
   console.error(`[release-pack] ${msg}\n`);
   console.error(
-    "usage: node scripts/release-pack.mjs --pack <dir> --tag <tag> [--key <key.key> --publisher <id> --key-id <kid>] [--dry-run]"
+    "usage: node scripts/release-pack.mjs --pack <dir> --tag <tag> [--repo owner/repo] [--key <key.key> --publisher <id> --key-id <kid>] [--dry-run]"
   );
   process.exit(2);
 }
