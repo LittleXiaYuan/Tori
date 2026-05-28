@@ -25,6 +25,7 @@ type ReflectiveLoop struct {
 	distillFn    DistillFunc
 	selfDistill  SelfDistillSink
 	memoryUpdate MemoryUpdateFunc
+	eventEmit    EventEmitFunc
 }
 
 // ReflectEvalFunc evaluates conversation quality.
@@ -71,6 +72,13 @@ type TrainingSample struct {
 // MemoryUpdateFunc applies a memory update from reflection.
 type MemoryUpdateFunc func(ctx context.Context, action, key, value string) error
 
+// EventEmitFunc is a generic sink for loop-completion events. Implementations
+// typically forward to a ledger or audit chain. kind is a stable string
+// (e.g. "reflection.completed"); payload is a JSON-serializable map.
+//
+// Decoupled from ledgercore so cognikernel stays infrastructure-agnostic.
+type EventEmitFunc func(ctx context.Context, kind string, payload map[string]any)
+
 // NewReflectiveLoop creates the reflective loop pipeline.
 func NewReflectiveLoop() *ReflectiveLoop {
 	return &ReflectiveLoop{}
@@ -81,6 +89,7 @@ func (rl *ReflectiveLoop) SetExperienceRecord(fn ExperienceRecordFunc) { rl.expe
 func (rl *ReflectiveLoop) SetDistill(fn DistillFunc)                   { rl.distillFn = fn }
 func (rl *ReflectiveLoop) SetSelfDistillSink(sink SelfDistillSink)     { rl.selfDistill = sink }
 func (rl *ReflectiveLoop) SetMemoryUpdate(fn MemoryUpdateFunc)         { rl.memoryUpdate = fn }
+func (rl *ReflectiveLoop) SetEventEmit(fn EventEmitFunc)               { rl.eventEmit = fn }
 
 // Run executes the full reflective pipeline for one conversation.
 func (rl *ReflectiveLoop) Run(ctx context.Context, data ConversationEndData) (*ReflectResult, error) {
@@ -156,6 +165,20 @@ func (rl *ReflectiveLoop) Run(ctx context.Context, data ConversationEndData) (*R
 		}
 	}
 
+	if rl.eventEmit != nil && evaluated {
+		rl.eventEmit(ctx, "reflection.completed", map[string]any{
+			"source":            "conversation_end",
+			"tenant_id":         data.TenantID,
+			"quality":           result.Quality,
+			"satisfied":         result.Satisfied,
+			"experiences_added": result.ExperiencesAdded,
+			"distilled_rules":   result.DistilledRules,
+			"memory_updates":    result.MemoryUpdates,
+			"skills_used":       data.SkillsUsed,
+			"user_intent":       data.UserIntent,
+		})
+	}
+
 	return result, nil
 }
 
@@ -200,6 +223,21 @@ func (rl *ReflectiveLoop) IngestFeedback(ctx context.Context, data FeedbackData)
 		result.Quality = 6
 	}
 	result.Score = float64(result.Quality) / 10.0
+
+	if rl.eventEmit != nil {
+		rl.eventEmit(ctx, "reflection.completed", map[string]any{
+			"source":            firstNonEmpty(data.Source, "feedback"),
+			"category":          firstNonEmpty(data.Category, "feedback"),
+			"outcome":           outcome,
+			"tenant_id":         data.TenantID,
+			"quality":           result.Quality,
+			"satisfied":         result.Satisfied,
+			"experiences_added": result.ExperiencesAdded,
+			"lesson":            lesson,
+			"source_id":         data.SourceID,
+		})
+	}
+
 	return result, nil
 }
 

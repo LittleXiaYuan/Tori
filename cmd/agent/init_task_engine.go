@@ -27,11 +27,23 @@ import (
 	"yunque-agent/internal/agentcore/tools"
 	"yunque-agent/internal/agentcore/trigger"
 	"yunque-agent/internal/agentcore/workflow"
+	"yunque-agent/internal/cognicore/causal"
+	"yunque-agent/internal/cognicore/curiosity"
+	"yunque-agent/internal/cognicore/eval"
+	"yunque-agent/internal/cognicore/microagent"
+	"yunque-agent/internal/cognicore/recommend"
+	"yunque-agent/internal/cognicore/trait"
+	"yunque-agent/internal/cognicore/world"
 	"yunque-agent/internal/controlplane/gateway"
 	"yunque-agent/internal/execution/channel"
 	reflectpkg "yunque-agent/internal/experimental/reflect"
 	iledger "yunque-agent/internal/ledger"
 	"yunque-agent/internal/observe"
+	experiencepack "yunque-agent/internal/packs/experience"
+	innerlifepack "yunque-agent/internal/packs/innerlife"
+	microagentpack "yunque-agent/internal/packs/microagent"
+	nightschoolpack "yunque-agent/internal/packs/nightschool"
+	worldmodelpack "yunque-agent/internal/packs/worldmodel"
 	"yunque-agent/pkg/skills"
 
 	"yunque-agent/internal/ledgercore"
@@ -115,6 +127,83 @@ func initTaskEngine(
 		typedLdg:       typedLdg,
 		skillLifecycle: skillLifecycleRaw.(*selfheal.Lifecycle),
 	})
+
+	// Inner Life pack — exposes the soul-layer outputs (curiosity / reflection /
+	// dreaming) over a read-only HTTP surface. Registered here because the
+	// curiosity module is built by initSoulLayer.
+	if app.Ledger != nil {
+		var curiosityMod *curiosity.Module
+		if cm, ok := app.Get("curiosity"); ok {
+			curiosityMod, _ = cm.(*curiosity.Module)
+		}
+		gw.RegisterBackendPack(innerlifepack.New(innerlifepack.Config{
+			Ledger:    app.Ledger,
+			Curiosity: curiosityMod,
+		}))
+	}
+
+	// Night School pack — exposes nightly learning: dreaming sessions, distilled
+	// task experience and learned user traits. Registered after the soul layer
+	// because the trait store / task distiller are built there.
+	if app.Ledger != nil {
+		var traitStore *trait.Store
+		if ts, ok := app.Get("trait_store"); ok {
+			traitStore, _ = ts.(*trait.Store)
+		}
+		gw.RegisterBackendPack(nightschoolpack.New(nightschoolpack.Config{
+			Ledger:     app.Ledger,
+			TraitStore: traitStore,
+		}))
+	}
+
+	// Experience pack — exposes the recommendation engine and task self-evals.
+	// Recommend engine is wired in initIntelligence; evaluator in initSoulLayer.
+	if app.Ledger != nil {
+		var recEngine *recommend.Engine
+		if re, ok := app.Get("recommend_engine"); ok {
+			recEngine, _ = re.(*recommend.Engine)
+		}
+		var evaluator *eval.Evaluator
+		if ev, ok := app.Get("evaluator"); ok {
+			evaluator, _ = ev.(*eval.Evaluator)
+		}
+		gw.RegisterBackendPack(experiencepack.New(experiencepack.Config{
+			Ledger:    app.Ledger,
+			Recommend: recEngine,
+			Evaluator: evaluator,
+		}))
+	}
+
+	// World Model pack — exposes the agent's understanding of external state
+	// (world model) plus causal-engine views on failed tasks.
+	if app.Ledger != nil {
+		var worldModel *world.Model
+		if wm, ok := app.Get("world_model"); ok {
+			worldModel, _ = wm.(*world.Model)
+		}
+		var causalEngine *causal.CausalEngine
+		if ce, ok := app.Get("causal_engine"); ok {
+			causalEngine, _ = ce.(*causal.CausalEngine)
+		}
+		gw.RegisterBackendPack(worldmodelpack.New(worldmodelpack.Config{
+			WorldModel: worldModel,
+			Causal:     causalEngine,
+		}))
+	}
+
+	// Micro-Agent pack — exposes the microagent registry and ReAct reasoning
+	// trace replay. Microagent registry is wired in initIntelligence; ReAct
+	// reasoning is recorded into the ledger by the react runner from initSoul.
+	{
+		var maRegistry *microagent.Registry
+		if mr, ok := app.Get("microagent_registry"); ok {
+			maRegistry, _ = mr.(*microagent.Registry)
+		}
+		gw.RegisterBackendPack(microagentpack.New(microagentpack.Config{
+			Registry: maRegistry,
+			Ledger:   app.Ledger,
+		}))
+	}
 
 	if recovered := taskRunner.RecoverAll(); recovered > 0 {
 		slog.Warn("task recovery: marked interrupted tasks", "count", recovered)

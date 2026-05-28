@@ -46,6 +46,14 @@ const (
 	EventReasoningConfUpdate EventKind = "reasoning.conf"
 )
 
+// Cognitive loop completion events — emitted by cognikernel.ReflectiveLoop
+// and DreamingLoop after a cycle finishes. Inner-life Pack reads these to
+// surface "what the agent thought about itself" and "what it explored when idle".
+const (
+	EventReflectionCompleted EventKind = "reflection.completed"
+	EventDreamingCompleted   EventKind = "dreaming.completed"
+)
+
 // Infrastructure events.
 const (
 	EventCheckpointCreated EventKind = "checkpoint.created"
