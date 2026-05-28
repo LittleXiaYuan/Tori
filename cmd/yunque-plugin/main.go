@@ -2,6 +2,9 @@ package main
 
 import (
 	"archive/zip"
+	"crypto/ed25519"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,6 +16,7 @@ import (
 	"text/template"
 
 	"yunque-agent/pkg/manifest"
+	"yunque-agent/pkg/packruntime"
 )
 
 const version = "0.1.0"
@@ -63,6 +67,12 @@ func main() {
 			targetDir = os.Args[2]
 		}
 		cmdList(targetDir)
+	case "pack":
+		cmdPack(os.Args[2:])
+	case "gen-key":
+		cmdGenKey(os.Args[2:])
+	case "sign":
+		cmdSign(os.Args[2:])
 	case "version":
 		fmt.Printf("tori-plugin %s\n", version)
 	case "help", "-h", "--help":
@@ -84,6 +94,11 @@ Usage:
   tori plugin test [path]              Run plugin tests
   tori plugin install <source> [dir]   Install plugin from path, .zip, or URL
   tori plugin list [dir]               List installed plugins
+  tori plugin pack <pack-dir> [--out file.yqpack]
+                                       Build a deterministic .yqpack archive
+  tori plugin gen-key [--out file]     Generate an ed25519 keypair (file.pub + file.key)
+  tori plugin sign <pack-dir> --key <key> --publisher <id> --key-id <kid>
+                                       Sign pack.json with an ed25519 key
   tori plugin version                  Show version
 
 Examples:
@@ -567,6 +582,153 @@ func fatal(format string, args ...any) {
 
 func isWindows() bool {
 	return os.PathSeparator == '\\'
+}
+
+// --- pack ---
+
+func cmdPack(args []string) {
+	if len(args) == 0 {
+		fatal("usage: yunque-plugin pack <pack-dir> [--out file.yqpack]")
+	}
+	packDir := args[0]
+	outPath := ""
+	for i := 1; i < len(args); i++ {
+		switch args[i] {
+		case "--out", "-o":
+			i++
+			if i >= len(args) {
+				fatal("--out requires a path")
+			}
+			outPath = args[i]
+		default:
+			fatal("unknown flag %q", args[i])
+		}
+	}
+
+	manifestPath := filepath.Join(packDir, packruntime.ManifestFileName)
+	m, err := packruntime.LoadManifest(manifestPath)
+	if err != nil {
+		fatal("load %s: %v", manifestPath, err)
+	}
+
+	if outPath == "" {
+		base := fmt.Sprintf("%s-%s.yqpack", safeFileSegment(m.ID), safeFileSegment(m.Version))
+		outPath = filepath.Join(filepath.Dir(packDir), base)
+	}
+
+	fmt.Printf("Packing %s → %s\n", packDir, outPath)
+	sha, err := packruntime.PackToYqpack(packDir, outPath)
+	if err != nil {
+		fatal("pack: %v", err)
+	}
+	info, err := os.Stat(outPath)
+	if err != nil {
+		fatal("stat %s: %v", outPath, err)
+	}
+	fmt.Printf("  ✓ %s (%d bytes, sha256 %s)\n", outPath, info.Size(), sha)
+	fmt.Printf("\n  Update distribution metadata:\n")
+	fmt.Printf("    distribution.sha256:    %s\n", sha)
+	fmt.Printf("    distribution.sizeBytes: %d\n", info.Size())
+}
+
+// --- gen-key ---
+
+func cmdGenKey(args []string) {
+	outBase := "yunque-pack"
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--out", "-o":
+			i++
+			if i >= len(args) {
+				fatal("--out requires a path")
+			}
+			outBase = args[i]
+		default:
+			fatal("unknown flag %q", args[i])
+		}
+	}
+	pub, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		fatal("generate key: %v", err)
+	}
+	pubPath := outBase + ".pub"
+	keyPath := outBase + ".key"
+	if err := os.WriteFile(pubPath, []byte(base64.StdEncoding.EncodeToString(pub)+"\n"), 0o644); err != nil {
+		fatal("write %s: %v", pubPath, err)
+	}
+	if err := os.WriteFile(keyPath, []byte(base64.StdEncoding.EncodeToString(priv)+"\n"), 0o600); err != nil {
+		fatal("write %s: %v", keyPath, err)
+	}
+	fmt.Printf("  ✓ wrote %s (public, base64)\n", pubPath)
+	fmt.Printf("  ✓ wrote %s (private, base64, 0600)\n", keyPath)
+	fmt.Println("\nDistribute the .pub file to anyone who needs to verify your packs.")
+	fmt.Println("Keep the .key file secret — anyone with it can sign as you.")
+}
+
+// --- sign ---
+
+func cmdSign(args []string) {
+	if len(args) == 0 {
+		fatal("usage: yunque-plugin sign <pack-dir> --key <key.key> --publisher <id> --key-id <kid>")
+	}
+	packDir := args[0]
+	keyPath, publisher, keyID := "", "", ""
+	for i := 1; i < len(args); i++ {
+		switch args[i] {
+		case "--key", "-k":
+			i++
+			keyPath = args[i]
+		case "--publisher", "-p":
+			i++
+			publisher = args[i]
+		case "--key-id":
+			i++
+			keyID = args[i]
+		default:
+			fatal("unknown flag %q", args[i])
+		}
+	}
+	if keyPath == "" || publisher == "" || keyID == "" {
+		fatal("--key, --publisher, --key-id are all required")
+	}
+	keyData, err := os.ReadFile(keyPath)
+	if err != nil {
+		fatal("read %s: %v", keyPath, err)
+	}
+	priv, err := base64.StdEncoding.DecodeString(strings.TrimSpace(string(keyData)))
+	if err != nil || len(priv) != ed25519.PrivateKeySize {
+		fatal("invalid ed25519 private key in %s", keyPath)
+	}
+	manifestPath := filepath.Join(packDir, packruntime.ManifestFileName)
+	m, err := packruntime.LoadManifest(manifestPath)
+	if err != nil {
+		fatal("load %s: %v", manifestPath, err)
+	}
+	if err := packruntime.SignManifest(&m, priv, publisher, keyID); err != nil {
+		fatal("sign: %v", err)
+	}
+	if err := packruntime.SaveManifest(manifestPath, m); err != nil {
+		fatal("save signed manifest: %v", err)
+	}
+	fmt.Printf("  ✓ signed %s as %s/%s\n", manifestPath, publisher, keyID)
+	fmt.Printf("    signing.algorithm:      %s\n", m.Signing.Algorithm)
+	fmt.Printf("    signing.manifestSha256: %s\n", m.Signing.ManifestSHA256)
+}
+
+func safeFileSegment(s string) string {
+	var b strings.Builder
+	for _, r := range s {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' || r == '.' {
+			b.WriteRune(r)
+		} else {
+			b.WriteByte('_')
+		}
+	}
+	out := strings.Trim(b.String(), "._")
+	if out == "" {
+		return "pack"
+	}
+	return out
 }
 
 // --- templates ---
