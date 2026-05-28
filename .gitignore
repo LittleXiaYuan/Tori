@@ -111,6 +111,11 @@ apps/browser-extension/manus-analysis/
 # ── Local agent/cache artifacts ──
 .atomcode/
 .tmp/
+.cursor/
+.aider*
+.continue/
+.windsurf/
+.copilot/
 
 # ── Tauri/Rust build outputs ──
 apps/desktop/src-tauri/target*/
