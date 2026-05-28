@@ -116,7 +116,7 @@ for (const token of ["dual-read parity gate", "runKVHistoryDualReadParity", "kv-
   if (!page.includes(token)) fail(`Memory Time Travel pack page missing kv_history dual-read parity token: ${token}`);
 }
 
-const docs = readRepoFile("doc/PACK-RUNTIME-BLUEPRINT.md") + "\n" + readRepoFile("docs/guide/pack-runtime.md") + "\n" + readRepoFile("docs/zh/guide/pack-runtime.md");
+const docs = readRepoFile("docs/spec/pack-runtime-blueprint.md") + "\n" + readRepoFile("docs/guide/pack-runtime.md") + "\n" + readRepoFile("docs/zh/guide/pack-runtime.md");
 for (const token of [
   "/v1/memory-time-travel/rollback/writeback/store",
   "/v1/memory-time-travel/rollback/writeback/executor/plan",

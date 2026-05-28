@@ -51,7 +51,7 @@ function walk(dir) {
 }
 
 const authoring = readText("packs/AUTHORING.md");
-const packRuntimeBlueprint = readText("doc/PACK-RUNTIME-BLUEPRINT.md");
+const packRuntimeBlueprint = readText("docs/spec/pack-runtime-blueprint.md");
 const englishGuide = readText("docs/guide/pack-runtime.md") + "\n" + readText("docs/guide/pack-runtime-state.md");
 const chineseGuide = readText("docs/zh/guide/pack-runtime.md") + "\n" + readText("docs/zh/guide/pack-runtime-state.md");
 const docsConfig = readText("docs/.vitepress/config.ts");

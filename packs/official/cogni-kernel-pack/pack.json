@@ -98,7 +98,7 @@
     "rollback": true
   },
   "metadata": {
-    "blueprint": "doc/PACK-RUNTIME-BLUEPRINT.md",
+    "blueprint": "docs/spec/pack-runtime-blueprint.md",
     "stage": "runtime-loop-pack-state-gate",
     "sync": "backend-registry-drives-frontend",
     "runtimeArtifact": "cogni-runtime-pack-state.json",

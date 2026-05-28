@@ -114,7 +114,7 @@
     "rollback": true
   },
   "metadata": {
-    "blueprint": "doc/PACK-RUNTIME-BLUEPRINT.md",
+    "blueprint": "docs/spec/pack-runtime-blueprint.md",
     "sync": "backend-registry-drives-frontend",
     "descriptionStyle": "one-line-plus-three-examples",
     "example1": "查看训练状态、历史与数据预检摘要。",

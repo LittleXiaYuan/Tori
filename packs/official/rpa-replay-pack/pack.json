@@ -112,7 +112,7 @@
     "rollback": true
   },
   "metadata": {
-    "blueprint": "doc/drafts/RPA-RECORD-REPLAY.md",
+    "blueprint": "docs/spec/pack-runtime-blueprint.md",
     "stage": "pack-shell-before-executor",
     "sync": "backend-registry-drives-frontend",
     "descriptionStyle": "one-line-plus-three-examples",
