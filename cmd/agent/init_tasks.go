@@ -532,6 +532,11 @@ func ensureBuiltinPacks(registry *packruntime.Registry) {
 	for _, manifestPath := range []string{
 		"packs/official/backup-pack/pack.json",
 		"packs/official/cogni-kernel-pack/pack.json",
+		"packs/official/inner-life-pack/pack.json",
+		"packs/official/night-school-pack/pack.json",
+		"packs/official/experience-pack/pack.json",
+		"packs/official/world-model-pack/pack.json",
+		"packs/official/micro-agent-pack/pack.json",
 		"packs/official/lora-pack/pack.json",
 		"packs/official/browser-intent-pack/pack.json",
 		"packs/official/chaos-probe-pack/pack.json",

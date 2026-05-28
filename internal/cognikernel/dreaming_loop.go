@@ -17,6 +17,7 @@ type DreamingLoop struct {
 	reverieFn    ReverieThinkFunc
 	skillGrowFn  SkillGrowDetectFunc
 	factSinkFn   FactSinkFunc
+	eventEmit    EventEmitFunc
 }
 
 // CuriosityExploreFunc runs a curiosity exploration cycle.
@@ -42,6 +43,7 @@ func (dl *DreamingLoop) SetCuriosity(fn CuriosityExploreFunc)   { dl.curiosityFn
 func (dl *DreamingLoop) SetReverie(fn ReverieThinkFunc)         { dl.reverieFn = fn }
 func (dl *DreamingLoop) SetSkillGrow(fn SkillGrowDetectFunc)    { dl.skillGrowFn = fn }
 func (dl *DreamingLoop) SetFactSink(fn FactSinkFunc)            { dl.factSinkFn = fn }
+func (dl *DreamingLoop) SetEventEmit(fn EventEmitFunc)          { dl.eventEmit = fn }
 
 // Run executes one dreaming cycle.
 func (dl *DreamingLoop) Run(ctx context.Context, tenantID string) (*DreamResult, error) {
@@ -102,6 +104,16 @@ func (dl *DreamingLoop) Run(ctx context.Context, tenantID string) (*DreamResult,
 				}
 			}
 		}
+	}
+
+	if dl.eventEmit != nil {
+		dl.eventEmit(ctx, "dreaming.completed", map[string]any{
+			"tenant_id":          tenantID,
+			"thoughts_generated": result.ThoughtsGenerated,
+			"explorations_run":   result.ExplorationsRun,
+			"facts_discovered":   result.FactsDiscovered,
+			"skills_suggested":   result.SkillsSuggested,
+		})
 	}
 
 	return result, nil

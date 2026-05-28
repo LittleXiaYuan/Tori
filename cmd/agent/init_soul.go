@@ -32,6 +32,7 @@ import (
 	"yunque-agent/internal/cognicore/world"
 	"yunque-agent/internal/agentcore/selfheal/iterate"
 	"yunque-agent/internal/agentcore/skillgrowth/adapter"
+	"yunque-agent/internal/cognikernel"
 
 	"yunque-agent/internal/ledgercore"
 
@@ -132,6 +133,37 @@ func initSoulLayer(deps soulDeps) {
 		})
 		app.Set("curiosity", curiosityMod)
 		slog.Info("curiosity: module ready")
+
+		// 3.1 DreamingLoop wraps curiosity + (later) reverie/skill-grow into one
+		// idle-time orchestrator. Persists a "dreaming.completed" ledger event
+		// after each cycle so Inner-life Pack can render the timeline.
+		dreamingLoop := cognikernel.NewDreamingLoop()
+		dreamingLoop.SetCuriosity(func(ctx context.Context, tenantID string) ([]string, int, error) {
+			results, err := curiosityMod.Explore(ctx, tenantID)
+			if err != nil {
+				return nil, 0, err
+			}
+			facts := make([]string, 0, len(results)*2)
+			for _, r := range results {
+				facts = append(facts, r.NewFacts...)
+			}
+			return facts, len(results), nil
+		})
+		dreamingLoop.SetEventEmit(func(ctx context.Context, kind string, payload map[string]any) {
+			if typedLdg == nil || typedLdg.Events == nil {
+				return
+			}
+			tenantID, _ := payload["tenant_id"].(string)
+			_ = typedLdg.Events.Append(ctx, &ledger.Event{
+				TaskID:    "tenant:" + tenantID,
+				Kind:      ledger.EventKind(kind),
+				Actor:     "dreaming_loop",
+				Payload:   ledger.MakePayload(payload),
+				CreatedAt: time.Now(),
+			})
+		})
+		app.Set("dreaming_loop", dreamingLoop)
+		slog.Info("dreaming_loop: ready (curiosity wired)")
 	}
 
 	// 3.5 World Model → track external environment state
@@ -390,17 +422,25 @@ func runNighttimeScheduler(app *agentrt.App, iterEngine *iterate.Engine, typedLd
 			}
 		}
 
-		// Run curiosity exploration
-		if cm, ok := app.Get("curiosity"); ok {
-			if curiosityMod, ok := cm.(*curiosity.Module); ok {
-				if curiosityMod.ShouldExplore(context.Background(), "default") {
-					ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
-					results, err := curiosityMod.Explore(ctx, "default")
-					cancel()
-					if err != nil {
-						slog.Debug("curiosity: nighttime explore failed", "err", err)
-					} else {
-						slog.Info("curiosity: nighttime explore complete", "results", len(results))
+		// Run dreaming cycle (curiosity + future reverie/skill-grow) — emits
+		// dreaming.completed ledger event for Inner-life Pack timeline.
+		if dl, ok := app.Get("dreaming_loop"); ok {
+			if dreamingLoop, ok := dl.(*cognikernel.DreamingLoop); ok {
+				if cm, ok := app.Get("curiosity"); ok {
+					if curiosityMod, ok := cm.(*curiosity.Module); ok && curiosityMod.ShouldExplore(context.Background(), "default") {
+						ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+						result, err := dreamingLoop.Run(ctx, "default")
+						cancel()
+						if err != nil {
+							slog.Debug("dreaming_loop: nighttime cycle failed", "err", err)
+						} else if result != nil {
+							slog.Info("dreaming_loop: nighttime cycle complete",
+								"explorations", result.ExplorationsRun,
+								"facts", result.FactsDiscovered,
+								"thoughts", result.ThoughtsGenerated,
+								"skills_suggested", result.SkillsSuggested,
+							)
+						}
 					}
 				}
 			}
