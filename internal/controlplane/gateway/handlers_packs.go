@@ -1235,6 +1235,9 @@ func (g *Gateway) handlePackInstall(w http.ResponseWriter, r *http.Request) {
 		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 		return
 	}
+	if g.planner != nil {
+		g.planner.InvalidatePromptCache()
+	}
 	writeJSON(w, map[string]any{"pack": pack, "status": pack.Status})
 }
 
@@ -1339,6 +1342,11 @@ func (g *Gateway) handlePackMutation(w http.ResponseWriter, r *http.Request, mut
 	if err != nil {
 		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 		return
+	}
+	// Pack state changed → invalidate planner system-prompt cache so the next
+	// turn rebuilds it with the new pack list (menus/capabilities/identity).
+	if g.planner != nil {
+		g.planner.InvalidatePromptCache()
 	}
 	writeJSON(w, map[string]any{"pack": pack, "status": pack.Status})
 }

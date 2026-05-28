@@ -15,6 +15,7 @@ import (
 	"yunque-agent/internal/agentcore/llm"
 	"yunque-agent/internal/agentcore/memory"
 	"yunque-agent/internal/agentcore/planner"
+	"yunque-agent/internal/cognikernel"
 	reflectpkg "yunque-agent/internal/experimental/reflect"
 	agentrt "yunque-agent/internal/agentcore/runtime"
 	"yunque-agent/internal/agentcore/session"
@@ -359,6 +360,17 @@ func buildChannelHandler(
 					Outcome: outcome,
 					Lesson:  fmt.Sprintf("[%s] Q: %s | Skills: %v | Quality: %d/10", displayName, truncChannel(msg.Content, 80), result.SkillsUsed, quality),
 					Context: truncChannel(result.Reply, 120),
+				})
+			}
+			// B-full: drive canonical ReflectiveLoop.Run so reflection.completed
+			// ledger events fire for every interaction (Inner-life Pack timeline).
+			if rl := gw.ReflectiveLoop(); rl != nil {
+				_, _ = rl.Run(learnCtx, cognikernel.ConversationEndData{
+					TenantID:   tenantID,
+					SessionID:  sessionID,
+					UserIntent: msg.Content,
+					AgentReply: result.Reply,
+					SkillsUsed: result.SkillsUsed,
 				})
 			}
 		})

@@ -1,0 +1,89 @@
+{
+  "id": "yunque.pack.world-model",
+  "name": "World Model Pack",
+  "version": "0.1.0",
+  "description": "世界模型与因果推理：Agent 对外部状态的认知与失败根因分析。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": [
+      "world.state",
+      "world.causal"
+    ],
+    "routes": [
+      "/v1/world/state",
+      "/v1/world/state/stale",
+      "/v1/world/causal/timeline",
+      "/v1/world/causal/root-cause",
+      "/v1/world/causal/failure-patterns"
+    ],
+    "permissions": [
+      "world:read"
+    ],
+    "routeSpecs": [
+      {
+        "method": "GET",
+        "path": "/v1/world/state",
+        "description": "Snapshot of all tracked external state entries (file/db/api/config/...)."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/world/state/stale",
+        "description": "Keys whose state hasn't been verified within the given duration (?max_age=24h)."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/world/causal/timeline",
+        "description": "Annotated event timeline for a task (?task_id=...)."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/world/causal/root-cause",
+        "description": "Root-cause chain for a failed task (?task_id=...)."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/world/causal/failure-patterns",
+        "description": "Recurring causal patterns across multiple failed tasks."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [
+      {
+        "key": "world-model",
+        "label": "世界模型",
+        "path": "/packs/world-model",
+        "icon": "globe",
+        "order": 73
+      }
+    ],
+    "routes": [
+      {
+        "path": "/packs/world-model",
+        "component": "worldmodel/WorldModelPackPage",
+        "title": "世界模型"
+      }
+    ],
+    "assets": {
+      "type": "builtin",
+      "entry": "worldmodel/WorldModelPackPage"
+    }
+  },
+  "sdk": {
+    "typescript": "yunque-client/world-model"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "sync": "backend-registry-drives-frontend",
+    "descriptionStyle": "one-line-plus-three-examples",
+    "example1": "查看 Agent 当前对外部世界（文件/数据库/API）的认知。",
+    "example2": "找出 Agent 认为已经过期、需要重新核实的状态条目。",
+    "example3": "分析失败任务的因果链条与跨任务的失败模式。"
+  },
+  "status": "beta"
+}

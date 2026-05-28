@@ -1,0 +1,78 @@
+{
+  "id": "yunque.pack.night-school",
+  "name": "Night School Pack",
+  "version": "0.1.0",
+  "description": "Agent 的夜校：梦境周期、任务经验蒸馏与用户特征学习。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": [
+      "night_school.dreams",
+      "night_school.distill",
+      "night_school.traits"
+    ],
+    "routes": [
+      "/v1/night-school/dreams",
+      "/v1/night-school/distill",
+      "/v1/night-school/traits"
+    ],
+    "permissions": [
+      "night_school:read"
+    ],
+    "routeSpecs": [
+      {
+        "method": "GET",
+        "path": "/v1/night-school/dreams",
+        "description": "List recent dreaming.completed sessions with full payload."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/night-school/distill",
+        "description": "List recent distilled rules / patterns / tool insights mined from completed tasks."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/night-school/traits",
+        "description": "List learned user trait preferences ordered by confidence."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [
+      {
+        "key": "night-school",
+        "label": "夜校",
+        "path": "/packs/night-school",
+        "icon": "graduation-cap",
+        "order": 71
+      }
+    ],
+    "routes": [
+      {
+        "path": "/packs/night-school",
+        "component": "nightschool/NightSchoolPackPage",
+        "title": "夜校"
+      }
+    ],
+    "assets": {
+      "type": "builtin",
+      "entry": "nightschool/NightSchoolPackPage"
+    }
+  },
+  "sdk": {
+    "typescript": "yunque-client/night-school"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "sync": "backend-registry-drives-frontend",
+    "descriptionStyle": "one-line-plus-three-examples",
+    "example1": "看 Agent 在夜里发现了哪些新事实和需要补的技能。",
+    "example2": "翻阅 Agent 从历史任务中蒸馏出的可复用规则与模式。",
+    "example3": "查看 Agent 通过对话学到的关于你的偏好画像。"
+  },
+  "status": "beta"
+}

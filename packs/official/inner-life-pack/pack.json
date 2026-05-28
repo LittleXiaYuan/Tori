@@ -1,0 +1,78 @@
+{
+  "id": "yunque.pack.inner-life",
+  "name": "Inner Life Pack",
+  "version": "0.1.0",
+  "description": "查看 Agent 的内在生活：好奇心探索、自动反思与夜间梦境。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": [
+      "inner_life.curiosity",
+      "inner_life.reflection",
+      "inner_life.dreaming"
+    ],
+    "routes": [
+      "/v1/inner-life/curiosity",
+      "/v1/inner-life/reflection",
+      "/v1/inner-life/dreaming"
+    ],
+    "permissions": [
+      "inner_life:read"
+    ],
+    "routeSpecs": [
+      {
+        "method": "GET",
+        "path": "/v1/inner-life/curiosity",
+        "description": "List recent curiosity questions and exploration results."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/inner-life/reflection",
+        "description": "List recent reflection.completed timeline events."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/inner-life/dreaming",
+        "description": "List recent dreaming.completed timeline events."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [
+      {
+        "key": "inner-life",
+        "label": "内在生活",
+        "path": "/packs/inner-life",
+        "icon": "sparkles",
+        "order": 70
+      }
+    ],
+    "routes": [
+      {
+        "path": "/packs/inner-life",
+        "component": "innerlife/InnerLifePackPage",
+        "title": "内在生活"
+      }
+    ],
+    "assets": {
+      "type": "builtin",
+      "entry": "innerlife/InnerLifePackPage"
+    }
+  },
+  "sdk": {
+    "typescript": "yunque-client/inner-life"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "sync": "backend-registry-drives-frontend",
+    "descriptionStyle": "one-line-plus-three-examples",
+    "example1": "查看 Agent 在空闲时探索过哪些问题。",
+    "example2": "回看每一次对话后的自我反思评分。",
+    "example3": "浏览夜间梦境周期发现的新事实与技能缺口。"
+  },
+  "status": "beta"
+}
