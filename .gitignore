@@ -121,6 +121,11 @@ apps/browser-extension/manus-analysis/
 apps/desktop/src-tauri/target*/
 apps/desktop/src-tauri/binaries/*.exe
 
+# ── Next.js build artifacts (never commit) ──
+**/.next/
+**/out/_next/
+apps/desktop/src-tauri/frontend/
+
 # ── Pack release artifacts (built locally by scripts/release-pack.mjs) ──
 packs/official/*.yqpack
 packs/official/*.yqpack.backup-*
