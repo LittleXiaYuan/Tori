@@ -1,0 +1,84 @@
+{
+  "id": "yunque.pack.experience",
+  "name": "Experience Pack",
+  "version": "0.1.0",
+  "description": "经验积累：技能推荐、用户偏好画像与任务自评。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": [
+      "experience.recommend",
+      "experience.preferences",
+      "experience.eval"
+    ],
+    "routes": [
+      "/v1/experience/recommendations",
+      "/v1/experience/items",
+      "/v1/experience/preferences",
+      "/v1/experience/evaluations"
+    ],
+    "permissions": [
+      "experience:read"
+    ],
+    "routeSpecs": [
+      {
+        "method": "GET",
+        "path": "/v1/experience/recommendations",
+        "description": "Top-K recommendations from the recommend engine for an optional context."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/experience/items",
+        "description": "List all registered recommendable items with usage statistics."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/experience/preferences",
+        "description": "Aggregated user preference signals (categories / tags / interactions)."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/experience/evaluations",
+        "description": "Recent task self-evaluation results."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [
+      {
+        "key": "experience",
+        "label": "经验",
+        "path": "/packs/experience",
+        "icon": "history",
+        "order": 72
+      }
+    ],
+    "routes": [
+      {
+        "path": "/packs/experience",
+        "component": "experience/ExperiencePackPage",
+        "title": "经验"
+      }
+    ],
+    "assets": {
+      "type": "builtin",
+      "entry": "experience/ExperiencePackPage"
+    }
+  },
+  "sdk": {
+    "typescript": "yunque-client/experience"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "sync": "backend-registry-drives-frontend",
+    "descriptionStyle": "one-line-plus-three-examples",
+    "example1": "看 Agent 当前最推荐使用哪些技能。",
+    "example2": "查看 Agent 累积的对你的偏好（喜欢的类别 / 想要避免的类别）。",
+    "example3": "回看 Agent 对每个已完成任务的自我评分。"
+  },
+  "status": "beta"
+}

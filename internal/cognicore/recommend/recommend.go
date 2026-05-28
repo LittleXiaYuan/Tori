@@ -279,6 +279,21 @@ func (e *Engine) Preferences() UserPreference {
 	return e.userPref
 }
 
+// Items returns a snapshot of all registered item profiles. The Features slice
+// is omitted to keep responses lightweight; callers needing the feature vector
+// should use SimilarItems.
+func (e *Engine) Items() []ItemProfile {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	out := make([]ItemProfile, 0, len(e.items))
+	for _, item := range e.items {
+		cp := *item
+		cp.Features = nil
+		out = append(out, cp)
+	}
+	return out
+}
+
 func (e *Engine) preferenceScore(item *ItemProfile) float64 {
 	score := 0.0
 	if catPref, ok := e.userPref.PreferredCategories[item.Category]; ok {

@@ -27,6 +27,7 @@ import (
 	"yunque-agent/internal/execution/channel"
 	"yunque-agent/internal/execution/scheduler"
 	reflectpkg "yunque-agent/internal/experimental/reflect"
+	"yunque-agent/internal/ledgercore"
 	"yunque-agent/internal/tori"
 	"yunque-agent/internal/updater"
 	pluginpkg "yunque-agent/pkg/plugin"
@@ -96,6 +97,25 @@ func initGateway(app *agentrt.App) error {
 		slog.Info("reflection: gateway-owned ExperienceStore created (initTasks did not)")
 	}
 	gw.WireReflectionLoop()
+	// B-full: wire ReflectiveLoop into Ledger event log and the legacy
+	// quality evaluator so its Run pipeline becomes useful in production.
+	if rl := gw.ReflectiveLoop(); rl != nil {
+		if app.Ledger != nil && app.Ledger.Events != nil {
+			rl.SetEventEmit(func(ctx context.Context, kind string, payload map[string]any) {
+				tenantID, _ := payload["tenant_id"].(string)
+				_ = app.Ledger.Events.Append(ctx, &ledger.Event{
+					TaskID:    "tenant:" + tenantID,
+					Kind:      ledger.EventKind(kind),
+					Actor:     "reflective_loop",
+					Payload:   ledger.MakePayload(payload),
+					CreatedAt: time.Now(),
+				})
+			})
+		}
+		if engine := learningLoop.Reflect(); engine != nil {
+			rl.SetReflectEval(engine.AsReflectEvalFunc())
+		}
+	}
 	// Wire LearningLoop → ExperienceStore so lessons become actionable strategies
 	learningLoop.SetOnLesson(func(category, outcome, lesson, lctx string, tags []string) {
 		app.Metrics.Cognitive().LessonLearned.Add(1)

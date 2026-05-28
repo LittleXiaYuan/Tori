@@ -371,6 +371,11 @@ func (g *Gateway) SetExperienceStore(es *reflectpkg.ExperienceStore) { g.experie
 // feedback ingestion and post-turn learning.
 func (g *Gateway) SetReflectiveLoop(rl *cognikernel.ReflectiveLoop) { g.reflectiveLoop = rl }
 
+// ReflectiveLoop returns the gateway-attached reflection loop, or nil if none.
+// Callers can use it to inject additional hooks (e.g. ledger event emission)
+// after WireReflectionLoop has run.
+func (g *Gateway) ReflectiveLoop() *cognikernel.ReflectiveLoop { return g.reflectiveLoop }
+
 // SetTemplateStore attaches the task template store.
 func (g *Gateway) SetTemplateStore(ts *task.TemplateStore) { g.templateStore = ts }
 

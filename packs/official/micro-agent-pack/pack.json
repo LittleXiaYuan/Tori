@@ -1,0 +1,77 @@
+{
+  "id": "yunque.pack.micro-agent",
+  "name": "Micro-Agent Pack",
+  "version": "0.1.0",
+  "description": "微代理与 ReAct 推理：领域提示注入 + 推理轨迹回放。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": [
+      "micro_agent.registry",
+      "micro_agent.react"
+    ],
+    "routes": [
+      "/v1/micro-agent/agents",
+      "/v1/micro-agent/resolve",
+      "/v1/micro-agent/react/trace"
+    ],
+    "permissions": [
+      "micro_agent:read"
+    ],
+    "routeSpecs": [
+      {
+        "method": "GET",
+        "path": "/v1/micro-agent/agents",
+        "description": "List all registered microagents (global / repo / task scopes)."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/micro-agent/resolve",
+        "description": "Resolve which microagents would activate for a given message (?message=...)."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/micro-agent/react/trace",
+        "description": "Recent ReAct reasoning trace for a task (?task_id=...)."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [
+      {
+        "key": "micro-agent",
+        "label": "微代理",
+        "path": "/packs/micro-agent",
+        "icon": "bot",
+        "order": 74
+      }
+    ],
+    "routes": [
+      {
+        "path": "/packs/micro-agent",
+        "component": "microagent/MicroAgentPackPage",
+        "title": "微代理"
+      }
+    ],
+    "assets": {
+      "type": "builtin",
+      "entry": "microagent/MicroAgentPackPage"
+    }
+  },
+  "sdk": {
+    "typescript": "yunque-client/micro-agent"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "sync": "backend-registry-drives-frontend",
+    "descriptionStyle": "one-line-plus-three-examples",
+    "example1": "查看 Agent 当前加载的所有领域微代理（按 scope 分组）。",
+    "example2": "看某条消息会触发哪些微代理被注入到提示中。",
+    "example3": "回放某个任务的 ReAct 推理轨迹（思考 / 决策 / 观察 / 回溯）。"
+  },
+  "status": "beta"
+}
