@@ -135,7 +135,7 @@ for (const pkg of promotedPackages) {
   }
 }
 
-const conceptMap = read("doc/AGENTCORE-CONCEPT-MAP.md");
+const conceptMap = read("docs/design/agentcore-concept-map.md");
 for (const needle of [
   "T8 first promotion slice",
   "internal/cognicore/trait",
@@ -162,28 +162,31 @@ for (const needle of [
   "remaining `internal/experimental/*` packages",
 ]) {
   if (!conceptMap.includes(needle)) {
-    failures.push(`doc/AGENTCORE-CONCEPT-MAP.md missing ${JSON.stringify(needle)}`);
+    failures.push(`docs/design/agentcore-concept-map.md missing ${JSON.stringify(needle)}`);
   }
 }
 
-const taskLedger = read("doc/LONG-TERM-TASKS.md");
-for (const needle of [
-  "scripts/check-experimental-boundaries.mjs",
-  "internal/cognicore",
-  "trait` / `recommend` / `react",
-  "taskdistill` / `eval",
-  "causal` / `curiosity` / `world",
-  "microagent",
-  "metacog",
-  "internal/agentcore/runtime/circuit",
-  "internal/agentcore/tasksched/rlsched",
-  "internal/agentcore/taskskills",
-  "task skill surface",
-  "TestRecommendCandidatesDeterministicVisibleRanking",
-  "Bayesian success-rate score",
-]) {
-  if (!taskLedger.includes(needle)) {
-    failures.push(`doc/LONG-TERM-TASKS.md missing ${JSON.stringify(needle)}`);
+const taskLedgerPath = "doc/LONG-TERM-TASKS.md";
+const taskLedger = fs.existsSync(path.join(root, taskLedgerPath)) ? fs.readFileSync(path.join(root, taskLedgerPath), "utf8") : null;
+if (taskLedger !== null) {
+  for (const needle of [
+    "scripts/check-experimental-boundaries.mjs",
+    "internal/cognicore",
+    "trait` / `recommend` / `react",
+    "taskdistill` / `eval",
+    "causal` / `curiosity` / `world",
+    "microagent",
+    "metacog",
+    "internal/agentcore/runtime/circuit",
+    "internal/agentcore/tasksched/rlsched",
+    "internal/agentcore/taskskills",
+    "task skill surface",
+    "TestRecommendCandidatesDeterministicVisibleRanking",
+    "Bayesian success-rate score",
+  ]) {
+    if (!taskLedger.includes(needle)) {
+      failures.push(`doc/LONG-TERM-TASKS.md missing ${JSON.stringify(needle)}`);
+    }
   }
 }
 

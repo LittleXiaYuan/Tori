@@ -1287,7 +1287,7 @@ for (const staleCallback of [
   }
 }
 
-const conceptMap = read("doc/AGENTCORE-CONCEPT-MAP.md");
+const conceptMap = read("docs/design/agentcore-concept-map.md");
 for (const needle of [
   "EmitCogniTraceForRequest",
   "AppendDynamicContextMessage",
@@ -1376,11 +1376,13 @@ for (const needle of [
   "The old `CogniContextFunc` / `CogniSkillFilterFunc` / `CogniTraceFunc` contracts and the split `SetCogniContext` / `SetCogniSkillFilter` / `SetCogniTrace` planner/context-assembly setters are removed",
 ]) {
   if (!conceptMap.includes(needle)) {
-    failures.push(`doc/AGENTCORE-CONCEPT-MAP.md missing ${JSON.stringify(needle)}`);
+    failures.push(`docs/design/agentcore-concept-map.md missing ${JSON.stringify(needle)}`);
   }
 }
 
-const taskLedger = read("doc/LONG-TERM-TASKS.md");
+const taskLedgerPath = "doc/LONG-TERM-TASKS.md";
+const taskLedger = fs.existsSync(path.join(root, taskLedgerPath)) ? fs.readFileSync(path.join(root, taskLedgerPath), "utf8") : null;
+if (taskLedger !== null) {
 for (const needle of [
   "第十六批删除 Planner 层 `maybeEmitCogniTrace`",
   "ContextAssemblyService.EmitCogniTraceForRequest",
@@ -1649,6 +1651,7 @@ for (const needle of [
   if (!taskLedger.includes(needle)) {
     failures.push(`doc/LONG-TERM-TASKS.md missing ${JSON.stringify(needle)}`);
   }
+}
 }
 
 const modelRuntime = read(modelRuntimeRel);

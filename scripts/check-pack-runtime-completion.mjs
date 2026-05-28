@@ -211,7 +211,7 @@ const sdk = [
 ].map(read).join("\n");
 const docs = [
   "packs/AUTHORING.md",
-  "doc/PACK-RUNTIME-BLUEPRINT.md",
+  "docs/spec/pack-runtime-blueprint.md",
   "docs/guide/pack-runtime.md",
   "docs/zh/guide/pack-runtime.md",
   "docs/guide/pack-runtime-state.md",
