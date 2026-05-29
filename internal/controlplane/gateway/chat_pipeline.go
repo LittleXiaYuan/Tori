@@ -17,15 +17,16 @@ import (
 
 // ChatRequest is the HTTP-independent representation of a chat request.
 type ChatRequest struct {
-	Messages      []llm.Message `json:"messages"`
-	SessionID     string        `json:"session_id"`
-	TaskID        string        `json:"task_id"`
-	ClassID       string        `json:"class_id"`
-	TeacherID     string        `json:"teacher_id"`
-	StudentID     string        `json:"student_id"`
-	Platform      string        `json:"platform,omitempty"`
-	ThinkingLevel string        `json:"thinking_level,omitempty"`
-	TenantID      string        `json:"-"`
+	Messages       []llm.Message `json:"messages"`
+	SessionID      string        `json:"session_id"`
+	TaskID         string        `json:"task_id"`
+	ClassID        string        `json:"class_id"`
+	TeacherID      string        `json:"teacher_id"`
+	StudentID      string        `json:"student_id"`
+	Platform       string        `json:"platform,omitempty"`
+	ThinkingLevel  string        `json:"thinking_level,omitempty"`
+	WorkspacePaths []string      `json:"workspace_paths,omitempty"`
+	TenantID       string        `json:"-"`
 }
 
 // ChatResponse is the HTTP-independent result of a chat execution.
@@ -206,6 +207,7 @@ func (g *Gateway) ExecuteChatPipeline(ctx context.Context, req *ChatRequest) (*C
 		TaskID:         req.TaskID,
 		TaskContext:    taskContext,
 		TraceID:        traceSpan.TraceID,
+		WorkspacePaths: req.WorkspacePaths,
 	}
 
 	if slashResp, handled, slashErr := g.tryHandleSlashCommand(ctx, planReq); handled {
@@ -256,6 +258,9 @@ func (g *Gateway) ExecuteChatPipeline(ctx context.Context, req *ChatRequest) (*C
 
 	g.persistChatResult(ctx, req, result)
 	g.runPostChatHooks(ctx, req, result, emotionHint)
+
+	// Ignite the reflective loop: learn from this turn (async, non-blocking).
+	g.fireReflection(req.TenantID, req.SessionID, lastUserMessage(req.Messages), result.Reply, result.SkillsUsed, routedTier)
 
 	observe.EndSpan(traceSpan, nil)
 

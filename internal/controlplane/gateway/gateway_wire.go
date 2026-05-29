@@ -372,6 +372,25 @@ func (g *Gateway) WireReflectionLoop() {
 		})
 		g.reflectiveLoop = rl
 	}
+	// Close the per-user memory loop: reflection's suggested memory updates
+	// (previously computed then discarded) now persist as preferences, so the
+	// agent actually "remembers" what it learned about the user. Tenant-scoped.
+	if g.memory != nil {
+		g.reflectiveLoop.SetMemoryUpdate(func(ctx context.Context, tenantID, action, key, value string) error {
+			switch action {
+			case "delete", "forget", "remove":
+				if key != "" {
+					g.memory.DeleteByQuery(ctx, tenantID, key)
+				}
+				return nil
+			default:
+				if key == "" && value == "" {
+					return nil
+				}
+				return g.memory.AddPreference(ctx, tenantID, key, value, "reflection")
+			}
+		})
+	}
 	if g.planner == nil {
 		return
 	}

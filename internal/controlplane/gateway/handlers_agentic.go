@@ -125,16 +125,17 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 		DataB64 string `json:"data_b64"`
 	}
 	var req struct {
-		Messages    []llm.Message `json:"messages"`
-		SessionID   string        `json:"session_id"`
-		TaskID      string        `json:"task_id"`
-		Platform    string        `json:"platform,omitempty"`
-		Thinking    *bool         `json:"thinking,omitempty"`
-		Mode        string        `json:"mode,omitempty"`
-		AiriMode    bool          `json:"airi_mode,omitempty"`
-		WebSearch   bool          `json:"web_search,omitempty"`  // Cherry 🌐 drawer: force-enable web search
-		ToolIDs     []string      `json:"tool_ids,omitempty"`    // Cherry 🔨 drawer: restrict to explicit skill subset
-		Attachments []Attachment  `json:"attachments,omitempty"` // Cherry 📎 drawer: inline per-turn files
+		Messages       []llm.Message `json:"messages"`
+		SessionID      string        `json:"session_id"`
+		TaskID         string        `json:"task_id"`
+		Platform       string        `json:"platform,omitempty"`
+		Thinking       *bool         `json:"thinking,omitempty"`
+		Mode           string        `json:"mode,omitempty"`
+		AiriMode       bool          `json:"airi_mode,omitempty"`
+		WebSearch      bool          `json:"web_search,omitempty"`       // Cherry 🌐 drawer: force-enable web search
+		ToolIDs        []string      `json:"tool_ids,omitempty"`         // Cherry 🔨 drawer: restrict to explicit skill subset
+		Attachments    []Attachment  `json:"attachments,omitempty"`      // Cherry 📎 drawer: inline per-turn files
+		WorkspacePaths []string      `json:"workspace_paths,omitempty"`  // Cursor-style opened folders, read-only for this turn
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		sendEvent("error", `{"code":"BAD_REQUEST","message":"invalid body"}`)
@@ -399,6 +400,7 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 		DisableTools:      chatMode,
 		DisableDelegation: chatMode,
 		AllowedSkills:     req.ToolIDs,
+		WorkspacePaths:    req.WorkspacePaths,
 		StepCallback: func(event observe.AgentEvent) {
 			streamEvent := friendlyAgentEventForStream(event)
 			data, _ := json.Marshal(streamEvent)
@@ -558,6 +560,9 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 		_ = g.orchestrator.Ingest(ctx, tid, reply, "conversation", "assistant_reply")
 		g.metrics.Cognitive().MemoryIngest.Add(1)
 	}
+
+	// Ignite the reflective loop: learn from this turn (async, non-blocking).
+	g.fireReflection(tid, req.SessionID, lastUserMessage(req.Messages), reply, result.SkillsUsed, routedTier)
 
 	// Memory pipeline (async) — skipped in fast/chat mode
 	if g.pipeline != nil && !fastMode && !chatMode && len(visibleMessages) > 0 {
