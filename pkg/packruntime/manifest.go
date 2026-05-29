@@ -59,6 +59,27 @@ type BackendManifest struct {
 	Routes       []string           `json:"routes,omitempty"`
 	RouteSpecs   []BackendRouteSpec `json:"routeSpecs,omitempty"`
 	Permissions  []string           `json:"permissions,omitempty"`
+	Runtime      *BackendRuntime    `json:"runtime,omitempty"`
+}
+
+// BackendRuntime declares how a pack's backend routes are executed. A nil
+// Runtime (the default) means the routes are served in-process by Go code
+// compiled into the host binary (first-party packs). Type "wasm" means the
+// routes are served by sandboxed WebAssembly shipped inside the .yqpack — the
+// untrusted third-party delivery path.
+type BackendRuntime struct {
+	Type   string `json:"type"`             // "" = in-process (first-party); "wasm" = sandboxed module
+	Module string `json:"module,omitempty"` // pack-relative path to the .wasm, e.g. "module.wasm"
+	SHA256 string `json:"sha256,omitempty"` // hex sha256 of the module bytes, enforced before execution
+}
+
+// RuntimeTypeWasm is the BackendRuntime.Type value selecting the WASM
+// delivery path.
+const RuntimeTypeWasm = "wasm"
+
+// IsWasm reports whether this backend is delivered as a sandboxed WASM module.
+func (b BackendManifest) IsWasm() bool {
+	return b.Runtime != nil && b.Runtime.Type == RuntimeTypeWasm
 }
 
 // BackendRouteSpec is manifest-owned backend route metadata. Routes keeps the
@@ -68,6 +89,9 @@ type BackendRouteSpec struct {
 	Method      string `json:"method"`
 	Path        string `json:"path"`
 	Description string `json:"description,omitempty"`
+	// Entrypoint names the WASM export invoked for this route (wasm runtime
+	// only). Empty defaults to "_start" (the WASI command convention).
+	Entrypoint string `json:"entrypoint,omitempty"`
 }
 
 type FrontendManifest struct {
@@ -148,6 +172,19 @@ func (m Manifest) Validate() error {
 		}
 		if !strings.HasPrefix(strings.TrimSpace(route.Path), "/") {
 			return fmt.Errorf("backend.routeSpecs[%d].path must start with /", i)
+		}
+	}
+	if rt := m.Backend.Runtime; rt != nil {
+		if rt.Type != "" && rt.Type != RuntimeTypeWasm {
+			return fmt.Errorf("backend.runtime.type must be empty or %q", RuntimeTypeWasm)
+		}
+		if rt.Type == RuntimeTypeWasm {
+			if strings.TrimSpace(rt.Module) == "" {
+				return fmt.Errorf("backend.runtime.module is required for wasm runtime")
+			}
+			if len(m.Backend.RouteSpecs) == 0 {
+				return fmt.Errorf("backend.runtime wasm requires at least one backend.routeSpecs entry")
+			}
 		}
 	}
 	for i, menu := range m.Frontend.Menus {

@@ -1230,7 +1230,19 @@ func (g *Gateway) handlePackInstall(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	pack, err := g.packRegistry.InstallWithArtifacts(manifest, source, artifacts)
+	// A wasm-backed pack must be extracted to disk (its .wasm module is needed
+	// at request time), so a downloaded .yqpack is installed via
+	// InstallFromYqpack rather than registering the manifest alone.
+	var pack packruntime.InstalledPack
+	if manifest.Backend.IsWasm() && artifacts != nil && strings.HasSuffix(strings.ToLower(artifacts.PackagePath), ".yqpack") {
+		pack, err = g.packRegistry.InstallFromYqpack(artifacts.PackagePath, packruntime.InstallOptions{
+			ExpectedSHA256: manifest.Distribution.SHA256,
+			TrustRoot:      g.packTrustRoot,
+			Source:         source,
+		})
+	} else {
+		pack, err = g.packRegistry.InstallWithArtifacts(manifest, source, artifacts)
+	}
 	if err != nil {
 		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 		return

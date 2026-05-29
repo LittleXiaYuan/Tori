@@ -114,6 +114,11 @@ func initTasks(app *agentrt.App) error {
 	} else {
 		ensureBuiltinPacks(packRegistry)
 		gw.SetPackRegistry(packRegistry)
+		trustRoot := packruntime.NewTrustRoot(cfg.DataPath("packs"))
+		if err := trustRoot.LoadDisk(); err != nil {
+			slog.Warn("pack trust root disk keys not loaded", "err", err)
+		}
+		gw.SetPackTrustRoot(trustRoot)
 		gw.SetPackCatalogSources(cfg.PackCatalogSourceDirs())
 		app.Set(agentrt.CompPackRuntimeRegistry, packRegistry)
 		slog.Info("pack runtime registry initialized", "dir", cfg.DataPath("packs"), "installed", len(packRegistry.List()), "catalog_sources", cfg.PackCatalogSourceDirs())

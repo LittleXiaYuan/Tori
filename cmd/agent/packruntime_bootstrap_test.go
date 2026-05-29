@@ -183,7 +183,7 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 	}
 
 	ensureBuiltinPacks(registry)
-	if got := len(registry.List()); got != 12 {
+	if got := len(registry.List()); got != 17 {
 		t.Fatalf("expected idempotent builtin install, got %d packs", got)
 	}
 }

@@ -123,6 +123,13 @@ func (r *Registry) Get(id string) (InstalledPack, bool) {
 	return InstalledPack{}, false
 }
 
+// InstalledDir returns the on-disk extraction directory for a pack id/version,
+// matching the layout InstallFromYqpack writes to:
+// <root>/installed/<safeID>-<safeVersion>. It does not check existence.
+func (r *Registry) InstalledDir(id, version string) string {
+	return filepath.Join(r.root, "installed", safeArtifactSegment(id)+"-"+safeArtifactSegment(version))
+}
+
 func (r *Registry) Install(manifest Manifest, source string) (InstalledPack, error) {
 	return r.InstallWithArtifacts(manifest, source, nil)
 }
