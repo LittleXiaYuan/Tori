@@ -70,7 +70,16 @@ import (
 // a dedicated file to reduce noise in gateway.go.
 
 // SetPackRegistry attaches the Pack Runtime registry used by /v1/packs and frontend sync.
-func (g *Gateway) SetPackRegistry(r *packruntime.Registry) { g.packRegistry = r }
+func (g *Gateway) SetPackRegistry(r *packruntime.Registry) {
+	g.packRegistry = r
+	g.wireWasmPacks()
+}
+
+// SetPackTrustRoot installs the resolver used to verify signed .yqpack
+// manifests at install time. Without it, signed packs fail closed.
+func (g *Gateway) SetPackTrustRoot(tr packruntime.PublicKeyResolver) {
+	g.packTrustRoot = tr
+}
 
 // SetPackCatalogSources attaches local pack manifest directories used by the
 // read-only Pack Runtime catalog. Sources can point at directories containing

@@ -315,6 +315,16 @@ type Gateway struct {
 	startTime time.Time
 	routesMu  sync.RWMutex
 
+	// dynamicRoutes holds runtime-mounted pack routes (wasm-backed), keyed by
+	// path and guarded by routesMu. Unlike mux, entries can be removed.
+	dynamicRoutes       map[string]*dynRoute
+	wasmWired           bool
+	wasmSandboxOnce     sync.Once
+	wasmSandboxInstance *sandbox.WasmSandbox
+	// packTrustRoot resolves publisher keys when installing signed .yqpacks.
+	// nil means signed packs fail closed (only unsigned dev packs install).
+	packTrustRoot packruntime.PublicKeyResolver
+
 	replyHooks   []ReplyHook
 	replyHooksMu sync.RWMutex
 
@@ -440,6 +450,7 @@ func NewFromConfig(cfg GatewayConfig) *Gateway {
 	}
 	g.searchOn.Store(true)
 	g.routes()
+	g.wireWasmPacks() // no-op unless cfg.Packs was provided (e.g. tests)
 	return g
 }
 
@@ -626,7 +637,7 @@ func (sw *statusWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 // ServeHTTP implements http.Handler with a composable middleware chain.
 // Individual middleware are defined in middleware.go.
 func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	g.buildMiddlewareChain(g.mux).ServeHTTP(w, r)
+	g.buildMiddlewareChain(g.dynamicDispatch(g.mux)).ServeHTTP(w, r)
 }
 
 func (g *Gateway) routes() {
