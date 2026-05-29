@@ -1,0 +1,144 @@
+name: agent-release
+
+# Release the yunque-agent CLI binary for 6 platforms when a version tag is pushed.
+#
+# Tag scheme:
+#   v0.1.0         -> main agent release (this workflow)
+#   pack/<name>/v* -> Pack release (handled out-of-band by scripts/release-pack.mjs)
+#   desktop-v*     -> Tauri desktop installer (handled by desktop-release.yml)
+#
+# Manual run (workflow_dispatch) lets us cut an unsigned dev release without
+# tagging — useful for smoke-testing the pipeline.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g. v0.1.0). Required for manual runs.'
+        required: true
+        type: string
+
+permissions:
+  contents: write  # gh release create/upload needs this
+
+concurrency:
+  group: agent-release-${{ github.ref }}
+  cancel-in-progress: false  # don't cancel a release midway
+
+jobs:
+  build:
+    name: Cross-compile + publish release
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # needed for `git describe` in Makefile VERSION
+
+      - name: Checkout Ledger sibling
+        # Mirrors ci.yml — some Go packages import the sibling repo at build time.
+        run: |
+          set -euo pipefail
+          if [ ! -d ../ledger ]; then
+            git clone --depth=1 https://github.com/LittleXiaYuan/ledger.git ../ledger
+          fi
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          check-latest: true
+          cache: true
+
+      - name: Build frontend (apps/web)
+        run: |
+          set -euo pipefail
+          cd apps/web
+          npm ci --prefer-offline --no-audit --no-fund
+          npm run build
+          test -d out/_next || (echo "::error::apps/web/out/_next missing after build" && exit 1)
+
+      - name: Cross-compile 6 platforms
+        run: |
+          set -euo pipefail
+          # Skip the `clean web-build` deps in `make release` because we've
+          # already built the frontend above; just run the compile loop.
+          mkdir -p dist
+          PLATFORMS="linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64"
+          VERSION="${RELEASE_TAG}"
+          GIT_COMMIT="$(git rev-parse --short HEAD)"
+          BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          LDFLAGS="-s -w \
+            -X yunque-agent/internal/version.Version=${VERSION} \
+            -X yunque-agent/internal/version.GitCommit=${GIT_COMMIT} \
+            -X yunque-agent/internal/version.BuildDate=${BUILD_DATE}"
+          for platform in $PLATFORMS; do
+            os="${platform%/*}"
+            arch="${platform#*/}"
+            ext=""
+            if [ "$os" = "windows" ]; then ext=".exe"; fi
+            out="dist/yunque-agent-${os}-${arch}${ext}"
+            echo "Building ${out}..."
+            CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" \
+              go build -ldflags "$LDFLAGS" -o "$out" ./cmd/agent
+          done
+          ls -lh dist/
+
+      - name: Compute SHA-256 checksums
+        run: |
+          set -euo pipefail
+          cd dist
+          # Per-file .sha256 (compatible with `sha256sum -c`) and one
+          # aggregate SHA256SUMS for users who want a single file.
+          : > SHA256SUMS
+          for f in yunque-agent-*; do
+            sha256sum "$f" | tee -a SHA256SUMS > "$f.sha256"
+          done
+          echo "── SHA256SUMS ──"
+          cat SHA256SUMS
+
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          tag="${RELEASE_TAG}"
+          # Hyphenated semver tags (v0.1.0-pre, -rc1, -beta) are pre-releases.
+          prerelease_flag=""
+          case "$tag" in
+            *-*) prerelease_flag="--prerelease" ;;
+          esac
+          # Idempotent: create if missing, upload (clobber) either way.
+          if ! gh release view "$tag" >/dev/null 2>&1; then
+            gh release create "$tag" \
+              --title "yunque-agent ${tag}" \
+              --notes "Automated release built from ${GITHUB_SHA::7}. See SHA256SUMS for artifact checksums." \
+              --verify-tag \
+              $prerelease_flag
+          fi
+          gh release upload "$tag" \
+            dist/yunque-agent-* dist/SHA256SUMS \
+            --clobber
+
+      - name: Upload artifacts (workflow run)
+        # Also keep a copy attached to the workflow run for 14 days, so failed
+        # releases can be inspected without re-running.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: yunque-agent-${{ env.RELEASE_TAG }}
+          path: |
+            dist/yunque-agent-*
+            dist/SHA256SUMS
+          retention-days: 14
