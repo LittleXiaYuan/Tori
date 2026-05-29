@@ -15,6 +15,7 @@ import (
 
 	iforestpkg "yunque-agent/internal/agentcore/anomaly"
 	"yunque-agent/internal/agentcore/llm/distill"
+	"yunque-agent/internal/agentcore/memory"
 	"yunque-agent/internal/agentcore/multiagent"
 	"yunque-agent/internal/agentcore/planner"
 	"yunque-agent/internal/agentcore/review"
@@ -149,6 +150,29 @@ func initSoulLayer(deps soulDeps) {
 			}
 			return facts, len(results), nil
 		})
+		// Close the dreaming loop: nightly curiosity discoveries flow into
+		// long-term memory and into Reverie (inner thoughts), instead of only
+		// emitting a timeline event. Closures read app fields at call time
+		// (the loop runs at night, long after init), so init ordering is moot.
+		dreamingLoop.SetFactSink(func(ctx context.Context, tenantID, fact, source string) error {
+			if app.MemManager == nil || fact == "" {
+				return nil
+			}
+			return app.MemManager.AddLong(ctx, tenantID, memory.Item{
+				Key: "curiosity_fact", Value: fact, Source: source, Category: "fact",
+			})
+		})
+		dreamingLoop.SetReverie(func(ctx context.Context, trigger, data string) error {
+			if app.Reverie == nil {
+				return nil
+			}
+			_, err := app.Reverie.ThinkWithEvent(ctx, planner.ReverieEvent{
+				Type:    planner.EventHighValueFact,
+				Trigger: trigger,
+				Data:    map[string]string{"summary": data},
+			})
+			return err
+		})
 		dreamingLoop.SetEventEmit(func(ctx context.Context, kind string, payload map[string]any) {
 			if typedLdg == nil || typedLdg.Events == nil {
 				return
@@ -163,7 +187,7 @@ func initSoulLayer(deps soulDeps) {
 			})
 		})
 		app.Set("dreaming_loop", dreamingLoop)
-		slog.Info("dreaming_loop: ready (curiosity wired)")
+		slog.Info("dreaming_loop: ready (curiosity → memory + reverie wired)")
 	}
 
 	// 3.5 World Model → track external environment state
