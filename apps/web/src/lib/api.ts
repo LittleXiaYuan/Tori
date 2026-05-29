@@ -118,6 +118,8 @@ export const api = {
       toolIds?: string[];
       /** Cherry 📎 drawer: inline files to splice into the last user message. */
       attachments?: Array<{ name: string; mime: string; dataB64: string }>;
+      /** Cursor-style opened folders; merged into file_search read roots for this turn. */
+      workspacePaths?: string[];
       /** Stop waiting if the stream goes quiet for too long. */
       idleTimeoutMs?: number;
     },
@@ -126,6 +128,9 @@ export const api = {
     if (thinkingLevel) body.thinking_level = thinkingLevel;
     if (options?.webSearch) body.web_search = true;
     if (options?.toolIds && options.toolIds.length > 0) body.tool_ids = options.toolIds;
+    if (options?.workspacePaths && options.workspacePaths.length > 0) {
+      body.workspace_paths = options.workspacePaths;
+    }
     if (options?.attachments && options.attachments.length > 0) {
       body.attachments = options.attachments.map((a) => ({
         name: a.name,

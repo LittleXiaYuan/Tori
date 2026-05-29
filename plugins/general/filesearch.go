@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"yunque-agent/internal/execution/sandbox"
@@ -48,7 +49,7 @@ func (s *FileSearchSkill) Execute(ctx context.Context, args map[string]any, env 
 	}
 
 	policy := sandbox.DefaultPolicy()
-	policy.HostReadPaths = s.hostReadPaths
+	policy.HostReadPaths = mergeWorkspacePaths(s.hostReadPaths, env)
 
 	sb, err := sandbox.New(os.TempDir(), policy)
 	if err != nil {
@@ -100,4 +101,28 @@ func (s *FileSearchSkill) Execute(ctx context.Context, args map[string]any, env 
 	default:
 		return "", fmt.Errorf("unknown action: %s (use search/grep/read/list)", action)
 	}
+}
+
+// mergeWorkspacePaths returns the global read roots plus any per-conversation
+// workspace directories the environment carries. Each workspace entry must be
+// an absolute path that resolves to an existing directory, so a malformed or
+// non-existent value can't silently widen the read surface. This is the
+// Cursor-style "opened folder" affordance: the user (via the client) opts a
+// directory into the read set for their own session without editing the
+// global HOST_READ_PATHS config.
+func mergeWorkspacePaths(base []string, env *skills.Environment) []string {
+	if env == nil || len(env.WorkspacePaths) == 0 {
+		return base
+	}
+	merged := append([]string{}, base...)
+	for _, p := range env.WorkspacePaths {
+		p = strings.TrimSpace(p)
+		if p == "" || !filepath.IsAbs(p) {
+			continue
+		}
+		if info, err := os.Stat(p); err == nil && info.IsDir() {
+			merged = append(merged, p)
+		}
+	}
+	return merged
 }

@@ -33,6 +33,7 @@ type PlanRequest struct {
 	DisableTools      bool            // when true, skip all tools — pure chat mode
 	ClientOverride    *llm.Client     // if set, bypass pool and use this client directly (session-level provider override)
 	AllowedSkills     []string        // if non-empty, buildFunctionDefs restricts to exactly these skill names (user-picked tool whitelist)
+	WorkspacePaths    []string        // extra host dirs the conversation opened; merged into read-only file skills' allowed roots
 }
 
 // StepEventType classifies the kind of intermediate step event.
