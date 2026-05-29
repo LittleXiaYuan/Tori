@@ -1,7 +1,9 @@
 package sandbox
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -10,7 +12,30 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
+	"github.com/tetratelabs/wazero/sys"
 )
+
+// cappedBuffer is an io.Writer that accumulates up to cap bytes and silently
+// discards the rest, so a misbehaving module can't exhaust host memory through
+// stdout/stderr. Writes always report full consumption so the guest never sees
+// a short write and aborts.
+type cappedBuffer struct {
+	buf bytes.Buffer
+	cap int
+}
+
+func (c *cappedBuffer) Write(p []byte) (int, error) {
+	if remaining := c.cap - c.buf.Len(); remaining > 0 {
+		if len(p) <= remaining {
+			c.buf.Write(p)
+		} else {
+			c.buf.Write(p[:remaining])
+		}
+	}
+	return len(p), nil
+}
+
+func (c *cappedBuffer) String() string { return c.buf.String() }
 
 // WasmSandbox executes WASM modules in a memory-safe, isolated environment.
 // Unlike process-based sandboxes, WASM provides deterministic execution with
@@ -22,6 +47,11 @@ type WasmSandbox struct {
 	maxOutput   int
 	hostFuncs   map[string]HostFunc
 	kvStore     map[string]string // simple KV for agent state
+	// compileCache lets a fresh per-execution runtime reuse prior compilation
+	// results (keyed by module bytes), removing the cold-compile cost on
+	// repeated executions of the same module without weakening per-execution
+	// isolation (each Execute still gets its own runtime + module instance).
+	compileCache wazero.CompilationCache
 }
 
 // HostFunc is a function exposed to WASM modules as an import.
@@ -66,11 +96,12 @@ func NewWasmSandbox(cfg WasmConfig) *WasmSandbox {
 		cfg.MaxOutputBytes = 64 * 1024
 	}
 	return &WasmSandbox{
-		memoryLimit: cfg.MemoryLimitPages,
-		maxDuration: cfg.MaxDuration,
-		maxOutput:   cfg.MaxOutputBytes,
-		hostFuncs:   make(map[string]HostFunc),
-		kvStore:     make(map[string]string),
+		memoryLimit:  cfg.MemoryLimitPages,
+		maxDuration:  cfg.MaxDuration,
+		maxOutput:    cfg.MaxOutputBytes,
+		hostFuncs:    make(map[string]HostFunc),
+		kvStore:      make(map[string]string),
+		compileCache: wazero.NewCompilationCache(),
 	}
 }
 
@@ -100,8 +131,13 @@ func (ws *WasmSandbox) Execute(ctx context.Context, wasmBytes []byte, stdin stri
 	ctx, cancel := context.WithTimeout(ctx, ws.maxDuration)
 	defer cancel()
 
-	// Create a new runtime per execution for full isolation
-	runtime := wazero.NewRuntime(ctx)
+	// Create a new runtime per execution for full isolation. A shared
+	// compilation cache lets repeated runs of the same module skip recompiling.
+	runtimeConfig := wazero.NewRuntimeConfig()
+	if ws.compileCache != nil {
+		runtimeConfig = runtimeConfig.WithCompilationCache(ws.compileCache)
+	}
+	runtime := wazero.NewRuntimeWithConfig(ctx, runtimeConfig)
 	defer runtime.Close(ctx)
 
 	// Instantiate WASI for stdio support
@@ -166,9 +202,15 @@ func (ws *WasmSandbox) Execute(ctx context.Context, wasmBytes []byte, stdin stri
 		envBuilder.Instantiate(ctx)
 	}
 
-	// Configure module with memory limits
+	// Configure module with memory limits. Stdout/stderr are captured into
+	// capped buffers so the guest can return data (the request/response
+	// envelope ABI) and so a runaway module can't exhaust host memory.
+	stdoutBuf := &cappedBuffer{cap: ws.maxOutput}
+	stderrBuf := &cappedBuffer{cap: ws.maxOutput}
 	moduleConfig := wazero.NewModuleConfig().
 		WithStdin(strings.NewReader(stdin)).
+		WithStdout(stdoutBuf).
+		WithStderr(stderrBuf).
 		WithStartFunctions() // Don't auto-call _start
 
 	// Compile the module
@@ -226,13 +268,29 @@ func (ws *WasmSandbox) Execute(ctx context.Context, wasmBytes []byte, stdin stri
 	result.Duration = time.Since(start).String()
 
 	if err != nil {
-		result.ExitCode = 1
-		result.Stderr = truncate(err.Error(), ws.maxOutput)
-		// Check if it was a timeout
-		if ctx.Err() == context.DeadlineExceeded {
+		// A WASI command module calls proc_exit, which wazero surfaces as
+		// sys.ExitError even on a clean exit(0). Treat that as the real exit
+		// code rather than a failure.
+		var exitErr *sys.ExitError
+		switch {
+		case errors.As(err, &exitErr):
+			result.ExitCode = int(exitErr.ExitCode())
+			if result.ExitCode != 0 {
+				result.Stderr = truncate(stderrBuf.String(), ws.maxOutput)
+			}
+		case ctx.Err() == context.DeadlineExceeded:
 			result.Stderr = "execution timeout exceeded"
 			result.ExitCode = -2
+		default:
+			result.ExitCode = 1
+			result.Stderr = truncate(err.Error(), ws.maxOutput)
 		}
+	}
+
+	// Capture stdout (and stderr on success-but-noisy) regardless of exit path.
+	result.Stdout = truncate(stdoutBuf.String(), ws.maxOutput)
+	if result.Stderr == "" {
+		result.Stderr = truncate(stderrBuf.String(), ws.maxOutput)
 	}
 
 	// Read memory usage
