@@ -833,10 +833,11 @@ func buildToolResultMsg(toolCallID, output string) llm.Message {
 // orchestration surface.
 func (s *ExecutionRuntimeService) BuildSkillEnvironment(req PlanRequest, modelRuntime *ModelRuntimeService, contextAssembly *ContextAssemblyService) *skills.Environment {
 	return &skills.Environment{
-		ClassID:   req.ClassID,
-		TeacherID: req.TeacherID,
-		StudentID: req.StudentID,
-		TenantID:  req.TenantID,
+		ClassID:        req.ClassID,
+		TeacherID:      req.TeacherID,
+		StudentID:      req.StudentID,
+		TenantID:       req.TenantID,
+		WorkspacePaths: req.WorkspacePaths,
 		LLMCall: func(ctx context.Context, system, user string) (string, error) {
 			msgs := []llm.Message{
 				{Role: "system", Content: system},

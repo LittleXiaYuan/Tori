@@ -48,6 +48,11 @@ type Environment struct {
 	TenantID     string
 	LLMCall      LLMCallFunc
 	MemorySearch MemorySearchFunc
+	// WorkspacePaths are extra host directories the current conversation has
+	// opened (Cursor-style "current workspace"). Read-only skills like
+	// file_search merge these into their allowed read roots for this call,
+	// without mutating the global HOST_READ_PATHS configuration.
+	WorkspacePaths []string
 }
 
 // SkillCategory groups skills under a named category for hierarchical invocation.
