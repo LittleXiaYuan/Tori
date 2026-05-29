@@ -199,8 +199,8 @@ export function updatePreferences<K extends keyof UserPreferences>(
   const updated: UserPreferences = {
     ...current,
     [section]: {
-      ...current[section],
-      ...updates,
+      ...(current[section] as unknown as Record<string, unknown>),
+      ...(updates as unknown as Record<string, unknown>),
     },
   };
   savePreferences(updated);
@@ -369,12 +369,16 @@ export function clearCommandHistory(): void {
 // Utility Functions
 // ============================================================================
 
-function deepMerge<T extends Record<string, unknown>>(target: T, source: Partial<T>): T {
-  const result = { ...target };
+// Constrain to `object` (not `Record<string, unknown>`) so that `interface`
+// types like UserPreferences — which lack an implicit index signature — still
+// satisfy the bound. The body operates on a Record view internally.
+function deepMerge<T extends object>(target: T, source: Partial<T>): T {
+  const result: Record<string, unknown> = { ...(target as Record<string, unknown>) };
+  const src = source as Record<string, unknown>;
 
-  for (const key in source) {
-    if (Object.prototype.hasOwnProperty.call(source, key)) {
-      const sourceValue = source[key];
+  for (const key in src) {
+    if (Object.prototype.hasOwnProperty.call(src, key)) {
+      const sourceValue = src[key];
       const targetValue = result[key];
 
       if (
@@ -388,14 +392,14 @@ function deepMerge<T extends Record<string, unknown>>(target: T, source: Partial
         result[key] = deepMerge(
           targetValue as Record<string, unknown>,
           sourceValue as Record<string, unknown>
-        ) as T[Extract<keyof T, string>];
+        );
       } else if (sourceValue !== undefined) {
-        result[key] = sourceValue as T[Extract<keyof T, string>];
+        result[key] = sourceValue;
       }
     }
   }
 
-  return result;
+  return result as T;
 }
 
 function migratePreferences(old: UserPreferences): UserPreferences {
