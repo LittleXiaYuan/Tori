@@ -69,8 +69,9 @@ type TrainingSample struct {
 	TenantID   string   `json:"tenant_id"`
 }
 
-// MemoryUpdateFunc applies a memory update from reflection.
-type MemoryUpdateFunc func(ctx context.Context, action, key, value string) error
+// MemoryUpdateFunc applies a memory update from reflection. tenantID scopes
+// the write so per-user memory stays isolated.
+type MemoryUpdateFunc func(ctx context.Context, tenantID, action, key, value string) error
 
 // EventEmitFunc is a generic sink for loop-completion events. Implementations
 // typically forward to a ledger or audit chain. kind is a stable string
@@ -112,7 +113,7 @@ func (rl *ReflectiveLoop) Run(ctx context.Context, data ConversationEndData) (*R
 			// Step 1b: Apply memory updates suggested by reflection
 			if rl.memoryUpdate != nil {
 				for _, mu := range eval.MemoryUpdates {
-					if err := rl.memoryUpdate(ctx, mu.Action, mu.Key, mu.Value); err != nil {
+					if err := rl.memoryUpdate(ctx, data.TenantID, mu.Action, mu.Key, mu.Value); err != nil {
 						slog.Warn("reflective_loop: memory update failed",
 							"action", mu.Action, "key", mu.Key, "err", err)
 					} else {
