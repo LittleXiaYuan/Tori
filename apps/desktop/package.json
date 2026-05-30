@@ -6,6 +6,8 @@
     "tauri": "tauri",
     "predev": "node scripts/copy-sidecar.mjs",
     "dev": "tauri dev",
+    "dev:all": "node scripts/dev.mjs",
+    "check:webview": "node scripts/check-webview-contract.mjs",
     "prebuild": "node scripts/sync-frontend.mjs --build && node scripts/copy-sidecar.mjs --all",
     "build": "tauri build",
     "copy-sidecar": "node scripts/copy-sidecar.mjs",
