@@ -20,6 +20,7 @@ import (
 	cognikernelpack "yunque-agent/internal/packs/cognikernel"
 	"yunque-agent/pkg/cogni"
 	"yunque-agent/pkg/packruntime"
+	"yunque-agent/pkg/safego"
 	"yunque-agent/pkg/skills"
 )
 
@@ -455,17 +456,6 @@ func (m *cogniModule) Start(ctx context.Context) error {
 		slog.Warn("cogni: declaration load error", "path", e.Path, "err", e.Err)
 	}
 
-	// Auto-organize: create cognis from installed skills
-	if m.cogniKernelPackEnabled() && m.autoOrganizer != nil {
-		result := m.autoOrganizer.Sync(context.Background())
-		if result.Created > 0 || result.Updated > 0 {
-			slog.Info("cogni: auto-organized skills into cognis",
-				"created", result.Created,
-				"updated", result.Updated,
-				"removed", result.Removed)
-		}
-	}
-
 	// Re-initialize experience stores when cognis are added/updated/removed.
 	m.registry.OnChange(func(event, id string) {
 		// pkg/cogni.Registry invokes hooks while holding its mutation lock.
@@ -475,7 +465,27 @@ func (m *cogniModule) Start(ctx context.Context) error {
 	})
 
 	m.watchCogniKernelPackState(ctx)
-	m.syncCogniKernelPackRuntime(ctx)
+
+	// Auto-organizing skills into cognis calls the LLM (intelligent grouping +
+	// activation-rule generation), and the initial runtime sync can be heavy.
+	// Module Start runs on the boot critical path BEFORE the HTTP listener
+	// binds, so doing this synchronously means a slow model stalls startup: the
+	// desktop shell health-checks the backend and kills it after 60s, so the
+	// listener never comes up ("本地服务不可用"). Run it in the background — these
+	// are projections that converge shortly after boot, not prerequisites for
+	// serving requests; OnChange re-syncs once auto-organize adds cognis.
+	safego.Go("cogni-startup-organize", func() {
+		if m.cogniKernelPackEnabled() && m.autoOrganizer != nil {
+			result := m.autoOrganizer.Sync(context.Background())
+			if result.Created > 0 || result.Updated > 0 {
+				slog.Info("cogni: auto-organized skills into cognis",
+					"created", result.Created,
+					"updated", result.Updated,
+					"removed", result.Removed)
+			}
+		}
+		m.syncCogniKernelPackRuntime(ctx)
+	})
 
 	return nil
 }
