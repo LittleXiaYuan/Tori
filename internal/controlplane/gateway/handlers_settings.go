@@ -30,6 +30,13 @@ type configField struct {
 	Sensitive   bool     `json:"sensitive,omitempty"`
 	Required    bool     `json:"required,omitempty"`
 	Hint        string   `json:"hint,omitempty"`
+	// Tier controls visibility in the layered Settings UI:
+	//   "common"   — shown by default (everyday behavior toggles, file access)
+	//   "advanced" — folded under the Advanced level (the default when unset)
+	//   "expert"   — folded under the Expert level (deployment/security internals)
+	// Leaving it empty is intentionally treated as "advanced" by the UI, so a
+	// new field is never accidentally exposed as common or buried as expert.
+	Tier string `json:"tier,omitempty"`
 }
 
 // configSchema defines the UI structure for the settings page.
@@ -40,7 +47,7 @@ var configSchema = []configGroup{
 			{Key: "LLM_BASE_URL", Label: "API Base URL", LabelZh: "API 地址", Type: "text", Placeholder: "https://api.openai.com/v1", Required: true},
 			{Key: "LLM_API_KEY", Label: "API Key", LabelZh: "API 密钥", Type: "password", Placeholder: "sk-...", Sensitive: true, Required: true},
 			{Key: "LLM_MODEL", Label: "Model", LabelZh: "模型名称", Type: "text", Placeholder: "gpt-4.1-mini"},
-			{Key: "AGENT_ADDR", Label: "Listen Address", LabelZh: "监听地址", Type: "text", Placeholder: ":9090"},
+			{Key: "AGENT_ADDR", Label: "Listen Address", LabelZh: "监听地址", Type: "text", Placeholder: ":9090", Tier: "expert"},
 		},
 	},
 	{
@@ -57,9 +64,9 @@ var configSchema = []configGroup{
 	{
 		Key: "advanced", Label: "Advanced Features", LabelZh: "高级功能",
 		Fields: []configField{
-			{Key: "THINKING_LEVEL", Label: "Thinking Level", LabelZh: "思考深度", Type: "select", Options: []string{"auto", "none", "deep"},
+			{Key: "THINKING_LEVEL", Label: "Thinking Level", LabelZh: "思考深度", Type: "select", Options: []string{"auto", "none", "deep"}, Tier: "common",
 				Hint: "全局默认思考深度。auto=按复杂度自动选择，none=最快响应，deep=始终完整推理链。聊天页面可临时覆盖。"},
-			{Key: "HEARTBEAT_ENABLED", Label: "Heartbeat", LabelZh: "心跳自检", Type: "select", Options: []string{"true", "false"},
+			{Key: "HEARTBEAT_ENABLED", Label: "Heartbeat", LabelZh: "心跳自检", Type: "select", Options: []string{"true", "false"}, Tier: "common",
 				Hint: "定期自动检查状态、回顾近期对话，结果推送到收件箱。"},
 			{Key: "HEARTBEAT_INTERVAL", Label: "Heartbeat Interval (min)", LabelZh: "心跳间隔（分钟）", Type: "number", Placeholder: "30",
 				Hint: "两次心跳之间的间隔（分钟）。"},
@@ -93,29 +100,29 @@ var configSchema = []configGroup{
 	{
 		Key: "filesystem", Label: "File System Access", LabelZh: "文件系统访问",
 		Fields: []configField{
-			{Key: "HOST_READ_PATHS", Label: "Read-Only Paths", LabelZh: "只读访问路径", Type: "text", Placeholder: "C:\\Users\\me\\Desktop,C:\\Users\\me\\Documents",
+			{Key: "HOST_READ_PATHS", Label: "Read-Only Paths", LabelZh: "只读访问路径", Type: "text", Placeholder: "C:\\Users\\me\\Desktop,C:\\Users\\me\\Documents", Tier: "common",
 				Hint: "Agent 可以读取的目录，逗号分隔。用于让 Agent 浏览你的文件。"},
-			{Key: "HOST_WRITE_PATHS", Label: "Writable Paths", LabelZh: "可写访问路径", Type: "text", Placeholder: "data/output,data/tasks",
+			{Key: "HOST_WRITE_PATHS", Label: "Writable Paths", LabelZh: "可写访问路径", Type: "text", Placeholder: "data/output,data/tasks", Tier: "common",
 				Hint: "Agent 可以写入的目录，逗号分隔。注意安全风险。"},
 		},
 	},
 	{
 		Key: "security", Label: "Security", LabelZh: "安全",
 		Fields: []configField{
-			{Key: "JWT_SECRET", Label: "JWT Secret", LabelZh: "JWT 密钥", Type: "password", Sensitive: true,
+			{Key: "JWT_SECRET", Label: "JWT Secret", LabelZh: "JWT 密钥", Type: "password", Sensitive: true, Tier: "expert",
 				Hint: "API 认证签名密钥。留空则每次启动自动生成（重启后旧 Token 失效）。"},
-			{Key: "RATE_LIMIT", Label: "Rate Limit (req/min)", LabelZh: "速率限制（请求/分钟）", Type: "number", Placeholder: "60",
+			{Key: "RATE_LIMIT", Label: "Rate Limit (req/min)", LabelZh: "速率限制（请求/分钟）", Type: "number", Placeholder: "60", Tier: "expert",
 				Hint: "每分钟最大请求数。防止滥用。0 或留空表示不限制。"},
-			{Key: "ALLOWED_ORIGINS", Label: "CORS Origins", LabelZh: "CORS 来源", Type: "text", Placeholder: "*",
+			{Key: "ALLOWED_ORIGINS", Label: "CORS Origins", LabelZh: "CORS 来源", Type: "text", Placeholder: "*", Tier: "expert",
 				Hint: "允许跨域访问的来源地址。* 表示允许所有来源。"},
 		},
 	},
 	{
 		Key: "storage", Label: "Storage & Persistence", LabelZh: "存储与持久化",
 		Fields: []configField{
-			{Key: "LEDGER_DB_PATH", Label: "Ledger DB Path", LabelZh: "Ledger 数据库路径", Type: "text", Placeholder: "data/ledger/ledger.db",
+			{Key: "LEDGER_DB_PATH", Label: "Ledger DB Path", LabelZh: "Ledger 数据库路径", Type: "text", Placeholder: "data/ledger/ledger.db", Tier: "expert",
 				Hint: "审计日志和记忆数据的 SQLite 文件路径。"},
-			{Key: "STORAGE_MODE", Label: "Memory Storage Mode", LabelZh: "记忆存储模式", Type: "select", Options: []string{"ledger", "memory"}, Placeholder: "ledger",
+			{Key: "STORAGE_MODE", Label: "Memory Storage Mode", LabelZh: "记忆存储模式", Type: "select", Options: []string{"ledger", "memory"}, Placeholder: "ledger", Tier: "expert",
 				Hint: "ledger=持久化到磁盘（重启不丢失），memory=仅内存（重启清空）。生产环境务必选 ledger。"},
 		},
 	},
@@ -139,7 +146,7 @@ var configSchema = []configGroup{
 		Fields: []configField{
 			{Key: "SEARXNG_URL", Label: "SearXNG URL", LabelZh: "SearXNG 搜索地址", Type: "text",
 				Hint: "自建搜索引擎 SearXNG 的地址。配置后 Agent 可使用网页搜索。"},
-			{Key: "OPEN_BROWSER", Label: "Auto-Open Browser", LabelZh: "自动打开浏览器", Type: "select", Options: []string{"true", "false"},
+			{Key: "OPEN_BROWSER", Label: "Auto-Open Browser", LabelZh: "自动打开浏览器", Type: "select", Options: []string{"true", "false"}, Tier: "common",
 				Hint: "启动后自动在默认浏览器中打开 WebUI。"},
 		},
 	},

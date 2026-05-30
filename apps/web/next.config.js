@@ -24,7 +24,7 @@ const securityHeaders = [
       "img-src 'self' data: blob: https:",
       // Tauri 2 的 IPC 走 https://ipc.localhost 协议（Windows WebView2）
       // 以及 ipc: 协议（macOS/Linux）；不放行会导致前端 ti.invoke() 全部被 CSP 阻止。
-      "connect-src 'self' http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:* https://ipc.localhost ipc: https: wss:",
+      "connect-src 'self' http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:* http://ipc.localhost https://ipc.localhost ipc: https: wss:",
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",
@@ -39,6 +39,12 @@ const securityHeaders = [
 
 const nextConfig = {
   ...(isProd ? { output: "export" } : {}),
+  // next dev 会把带尾斜杠的请求 308 重定向到无斜杠变体。桌面 webview 经
+  // SPA 路由发出的 /api/*、/v1/* 代理请求带了尾斜杠，于是 308 与 webview
+  // 的归一化互相弹跳，浏览器报 ERR_TOO_MANY_REDIRECTS（命令行 curl 手测无
+  // 斜杠路径看不到，这是 webview 独有的死循环）。关掉这个运行时 308 即可，
+  // 静态导出（output:export）的文件名行为不受影响。
+  skipTrailingSlashRedirect: true,
   images: { unoptimized: true },
   // Keep the local SDK as a first-class source dependency during Turbopack
   // builds so subpath imports like `yunque-client/packs` resolve directly to
@@ -63,7 +69,12 @@ const nextConfig = {
   ...(!isProd
     ? {
         async rewrites() {
-          const api = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:9090";
+          // Use 127.0.0.1 (not "localhost") as the default proxy target: on
+          // Windows "localhost" resolves to IPv6 ::1 first, but the agent binds
+          // IPv4 127.0.0.1:9090. A "localhost" target intermittently hits ::1
+          // and fails with ECONNREFUSED, surfacing as "Failed to fetch" in the
+          // desktop webview. 127.0.0.1 targets the IPv4 listener deterministically.
+          const api = process.env.NEXT_PUBLIC_API_BASE || "http://127.0.0.1:9090";
           return {
             beforeFiles: [
               { source: "/v1/:path*", destination: `${api}/v1/:path*` },

@@ -20,6 +20,7 @@ export interface ConfigField {
   sensitive?: boolean;
   required?: boolean;
   hint?: string;
+  tier?: "common" | "advanced" | "expert"; // visibility level; empty treated as advanced
 }
 
 export interface ConfigGroup {

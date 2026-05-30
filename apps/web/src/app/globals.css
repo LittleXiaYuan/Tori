@@ -1687,6 +1687,111 @@ button, [role="button"] { border-radius: var(--radius-md); }
   opacity: 1;
 }
 
+/* Settings page: unified guide card (setup / provider / api-key / tier / error) */
+.settings-card {
+  position: relative;
+  padding: var(--card-pad-sm);
+  padding-left: calc(var(--card-pad-sm) + 3px);
+  border-radius: var(--radius-lg);
+  background: var(--glass-card, var(--yunque-card));
+  border: 1px solid var(--glass-edge, var(--yunque-border));
+  backdrop-filter: blur(var(--yunque-glass-blur)) saturate(var(--yunque-glass-saturate));
+  -webkit-backdrop-filter: blur(var(--yunque-glass-blur)) saturate(var(--yunque-glass-saturate));
+}
+/* Accent bar on the left edge; color set per tone. */
+.settings-card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  border-radius: var(--radius-lg) 0 0 var(--radius-lg);
+  background: var(--yunque-border-strong);
+}
+.settings-card--accent::before { background: var(--yunque-accent); }
+.settings-card--warning::before { background: var(--yunque-warning); }
+.settings-card--danger::before { background: var(--yunque-danger); }
+.settings-card--warning { background: var(--yunque-warning-muted); }
+.settings-card--link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+.settings-card--link:hover { border-color: var(--yunque-border-strong); }
+
+.settings-card__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+}
+.settings-card__icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.settings-card__text { flex: 1; min-width: 0; }
+.settings-card__title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--yunque-text);
+}
+.settings-card__desc {
+  font-size: var(--text-xs);
+  color: var(--yunque-text-muted);
+  margin-top: 2px;
+  line-height: 1.45;
+}
+.settings-card__action {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  margin-left: var(--sp-2);
+}
+.settings-card__body { margin-top: var(--sp-3); }
+
+/* Top guide cards laid out side by side; collapses to one column when narrow. */
+.settings-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-4);
+}
+/* Standalone cards (tier selector, error notice) stack with breathing room;
+   cards inside the grid let the grid gap handle spacing. */
+.settings-card { margin-bottom: var(--sp-4); }
+.settings-card-grid .settings-card { margin-bottom: 0; }
+
+/* Section header inside the content pane (group header, detect panel header). */
+.settings-section-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-5);
+  padding-bottom: var(--sp-3);
+  border-bottom: 1px solid var(--yunque-border);
+}
+.settings-section-head__title {
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--yunque-text);
+}
+.settings-section-head__count {
+  font-size: var(--text-xs);
+  color: var(--yunque-text-muted);
+  margin-left: var(--sp-2);
+}
+.settings-section-head__action { margin-left: auto; }
+.settings-nav-hint {
+  font-size: 11px;
+  color: var(--yunque-text-disabled);
+  line-height: 1.45;
+  padding: 0 var(--sp-2) var(--sp-2);
+}
+
 /* Dashboard quick action button */
 .quick-action-btn {
   display: flex;

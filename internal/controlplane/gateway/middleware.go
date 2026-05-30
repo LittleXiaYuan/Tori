@@ -32,7 +32,8 @@ func (g *Gateway) securityHeaders(next http.Handler) http.Handler {
 		w.Header().Set("Content-Security-Policy",
 			"default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; "+
 				"style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; "+
-				"connect-src 'self' ws: wss:; font-src 'self' data:; frame-ancestors 'none'")
+				"connect-src 'self' ws: wss: http://ipc.localhost https://ipc.localhost ipc:; "+
+				"font-src 'self' data:; frame-ancestors 'none'")
 		if r.Header.Get("X-Forwarded-Proto") == "https" || r.TLS != nil {
 			w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 		}
