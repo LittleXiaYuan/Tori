@@ -52,7 +52,12 @@ func (g *Gateway) corsMiddleware(next http.Handler) http.Handler {
 				w.Header().Set("Vary", "Origin")
 			}
 		}
-		w.Header().Set("Access-Control-Allow-Methods", "GET,POST,DELETE,OPTIONS")
+		// PUT/PATCH must be advertised: settings save (PUT /api/settings/config),
+		// persona, heartbeat, preset-features and sticker endpoints all use PUT.
+		// Omitting them makes the browser's CORS preflight reject the real
+		// request, surfacing in the webview as "Failed to fetch" (curl never
+		// runs the preflight, so it cannot reproduce this).
+		w.Header().Set("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Authorization,Content-Type,X-API-Key")
 		w.Header().Set("Access-Control-Max-Age", "86400")
 		if r.Method == "OPTIONS" {
