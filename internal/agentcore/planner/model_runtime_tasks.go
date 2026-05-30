@@ -76,6 +76,72 @@ func (s *ModelRuntimeService) GenerateConversationTitle(ctx context.Context, use
 	return title
 }
 
+// StarterSuggestion is one personalized chat opener shown on the empty chat
+// screen: a short chip label plus the full prompt sent when it is tapped.
+type StarterSuggestion struct {
+	Label  string `json:"label"`  // short chip text, 2-6 chars ideally
+	Prompt string `json:"prompt"` // full prompt sent on click
+}
+
+const starterSuggestionsPrompt = `你为「云雀」AI 工作助手生成对话首页的开场建议。
+根据用户近期对话、已安装能力（Pack）和当前时段，给出 4 条**贴合该用户**的开场建议。
+
+只输出 JSON 数组，不要 markdown、不要解释：
+[{"label":"简短动词短语(2-6字)","prompt":"用户视角的第一句话，可直接发送(15-40字)"}]
+
+规则：
+- label 是按钮上的短词（如「写周报」「查资料」「改代码」），prompt 是点击后真正发送的完整请求
+- 紧扣用户近期在做的事；若信息不足，给通用但实用的工作场景，不要空泛寒暄
+- prompt 用第一人称、命令式中文，像用户自己打的字
+- 必须正好 4 条，label 互不重复`
+
+// GenerateStarterSuggestions uses the fast model tier to produce personalized
+// empty-screen chat openers from lightweight profile context (recent
+// conversation titles/summaries, installed pack names, time of day). Returns a
+// non-nil error on any failure so callers can fall back to a curated static set.
+func (s *ModelRuntimeService) GenerateStarterSuggestions(ctx context.Context, profile string) ([]StarterSuggestion, error) {
+	if s == nil {
+		return nil, fmt.Errorf("model runtime not configured")
+	}
+	msgs := []llm.Message{
+		{Role: "system", Content: starterSuggestionsPrompt},
+		{Role: "user", Content: clipRunes(profile, 1600)},
+	}
+	reply, err := s.ChatForRequestTier(ctx, PlanRequest{}, "fast", msgs, 0.5)
+	if err != nil {
+		return nil, fmt.Errorf("LLM call failed: %w", err)
+	}
+
+	var out []StarterSuggestion
+	if err := json.Unmarshal([]byte(reply), &out); err != nil {
+		cleaned := jsonutil.Extract(reply)
+		if err2 := json.Unmarshal([]byte(cleaned), &out); err2 != nil {
+			slog.Debug("model runtime: failed to parse starter suggestions JSON", "raw", reply, "err", err2)
+			return nil, fmt.Errorf("parse suggestions: %w", err2)
+		}
+	}
+
+	// Sanitize: trim, drop empties, clip lengths, cap at 4.
+	cleaned := out[:0]
+	for _, sug := range out {
+		sug.Label = strings.TrimSpace(sug.Label)
+		sug.Prompt = strings.TrimSpace(sug.Prompt)
+		if sug.Label == "" || sug.Prompt == "" {
+			continue
+		}
+		sug.Label = clipRunes(sug.Label, 12)
+		sug.Prompt = clipRunes(sug.Prompt, 200)
+		cleaned = append(cleaned, sug)
+		if len(cleaned) >= 4 {
+			break
+		}
+	}
+	if len(cleaned) == 0 {
+		return nil, fmt.Errorf("no usable suggestions in model reply")
+	}
+	return cleaned, nil
+}
+
 // ParseMissionIntent classifies a natural language description into a structured mission intent.
 func (s *ModelRuntimeService) ParseMissionIntent(ctx context.Context, description string) (MissionParseResult, error) {
 	messages := []llm.Message{

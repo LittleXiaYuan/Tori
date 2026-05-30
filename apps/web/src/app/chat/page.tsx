@@ -66,6 +66,7 @@ import { ChatStreamTimeoutError, parseAgenticChatStream } from "@/lib/chat-sse";
 import { buildHiddenContextAttachments } from "@/lib/chat-attachments";
 import { PlannerRecoveryShelf } from "@/components/chat/planner-recovery-shelf";
 import { formatErrorMessage } from "@/lib/error-utils";
+import { providerModelLabel } from "@/lib/provider-ui";
 import {
   buildSocialPublishActions,
   detectSocialPublishIntent,
@@ -85,7 +86,7 @@ export default function ChatPage() {
   const {
     currentModel, currentModelId, availableModels,
     setupNeeded, presets, activePreset,
-    airiAvailable, heroSkills,
+    airiAvailable,
     setCurrentModel, setCurrentModelId,
     handleSwitchPreset,
   } = useChatInit();
@@ -690,6 +691,10 @@ export default function ChatPage() {
           if (doneData.suggestions?.length > 0) updates.suggestions = doneData.suggestions;
           if (doneData.context_layers?.length > 0) updates.contextLayers = doneData.context_layers;
           if (doneData.reasoning_content) updates.reasoning = doneData.reasoning_content;
+          const doneModel = typeof doneData.model === "string" ? doneData.model : "";
+          const doneProviderId = typeof doneData.provider_id === "string" ? doneData.provider_id : "";
+          if (doneModel) updates.model = doneModel;
+          if (doneProviderId) updates.providerId = doneProviderId;
           if (doneData.browser_summary) {
             updates.browserSummary = mapBrowserSummary(doneData.browser_summary);
             setResumePromptForBrowser(null);
@@ -1017,6 +1022,72 @@ export default function ChatPage() {
     { key: "deep" as const, label: "深度", icon: <Brain size={12} /> },
   ] as const;
 
+  // The composer is rendered in one of two places depending on whether a
+  // conversation has started: centered on the empty screen (Claude.ai-style)
+  // or pinned to the bottom once messages exist. Build it once so both
+  // branches share the exact same props.
+  const composer = (
+    <ChatInputArea
+      input={chat.input}
+      loading={chat.loading}
+      streaming={chat.streaming}
+      hasMessages={chat.messages.length > 0}
+      chatMode={chatMode}
+      isDragging={isDragging}
+      pendingFiles={pendingFiles}
+      showSlashMenu={showSlashMenu}
+      slashQuery={slashQuery}
+      activeSlashCommand={activeSlashCommand}
+      showConnectors={showConnectors}
+      bridgeConnected={Boolean(bridgeState?.connected)}
+      availableModels={availableModels}
+      currentModel={currentModel || "选择模型"}
+      currentModelId={currentModelId}
+      airiAvailable={airiAvailable}
+      thinkingLevel={thinkingLevel}
+      isRecording={isRecording}
+      inputRef={inputRef}
+      fileInputRef={fileInputRef}
+      inputShellRef={inputShellRef}
+      onInputChange={handleInputChange}
+      onKeyDown={handleKeyDown}
+      onSlashSelect={handleSlashSelect}
+      onSlashClose={() => setShowSlashMenu(false)}
+      onFileUpload={handleFileUpload}
+      onDrop={handleDrop}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onSend={() => sendMessage()}
+      onStop={stopGeneration}
+      onRemoveFile={(id, preview) => { if (preview) URL.revokeObjectURL(preview); setPendingFiles(prev => prev.filter((item) => item.id !== id)); }}
+      onConnectorsToggle={setShowConnectors}
+      onModelSelect={async (m) => {
+        setCurrentModel(providerModelLabel(m));
+        setCurrentModelId(m.id);
+        try {
+          await api.setExecProvider(m.id);
+          if (conv.activeId) {
+            await api.providerSessionOverride(m.id, conv.activeId).catch(() => {});
+          }
+        } catch (e) {
+          showToast(formatErrorMessage(e, "切换执行层模型失败。"), "error");
+        }
+      }}
+      onModeChange={(mode) => {
+        setChatMode(mode);
+        if (mode === "chat" && airiAvailable) setAiriMode(true);
+        else setAiriMode(false);
+      }}
+      onThinkingChange={(lvl) => {
+        setThinkingLevel(lvl);
+        setThinkingEnabled(lvl === "deep" ? true : lvl === "none" ? false : null);
+      }}
+      onStartRecording={startRecording}
+      onStopRecording={stopRecording}
+      onOpenImagePicker={() => { if (fileInputRef.current) { fileInputRef.current.accept = "image/*"; fileInputRef.current.click(); } }}
+    />
+  );
+
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: "transparent" }}>
       <div
@@ -1160,94 +1231,46 @@ export default function ChatPage() {
         )}
 
         {/* Chat Messages */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto chat-scroll-area px-5 py-4 xl:px-6">
-          {chat.messages.length === 0 ? (
-            <ChatEmptyState setupNeeded={setupNeeded} heroSkills={heroSkills} chatD={chatD} inputRef={inputRef} onSend={sendMessage} />
-          ) : (
-            <ChatMessageList
-              messages={chat.messages}
-              streaming={chat.streaming}
-              chatMode={chatMode}
-              currentModel={currentModel}
-              copiedIdx={copiedIdx}
-              ttsPlaying={ttsPlaying}
-              bridgeState={bridgeState}
-              resumePromptForBrowser={resumePromptForBrowser}
-              onCopy={handleCopy}
-              onPlayTTS={playTTS}
-              onEdit={editMessage}
-              onRollback={rollbackToMessage}
-              onRetry={retryMessage}
-              onAction={handleAction}
-              onSlashSelect={handleSlashSelect}
-              onSend={sendMessage}
-              onShare={handleShare}
-              onBrowserRefresh={() => {
-                syncBridgeState();
-                browserIntentClient.extensionStatus()
-                  .then((status) => setBridgeNotice({ tone: status.connected ? "success" : "info", text: status.connected ? "Browser connector is ready." : "Browser connector is still offline." }))
-                  .catch(() => setBridgeNotice({ tone: "error", text: "Unable to refresh browser connector status." }));
-              }}
-              onBrowserContinue={(prompt) => {
-                setResumePromptForBrowser(prompt);
-                continueBlockedBrowserTask(prompt);
-              }}
-            />
-          )}
-        </div>
-
-        <ChatInputArea
-          input={chat.input}
-          loading={chat.loading}
-          streaming={chat.streaming}
-          hasMessages={chat.messages.length > 0}
-          chatMode={chatMode}
-          isDragging={isDragging}
-          pendingFiles={pendingFiles}
-          showSlashMenu={showSlashMenu}
-          slashQuery={slashQuery}
-          activeSlashCommand={activeSlashCommand}
-          showConnectors={showConnectors}
-          bridgeConnected={Boolean(bridgeState?.connected)}
-          availableModels={availableModels}
-          currentModel={currentModel || "选择模型"}
-          currentModelId={currentModelId}
-          airiAvailable={airiAvailable}
-          thinkingLevel={thinkingLevel}
-          isRecording={isRecording}
-          inputRef={inputRef}
-          fileInputRef={fileInputRef}
-          inputShellRef={inputShellRef}
-          onInputChange={handleInputChange}
-          onKeyDown={handleKeyDown}
-          onSlashSelect={handleSlashSelect}
-          onSlashClose={() => setShowSlashMenu(false)}
-          onFileUpload={handleFileUpload}
-          onDrop={handleDrop}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onSend={() => sendMessage()}
-          onStop={stopGeneration}
-          onRemoveFile={(id, preview) => { if (preview) URL.revokeObjectURL(preview); setPendingFiles(prev => prev.filter((item) => item.id !== id)); }}
-          onConnectorsToggle={setShowConnectors}
-          onModelSelect={(m) => {
-            setCurrentModel(m.model || m.display_name || m.id);
-            setCurrentModelId(m.id);
-            api.providerSessionOverride(m.id, conv.activeId || "default").catch(() => {});
-          }}
-          onModeChange={(mode) => {
-            setChatMode(mode);
-            if (mode === "chat" && airiAvailable) setAiriMode(true);
-            else setAiriMode(false);
-          }}
-          onThinkingChange={(lvl) => {
-            setThinkingLevel(lvl);
-            setThinkingEnabled(lvl === "deep" ? true : lvl === "none" ? false : null);
-          }}
-          onStartRecording={startRecording}
-          onStopRecording={stopRecording}
-          onOpenImagePicker={() => { if (fileInputRef.current) { fileInputRef.current.accept = "image/*"; fileInputRef.current.click(); } }}
-        />
+        {chat.messages.length === 0 ? (
+          <div className="flex-1 overflow-y-auto chat-scroll-area px-5 py-4 xl:px-6">
+            <ChatEmptyState setupNeeded={setupNeeded} chatD={chatD} inputRef={inputRef} composer={composer} />
+          </div>
+        ) : (
+          <>
+            <div ref={scrollRef} className="flex-1 overflow-y-auto chat-scroll-area px-5 py-4 xl:px-6">
+              <ChatMessageList
+                messages={chat.messages}
+                streaming={chat.streaming}
+                chatMode={chatMode}
+                currentModel={currentModel}
+                copiedIdx={copiedIdx}
+                ttsPlaying={ttsPlaying}
+                bridgeState={bridgeState}
+                resumePromptForBrowser={resumePromptForBrowser}
+                onCopy={handleCopy}
+                onPlayTTS={playTTS}
+                onEdit={editMessage}
+                onRollback={rollbackToMessage}
+                onRetry={retryMessage}
+                onAction={handleAction}
+                onSlashSelect={handleSlashSelect}
+                onSend={sendMessage}
+                onShare={handleShare}
+                onBrowserRefresh={() => {
+                  syncBridgeState();
+                  browserIntentClient.extensionStatus()
+                    .then((status) => setBridgeNotice({ tone: status.connected ? "success" : "info", text: status.connected ? "Browser connector is ready." : "Browser connector is still offline." }))
+                    .catch(() => setBridgeNotice({ tone: "error", text: "Unable to refresh browser connector status." }));
+                }}
+                onBrowserContinue={(prompt) => {
+                  setResumePromptForBrowser(prompt);
+                  continueBlockedBrowserTask(prompt);
+                }}
+              />
+            </div>
+            {composer}
+          </>
+        )}
       </div>
 
       {/* Computer Panel — Telegram-style side panel within the window */}

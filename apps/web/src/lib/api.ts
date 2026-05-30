@@ -382,6 +382,10 @@ export const api = {
   detectDirs: () =>
     fetcher<{ dirs: Array<{ label: string; label_zh: string; path: string; exists: boolean; kind: string }>; default_paths: string[]; current_read: string; current_write: string }>("/api/settings/detect-dirs"),
 
+  // Personalized empty-screen chat openers (best-effort; falls back to static when empty)
+  starterSuggestions: () =>
+    fetcher<{ suggestions: Array<{ label: string; prompt: string }>; cached?: boolean }>("/v1/chat/starter-suggestions"),
+
   // Conversations
   conversations: (archived = false) =>
     fetcher<{ sessions: ConversationInfo[]; count: number }>(`/v1/conversations?archived=${archived}`),

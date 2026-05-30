@@ -57,6 +57,15 @@ func (p *Planner) GenerateConversationTitle(ctx context.Context, userMsg, assist
 	return modelRuntime.GenerateConversationTitle(ctx, userMsg, assistReply)
 }
 
+// GenerateStarterSuggestions delegates personalized empty-screen chat openers to the model runtime.
+func (p *Planner) GenerateStarterSuggestions(ctx context.Context, profile string) ([]StarterSuggestion, error) {
+	if p == nil {
+		return nil, fmt.Errorf("planner or llm not configured")
+	}
+	modelRuntime := p.ensureModelRuntime()
+	return modelRuntime.GenerateStarterSuggestions(ctx, profile)
+}
+
 // ParseMissionIntent delegates mission intent parsing to the model runtime.
 func (p *Planner) ParseMissionIntent(ctx context.Context, description string) (MissionParseResult, error) {
 	if p == nil {

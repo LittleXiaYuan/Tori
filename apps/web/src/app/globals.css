@@ -1792,6 +1792,123 @@ button, [role="button"] { border-radius: var(--radius-md); }
   padding: 0 var(--sp-2) var(--sp-2);
 }
 
+/* Chat empty screen — Claude.ai-style centered composer with greeting + chips */
+.chat-empty {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-5);
+  width: 100%;
+  max-width: min(720px, 92vw);
+  margin: 0 auto;
+  padding-bottom: 6vh;
+  animation: fadeInUp 0.4s ease-out both;
+}
+.chat-empty__setup {
+  width: 100%;
+  max-width: 460px;
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--yunque-border);
+  border-left: 3px solid #f59e0b;
+  background: rgba(245, 158, 11, 0.06);
+}
+.chat-empty__setup-title {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--yunque-text);
+}
+.chat-empty__setup-desc {
+  font-size: var(--text-xs);
+  color: var(--yunque-text-muted);
+  margin-top: 4px;
+}
+.chat-empty__setup-link {
+  display: inline-flex;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: #f59e0b;
+  margin-top: var(--sp-2);
+}
+
+.chat-empty__hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+  text-align: center;
+}
+.chat-empty__mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  margin-bottom: var(--sp-1);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(168, 85, 247, 0.1));
+}
+.chat-empty__greeting {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--yunque-text);
+}
+.chat-empty__sub {
+  font-size: var(--text-sm);
+  color: var(--yunque-text-muted);
+}
+
+/* Composer sits in the visual center; it carries its own width clamp. */
+.chat-empty__composer {
+  width: 100%;
+}
+
+.chat-empty__chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  width: 100%;
+}
+.chat-empty__chip {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--yunque-text-secondary);
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--glass-edge, var(--yunque-border));
+  background: var(--glass-card, var(--yunque-card));
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chat-empty__chip:hover {
+  color: var(--yunque-text);
+  border-color: var(--yunque-border-strong);
+  transform: translateY(-1px);
+}
+.chat-empty__chip--skeleton {
+  width: 84px;
+  height: 30px;
+  cursor: default;
+  pointer-events: none;
+  animation: chat-empty-chip-pulse 1.4s ease-in-out infinite;
+}
+@keyframes chat-empty-chip-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.8; }
+}
+
 /* Dashboard quick action button */
 .quick-action-btn {
   display: flex;

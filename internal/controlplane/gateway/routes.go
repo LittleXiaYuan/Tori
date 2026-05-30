@@ -31,6 +31,7 @@ func (g *Gateway) registerChatRoutes() {
 	g.mux.HandleFunc("/v1/chat", g.requireAuth(g.limiter.Middleware(g.handleChat)))
 	g.mux.HandleFunc("/v1/chat/stream", g.requireAuth(g.limiter.Middleware(g.handleStreamChat)))
 	g.mux.HandleFunc("/v1/chat/agentic", g.requireAuth(g.limiter.Middleware(g.handleAgenticChat)))
+	g.mux.HandleFunc("/v1/chat/starter-suggestions", g.requireAuth(g.handleStarterSuggestions))
 	g.mux.HandleFunc("/v1/ws", g.requireAuth(g.handleWebSocket))
 	g.mux.HandleFunc("/v1/token", g.handleTokenGenerate)
 
