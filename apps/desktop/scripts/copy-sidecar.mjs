@@ -13,6 +13,7 @@ import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..", "..", "..");
+const DESKTOP_DIR = path.resolve(__dirname, "..");
 // Tauri v2 expects externalBin entries at <src-tauri>/<path>, e.g. the
 // tauri.conf.json entry "binaries/yunque-agent" points at
 // <src-tauri>/binaries/yunque-agent-<triple><ext>. Keeping the binaries in a
@@ -32,7 +33,9 @@ const PLATFORM_MAP = {
 function copyBinary(platformKey) {
   const { triple, ext } = PLATFORM_MAP[platformKey];
   const srcName = `yunque-agent-${platformKey}${ext}`;
-  const srcPath = path.join(ROOT, srcName);
+  const releasePath = path.join(ROOT, srcName);
+  const devPath = path.join(DESKTOP_DIR, "src-tauri", "target", "debug", `yunque-agent${ext}`);
+  const srcPath = !copyAll && fs.existsSync(devPath) ? devPath : releasePath;
 
   if (!fs.existsSync(srcPath)) {
     console.warn(`  skip: ${srcName} (not found)`);
@@ -43,7 +46,7 @@ function copyBinary(platformKey) {
   const dstPath = path.join(BIN_DIR, dstName);
   fs.copyFileSync(srcPath, dstPath);
   const sizeMB = (fs.statSync(dstPath).size / 1024 / 1024).toFixed(1);
-  console.log(`  ok:   ${srcName} -> ${dstName} (${sizeMB} MB)`);
+  console.log(`  ok:   ${path.relative(ROOT, srcPath)} -> ${dstName} (${sizeMB} MB)`);
   return true;
 }
 

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@heroui/react";
 import { RefreshCw, WifiOff } from "lucide-react";
+import { BASE } from "@/lib/api-core";
 
 type ServiceState = "checking" | "ready" | "offline";
 
@@ -70,18 +71,12 @@ function Splash({ state, detail, onRetry }: { state: ServiceState; detail?: stri
 }
 
 function getHealthUrl(): string {
-  const base = process.env.NEXT_PUBLIC_API_BASE;
-  if (base) return `${base}/healthz`;
-  // 在开发模式下，直接访问后端
-  // 检查是否在 localhost:3001 或 Tauri 环境
-  if (typeof window !== "undefined") {
-    const isTauriOrDev = window.location.hostname === "localhost" ||
-                         window.location.protocol === "tauri:" ||
-                         window.location.protocol.startsWith("http");
-    if (isTauriOrDev) {
-      return "http://127.0.0.1:9090/healthz";
-    }
-  }
+  if (BASE) return `${BASE.replace(/\/$/, "")}/healthz`;
+  // Prefer the same-origin health endpoint. In Next dev this goes through
+  // next.config.js rewrites, and in the packaged desktop app it is served by
+  // the Go backend directly. Hard-coding http://127.0.0.1:9090 here turns the
+  // probe into a cross-origin request and makes the browser report a vague
+  // "Failed to fetch" unless CORS is configured.
   return "/healthz";
 }
 

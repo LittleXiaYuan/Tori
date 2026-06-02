@@ -2,6 +2,7 @@ package llm
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 )
 
@@ -154,6 +155,9 @@ func TestProviderRegistryByType(t *testing.T) {
 	if len(chatProviders) != 1 { // chat2 is disabled
 		t.Errorf("expected 1 enabled chat provider, got %d", len(chatProviders))
 	}
+	if reg.Pool().Has("chat2") {
+		t.Error("disabled chat provider should not be registered in the pool")
+	}
 
 	embProviders := reg.ByType(ProviderTypeEmbedding)
 	if len(embProviders) != 1 {
@@ -255,4 +259,130 @@ func TestProviderRegistryPoolSync(t *testing.T) {
 	if !pool.Has("fast") {
 		t.Error("expected pool to have 'fast'")
 	}
+}
+
+func TestProviderRegistryDisableRemovesPoolEntriesAndEnableRestores(t *testing.T) {
+	pool := NewPool()
+	reg := NewProviderRegistry(pool)
+	if err := reg.Register(ProviderConfig{
+		ID:      "local-ollama",
+		Type:    ProviderTypeChat,
+		Source:  ProviderSourceLocal,
+		BaseURL: "http://localhost:11434/v1",
+		APIKeys: []string{"local"},
+		Model:   "qwen3.5:4b",
+		Enabled: true,
+		Tier:    "fast",
+	}); err != nil {
+		t.Fatalf("register provider: %v", err)
+	}
+	if !pool.Has("local-ollama") || !pool.Has("fast") {
+		t.Fatal("expected enabled provider to sync into pool")
+	}
+
+	if err := reg.Disable("local-ollama"); err != nil {
+		t.Fatalf("disable provider: %v", err)
+	}
+	if pool.Has("local-ollama") || pool.Has("fast") {
+		t.Fatal("disabled provider should be removed from pool")
+	}
+
+	if err := reg.Enable("local-ollama"); err != nil {
+		t.Fatalf("enable provider: %v", err)
+	}
+	if !pool.Has("local-ollama") || !pool.Has("fast") {
+		t.Fatal("enabled provider should be restored into pool")
+	}
+}
+
+func TestProviderRegistryLoadFromStoreFilteredSkipsLocalWithoutPersisting(t *testing.T) {
+	store := newTestProviderStore()
+	configs := []ProviderConfig{
+		{
+			ID:           "local-ollama",
+			DisplayName:  "Local ollama (qwen3.5:4b)",
+			Type:         ProviderTypeChat,
+			Source:       ProviderSourceLocal,
+			BaseURL:      "http://localhost:11434/v1",
+			APIKeys:      []string{"local"},
+			Model:        "qwen3.5:4b",
+			Enabled:      true,
+			Tier:         "fast",
+			Capabilities: []Capability{CapChat},
+		},
+		{
+			ID:      "remote",
+			Type:    ProviderTypeChat,
+			Source:  ProviderSourceDirect,
+			BaseURL: "https://api.example.com/v1",
+			APIKeys: []string{"key"},
+			Model:   "remote-model",
+			Enabled: true,
+		},
+	}
+	if err := store.Put(context.Background(), "all", configs); err != nil {
+		t.Fatalf("put providers: %v", err)
+	}
+
+	reg := NewProviderRegistry(NewPool())
+	reg.SetPersistStore(store)
+	count, skipped, err := reg.LoadFromStoreFiltered(func(cfg ProviderConfig) bool {
+		return cfg.Source != ProviderSourceLocal
+	})
+	if err != nil {
+		t.Fatalf("LoadFromStoreFiltered: %v", err)
+	}
+	if count != 1 || skipped != 1 {
+		t.Fatalf("expected loaded=1 skipped=1, got loaded=%d skipped=%d", count, skipped)
+	}
+	if reg.Get("remote") == nil {
+		t.Fatal("expected remote provider to load")
+	}
+	p := reg.Get("local-ollama")
+	if p == nil {
+		t.Fatal("local provider should remain visible in registry")
+	}
+	if p.Enabled() {
+		t.Fatal("local provider should be disabled")
+	}
+	if reg.Pool().Has("fast") {
+		t.Fatal("skipped local provider should not register its fast tier")
+	}
+
+	var persisted []ProviderConfig
+	found, err := store.Get(context.Background(), "all", &persisted)
+	if err != nil || !found {
+		t.Fatalf("read persisted providers: found=%v err=%v", found, err)
+	}
+	if len(persisted) != 2 {
+		t.Fatalf("filter load should not destructively rewrite persisted providers, got %d", len(persisted))
+	}
+}
+
+type testProviderStore struct {
+	values map[string][]byte
+}
+
+func newTestProviderStore() *testProviderStore {
+	return &testProviderStore{values: make(map[string][]byte)}
+}
+
+func (s *testProviderStore) Put(_ context.Context, key string, value any) error {
+	data, err := json.Marshal(value)
+	if err != nil {
+		return err
+	}
+	s.values[key] = data
+	return nil
+}
+
+func (s *testProviderStore) Get(_ context.Context, key string, dest any) (bool, error) {
+	data, ok := s.values[key]
+	if !ok {
+		return false, nil
+	}
+	if err := json.Unmarshal(data, dest); err != nil {
+		return true, err
+	}
+	return true, nil
 }

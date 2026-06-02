@@ -171,6 +171,13 @@ func (g *Gateway) handleProviderSessionOverride(w http.ResponseWriter, r *http.R
 		apperror.WriteCode(w, apperror.CodeBadRequest, "session_id is required")
 		return
 	}
+	if req.ProviderID != "" {
+		p := g.providerReg.Get(req.ProviderID)
+		if p == nil || !p.Enabled() {
+			apperror.WriteCode(w, apperror.CodeBadRequest, "provider is not available")
+			return
+		}
+	}
 	g.providerReg.SetSessionProvider(req.SessionID, req.ProviderID)
 	action := "set"
 	if req.ProviderID == "" {
@@ -483,6 +490,13 @@ func (g *Gateway) handleExecProvider(w http.ResponseWriter, r *http.Request) {
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			apperror.WriteCode(w, apperror.CodeBadRequest, "invalid body")
 			return
+		}
+		if req.ProviderID != "" && req.ProviderID != "smart" {
+			p := g.providerReg.Get(req.ProviderID)
+			if p == nil || !p.Enabled() {
+				apperror.WriteCode(w, apperror.CodeBadRequest, "provider is not available")
+				return
+			}
 		}
 		g.SetExecProvider(req.ProviderID)
 		_ = os.WriteFile(appdir.File("exec_provider.json"), []byte(`{"provider_id":`+strconvQuote(req.ProviderID)+`}`), 0o600)

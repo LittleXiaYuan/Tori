@@ -150,6 +150,8 @@ export default function DashboardPage() {
   const router = useRouter();
   const [metrics, setMetrics] = useState<MetricsSnapshot | null>(null);
   const [version, setVersion] = useState<VersionInfo | null>(null);
+  const [serviceOnline, setServiceOnline] = useState(false);
+  const [serviceUptime, setServiceUptime] = useState(0);
   const [skills, setSkills] = useState<SkillInfo[]>([]);
   const [costSummary, setCostSummary] = useState<CostSummary | null>(null);
   const [sysInfo, setSysInfo] = useState<SysInfo | null>(null);
@@ -157,16 +159,42 @@ export default function DashboardPage() {
   const [setupNeeded, setSetupNeeded] = useState(false);
 
   const load = useCallback(async () => {
+    let online = false;
+    try {
+      const health = await api.healthz();
+      online = true;
+      setServiceOnline(true);
+      setServiceUptime(Number((health as { uptime_sec?: number })?.uptime_sec || 0));
+      setVersion(prev => prev || {
+        version: health.version || "",
+        git_commit: "",
+        build_date: "",
+        go_version: "",
+        os: "",
+        arch: "",
+      });
+    } catch {
+      setServiceOnline(false);
+      setServiceUptime(0);
+    }
+
     try {
       const [m, v, s, cost, sys] = await Promise.all([
-        api.metrics(),
-        api.version(),
-        api.skills(),
+        api.metrics().catch(() => null),
+        api.version().catch(() => null),
+        api.skills().catch(() => ({ skills: [] })),
         api.costSummary().catch(() => null),
         api.systemInfo().catch(() => null),
       ]);
-      setMetrics(m); setVersion(v); setSkills(s.skills || []); setCostSummary(cost); setSysInfo(sys);
-    } catch { /* offline */ }
+      setMetrics(m);
+      if (v) setVersion(v);
+      setSkills(s.skills || []);
+      setCostSummary(cost);
+      setSysInfo(sys);
+      if (m || v || s.skills?.length || cost || sys) setServiceOnline(true);
+    } catch {
+      setServiceOnline(online);
+    }
     try {
       const chk = await api.checkSetup();
       setSetupNeeded(chk.setup_needed);
@@ -185,7 +213,7 @@ export default function DashboardPage() {
   const tokensOut = metrics?.tokens_out ?? 0;
   const avgMs = metrics?.request_latency?.avg_ms ?? 0;
   const p99Ms = metrics?.request_latency?.p99_ms ?? 0;
-  const uptime = metrics?.uptime ?? 0;
+  const uptime = metrics?.uptime ?? serviceUptime;
   const successRate = reqTotal > 0 ? (reqSuccess / reqTotal * 100) : 0;
 
   const skillMetrics = metrics?.skills ?? [];
@@ -209,8 +237,8 @@ export default function DashboardPage() {
           <h1 className="page-title">工作台</h1>
           <div className="page-subtitle" style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span>先选场景，再验收产物</span>
-            <span className={`status-dot ${metrics ? "status-dot--online" : "status-dot--offline"}`} />
-            {metrics ? "运行中" : "离线"}
+            <span className={`status-dot ${serviceOnline ? "status-dot--online" : "status-dot--offline"}`} />
+            {serviceOnline ? "运行中" : "离线"}
             {version ? ` · v${version.version}` : ""}
             {uptime > 0 ? ` · ${formatUptime(uptime)}` : ""}
           </div>

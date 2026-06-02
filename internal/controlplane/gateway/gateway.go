@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -23,10 +24,10 @@ import (
 	"yunque-agent/internal/agentcore/cron"
 	"yunque-agent/internal/agentcore/rbac"
 	"yunque-agent/internal/agentcore/review"
+	"yunque-agent/internal/agentcore/skillgrowth/adapter"
 	"yunque-agent/internal/agentcore/tools"
 	"yunque-agent/internal/agentcore/trust"
 	"yunque-agent/internal/agentcore/workflow"
-	"yunque-agent/internal/agentcore/skillgrowth/adapter"
 
 	"yunque-agent/internal/agentcore/embeddings"
 	"yunque-agent/internal/agentcore/emotion"
@@ -48,6 +49,7 @@ import (
 	agentrt "yunque-agent/internal/agentcore/runtime"
 	"yunque-agent/internal/agentcore/runtime/heartbeat"
 	"yunque-agent/internal/agentcore/selfheal"
+	"yunque-agent/internal/agentcore/selfheal/iterate"
 	"yunque-agent/internal/agentcore/session"
 	"yunque-agent/internal/agentcore/skillgrowth"
 	"yunque-agent/internal/agentcore/skillmarket"
@@ -71,7 +73,6 @@ import (
 	"yunque-agent/internal/execution/channel"
 	"yunque-agent/internal/execution/sandbox"
 	"yunque-agent/internal/execution/scheduler"
-	"yunque-agent/internal/agentcore/selfheal/iterate"
 	reflectpkg "yunque-agent/internal/experimental/reflect"
 	"yunque-agent/internal/integrations/mineru"
 	mcpserver "yunque-agent/internal/mcp/server"
@@ -467,6 +468,7 @@ func (g *Gateway) SetPasswordStore(ps *PasswordStore) {
 	// Register auth routes (no auth required for these)
 	g.mux.HandleFunc("/v1/auth/login", g.handleAuthLogin)
 	g.mux.HandleFunc("/v1/auth/status", g.handleAuthStatus)
+	g.mux.HandleFunc("/v1/auth/desktop-bootstrap", g.handleDesktopBootstrap)
 	g.mux.HandleFunc("/v1/auth/set-password", g.handleAuthSetPassword)
 	g.mux.HandleFunc("/v1/auth/oauth/tori", g.handleOAuthToriStart)
 	g.mux.HandleFunc("/v1/auth/oauth/tori/callback", g.handleOAuthToriCallback)
@@ -594,6 +596,9 @@ func (g *Gateway) checkWSOrigin(r *http.Request) bool {
 // ALLOWED_ORIGINS=* to opt in.
 func (g *Gateway) corsOrigin(origin string) string {
 	if len(g.allowedOrigins) == 0 {
+		if isLoopbackOrigin(origin) {
+			return origin
+		}
 		return ""
 	}
 	for _, o := range g.allowedOrigins {
@@ -605,6 +610,40 @@ func (g *Gateway) corsOrigin(origin string) string {
 		}
 	}
 	return ""
+}
+
+func isLoopbackOrigin(origin string) bool {
+	if origin == "" {
+		return false
+	}
+	u, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+	switch strings.ToLower(u.Scheme) {
+	case "http", "https":
+	default:
+		return false
+	}
+	host := u.Hostname()
+	if host == "localhost" {
+		return true
+	}
+	if ip := net.ParseIP(host); ip != nil {
+		return ip.IsLoopback()
+	}
+	return false
+}
+
+func isLoopbackRequest(r *http.Request) bool {
+	host := extractHost(r)
+	if host == "localhost" {
+		return true
+	}
+	if ip := net.ParseIP(host); ip != nil {
+		return ip.IsLoopback()
+	}
+	return false
 }
 
 // statusWriter wraps http.ResponseWriter to capture status code.
@@ -641,11 +680,6 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (g *Gateway) routes() {
-	// Root "/" serves the embedded Next.js static UI (SPA).
-	// Falls back to pure HTML dashboard if no frontend build is available.
-	// Specific API routes below take priority over this catch-all.
-	g.mux.HandleFunc("/", g.serveWebUI)
-
 	// Domain-specific route groups
 	g.registerSystemRoutes()       // healthz, version, tenants, metrics, settings, backup, speech, heartbeat, federation
 	g.registerChatRoutes()         // chat, ws, conversations, persona, emotion, bots, inbox, webhooks, webchat
@@ -701,6 +735,13 @@ func (g *Gateway) routes() {
 		ForkTree:  g.forkTree,
 		Persister: g.forkPersister,
 	}).RegisterRoutes(g.mux, g.requireAuth)
+
+	// Root "/" serves the embedded Next.js static UI (SPA).
+	// Falls back to pure HTML dashboard if no frontend build is available.
+	// Keep this catch-all last: net/http ServeMux resolves equal-length unknown
+	// API paths to the first matching pattern, so registering "/" first can mask
+	// missing /v1 routes as HTML.
+	g.mux.HandleFunc("/", g.serveWebUI)
 }
 
 // --- Auth middleware ---
@@ -710,6 +751,28 @@ const ctxTenantKey ctxKeyType = "tenant_id"
 func (g *Gateway) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		token := authTokenFromHeaders(r)
+
+		// Desktop WebView state can outlive backend auth state during development
+		// and app upgrades. If a stale localStorage token is sent, validating it
+		// first turns otherwise-authorized local desktop requests into 401s and
+		// the frontend may enter a login redirect loop. For the desktop launcher,
+		// trust loopback requests from the local WebView before considering any
+		// browser-provided token.
+		if isDesktopLoopbackRequest(r) {
+			tenantID := "default"
+			if g.tenants != nil {
+				if t := g.tenants.ByID(tenantID); t == nil {
+					list := g.tenants.List()
+					if len(list) > 0 {
+						tenantID = list[0].ID
+					}
+				}
+			}
+			ctx := contextWithTenant(r.Context(), tenantID)
+			ctx = context.WithValue(ctx, ctxRoleKey, "admin")
+			next.ServeHTTP(w, r.WithContext(ctx))
+			return
+		}
 
 		// Localhost bypass is disabled — all access requires authentication.
 		// Set LOCALHOST_BYPASS=true in .env to re-enable for development.
@@ -739,6 +802,10 @@ func (g *Gateway) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 
 		apperror.WriteCode(w, apperror.CodeUnauthorized, "invalid credentials")
 	}
+}
+
+func isDesktopLoopbackRequest(r *http.Request) bool {
+	return strings.TrimSpace(os.Getenv("YUNQUE_LAUNCHER")) == "tauri-desktop" && isLoopbackRequest(r)
 }
 
 func contextWithTenant(ctx context.Context, id string) context.Context {

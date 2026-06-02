@@ -185,6 +185,8 @@ type CapabilityPrepareReport struct {
 // downloading still goes through the explicit Pack Runtime mutation endpoints.
 type PackCatalogEntry struct {
 	ManifestPath string     `json:"manifest_path,omitempty"`
+	ManifestURL  string     `json:"manifest_url,omitempty"`
+	PackageURL   string     `json:"package_url,omitempty"`
 	Source       string     `json:"source,omitempty"`
 	Manifest     Manifest   `json:"manifest"`
 	Installed    bool       `json:"installed"`

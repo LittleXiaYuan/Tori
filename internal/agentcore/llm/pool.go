@@ -72,16 +72,19 @@ func (p *Pool) GetOrFallback(key string) *Client {
 }
 
 // GetFallbackChain returns a prioritized fallback chain of LLM clients.
-// Order: requested model -> expert -> smart -> fast -> local (Ollama).
+// Order: requested model -> expert -> smart -> fast, then primary as final
+// failsafe. Local desktop models are intentionally not implicit fallbacks:
+// a fallback should not silently wake Ollama/vLLM and make the user's machine
+// sluggish. If local execution is desired, route to its provider explicitly.
 func (p *Pool) GetFallbackChain(key string) []*Client {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
 	var chain []*Client
-	
+
 	// Define the standard degradation sequence for intelligence vs reliability
-	sequence := []string{key, "expert", "smart", "fast", "local"}
-	
+	sequence := []string{key, "expert", "smart", "fast"}
+
 	seen := make(map[string]bool)
 	for _, k := range sequence {
 		if k == "" || seen[k] {
@@ -92,7 +95,7 @@ func (p *Pool) GetFallbackChain(key string) []*Client {
 			chain = append(chain, c)
 		}
 	}
-	
+
 	// Append primary model as the final failsafe if not already included
 	if p.primary != "" && !seen[p.primary] {
 		if c, ok := p.clients[p.primary]; ok {

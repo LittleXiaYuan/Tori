@@ -71,9 +71,11 @@ func TestPool_GetFallbackChain_Full(t *testing.T) {
 	pool.SetPrimary("smart")
 
 	chain := pool.GetFallbackChain("expert")
-	// Expected order: expert → smart → fast → local (primary=smart already seen)
-	if len(chain) != 4 {
-		t.Fatalf("expected 4 entries, got %d", len(chain))
+	// Expected order: expert → smart → fast (primary=smart already seen).
+	// Local desktop models must not be implicit fallbacks; use their provider
+	// explicitly when local execution is desired.
+	if len(chain) != 3 {
+		t.Fatalf("expected 3 entries, got %d", len(chain))
 	}
 	if chain[0] != expert {
 		t.Fatal("first should be expert (requested)")
@@ -84,8 +86,10 @@ func TestPool_GetFallbackChain_Full(t *testing.T) {
 	if chain[2] != fast {
 		t.Fatal("third should be fast")
 	}
-	if chain[3] != local {
-		t.Fatal("fourth should be local")
+	for _, c := range chain {
+		if c == local {
+			t.Fatal("local should not be included as an implicit fallback")
+		}
 	}
 }
 
@@ -96,7 +100,7 @@ func TestPool_GetFallbackChain_UnknownKey(t *testing.T) {
 	pool.SetPrimary("fast")
 
 	chain := pool.GetFallbackChain("nonexist")
-	// nonexist → skip because not registered, expert→skip, smart→skip, fast→✓, local→skip, primary=fast already seen
+	// nonexist → skip because not registered, expert→skip, smart→skip, fast→✓, primary=fast already seen
 	if len(chain) != 1 {
 		t.Fatalf("expected 1 entry (fast), got %d", len(chain))
 	}

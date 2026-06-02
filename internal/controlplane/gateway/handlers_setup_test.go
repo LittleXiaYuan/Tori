@@ -236,3 +236,38 @@ func TestHandleSettingsCheckSupportsKeylessProviders(t *testing.T) {
 		t.Fatalf("unexpected response: %+v", resp)
 	}
 }
+
+func TestHandleSettingsConfigSavesEnvValues(t *testing.T) {
+	g, tm := newTestGateway()
+	tenant := tm.Register("settings-save")
+	tmp := chdirTemp(t)
+	envPath := filepath.Join(tmp, ".env")
+	if err := os.WriteFile(envPath, []byte("LLM_BASE_URL=https://old.example/v1\nLLM_API_KEY=sk-old\nLLM_MODEL=old-model\n"), 0o600); err != nil {
+		t.Fatalf("seed .env: %v", err)
+	}
+
+	body := strings.NewReader(`{"values":{"HOST_READ_PATHS":"C:\\Users\\Administrator\\Documents","LLM_API_KEY":"****"}}`)
+	req := httptest.NewRequest(http.MethodPut, "/api/settings/config", body)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	rr := httptest.NewRecorder()
+
+	g.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("unexpected status: %d body=%s", rr.Code, rr.Body.String())
+	}
+	data, err := os.ReadFile(envPath)
+	if err != nil {
+		t.Fatalf("read env: %v", err)
+	}
+	env := string(data)
+	if !strings.Contains(env, `HOST_READ_PATHS=C:\Users\Administrator\Documents`) {
+		t.Fatalf("saved env missing HOST_READ_PATHS: %s", env)
+	}
+	if strings.Contains(env, "# ── Extra ──\nHOST_READ_PATHS=") {
+		t.Fatalf("HOST_READ_PATHS should be a first-class ordered env key, got extra section:\n%s", env)
+	}
+	if !strings.Contains(env, "LLM_API_KEY=sk-old") {
+		t.Fatalf("masked sensitive value should preserve existing key: %s", env)
+	}
+}

@@ -3,8 +3,10 @@ package gateway
 import (
 	"context"
 	"encoding/json"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 )
@@ -144,6 +146,67 @@ func TestRequireAuth_MissingCredentials(t *testing.T) {
 	}
 }
 
+func TestRequireAuth_AllowsDesktopLoopbackWithoutStoredToken(t *testing.T) {
+	gw, tm := newTestGateway()
+	tm.RegisterWithID("default", "Default", "api-key")
+	t.Setenv("YUNQUE_LAUNCHER", "tauri-desktop")
+
+	called := false
+	handler := gw.requireAuth(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		if got := tenantFromCtx(r.Context()); got != "default" {
+			t.Fatalf("tenant = %q, want default", got)
+		}
+		if got := roleFromCtx(r.Context()); got != "admin" {
+			t.Fatalf("role = %q, want admin", got)
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/settings/schema", nil)
+	req.RemoteAddr = "127.0.0.1:54321"
+	w := httptest.NewRecorder()
+	handler(w, req)
+
+	if !called {
+		t.Fatal("handler should be called for desktop loopback requests")
+	}
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 for desktop loopback request, got %d", w.Code)
+	}
+}
+
+func TestRequireAuth_AllowsDesktopLoopbackWithStaleToken(t *testing.T) {
+	gw, tm := newTestGateway()
+	tm.RegisterWithID("default", "Default", "api-key")
+	t.Setenv("YUNQUE_LAUNCHER", "tauri-desktop")
+
+	called := false
+	handler := gw.requireAuth(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		if got := tenantFromCtx(r.Context()); got != "default" {
+			t.Fatalf("tenant = %q, want default", got)
+		}
+		if got := roleFromCtx(r.Context()); got != "admin" {
+			t.Fatalf("role = %q, want admin", got)
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/settings/config", nil)
+	req.RemoteAddr = "127.0.0.1:54321"
+	req.Header.Set("Authorization", "Bearer stale-localstorage-token")
+	w := httptest.NewRecorder()
+	handler(w, req)
+
+	if !called {
+		t.Fatal("handler should be called for desktop loopback requests even with stale token")
+	}
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 for desktop loopback request with stale token, got %d", w.Code)
+	}
+}
+
 func TestRequireAuth_InvalidAPIKey(t *testing.T) {
 	gw, _ := newTestGateway()
 
@@ -186,6 +249,56 @@ func TestRequireAuth_ExpiredJWT(t *testing.T) {
 	}
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("expected 401 with expired JWT, got %d", w.Code)
+	}
+}
+
+func TestDesktopBootstrapRequiresDesktopLoopback(t *testing.T) {
+	gw, tm := newTestGateway()
+	tm.RegisterWithID("default", "default", "api-key")
+	t.Setenv("YUNQUE_LAUNCHER", "tauri-desktop")
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/auth/desktop-bootstrap", nil)
+	req.RemoteAddr = "127.0.0.1:54321"
+	w := httptest.NewRecorder()
+	gw.handleDesktopBootstrap(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected desktop bootstrap success, got %d body=%s", w.Code, w.Body.String())
+	}
+	var resp map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	token, _ := resp["token"].(string)
+	if token == "" {
+		t.Fatal("expected token")
+	}
+	if _, err := ValidateJWT(*gw.jwtCfg, token); err != nil {
+		t.Fatalf("bootstrap token should validate: %v", err)
+	}
+}
+
+func TestDesktopBootstrapRejectsNonDesktopOrRemote(t *testing.T) {
+	gw, _ := newTestGateway()
+	old := os.Getenv("YUNQUE_LAUNCHER")
+	t.Cleanup(func() { os.Setenv("YUNQUE_LAUNCHER", old) })
+	os.Unsetenv("YUNQUE_LAUNCHER")
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/auth/desktop-bootstrap", nil)
+	req.RemoteAddr = "127.0.0.1:54321"
+	w := httptest.NewRecorder()
+	gw.handleDesktopBootstrap(w, req)
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 outside desktop launcher, got %d", w.Code)
+	}
+
+	t.Setenv("YUNQUE_LAUNCHER", "tauri-desktop")
+	req = httptest.NewRequest(http.MethodPost, "/v1/auth/desktop-bootstrap", nil)
+	req.RemoteAddr = net.JoinHostPort("203.0.113.10", "54321")
+	w = httptest.NewRecorder()
+	gw.handleDesktopBootstrap(w, req)
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 for non-loopback remote, got %d", w.Code)
 	}
 }
 

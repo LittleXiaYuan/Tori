@@ -35,6 +35,7 @@ import AccountRailFlyout from "@/components/layout/account-rail-flyout";
 import { WindowControls } from "@/components/title-bar";
 import { buildPackNavItems, fetchEnabledPacks } from "@/lib/pack-sync";
 import type { NavItem } from "@/lib/nav-items";
+import { useNavigationPreferences } from "@/hooks/use-user-preferences";
 
 const FLY_ENTER_DELAY_MS = 300;
 const FLY_LEAVE_DELAY_MS = 200;
@@ -47,8 +48,8 @@ interface QuickLink {
 }
 
 /**
- * 常用功能直达，少而精；其它入口仍然在 ⌘K 命令面板里。
- * 工作台由头像承载；这里仅放行动、任务和记忆三段主路径。
+ * 常用功能直达，少而精。启用后的能力包入口默认只进入「主路径」弹层
+ * 和 ⌘K；只有用户手动固定后才出现在这条窄侧边栏中。
  */
 const QUICK_LINKS: QuickLink[] = [
   { href: "/chat",      icon: <MessageCircle size={16} />, zh: "对话",   en: "Chat" },
@@ -60,6 +61,7 @@ export default function AccountRail() {
   const router = useRouter();
   const pathname = usePathname();
   const { locale, setLocale } = useI18n();
+  const navigationPrefs = useNavigationPreferences();
   const [online, setOnline] = useState<boolean | null>(null);
   const [version, setVersion] = useState("");
   const [themeMode, setThemeMode] = useState<"dark" | "light">("dark");
@@ -102,6 +104,7 @@ export default function AccountRail() {
             label: item.label,
             group: "扩展" as const,
             layer: "pack" as const,
+            defaultVisible: true,
             icon: item.icon,
             keywords: item.keywords,
           })),
@@ -167,14 +170,16 @@ export default function AccountRail() {
   }, [flyoutOpen, closeFlyoutNow]);
 
   // 后端心跳轮询（10s）。可见性变化时暂停。
+  // 只用轻量 /healthz 判断“在线/离线”：版本接口偶发失败、鉴权状态或更新检查
+  // 不应该让桌面壳显示成离线。
   useEffect(() => {
     let timer: ReturnType<typeof setInterval> | undefined;
     const probe = () => {
       api
-        .version()
-        .then((v) => {
+        .healthz()
+        .then((health) => {
           setOnline(true);
-          setVersion(v?.version || "");
+          setVersion(health?.version || "");
         })
         .catch(() => setOnline(false));
     };
@@ -324,7 +329,12 @@ export default function AccountRail() {
 
         <div className="account-rail-divider" aria-hidden="true" />
 
-        {QUICK_LINKS.map((link) => {
+        {[...QUICK_LINKS, ...packItems.filter((item) => navigationPrefs.pinnedItems.includes(item.id)).map((item) => ({
+          href: item.href,
+          icon: item.icon,
+          zh: item.label,
+          en: item.label,
+        }))].map((link) => {
           const active = pathname === link.href || (pathname?.startsWith(link.href + "/") ?? false);
           return (
             <Tooltip key={link.href} delay={0}>

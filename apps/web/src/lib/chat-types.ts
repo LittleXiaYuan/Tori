@@ -49,6 +49,8 @@ export interface Message {
   role: "user" | "assistant";
   content: string;
   id: string;
+  model?: string;
+  providerId?: string;
   files?: ChatShareFile[];
   emotion?: EmotionResult;
   sticker?: StickerSuggestion;

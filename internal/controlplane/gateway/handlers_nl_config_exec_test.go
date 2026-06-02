@@ -2,6 +2,8 @@ package gateway
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
@@ -141,6 +143,36 @@ func TestNLConfigExecProviderAddRequiresKeyForRemote(t *testing.T) {
 	gw.execProviderAdd(result)
 	if result.ExecError == "" {
 		t.Fatal("expected missing api key error")
+	}
+}
+
+func TestExecProviderRejectsUnavailableProvider(t *testing.T) {
+	gw, _ := newTestGateway()
+	gw.SetProviderRegistry(llm.NewProviderRegistry(nil))
+
+	req := httptest.NewRequest(http.MethodPost, "/api/providers/exec", strings.NewReader(`{"provider_id":"local-ollama"}`))
+	w := httptest.NewRecorder()
+	gw.handleExecProvider(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for unavailable provider, got %d: %s", w.Code, w.Body.String())
+	}
+	if got := gw.ExecProvider(); got != "" {
+		t.Fatalf("exec provider should not change, got %q", got)
+	}
+}
+
+func TestProviderSessionOverrideRejectsUnavailableProvider(t *testing.T) {
+	gw, _ := newTestGateway()
+	gw.SetProviderRegistry(llm.NewProviderRegistry(nil))
+
+	req := httptest.NewRequest(http.MethodPost, "/api/providers/session", strings.NewReader(`{"session_id":"s1","provider_id":"local-ollama"}`))
+	w := httptest.NewRecorder()
+	gw.handleProviderSessionOverride(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for unavailable provider, got %d: %s", w.Code, w.Body.String())
+	}
+	if got := gw.providerReg.GetForSession("s1"); got != nil {
+		t.Fatalf("session provider should not change, got %#v", got)
 	}
 }
 

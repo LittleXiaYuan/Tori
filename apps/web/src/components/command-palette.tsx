@@ -64,6 +64,7 @@ export default function CommandPalette() {
           label: item.label,
           group: "扩展",
           layer: "pack" as const,
+          defaultVisible: true,
           icon: item.icon,
           keywords: item.keywords,
         })));

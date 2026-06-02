@@ -90,8 +90,44 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 		flusher.Flush()
 	}
 
+	// Attachment is an inline user-uploaded file. Currently used by the Cherry
+	// input-bar 📎 drawer. For now we stay in-process (no persistent storage)
+	// and handle only small files — large binary uploads deserve their own
+	// multipart endpoint, which is a separate task.
+	type Attachment struct {
+		Name    string `json:"name"`
+		Mime    string `json:"mime"`
+		DataB64 string `json:"data_b64"`
+	}
+	var req struct {
+		Messages       []llm.Message `json:"messages"`
+		SessionID      string        `json:"session_id"`
+		TaskID         string        `json:"task_id"`
+		Platform       string        `json:"platform,omitempty"`
+		Thinking       *bool         `json:"thinking,omitempty"`
+		Mode           string        `json:"mode,omitempty"`
+		AiriMode       bool          `json:"airi_mode,omitempty"`
+		WebSearch      bool          `json:"web_search,omitempty"`      // Cherry 🌐 drawer: force-enable web search
+		ToolIDs        []string      `json:"tool_ids,omitempty"`        // Cherry 🔨 drawer: restrict to explicit skill subset
+		Attachments    []Attachment  `json:"attachments,omitempty"`     // Cherry 📎 drawer: inline per-turn files
+		WorkspacePaths []string      `json:"workspace_paths,omitempty"` // Cursor-style opened folders, read-only for this turn
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		sendEvent("error", `{"code":"BAD_REQUEST","message":"invalid body"}`)
+		observe.EndSpan(traceSpan, err)
+		return
+	}
+	if len(req.Messages) == 0 {
+		sendEvent("error", `{"code":"MESSAGES_REQUIRED","message":"messages array is required"}`)
+		observe.EndSpan(traceSpan, nil)
+		return
+	}
+
 	// Send an immediate empty frame so the browser knows the stream is alive
 	// before guardrails, memory, routing, or the first upstream LLM token runs.
+	// Important: do this only after reading the POST body. In net/http, writing
+	// and flushing an HTTP/1.x response before the request body has been read can
+	// close the body for some clients, producing "http: invalid Read on closed Body".
 	// Some providers can take >60s to produce a first token; without this ping
 	// the frontend may show “响应超时（60s 无数据）” even though the request is still running.
 	sendKeepAlive()
@@ -114,39 +150,6 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}()
-
-	// Attachment is an inline user-uploaded file. Currently used by the Cherry
-	// input-bar 📎 drawer. For now we stay in-process (no persistent storage)
-	// and handle only small files — large binary uploads deserve their own
-	// multipart endpoint, which is a separate task.
-	type Attachment struct {
-		Name    string `json:"name"`
-		Mime    string `json:"mime"`
-		DataB64 string `json:"data_b64"`
-	}
-	var req struct {
-		Messages       []llm.Message `json:"messages"`
-		SessionID      string        `json:"session_id"`
-		TaskID         string        `json:"task_id"`
-		Platform       string        `json:"platform,omitempty"`
-		Thinking       *bool         `json:"thinking,omitempty"`
-		Mode           string        `json:"mode,omitempty"`
-		AiriMode       bool          `json:"airi_mode,omitempty"`
-		WebSearch      bool          `json:"web_search,omitempty"`       // Cherry 🌐 drawer: force-enable web search
-		ToolIDs        []string      `json:"tool_ids,omitempty"`         // Cherry 🔨 drawer: restrict to explicit skill subset
-		Attachments    []Attachment  `json:"attachments,omitempty"`      // Cherry 📎 drawer: inline per-turn files
-		WorkspacePaths []string      `json:"workspace_paths,omitempty"`  // Cursor-style opened folders, read-only for this turn
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		sendEvent("error", `{"code":"BAD_REQUEST","message":"invalid body"}`)
-		observe.EndSpan(traceSpan, err)
-		return
-	}
-	if len(req.Messages) == 0 {
-		sendEvent("error", `{"code":"MESSAGES_REQUIRED","message":"messages array is required"}`)
-		observe.EndSpan(traceSpan, nil)
-		return
-	}
 	visibleMessages := cloneLLMMessages(req.Messages)
 	hiddenAttachmentMessage := llm.Message{}
 
@@ -364,10 +367,14 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 
 	// Session-level provider override
 	var sessionClient *llm.Client
+	actualProviderID := ""
+	actualModel := ""
 	if g.providerReg != nil {
 		if req.SessionID != "" {
 			if sp := g.providerReg.GetForSession(req.SessionID); sp != nil {
 				sessionClient = sp.Client
+				actualProviderID = sp.Config.ID
+				actualModel = sp.Config.Model
 				slog.Info("agentic: using session provider override", "session", req.SessionID, "provider", sp.Config.ID)
 			}
 		}
@@ -380,12 +387,17 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 			if execProvider := strings.TrimSpace(g.ExecProvider()); execProvider != "" && execProvider != "smart" {
 				if ep := g.providerReg.Get(execProvider); ep != nil && ep.Config.Enabled {
 					sessionClient = ep.Client
+					actualProviderID = ep.Config.ID
+					actualModel = ep.Config.Model
 					slog.Info("agentic: using exec provider override", "provider", ep.Config.ID, "model", ep.Config.Model)
 				} else {
 					slog.Warn("agentic: exec provider override not available, falling back", "provider", execProvider)
 				}
 			}
 		}
+	}
+	if actualModel == "" && sessionClient != nil {
+		actualModel = sessionClient.Model()
 	}
 
 	// ── Run planner with StepCallback → SSE ──
@@ -434,7 +446,17 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 			sendEvent("delta", string(data))
 		}
 
-		doneBytes, _ := json.Marshal(slashResp.Raw)
+		donePayload := make(map[string]any, len(slashResp.Raw)+2)
+		for k, v := range slashResp.Raw {
+			donePayload[k] = v
+		}
+		if actualProviderID != "" {
+			donePayload["provider_id"] = actualProviderID
+		}
+		if actualModel != "" {
+			donePayload["model"] = actualModel
+		}
+		doneBytes, _ := json.Marshal(donePayload)
 		sendEvent("done", string(doneBytes))
 		if req.SessionID != "" {
 			g.convStore.Append(req.SessionID, llm.Message{Role: "assistant", Content: reply})
@@ -498,6 +520,12 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 		"reply":       reply,
 		"skills_used": result.SkillsUsed,
 		"steps":       result.Steps,
+	}
+	if actualProviderID != "" {
+		doneData["provider_id"] = actualProviderID
+	}
+	if actualModel != "" {
+		doneData["model"] = actualModel
 	}
 	if result.ReasoningContent != "" {
 		doneData["reasoning_content"] = result.ReasoningContent

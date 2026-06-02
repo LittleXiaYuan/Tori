@@ -4,6 +4,7 @@ export interface ProviderLike {
   id: string;
   display_name?: string;
   type: string;
+  source?: string;
   model: string;
   base_url: string;
   enabled: boolean;
@@ -144,4 +145,24 @@ export function normalizeProviderTestResult(result?: ProviderTestLike | null): N
     model: result?.model,
     error: result?.error || (result?.status && result.status !== "ok" ? result.status : "检测未通过"),
   };
+}
+
+export function providerModelLabel(provider?: Pick<ProviderLike, "id" | "display_name" | "model"> | null): string {
+  if (!provider) return "";
+  return provider.model || provider.display_name || provider.id;
+}
+
+export function resolveDisplayedChatProvider<T extends ProviderLike>(
+  providers: T[],
+  execProviderId?: string,
+): T | undefined {
+  const enabled = providers.filter((provider) => provider.enabled);
+  const execId = (execProviderId || "").trim();
+  if (execId && execId !== "smart") {
+    const exact = enabled.find((provider) => provider.id === execId);
+    if (exact) return exact;
+  }
+  return enabled.find((provider) => /minimax/i.test(`${provider.id} ${provider.display_name || ""} ${provider.model}`))
+    || enabled.find((provider) => provider.source === "direct")
+    || enabled[0];
 }

@@ -53,17 +53,17 @@ const (
 type ProviderConfig struct {
 	ID            string         `json:"id"`
 	DisplayName   string         `json:"display_name,omitempty"`
-	Type          ProviderType   `json:"type"` // "chat", "embedding", etc.
+	Type          ProviderType   `json:"type"`             // "chat", "embedding", etc.
 	Source        ProviderSource `json:"source,omitempty"` // "direct", "tori", "local"
 	BaseURL       string         `json:"base_url"`
 	APIKeys       []string       `json:"api_keys"` // supports key rotation
 	Model         string         `json:"model"`
 	Enabled       bool           `json:"enabled"`
-	Priority      int            `json:"priority,omitempty"`     // lower = higher priority
-	Capabilities  []Capability   `json:"capabilities,omitempty"` // chat, tools, vision, etc.
-	Tier          string         `json:"tier,omitempty"`         // "fast", "smart", "expert"
-	PresetID      string         `json:"preset_id,omitempty"`    // links to a provider preset template
-	Dialect       Dialect        `json:"dialect,omitempty"`      // API dialect: "" = OpenAI, "anthropic" = Claude
+	Priority      int            `json:"priority,omitempty"`       // lower = higher priority
+	Capabilities  []Capability   `json:"capabilities,omitempty"`   // chat, tools, vision, etc.
+	Tier          string         `json:"tier,omitempty"`           // "fast", "smart", "expert"
+	PresetID      string         `json:"preset_id,omitempty"`      // links to a provider preset template
+	Dialect       Dialect        `json:"dialect,omitempty"`        // API dialect: "" = OpenAI, "anthropic" = Claude
 	ContextWindow int            `json:"context_window,omitempty"` // in K tokens (e.g. 128 = 128K), 0 = 128K default
 }
 
@@ -215,8 +215,17 @@ func (r *ProviderRegistry) SetPersistPath(path string) {
 
 // LoadFromStore loads providers and mode from the configured KV store.
 func (r *ProviderRegistry) LoadFromStore() (int, error) {
+	count, _, err := r.LoadFromStoreFiltered(nil)
+	return count, err
+}
+
+// LoadFromStoreFiltered loads persisted providers and optionally skips entries.
+// Skipped entries are not removed from persistence; callers can use this for
+// feature gates such as "do not load local desktop models unless explicitly
+// enabled" without destructively editing user configuration.
+func (r *ProviderRegistry) LoadFromStoreFiltered(include func(ProviderConfig) bool) (int, int, error) {
 	if r.persistStore == nil {
-		return 0, nil
+		return 0, 0, nil
 	}
 	var modeStr string
 	if found, err := r.persistStore.Get(context.Background(), "mode", &modeStr); err == nil && found && modeStr != "" {
@@ -231,18 +240,25 @@ func (r *ProviderRegistry) LoadFromStore() (int, error) {
 	var configs []ProviderConfig
 	found, err := r.persistStore.Get(context.Background(), "all", &configs)
 	if err != nil || !found {
-		return 0, err
+		return 0, 0, err
 	}
 	count := 0
+	skipped := 0
 	for _, cfg := range configs {
 		if cfg.ID == "primary" {
 			continue
 		}
-		if err := r.Register(cfg); err == nil {
+		if include != nil && !include(cfg) {
+			cfg.Enabled = false
+			_ = r.register(cfg, false)
+			skipped++
+			continue
+		}
+		if err := r.register(cfg, false); err == nil {
 			count++
 		}
 	}
-	return count, nil
+	return count, skipped, nil
 }
 
 // persist saves all non-primary providers to the configured store or file.
@@ -346,6 +362,10 @@ func bestByPriority(providers []*ProviderInstance) *ProviderInstance {
 
 // Register adds a provider to the registry.
 func (r *ProviderRegistry) Register(cfg ProviderConfig) error {
+	return r.register(cfg, true)
+}
+
+func (r *ProviderRegistry) register(cfg ProviderConfig, shouldPersist bool) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -363,8 +383,8 @@ func (r *ProviderRegistry) Register(cfg ProviderConfig) error {
 	inst := newProviderInstance(cfg)
 	r.providers[cfg.ID] = inst
 
-	// Sync to Pool for backward compatibility
-	if cfg.Type == ProviderTypeChat {
+	// Sync enabled chat providers to Pool for backward compatibility.
+	if cfg.Type == ProviderTypeChat && cfg.Enabled {
 		r.pool.Register(cfg.ID, inst.Client)
 		// Also register under tier name if specified
 		if cfg.Tier != "" {
@@ -379,7 +399,9 @@ func (r *ProviderRegistry) Register(cfg ProviderConfig) error {
 		"tier", cfg.Tier,
 		"keys", len(cfg.APIKeys),
 	)
-	r.persist()
+	if shouldPersist {
+		r.persist()
+	}
 	return nil
 }
 
@@ -491,6 +513,12 @@ func (r *ProviderRegistry) Enable(id string) error {
 	}
 	p.SetEnabled(true)
 	p.Config.Enabled = true
+	if p.Config.Type == ProviderTypeChat {
+		r.pool.Register(p.Config.ID, p.Client)
+		if p.Config.Tier != "" {
+			r.pool.Register(p.Config.Tier, p.Client)
+		}
+	}
 	r.persist()
 	r.mu.Unlock()
 	slog.Info("provider: enabled", "id", id)
@@ -507,6 +535,10 @@ func (r *ProviderRegistry) Disable(id string) error {
 	}
 	p.SetEnabled(false)
 	p.Config.Enabled = false
+	r.pool.Unregister(id)
+	if p.Config.Tier != "" {
+		r.pool.Unregister(p.Config.Tier)
+	}
 	r.persist()
 	r.mu.Unlock()
 	slog.Info("provider: disabled", "id", id)
@@ -539,9 +571,11 @@ func (r *ProviderRegistry) SwitchModel(id, newModel string) error {
 		p.Client = NewClient(p.Config.BaseURL, key, newModel)
 	}
 	p.mu.Unlock()
-	r.pool.Register(id, p.Client)
-	if p.Config.Tier != "" {
-		r.pool.Register(p.Config.Tier, p.Client)
+	if p.Config.Enabled {
+		r.pool.Register(id, p.Client)
+		if p.Config.Tier != "" {
+			r.pool.Register(p.Config.Tier, p.Client)
+		}
 	}
 	r.persist()
 	r.mu.Unlock()

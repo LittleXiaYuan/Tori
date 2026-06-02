@@ -247,6 +247,46 @@ func (r *Registry) InstallFromYqpack(path string, opts InstallOptions) (Installe
 	return r.InstallWithArtifacts(manifest, source, artifacts)
 }
 
+// InspectYqpackManifestFile reads only the pack manifest from a local .yqpack
+// and returns the validated manifest plus the artifact SHA256 and byte size.
+// It performs no signature verification and does not extract or install
+// anything, making it suitable for catalog/preview UI flows.
+func InspectYqpackManifestFile(path string) (Manifest, string, int64, error) {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return Manifest{}, "", 0, fmt.Errorf("yqpack: abs path: %w", err)
+	}
+	data, err := os.ReadFile(abs)
+	if err != nil {
+		return Manifest{}, "", 0, fmt.Errorf("yqpack: read %s: %w", abs, err)
+	}
+	manifest, digest, err := InspectYqpackManifestBytes(data)
+	return manifest, digest, int64(len(data)), err
+}
+
+// InspectYqpackManifestBytes reads only pack.json from .yqpack bytes and
+// returns the validated manifest plus the artifact SHA256. It performs no
+// signature verification and does not extract or install anything.
+func InspectYqpackManifestBytes(data []byte) (Manifest, string, error) {
+	digest := hex.EncodeToString(sha256Sum(data))
+	zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		return Manifest{}, digest, fmt.Errorf("yqpack: open zip: %w", err)
+	}
+	manifestRaw, err := readZipFile(zr, ManifestFileName)
+	if err != nil {
+		return Manifest{}, digest, fmt.Errorf("yqpack: %w", err)
+	}
+	var manifest Manifest
+	if err := json.Unmarshal(manifestRaw, &manifest); err != nil {
+		return Manifest{}, digest, fmt.Errorf("yqpack: parse pack.json: %w", err)
+	}
+	if err := manifest.Validate(); err != nil {
+		return Manifest{}, digest, fmt.Errorf("yqpack: validate pack.json: %w", err)
+	}
+	return manifest, digest, nil
+}
+
 func sha256Sum(data []byte) []byte {
 	h := sha256.New()
 	h.Write(data)

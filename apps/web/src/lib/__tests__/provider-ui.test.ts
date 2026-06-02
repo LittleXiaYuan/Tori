@@ -5,7 +5,9 @@ import {
   orderedCapabilities,
   providerColor,
   providerInitial,
+  providerModelLabel,
   providerTitle,
+  resolveDisplayedChatProvider,
   searchMatch,
   statusTone,
   type ProviderLike,
@@ -62,5 +64,33 @@ describe("provider-ui", () => {
       status: "error",
       error: "401 Unauthorized",
     });
+  });
+
+  it("uses the exec-layer provider for chat display instead of the first enabled direct provider", () => {
+    const deepseek = provider({
+      id: "deepseek-deepseek-v4-flash",
+      display_name: "DeepSeek",
+      source: "direct",
+      model: "deepseek-v4-flash",
+      enabled: true,
+    });
+    const local = provider({
+      id: "local-ollama",
+      display_name: "Local Ollama",
+      source: "local",
+      model: "qwen3.5:4b",
+      enabled: true,
+    });
+
+    expect(resolveDisplayedChatProvider([deepseek, local], "local-ollama")?.id).toBe("local-ollama");
+    expect(providerModelLabel(local)).toBe("qwen3.5:4b");
+  });
+
+  it("falls back to the old visible provider preference when exec provider is smart or unavailable", () => {
+    const local = provider({ id: "local-ollama", source: "local", model: "qwen3.5:4b", enabled: true });
+    const direct = provider({ id: "deepseek-deepseek-v4-flash", source: "direct", model: "deepseek-v4-flash", enabled: true });
+
+    expect(resolveDisplayedChatProvider([local, direct], "smart")?.id).toBe("deepseek-deepseek-v4-flash");
+    expect(resolveDisplayedChatProvider([local, direct], "missing-provider")?.id).toBe("deepseek-deepseek-v4-flash");
   });
 });

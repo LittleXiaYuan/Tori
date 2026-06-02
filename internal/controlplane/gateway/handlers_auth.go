@@ -22,10 +22,10 @@ import (
 )
 
 const (
-	bcryptCost          = 12
-	minPasswordLen      = 8
-	loginLockoutMax     = 5
-	loginLockoutWindow  = 15 * time.Minute
+	bcryptCost         = 12
+	minPasswordLen     = 8
+	loginLockoutMax    = 5
+	loginLockoutWindow = 15 * time.Minute
 )
 
 // authKVStore abstracts Ledger KV to avoid import cycles.
@@ -313,6 +313,41 @@ func (g *Gateway) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]any{
 		"token":      token,
 		"expires_in": int(expiry.Seconds()),
+	})
+}
+
+func (g *Gateway) handleDesktopBootstrap(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "POST required")
+		return
+	}
+	if strings.TrimSpace(os.Getenv("YUNQUE_LAUNCHER")) != "tauri-desktop" || !isLoopbackRequest(r) {
+		apperror.WriteCode(w, apperror.CodeUnauthorized, "desktop bootstrap unavailable")
+		return
+	}
+	if g.jwtCfg == nil {
+		apperror.WriteCode(w, apperror.CodeInternal, "JWT not configured")
+		return
+	}
+
+	tenants := g.tenants.List()
+	tenantID := "default"
+	if len(tenants) > 0 {
+		tenantID = tenants[0].ID
+	}
+
+	cfgCopy := *g.jwtCfg
+	cfgCopy.Expiration = 7 * 24 * time.Hour
+	token, err := GenerateJWT(cfgCopy, tenantID, "admin")
+	if err != nil {
+		apperror.WriteCode(w, apperror.CodeInternal, "token generation failed")
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"token":      token,
+		"expires_in": int(cfgCopy.Expiration.Seconds()),
 	})
 }
 

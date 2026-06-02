@@ -195,6 +195,19 @@ func TestFriendlyChatPipelineErrorSanitizesLowLevelPlannerFailures(t *testing.T)
 	}
 }
 
+func TestFriendlyChatPipelineErrorExplainsProviderAuthentication(t *testing.T) {
+	rawErr := errors.New(`planner fc step 1: all fallback LLM clients failed (FC): chat API status 401: {"error":{"message":"Authentication Fails, Your api key: ****3709 is invalid","type":"authentication_error"}}`)
+	got := friendlyChatPipelineError(rawErr)
+	if !strings.Contains(got, "模型密钥") || !strings.Contains(got, "执行层模型") {
+		t.Fatalf("expected provider auth guidance, got %q", got)
+	}
+	for _, raw := range []string{"api key", "****3709", "fallback", "401"} {
+		if strings.Contains(strings.ToLower(got), strings.ToLower(raw)) {
+			t.Fatalf("friendly error should not expose raw provider detail %q, got %q", raw, got)
+		}
+	}
+}
+
 func TestChat_SessionManagement(t *testing.T) {
 	gw, _ := newTestGateway()
 	// Send with session_id — should create session automatically

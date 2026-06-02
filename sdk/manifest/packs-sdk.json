@@ -14,6 +14,7 @@
   "routes": [
     "GET /v1/packs",
     "GET /v1/packs/catalog",
+    "POST /v1/packs/release-catalog",
     "GET /v1/packs/installed",
     "GET /v1/packs/enabled",
     "GET /v1/packs/capabilities",
@@ -41,6 +42,12 @@
       "route": "GET /v1/packs/catalog",
       "readOnly": true,
       "description": "Read installable Pack catalog entries from configured manifest sources, aligned with installed/enabled state, distribution metadata, per-source source_reports scan observability, and summarizeCatalogSourceReports()/hasCatalogSourceIssues() helper support."
+    },
+    {
+      "name": "releaseCatalog",
+      "route": "POST /v1/packs/release-catalog",
+      "readOnly": true,
+      "description": "Read installable .yqpack assets from GitHub Release URLs, inspect embedded pack manifests, and align them with installed/enabled state for card-based install UX."
     },
     {
       "name": "installed",
@@ -100,7 +107,7 @@
       "name": "install",
       "route": "POST /v1/packs/install",
       "readOnly": false,
-      "description": "Install a pack from a local manifest path or manifest URL."
+      "description": "Install a pack from a local manifest path, manifest URL, or .yqpack package URL."
     },
     {
       "name": "enable",
@@ -147,11 +154,12 @@
       ],
       "docs": [
         "packages/yunque-client/README.md",
-        "docs/plugins/sdk-typescript.md"
+        "docs/spec/pack-runtime-blueprint.md"
       ],
       "entrypoints": {
         "list": "createPacksClient().list",
         "catalog": "createPacksClient().catalog",
+        "releaseCatalog": "createPacksClient().releaseCatalog",
         "installed": "createPacksClient().installed",
         "enabled": "createPacksClient().enabled",
         "capabilities": "createPacksClient().capabilities",
@@ -172,12 +180,9 @@
     }
   },
   "overviewDocs": [
-    "docs/plugins/sdk-overview.md",
-    "docs/plugins/overview.md",
-    "docs/plugins/developing.md",
-    "docs/guide/pack-runtime.md",
-    "docs/zh/guide/pack-runtime.md",
-    "packs/AUTHORING.md"
+    "packages/yunque-client/README.md",
+    "docs/spec/pack-runtime-blueprint.md",
+    "docs/spec/pack-distribution-spec.md"
   ],
   "packBindings": [
     "sdk/manifest/lora-pack-sdk.json"

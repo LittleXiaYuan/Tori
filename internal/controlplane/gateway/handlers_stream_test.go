@@ -293,6 +293,46 @@ func TestAgenticChatSendsImmediateHeartbeatBeforeSlowWork(t *testing.T) {
 	}
 }
 
+func TestAgenticChatViaServeHTTPReadsBodyBeforeHeartbeat(t *testing.T) {
+	var mu sync.Mutex
+	var capturedBodies []string
+	mock := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload struct {
+			Messages []map[string]string `json:"messages"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&payload)
+		raw, _ := json.Marshal(payload.Messages)
+		mu.Lock()
+		capturedBodies = append(capturedBodies, string(raw))
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"choices": []map[string]any{{"message": map[string]string{"role": "assistant", "content": "ok"}}},
+		})
+	}))
+	defer mock.Close()
+
+	gw, tm := newE2EGateway(mock.URL)
+	tenant := tm.Register("agentic-body-before-heartbeat")
+	body := `{"messages":[{"role":"user","content":"hello"}],"session_id":"agentic-body-before-heartbeat","mode":"chat"}`
+	req := authedRequest(http.MethodPost, "/v1/chat/agentic", body, tenant.APIKey)
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+
+	bodyText := w.Body.String()
+	if strings.Contains(bodyText, "invalid body") || strings.Contains(bodyText, "BAD_REQUEST") {
+		t.Fatalf("agentic chat should decode body before heartbeat flush, got %s", bodyText)
+	}
+	if !strings.Contains(bodyText, "event: ping") || !strings.Contains(bodyText, "event: done") {
+		t.Fatalf("expected live SSE ping and done events, got %s", bodyText)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(capturedBodies) == 0 || !strings.Contains(capturedBodies[0], "hello") {
+		t.Fatalf("expected request to reach mock LLM with user message, captured=%v", capturedBodies)
+	}
+}
+
 func TestAgenticChatAttachmentContextIsHiddenFromConversationStore(t *testing.T) {
 	gw, _ := newTestGateway()
 	rawDoc := "[Parsed document: 申请表.docx]\nWorkspace path: uploads/申请表.docx\n\n公司名称\t云鸢科技\n联系电话\t已填写"

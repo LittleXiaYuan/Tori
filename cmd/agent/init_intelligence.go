@@ -25,46 +25,51 @@ import (
 // inconsistency; that wiring has been removed in favor of the soul layer's.
 
 func initIntelligence(app *agentrt.App) error {
-	// ?? LocalBrain: local small model decision layer ??
-	// Priority: "local" pool key ??"fast" key ??first available key.
-	// LocalBrain pre-classifies intent cheaply; even when backed by the same
-	// model, the fast-path (NeedTools=false for greetings) avoids injecting
-	// 40+ tool definitions and cuts latency for trivial queries.
+	// LocalBrain is an opt-in local small-model decision layer. It should not
+	// silently bind to the generic "fast" tier: when "fast" is a local Ollama
+	// model, every chat turn can wake the user's desktop model and make the
+	// machine sluggish; when "fast" is remote, it also defeats the "local"
+	// premise. Enable with LOCALBRAIN_ENABLED=true after explicitly enabling a
+	// local backend.
 	var brain *localbrain.LocalBrain
-	lbClient := app.LLMPool.Get("local")
-	lbLabel := "local"
-	if lbClient == nil {
-		lbClient = app.LLMPool.Get("fast")
-		lbLabel = "fast"
-	}
-	if lbClient == nil {
-		lbClient = app.LLMPool.Get("smart")
-		lbLabel = "smart (fallback)"
-	}
-	if lbClient == nil {
-		lbClient = app.LLMPool.Get("primary")
-		lbLabel = "primary (fallback)"
-	}
-	if lbClient != nil {
-		brain = localbrain.New(lbClient, app.LLMPool)
-		app.Planner.SetLocalBrain(brain)
-
-		if routerRaw, ok := app.Get(agentrt.CompSmartRouter); ok {
-			if r, ok := routerRaw.(interface {
-				SetLocalBrain(*localbrain.LocalBrain)
-			}); ok {
-				r.SetLocalBrain(brain)
+	if app.Config.LocalBrainEnabled {
+		lbClient := app.LLMPool.Get("local")
+		lbLabel := "local"
+		if lbClient == nil && app.Config.LocalModelsEnabled {
+			if app.Config.OllamaBaseURL != "" {
+				lbClient = app.LLMPool.Get("local-ollama")
+				lbLabel = "local-ollama"
+			}
+			if lbClient == nil && app.Config.VLLMBaseURL != "" {
+				lbClient = app.LLMPool.Get("local-vllm")
+				lbLabel = "local-vllm"
 			}
 		}
+		if lbClient != nil {
+			brain = localbrain.New(lbClient, app.LLMPool)
+			app.Planner.SetLocalBrain(brain)
 
-		slog.Info("localbrain: initialized", "backend", lbLabel)
+			if routerRaw, ok := app.Get(agentrt.CompSmartRouter); ok {
+				if r, ok := routerRaw.(interface {
+					SetLocalBrain(*localbrain.LocalBrain)
+				}); ok {
+					r.SetLocalBrain(brain)
+				}
+			}
+
+			slog.Info("localbrain: initialized", "backend", lbLabel)
+		} else {
+			slog.Warn("localbrain: enabled but no local LLM client is available")
+		}
 	} else {
-		slog.Warn("localbrain: no LLM client available, disabled")
+		slog.Info("localbrain: disabled (set LOCALBRAIN_ENABLED=true to enable local pre-routing)")
 	}
 	app.Set("localbrain", brain)
 
-	// ?? LoRA Scheduler: training lifecycle for small model evolution ??
-	if brain != nil && app.Ledger != nil {
+	// LoRA Scheduler: training lifecycle for small model evolution. Opt-in,
+	// because evaluator/trainer hooks are part of the local-learning path and
+	// should not be initialized on ordinary desktop chat launches.
+	if app.Config.LocalLoRAEnabled && brain != nil && app.Ledger != nil {
 		loraCfg := localbrain.DefaultSchedulerConfig()
 		loraCfg.BaseModel = os.Getenv("LOCALBRAIN_BASE_MODEL")
 		if loraCfg.BaseModel == "" {
@@ -153,6 +158,8 @@ func initIntelligence(app *agentrt.App) error {
 			"strategy_interval", coordCfg.StrategyInterval,
 			"weight_threshold", coordCfg.WeightHitRateThreshold,
 		)
+	} else if !app.Config.LocalLoRAEnabled {
+		slog.Info("lora scheduler: disabled (set LOCAL_LORA_ENABLED=true to enable local training)")
 	}
 
 	// AgenticThinking: dynamic think depth

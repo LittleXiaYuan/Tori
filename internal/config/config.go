@@ -11,35 +11,38 @@ import (
 
 // Config holds all agent configuration.
 type Config struct {
-	DataDir          string // root data directory (default: "data")
-	Addr             string // HTTP listen address
-	LLMBaseURL       string
-	LLMAPIKey        string
-	LLMModel         string
-	LLMFastURL       string // optional: separate endpoint for fast/cheap model
-	LLMFastKey       string
-	LLMFastModel     string
-	LLMExpertURL     string // optional: separate endpoint for expert/powerful model
-	LLMExpertKey     string
-	LLMExpertModel   string
-	OllamaBaseURL    string // optional: Ollama local model endpoint
-	OllamaModel      string
-	VLLMBaseURL      string // optional: vLLM local model endpoint
-	VLLMModel        string
-	LocalModelTier   string // tier assignment for local models: fast/smart/expert
-	HostReadPaths    string // comma-separated host paths for read-only access
-	HostWritePaths   string // comma-separated host paths for writable access
-	TelegramToken    string
-	FeishuAppID      string
-	FeishuAppSecret  string
-	JWTSecret        string
-	ToriAPIBaseURL   string
-	MinerUEnabled    bool
-	MinerUBackend    string
-	MinerUCommand    string
-	MinerUCLIArgs    string
-	MinerUOutputDir  string
-	MinerUTimeoutSec int
+	DataDir            string // root data directory (default: "data")
+	Addr               string // HTTP listen address
+	LLMBaseURL         string
+	LLMAPIKey          string
+	LLMModel           string
+	LLMFastURL         string // optional: separate endpoint for fast/cheap model
+	LLMFastKey         string
+	LLMFastModel       string
+	LLMExpertURL       string // optional: separate endpoint for expert/powerful model
+	LLMExpertKey       string
+	LLMExpertModel     string
+	OllamaBaseURL      string // optional: Ollama local model endpoint
+	OllamaModel        string
+	VLLMBaseURL        string // optional: vLLM local model endpoint
+	VLLMModel          string
+	LocalModelsEnabled bool   // opt-in: register/use local Ollama/vLLM models at startup
+	LocalBrainEnabled  bool   // opt-in: use a local small model for pre-routing/context filtering
+	LocalLoRAEnabled   bool   // opt-in: initialize LoRA training/evaluation pipeline
+	LocalModelTier     string // tier assignment for local models: fast/smart/expert
+	HostReadPaths      string // comma-separated host paths for read-only access
+	HostWritePaths     string // comma-separated host paths for writable access
+	TelegramToken      string
+	FeishuAppID        string
+	FeishuAppSecret    string
+	JWTSecret          string
+	ToriAPIBaseURL     string
+	MinerUEnabled      bool
+	MinerUBackend      string
+	MinerUCommand      string
+	MinerUCLIArgs      string
+	MinerUOutputDir    string
+	MinerUTimeoutSec   int
 	// Self-iteration
 	SelfIterateEnabled     bool
 	SelfIterateTokenBudget int
@@ -84,22 +87,25 @@ func Load() Config {
 		}
 	}
 	return Config{
-		DataDir:        getenv("DATA_DIR", appdir.DataDir()),
-		Addr:           getenv("AGENT_ADDR", ":9090"),
-		LLMBaseURL:     getenv("LLM_BASE_URL", "https://api-ai.gitcode.com/v1"),
-		LLMAPIKey:      getenv("LLM_API_KEY", ""),
-		LLMModel:       getenv("LLM_MODEL", "zai-org/GLM-5"),
-		LLMFastURL:     getenv("LLM_FAST_URL", ""),
-		LLMFastKey:     getenv("LLM_FAST_KEY", ""),
-		LLMFastModel:   getenv("LLM_FAST_MODEL", ""),
-		LLMExpertURL:   getenv("LLM_EXPERT_URL", ""),
-		LLMExpertKey:   getenv("LLM_EXPERT_KEY", ""),
-		LLMExpertModel: getenv("LLM_EXPERT_MODEL", ""),
-		OllamaBaseURL:  getenv("OLLAMA_BASE_URL", ""),
-		OllamaModel:    getenv("OLLAMA_MODEL", ""),
-		VLLMBaseURL:    getenv("VLLM_BASE_URL", ""),
-		VLLMModel:      getenv("VLLM_MODEL", ""),
-		LocalModelTier: getenv("LOCAL_MODEL_TIER", "fast"),
+		DataDir:            getenv("DATA_DIR", appdir.DataDir()),
+		Addr:               getenv("AGENT_ADDR", ":9090"),
+		LLMBaseURL:         getenv("LLM_BASE_URL", "https://api-ai.gitcode.com/v1"),
+		LLMAPIKey:          getenv("LLM_API_KEY", ""),
+		LLMModel:           getenv("LLM_MODEL", "zai-org/GLM-5"),
+		LLMFastURL:         getenv("LLM_FAST_URL", ""),
+		LLMFastKey:         getenv("LLM_FAST_KEY", ""),
+		LLMFastModel:       getenv("LLM_FAST_MODEL", ""),
+		LLMExpertURL:       getenv("LLM_EXPERT_URL", ""),
+		LLMExpertKey:       getenv("LLM_EXPERT_KEY", ""),
+		LLMExpertModel:     getenv("LLM_EXPERT_MODEL", ""),
+		OllamaBaseURL:      getenv("OLLAMA_BASE_URL", ""),
+		OllamaModel:        getenv("OLLAMA_MODEL", ""),
+		VLLMBaseURL:        getenv("VLLM_BASE_URL", ""),
+		VLLMModel:          getenv("VLLM_MODEL", ""),
+		LocalModelsEnabled: getenv("LOCAL_MODELS_ENABLED", "") == "true",
+		LocalBrainEnabled:  getenv("LOCALBRAIN_ENABLED", "") == "true",
+		LocalLoRAEnabled:   getenv("LOCAL_LORA_ENABLED", "") == "true",
+		LocalModelTier:     getenv("LOCAL_MODEL_TIER", "fast"),
 
 		HostReadPaths:          getenv("HOST_READ_PATHS", ""),
 		HostWritePaths:         getenv("HOST_WRITE_PATHS", ""),

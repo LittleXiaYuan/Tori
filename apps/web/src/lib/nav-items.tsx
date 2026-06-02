@@ -1,7 +1,8 @@
 /**
  * 全局导航条目，被 `command-palette`（⌘K）和 `account-rail` 的 hover flyout
  * 同时复用。默认面遵循「场景 → 行动 → 产物 → 反馈 → 记忆」主路径；
- * 其它能力保留在 Pack、Lab 或控制面里，避免继续平铺。
+ * 启用后的 Pack 菜单也会进入主路径，未启用或高级能力仍保留在 Pack、Lab
+ * 或控制面里，避免继续平铺。
  */
 import type React from "react";
 import {

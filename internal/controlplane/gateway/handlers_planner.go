@@ -1376,6 +1376,8 @@ func plannerKnownFriendlyError(raw string) string {
 	message := strings.TrimSpace(raw)
 	lower := strings.ToLower(message)
 	switch {
+	case strings.Contains(lower, "401") || strings.Contains(lower, "unauthorized") || strings.Contains(lower, "invalid authentication") || strings.Contains(lower, "invalid_authentication") || strings.Contains(lower, "authentication fails") || strings.Contains(lower, "invalid api key") || strings.Contains(lower, "api key") && strings.Contains(lower, "invalid") || strings.Contains(lower, "token not found"):
+		return "模型密钥无效或已过期，请到模型设置检查当前执行层模型。"
 	case strings.Contains(message, "尚未完成") || strings.Contains(message, "依赖") || strings.Contains(lower, "dependency"):
 		return "前置步骤还没有完全确认，已保留现场，可查看依赖关系后继续。"
 	case strings.Contains(lower, "unknown skill") || strings.Contains(message, "未知工具") || strings.Contains(message, "未找到工具"):

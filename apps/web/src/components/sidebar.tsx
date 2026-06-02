@@ -144,8 +144,8 @@ export default function Sidebar() {
   useEffect(() => {
     let timer: NodeJS.Timeout;
     const probe = () => {
-      api.version()
-        .then((v) => { setOnline(true); setVersion(v?.version || ""); })
+      api.healthz()
+        .then((health) => { setOnline(true); setVersion(health?.version || ""); })
         .catch(() => setOnline(false));
     };
     probe();

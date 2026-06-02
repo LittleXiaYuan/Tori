@@ -154,30 +154,6 @@ export default function LoginPage() {
               云雀 Agent
             </h1>
           </div>
-          <p className="text-sm" style={{ color: "var(--yunque-text-muted)", maxWidth: 320, margin: "0 auto" }}>
-            全栈 AI Agent 平台 — 对话、思考、行动、进化
-          </p>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2 w-full">
-          {[
-            { icon: "💬", label: "智能对话", desc: "多模型路由 · 深度思考" },
-            { icon: "🌐", label: "浏览器操控", desc: "自动化网页操作" },
-            { icon: "🧠", label: "认知架构", desc: "记忆 · 反思 · 进化" },
-            { icon: "⚡", label: "工作流引擎", desc: "技能编排 · 定时任务" },
-          ].map((f) => (
-            <div
-              key={f.label}
-              className="flex items-center gap-2.5 rounded-xl px-3 py-2.5"
-              style={{ background: "var(--yunque-bg-muted)", border: "1px solid var(--yunque-border)" }}
-            >
-              <span className="text-base">{f.icon}</span>
-              <div className="min-w-0">
-                <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>{f.label}</div>
-                <div className="text-[10px]" style={{ color: "var(--yunque-text-muted)" }}>{f.desc}</div>
-              </div>
-            </div>
-          ))}
         </div>
 
       <Card className="section-card relative w-full">

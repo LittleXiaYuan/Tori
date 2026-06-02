@@ -54,6 +54,14 @@ describe("formatErrorMessage", () => {
     ).toBe("所有可用模型通道暂时失败，已保留现场；可以稍后重试，或先切换模型/供应商继续。");
   });
 
+  it("explains provider authentication failures without exposing raw key hints", () => {
+    const out = formatErrorMessage(
+      'planner fc step 1: all fallback LLM clients failed (FC): chat API status 401: {"error":{"message":"Authentication Fails, Your api key: ****3709 is invalid","type":"authentication_error"}}',
+    );
+    expect(out).toBe("模型密钥无效或已过期，请到模型设置检查当前执行层模型。");
+    expect(out).not.toMatch(/401|api key|\*\*\*\*3709|fallback/i);
+  });
+
   it("hides raw tool execution implementation errors", () => {
     expect(formatErrorMessage("unknown skill: file_exec")).toBe("所需工具暂时不可用，已保留现场，可换用可用工具或调整步骤继续。");
     expect(formatErrorMessage({ reason: "blocked by trust gate: needs approval" })).toBe("这一步需要更高信任或确认，已保留现场，可确认后继续。");

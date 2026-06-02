@@ -6,9 +6,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -23,13 +26,62 @@ type packActionRequest struct {
 type packInstallRequest struct {
 	ManifestPath string `json:"manifest_path"`
 	ManifestURL  string `json:"manifest_url"`
+	PackageURL   string `json:"package_url"`
+	SHA256       string `json:"sha256"`
 	Source       string `json:"source"`
 	Download     bool   `json:"download"`
 }
 
+type packReleaseCatalogRequest struct {
+	Releases []string `json:"releases"`
+}
+
+type packReleaseCatalogEntry struct {
+	ReleaseURL   string                 `json:"release_url"`
+	ReleaseTag   string                 `json:"release_tag,omitempty"`
+	ReleaseName  string                 `json:"release_name,omitempty"`
+	PublishedAt  string                 `json:"published_at,omitempty"`
+	PackageURL   string                 `json:"package_url"`
+	AssetName    string                 `json:"asset_name,omitempty"`
+	SHA256       string                 `json:"sha256,omitempty"`
+	SizeBytes    int64                  `json:"size_bytes,omitempty"`
+	Manifest     packruntime.Manifest   `json:"manifest"`
+	Installed    bool                   `json:"installed"`
+	Enabled      bool                   `json:"enabled"`
+	Status       packruntime.PackStatus `json:"status,omitempty"`
+	UpdateAction string                 `json:"update_action"`
+	Downloadable bool                   `json:"downloadable"`
+}
+
+type packReleaseCatalogReport struct {
+	GeneratedAt time.Time                 `json:"generated_at"`
+	Releases    []string                  `json:"releases"`
+	Count       int                       `json:"count"`
+	Entries     []packReleaseCatalogEntry `json:"entries"`
+	Errors      []string                  `json:"errors,omitempty"`
+}
+
+type githubReleaseAsset struct {
+	Name               string `json:"name"`
+	BrowserDownloadURL string `json:"browser_download_url"`
+	Size               int64  `json:"size"`
+	Digest             string `json:"digest"`
+}
+
+type githubReleaseResponse struct {
+	TagName     string               `json:"tag_name"`
+	Name        string               `json:"name"`
+	HTMLURL     string               `json:"html_url"`
+	PublishedAt string               `json:"published_at"`
+	Assets      []githubReleaseAsset `json:"assets"`
+}
+
+var githubAssetHrefPattern = regexp.MustCompile(`href="([^"]+\.yqpack[^"]*)"`)
+
 func (g *Gateway) registerPackRoutes() {
 	g.mux.HandleFunc("/v1/packs", g.requireAuth(g.handlePacksList))
 	g.mux.HandleFunc("/v1/packs/catalog", g.requireAuth(g.handlePackCatalog))
+	g.mux.HandleFunc("/v1/packs/release-catalog", g.requireAuth(g.handlePackReleaseCatalog))
 	g.mux.HandleFunc("/v1/packs/installed", g.requireAuth(g.handlePacksList))
 	g.mux.HandleFunc("/v1/packs/enabled", g.requireAuth(g.handlePacksEnabled))
 	g.mux.HandleFunc("/v1/packs/capabilities/plan", g.requireAuth(g.handlePackCapabilityPlan))
@@ -323,6 +375,380 @@ func (g *Gateway) packCatalogSourceDirs() []string {
 	return []string{filepath.Join("packs", "official"), filepath.Join("packs", "templates")}
 }
 
+func (g *Gateway) handlePackReleaseCatalog(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSONStatus(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+		return
+	}
+	var req packReleaseCatalogRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": "invalid request body"})
+		return
+	}
+	if len(req.Releases) == 0 {
+		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": "releases is required"})
+		return
+	}
+	writeJSON(w, g.packReleaseCatalogReport(r, req.Releases))
+}
+
+func (g *Gateway) packReleaseCatalogReport(r *http.Request, releaseURLs []string) packReleaseCatalogReport {
+	report := packReleaseCatalogReport{
+		GeneratedAt: time.Now().UTC(),
+		Releases:    []string{},
+		Entries:     []packReleaseCatalogEntry{},
+	}
+	installed := map[string]packruntime.InstalledPack{}
+	if g.packRegistry != nil {
+		for _, pack := range g.packRegistry.List() {
+			installed[pack.Manifest.ID] = pack
+		}
+	}
+	seenReleases := map[string]bool{}
+	seenPackages := map[string]bool{}
+	for _, releaseURL := range releaseURLs {
+		releaseURL = strings.TrimSpace(releaseURL)
+		if releaseURL == "" || seenReleases[releaseURL] {
+			continue
+		}
+		seenReleases[releaseURL] = true
+		report.Releases = append(report.Releases, releaseURL)
+		release, err := fetchGitHubRelease(r, releaseURL)
+		if err != nil {
+			fallbackRelease, fallbackErr := scrapeGitHubReleaseAssets(r, releaseURL)
+			if fallbackErr != nil {
+				report.Errors = append(report.Errors, fmt.Sprintf("%s: %v", releaseURL, err))
+				report.Errors = append(report.Errors, fmt.Sprintf("%s: fallback scrape: %v", releaseURL, fallbackErr))
+				continue
+			}
+			release = fallbackRelease
+		}
+		entryReleaseURL := release.HTMLURL
+		if strings.TrimSpace(entryReleaseURL) == "" {
+			entryReleaseURL = releaseURL
+		}
+		for _, asset := range release.Assets {
+			packageURL := strings.TrimSpace(asset.BrowserDownloadURL)
+			if packageURL == "" || !strings.HasSuffix(strings.ToLower(strings.TrimSpace(asset.Name)), ".yqpack") || seenPackages[packageURL] {
+				continue
+			}
+			seenPackages[packageURL] = true
+			manifest, artifactSHA, err := fetchYqpackManifest(r, packageURL)
+			if err != nil {
+				report.Errors = append(report.Errors, fmt.Sprintf("%s: %v", packageURL, err))
+				continue
+			}
+			if manifest.Distribution.PackageURL == "" {
+				manifest.Distribution.PackageURL = packageURL
+			}
+			assetSHA := strings.TrimSpace(asset.Digest)
+			if assetSHA == "" {
+				assetSHA = artifactSHA
+			}
+			if manifest.Distribution.SHA256 == "" {
+				manifest.Distribution.SHA256 = assetSHA
+			}
+			if manifest.Distribution.SizeBytes == 0 && asset.Size > 0 {
+				manifest.Distribution.SizeBytes = asset.Size
+			}
+			if manifest.Distribution.ManifestURL == "" {
+				manifest.Distribution.ManifestURL = entryReleaseURL
+			}
+			entry := packReleaseCatalogEntry{
+				ReleaseURL:   entryReleaseURL,
+				ReleaseTag:   release.TagName,
+				ReleaseName:  release.Name,
+				PublishedAt:  release.PublishedAt,
+				PackageURL:   packageURL,
+				AssetName:    asset.Name,
+				SHA256:       assetSHA,
+				SizeBytes:    asset.Size,
+				Manifest:     manifest,
+				UpdateAction: "install",
+				Downloadable: true,
+			}
+			if installedPack, ok := installed[manifest.ID]; ok {
+				entry.Installed = true
+				entry.Status = installedPack.Status
+				entry.Enabled = installedPack.Status == packruntime.PackStatusEnabled
+				if installedPack.Manifest.Version != manifest.Version {
+					entry.UpdateAction = "update"
+				} else if installedPack.Status == packruntime.PackStatusDisabled {
+					entry.UpdateAction = "enable"
+				} else {
+					entry.UpdateAction = "use"
+				}
+			}
+			report.Entries = append(report.Entries, entry)
+		}
+	}
+	slices.SortFunc(report.Entries, func(a, b packReleaseCatalogEntry) int {
+		if cmp := strings.Compare(a.Manifest.ID, b.Manifest.ID); cmp != 0 {
+			return cmp
+		}
+		return strings.Compare(a.ReleaseTag, b.ReleaseTag)
+	})
+	report.Count = len(report.Entries)
+	return report
+}
+
+func fetchGitHubRelease(r *http.Request, releaseURL string) (githubReleaseResponse, error) {
+	apiURL, err := githubReleaseAPIURL(releaseURL)
+	if err != nil {
+		return githubReleaseResponse{}, err
+	}
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, apiURL, nil)
+	if err != nil {
+		return githubReleaseResponse{}, fmt.Errorf("create github release request: %w", err)
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("User-Agent", "Yunque-PackRuntime")
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return githubReleaseResponse{}, fmt.Errorf("download github release: %w", err)
+	}
+	defer res.Body.Close()
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		return githubReleaseResponse{}, fmt.Errorf("download github release: http %d", res.StatusCode)
+	}
+	data, err := io.ReadAll(io.LimitReader(res.Body, 4<<20))
+	if err != nil {
+		return githubReleaseResponse{}, fmt.Errorf("read github release: %w", err)
+	}
+	var release githubReleaseResponse
+	if err := json.Unmarshal(data, &release); err != nil {
+		return githubReleaseResponse{}, fmt.Errorf("parse github release: %w", err)
+	}
+	return release, nil
+}
+
+func scrapeGitHubReleaseAssets(r *http.Request, releaseURL string) (githubReleaseResponse, error) {
+	parsed, err := parseGitHubReleaseURL(releaseURL)
+	if err != nil {
+		return githubReleaseResponse{}, err
+	}
+	expandedURL := fmt.Sprintf("https://github.com/%s/%s/releases/expanded_assets/%s", url.PathEscape(parsed.owner), url.PathEscape(parsed.repo), strings.ReplaceAll(url.PathEscape(parsed.tag), "%2F", "/"))
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, expandedURL, nil)
+	if err != nil {
+		return githubReleaseResponse{}, fmt.Errorf("create github assets request: %w", err)
+	}
+	req.Header.Set("Accept", "text/fragment+html")
+	req.Header.Set("User-Agent", "Yunque-PackRuntime")
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return githubReleaseResponse{}, fmt.Errorf("download github assets: %w", err)
+	}
+	defer res.Body.Close()
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		return githubReleaseResponse{}, fmt.Errorf("download github assets: http %d", res.StatusCode)
+	}
+	data, err := io.ReadAll(io.LimitReader(res.Body, 4<<20))
+	if err != nil {
+		return githubReleaseResponse{}, fmt.Errorf("read github assets: %w", err)
+	}
+	fragment := string(data)
+	var assets []githubReleaseAsset
+	seen := map[string]bool{}
+	for _, match := range githubAssetHrefPattern.FindAllStringSubmatch(fragment, -1) {
+		if len(match) < 2 {
+			continue
+		}
+		href := strings.TrimSpace(htmlUnescape(match[1]))
+		if href == "" {
+			continue
+		}
+		assetURL, err := url.Parse(href)
+		if err != nil {
+			continue
+		}
+		if !assetURL.IsAbs() {
+			assetURL = (&url.URL{Scheme: "https", Host: "github.com"}).ResolveReference(assetURL)
+		}
+		downloadURL := assetURL.String()
+		if seen[downloadURL] {
+			continue
+		}
+		seen[downloadURL] = true
+		name, _ := url.PathUnescape(pathfileBase(assetURL.EscapedPath()))
+		assets = append(assets, githubReleaseAsset{
+			Name:               name,
+			BrowserDownloadURL: downloadURL,
+			Size:               parseGitHubAssetSize(fragment, href),
+			Digest:             parseGitHubAssetDigest(fragment, name),
+		})
+	}
+	if len(assets) == 0 {
+		return githubReleaseResponse{}, fmt.Errorf("no .yqpack assets found")
+	}
+	return githubReleaseResponse{
+		TagName: parsed.tag,
+		Name:    parsed.tag,
+		HTMLURL: fmt.Sprintf("https://github.com/%s/%s/releases/tag/%s", url.PathEscape(parsed.owner), url.PathEscape(parsed.repo), strings.ReplaceAll(url.PathEscape(parsed.tag), "%2F", "/")),
+		Assets:  assets,
+	}, nil
+}
+
+type githubReleaseURLParts struct {
+	owner string
+	repo  string
+	tag   string
+}
+
+func parseGitHubReleaseURL(releaseURL string) (githubReleaseURLParts, error) {
+	parsed, err := url.Parse(strings.TrimSpace(releaseURL))
+	if err != nil {
+		return githubReleaseURLParts{}, fmt.Errorf("parse release url: %w", err)
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return githubReleaseURLParts{}, fmt.Errorf("release url must use http or https")
+	}
+	host := strings.ToLower(parsed.Hostname())
+	if host != "github.com" {
+		return githubReleaseURLParts{}, fmt.Errorf("only github.com release urls are supported")
+	}
+	parts := strings.Split(strings.Trim(parsed.EscapedPath(), "/"), "/")
+	if len(parts) < 5 || parts[2] != "releases" || parts[3] != "tag" {
+		return githubReleaseURLParts{}, fmt.Errorf("expected github release tag url")
+	}
+	owner, err := url.PathUnescape(parts[0])
+	if err != nil {
+		return githubReleaseURLParts{}, fmt.Errorf("parse github owner: %w", err)
+	}
+	repo, err := url.PathUnescape(parts[1])
+	if err != nil {
+		return githubReleaseURLParts{}, fmt.Errorf("parse github repo: %w", err)
+	}
+	tagEscaped := strings.Join(parts[4:], "/")
+	tag, err := url.PathUnescape(tagEscaped)
+	if err != nil {
+		return githubReleaseURLParts{}, fmt.Errorf("parse github release tag: %w", err)
+	}
+	return githubReleaseURLParts{owner: owner, repo: repo, tag: tag}, nil
+}
+
+func htmlUnescape(value string) string {
+	replacer := strings.NewReplacer("&amp;", "&", "&quot;", `"`, "&#39;", "'", "&lt;", "<", "&gt;", ">")
+	return replacer.Replace(value)
+}
+
+func pathfileBase(escapedPath string) string {
+	parts := strings.Split(strings.TrimRight(escapedPath, "/"), "/")
+	if len(parts) == 0 {
+		return ""
+	}
+	return parts[len(parts)-1]
+}
+
+func parseGitHubAssetDigest(fragment string, assetName string) string {
+	if strings.TrimSpace(assetName) == "" {
+		return ""
+	}
+	idx := strings.Index(fragment, assetName)
+	if idx < 0 {
+		return ""
+	}
+	end := idx + 4096
+	if end > len(fragment) {
+		end = len(fragment)
+	}
+	window := fragment[idx:end]
+	digestPattern := regexp.MustCompile(`sha256:[a-fA-F0-9]{64}`)
+	return digestPattern.FindString(window)
+}
+
+func parseGitHubAssetSize(fragment string, href string) int64 {
+	idx := strings.Index(fragment, href)
+	if idx < 0 {
+		idx = 0
+	}
+	end := idx + 4096
+	if end > len(fragment) {
+		end = len(fragment)
+	}
+	window := fragment[idx:end]
+	sizePattern := regexp.MustCompile(`>([0-9]+(?:\.[0-9]+)?)\s*(KB|MB|GB|bytes)<`)
+	match := sizePattern.FindStringSubmatch(window)
+	if len(match) < 3 {
+		return 0
+	}
+	value, err := strconv.ParseFloat(match[1], 64)
+	if err != nil {
+		return 0
+	}
+	switch strings.ToUpper(match[2]) {
+	case "GB":
+		value *= 1024 * 1024 * 1024
+	case "MB":
+		value *= 1024 * 1024
+	case "KB":
+		value *= 1024
+	}
+	return int64(value)
+}
+
+func githubReleaseAPIURL(releaseURL string) (string, error) {
+	parsed, err := url.Parse(strings.TrimSpace(releaseURL))
+	if err != nil {
+		return "", fmt.Errorf("parse release url: %w", err)
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return "", fmt.Errorf("release url must use http or https")
+	}
+	host := strings.ToLower(parsed.Hostname())
+	if host == "api.github.com" {
+		return parsed.String(), nil
+	}
+	if host != "github.com" {
+		return "", fmt.Errorf("only github.com release urls are supported")
+	}
+	parts := strings.Split(strings.Trim(parsed.EscapedPath(), "/"), "/")
+	if len(parts) < 5 || parts[2] != "releases" || parts[3] != "tag" {
+		return "", fmt.Errorf("expected github release tag url")
+	}
+	owner, err := url.PathUnescape(parts[0])
+	if err != nil {
+		return "", fmt.Errorf("parse github owner: %w", err)
+	}
+	repo, err := url.PathUnescape(parts[1])
+	if err != nil {
+		return "", fmt.Errorf("parse github repo: %w", err)
+	}
+	tagEscaped := strings.Join(parts[4:], "/")
+	tag, err := url.PathUnescape(tagEscaped)
+	if err != nil {
+		return "", fmt.Errorf("parse github release tag: %w", err)
+	}
+	return fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/tags/%s", url.PathEscape(owner), url.PathEscape(repo), url.PathEscape(tag)), nil
+}
+
+func fetchYqpackManifest(r *http.Request, packageURL string) (packruntime.Manifest, string, error) {
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, packageURL, nil)
+	if err != nil {
+		return packruntime.Manifest{}, "", fmt.Errorf("create yqpack request: %w", err)
+	}
+	req.Header.Set("User-Agent", "Yunque-PackRuntime")
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return packruntime.Manifest{}, "", fmt.Errorf("download yqpack: %w", err)
+	}
+	defer res.Body.Close()
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		return packruntime.Manifest{}, "", fmt.Errorf("download yqpack: http %d", res.StatusCode)
+	}
+	data, err := io.ReadAll(io.LimitReader(res.Body, 64<<20))
+	if err != nil {
+		return packruntime.Manifest{}, "", fmt.Errorf("read yqpack: %w", err)
+	}
+	if len(bytes.TrimSpace(data)) == 0 {
+		return packruntime.Manifest{}, "", fmt.Errorf("downloaded yqpack is empty")
+	}
+	manifest, digest, err := packruntime.InspectYqpackManifestBytes(data)
+	if err != nil {
+		return packruntime.Manifest{}, digest, err
+	}
+	return manifest, digest, nil
+}
+
 func packCatalogManifestPaths(source string) ([]string, error) {
 	source = strings.TrimSpace(source)
 	if source == "" {
@@ -361,6 +787,8 @@ func packCatalogManifestPaths(source string) ([]string, error) {
 func packCatalogEntry(manifestPath string, source string, manifest packruntime.Manifest, installed packruntime.InstalledPack) packruntime.PackCatalogEntry {
 	entry := packruntime.PackCatalogEntry{
 		ManifestPath: manifestPath,
+		ManifestURL:  manifest.Distribution.ManifestURL,
+		PackageURL:   manifest.Distribution.PackageURL,
 		Source:       source,
 		Manifest:     manifest,
 		UpdateAction: "install",
@@ -1213,8 +1641,21 @@ func (g *Gateway) handlePackInstall(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req packInstallRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || (req.ManifestPath == "" && req.ManifestURL == "") {
-		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": "manifest_path or manifest_url is required"})
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || (req.ManifestPath == "" && req.ManifestURL == "" && req.PackageURL == "") {
+		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": "manifest_path, manifest_url or package_url is required"})
+		return
+	}
+	var pack packruntime.InstalledPack
+	if req.PackageURL != "" && req.ManifestPath == "" && req.ManifestURL == "" {
+		pack, err := g.installPackFromPackageURL(r, req)
+		if err != nil {
+			writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+			return
+		}
+		if g.planner != nil {
+			g.planner.InvalidatePromptCache()
+		}
+		writeJSON(w, map[string]any{"pack": pack, "status": pack.Status})
 		return
 	}
 	manifest, source, err := loadPackInstallManifest(r, req)
@@ -1233,8 +1674,7 @@ func (g *Gateway) handlePackInstall(w http.ResponseWriter, r *http.Request) {
 	// A wasm-backed pack must be extracted to disk (its .wasm module is needed
 	// at request time), so a downloaded .yqpack is installed via
 	// InstallFromYqpack rather than registering the manifest alone.
-	var pack packruntime.InstalledPack
-	if manifest.Backend.IsWasm() && artifacts != nil && strings.HasSuffix(strings.ToLower(artifacts.PackagePath), ".yqpack") {
+	if artifacts != nil && strings.HasSuffix(strings.ToLower(artifacts.PackagePath), ".yqpack") {
 		pack, err = g.packRegistry.InstallFromYqpack(artifacts.PackagePath, packruntime.InstallOptions{
 			ExpectedSHA256: manifest.Distribution.SHA256,
 			TrustRoot:      g.packTrustRoot,
@@ -1251,6 +1691,32 @@ func (g *Gateway) handlePackInstall(w http.ResponseWriter, r *http.Request) {
 		g.planner.InvalidatePromptCache()
 	}
 	writeJSON(w, map[string]any{"pack": pack, "status": pack.Status})
+}
+
+func (g *Gateway) installPackFromPackageURL(r *http.Request, req packInstallRequest) (packruntime.InstalledPack, error) {
+	manifest, artifactSHA, err := fetchYqpackManifest(r, req.PackageURL)
+	if err != nil {
+		return packruntime.InstalledPack{}, err
+	}
+	expected := strings.TrimSpace(req.SHA256)
+	if expected == "" {
+		expected = artifactSHA
+	}
+	manifest.Distribution.PackageURL = req.PackageURL
+	manifest.Distribution.SHA256 = expected
+	artifacts, err := g.packRegistry.CacheDistribution(r.Context(), manifest)
+	if err != nil {
+		return packruntime.InstalledPack{}, err
+	}
+	source := req.Source
+	if source == "" {
+		source = req.PackageURL
+	}
+	return g.packRegistry.InstallFromYqpack(artifacts.PackagePath, packruntime.InstallOptions{
+		ExpectedSHA256: expected,
+		TrustRoot:      g.packTrustRoot,
+		Source:         source,
+	})
 }
 
 func loadPackInstallManifest(r *http.Request, req packInstallRequest) (packruntime.Manifest, string, error) {

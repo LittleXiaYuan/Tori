@@ -150,6 +150,7 @@ func AutoRegisterLocal(ctx context.Context, registry *ProviderRegistry, cfg Loca
 		ID:           providerID,
 		DisplayName:  fmt.Sprintf("Local %s (%s)", backend, model),
 		Type:         ProviderTypeChat,
+		Source:       ProviderSourceLocal,
 		BaseURL:      chatBase,
 		APIKeys:      []string{"local"}, // local backends don't need real keys
 		Model:        model,

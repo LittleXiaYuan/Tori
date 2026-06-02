@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Spinner } from "@heroui/react";
 import { useI18n } from "@/lib/i18n";
+import { getAuthHeaders } from "@/lib/api-core";
 
 const PUBLIC_PATHS = ["/login", "/setup"];
 const AUTH_TIMEOUT_MS = 8000;
@@ -34,18 +35,26 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
         }
       }, 750);
     };
+    const clearStoredCredentials = () => {
+      localStorage.removeItem("yunque_token");
+      localStorage.removeItem("yunque_api_key");
+    };
+    const bootstrapDesktopToken = async (signal: AbortSignal): Promise<Record<string, string>> => {
+      const res = await fetch("/v1/auth/desktop-bootstrap", {
+        method: "POST",
+        signal,
+      });
+      if (!res.ok) return {};
+      const data = await res.json().catch(() => ({}));
+      const token = typeof data?.token === "string" ? data.token : "";
+      if (!token) return {};
+      localStorage.setItem("yunque_token", token);
+      localStorage.removeItem("yunque_api_key");
+      return { Authorization: `Bearer ${token}` };
+    };
 
     if (PUBLIC_PATHS.some((path) => pathname?.startsWith(path))) {
       setChecking(false);
-      return () => {
-        cancelled = true;
-        if (redirectFallback) clearTimeout(redirectFallback);
-      };
-    }
-
-    const token = localStorage.getItem("yunque_token");
-    if (!token) {
-      redirectToLogin();
       return () => {
         cancelled = true;
         if (redirectFallback) clearTimeout(redirectFallback);
@@ -65,12 +74,23 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     }, AUTH_TIMEOUT_MS);
     setChecking(true);
 
-    fetch("/v1/auth/status", {
-      headers: { Authorization: `Bearer ${token}` },
-      signal: controller.signal,
-    })
+    (async () => {
+      let headers = getAuthHeaders();
+      if (!headers.Authorization && !headers["X-API-Key"]) {
+        headers = await bootstrapDesktopToken(controller.signal);
+      }
+      if (!headers.Authorization && !headers["X-API-Key"]) {
+        redirectToLogin();
+        return null;
+      }
+      return fetch("/v1/auth/status", {
+        headers,
+        signal: controller.signal,
+      });
+    })()
       .then(async (res) => {
         if (cancelled) return null;
+        if (res === null) return null;
         if (!res.ok) {
           // Surface status code to the catch branch via Error.cause so we
           // can tell "401 revoked" apart from "502 upstream hiccup".
@@ -84,12 +104,12 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
           // Server says no password is configured yet. Route to /login which
           // doubles as the "set password" flow; clear token so a stale one
           // can't sneak back.
-          localStorage.removeItem("yunque_token");
+          clearStoredCredentials();
           redirectToLogin();
           return;
         }
         if (!data?.authenticated) {
-          localStorage.removeItem("yunque_token");
+          clearStoredCredentials();
           redirectToLogin();
           return;
         }
@@ -100,8 +120,8 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
         if (cancelled) return;
         const status = (error as { cause?: unknown })?.cause;
         if (status === 401 || status === 403) {
-          // Explicit auth failure → token is actually invalid/revoked.
-          localStorage.removeItem("yunque_token");
+          // Explicit auth failure → stored credentials are actually invalid/revoked.
+          clearStoredCredentials();
           redirectToLogin();
           return;
         }

@@ -24,6 +24,7 @@ const maxUnpackedGrowthPerMemoryTimeTravelCapability = 3_600;
 const maxUnpackedGrowthPerWASMPluginRoute = 4_600;
 const maxUnpackedGrowthPerPackSdkHelperExport = 700;
 const maxUnpackedGrowthForPackPrepareSummaryHelperExport = 2_800;
+const maxUnpackedGrowthPerPackReleaseCatalogCapability = 11_000;
 // Pack manifests now carry one-line + three-example public description metadata.
 // Keep the added package size scoped to verified official manifests instead of
 // broadening the global base size; scripts/check-pack-description-style.mjs owns
@@ -178,6 +179,7 @@ const maxUnpackedSize = baseUnpackedSize
   + Math.max(0, wasmPluginRouteCount - 13) * maxUnpackedGrowthPerWASMPluginRoute
   + Math.max(0, packSdkHelperExports - basePackSdkHelperExports) * maxUnpackedGrowthPerPackSdkHelperExport
   + packSdkPrepareSummaryHelperExports * maxUnpackedGrowthForPackPrepareSummaryHelperExport
+  + (packManifest.capabilities?.some((cap) => cap.name === "releaseCatalog") ? maxUnpackedGrowthPerPackReleaseCatalogCapability : 0)
   + styledOfficialPackCount * maxUnpackedGrowthPerStyledOfficialPack;
 if (pack.unpackedSize > maxUnpackedSize) {
   console.error(`pack unpacked size ${pack.unpackedSize} exceeds dynamic budget ${maxUnpackedSize}`);

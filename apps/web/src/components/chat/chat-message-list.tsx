@@ -421,7 +421,7 @@ export function ChatMessageList({
             {!isBubble && (
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-[13px] font-semibold" style={{ color: msg.role === "assistant" ? "var(--yunque-accent)" : "var(--yunque-text)" }}>
-                  {msg.role === "assistant" ? (currentModel || "Yunque Agent") : t("chat.user")}
+                  {msg.role === "assistant" ? (msg.model || currentModel || "Yunque Agent") : t("chat.user")}
                 </span>
                 {msg.timestamp && (
                   <span className="text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>

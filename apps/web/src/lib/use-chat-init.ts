@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { api, type PresetInfo, type SkillInfo } from "@/lib/api";
 import type { ModelOption } from "@/components/model-selector-popup";
 import { showErrorToast } from "@/components/toast-provider";
+import { providerModelLabel, resolveDisplayedChatProvider } from "@/lib/provider-ui";
 
 export interface ChatInitState {
   currentModel: string;
@@ -48,18 +49,22 @@ export function useChatInit(): ChatInitState {
   }, []);
 
   useEffect(() => {
-    api.providerList().then((data) => {
+    Promise.all([
+      api.providerList(),
+      api.execProvider().catch(() => ({ exec_provider: "", available_providers: [] as string[] })),
+    ]).then(([data, exec]) => {
       const providers = data.providers || [];
       setAvailableModels(providers.filter(p => p.type === "chat").map(p => ({
         id: p.id, model: p.model, display_name: p.display_name, enabled: p.enabled,
         type: p.id.split("-")[0] || p.id,
         tier: p.tier, capabilities: p.capabilities,
       })));
-      const primary = providers.find(p => p.enabled && /minimax/i.test(`${p.id} ${p.display_name || ""} ${p.model}`))
-        || providers.find(p => p.enabled && p.source === "direct")
-        || providers.find(p => p.enabled);
+      const primary = resolveDisplayedChatProvider(
+        providers.filter(p => p.type === "chat"),
+        exec.exec_provider,
+      );
       if (primary) {
-        setCurrentModel(primary.model || primary.display_name || primary.id);
+        setCurrentModel(providerModelLabel(primary));
         setCurrentModelId(primary.id);
       }
     }).catch(() => {});

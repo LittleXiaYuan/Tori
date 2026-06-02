@@ -164,8 +164,8 @@ func TestSecurityHeaders(t *testing.T) {
 
 	expectedHeaders := map[string]string{
 		"X-Content-Type-Options": "nosniff",
-		"X-Frame-Options":       "DENY",
-		"Referrer-Policy":       "strict-origin-when-cross-origin",
+		"X-Frame-Options":        "DENY",
+		"Referrer-Policy":        "strict-origin-when-cross-origin",
 	}
 	for h, v := range expectedHeaders {
 		if got := w.Header().Get(h); got != v {
@@ -274,6 +274,27 @@ func TestCORSMiddleware_NoOrigins(t *testing.T) {
 
 	if got := w.Header().Get("Access-Control-Allow-Origin"); got != "" {
 		t.Fatalf("no origins configured should mean no CORS header, got %q", got)
+	}
+}
+
+func TestCORSMiddleware_NoOriginsAllowsLoopbackDesktopDev(t *testing.T) {
+	gw, _ := newTestGateway()
+
+	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	chain := gw.corsMiddleware(inner)
+
+	req := httptest.NewRequest("GET", "/healthz", nil)
+	req.Header.Set("Origin", "http://localhost:3001")
+	w := httptest.NewRecorder()
+	chain.ServeHTTP(w, req)
+
+	if got := w.Header().Get("Access-Control-Allow-Origin"); got != "http://localhost:3001" {
+		t.Fatalf("loopback dev origin should be allowed, got %q", got)
+	}
+	if got := w.Header().Get("Vary"); got != "Origin" {
+		t.Fatalf("expected Vary: Origin for reflected loopback origin, got %q", got)
 	}
 }
 
@@ -459,6 +480,8 @@ func TestCorsOrigin_LogicCases(t *testing.T) {
 		expected string
 	}{
 		{"empty list", nil, "https://any.com", ""},
+		{"empty list allows localhost", nil, "http://localhost:3001", "http://localhost:3001"},
+		{"empty list allows loopback ip", nil, "http://127.0.0.1:3001", "http://127.0.0.1:3001"},
 		{"wildcard", []string{"*"}, "https://any.com", "*"},
 		{"exact match", []string{"https://my.com"}, "https://my.com", "https://my.com"},
 		{"no match", []string{"https://a.com"}, "https://b.com", ""},

@@ -63,12 +63,28 @@ func initLLM(app *agentrt.App) error {
 		_ = migrator.MigrateFile("providers", "all", appdir.File("providers.json"))
 		slog.Info("provider: using Ledger KV for persistence")
 
-		// Load persisted providers BEFORE registering primary —
-		// Register(primary) calls persist() which would overwrite saved data with [].
-		if count, err := app.Providers.LoadFromStore(); err != nil {
+		// Load persisted providers BEFORE registering primary.
+		// Local desktop providers are opt-in: otherwise a previously saved
+		// local-ollama/local-vllm entry can still be selected by the UI/session
+		// and wake the user's desktop model after startup.
+		includeProvider := func(pc llm.ProviderConfig) bool {
+			if cfg.LocalModelsEnabled {
+				return true
+			}
+			if isLocalProviderConfig(pc) {
+				return false
+			}
+			return true
+		}
+		if count, skipped, err := app.Providers.LoadFromStoreFiltered(includeProvider); err != nil {
 			slog.Warn("provider: load from Ledger KV error", "err", err)
-		} else if count > 0 {
-			slog.Info("provider: loaded from Ledger KV", "count", count)
+		} else {
+			if count > 0 {
+				slog.Info("provider: loaded from Ledger KV", "count", count)
+			}
+			if skipped > 0 {
+				slog.Info("provider: skipped persisted local providers (set LOCAL_MODELS_ENABLED=true to enable)", "count", skipped)
+			}
 		}
 	} else {
 		app.Providers.SetPersistPath(appdir.File("providers.json"))
@@ -112,6 +128,10 @@ func initLLM(app *agentrt.App) error {
 			continue
 		}
 		for _, pc := range res.providers {
+			if !cfg.LocalModelsEnabled && isLocalProviderConfig(pc) {
+				slog.Info("provider: skipped configured local provider (set LOCAL_MODELS_ENABLED=true to enable)", "source", res.source, "id", pc.ID)
+				continue
+			}
 			if err := app.Providers.Register(pc); err != nil {
 				slog.Warn("provider registration failed", "id", pc.ID, "err", err)
 			}
@@ -122,33 +142,41 @@ func initLLM(app *agentrt.App) error {
 	}
 	slog.Info("provider registry initialized", "providers", len(app.Providers.List()))
 
-	// Local model auto-detection (Ollama / vLLM)
+	// Local model auto-detection (Ollama / vLLM). This is deliberately opt-in:
+	// probing/registering a local backend makes the planner and auxiliary
+	// routing layers eligible to call it, which can load a large model and slow
+	// the user's desktop. Use LOCAL_MODELS_ENABLED=true when the user explicitly
+	// wants local/vLLM/Ollama execution.
 	type localProbe struct {
 		name string
 		cfg  llm.LocalAutoConfig
 	}
 	localProbes := make([]localProbe, 0, 2)
-	if cfg.OllamaBaseURL != "" {
-		localProbes = append(localProbes, localProbe{
-			name: "ollama",
-			cfg: llm.LocalAutoConfig{
-				BaseURL: cfg.OllamaBaseURL,
-				Model:   cfg.OllamaModel,
-				Tier:    cfg.LocalModelTier,
-				Backend: llm.BackendOllama,
-			},
-		})
-	}
-	if cfg.VLLMBaseURL != "" {
-		localProbes = append(localProbes, localProbe{
-			name: "vllm",
-			cfg: llm.LocalAutoConfig{
-				BaseURL: cfg.VLLMBaseURL,
-				Model:   cfg.VLLMModel,
-				Tier:    cfg.LocalModelTier,
-				Backend: llm.BackendVLLM,
-			},
-		})
+	if cfg.LocalModelsEnabled {
+		if cfg.OllamaBaseURL != "" {
+			localProbes = append(localProbes, localProbe{
+				name: "ollama",
+				cfg: llm.LocalAutoConfig{
+					BaseURL: cfg.OllamaBaseURL,
+					Model:   cfg.OllamaModel,
+					Tier:    cfg.LocalModelTier,
+					Backend: llm.BackendOllama,
+				},
+			})
+		}
+		if cfg.VLLMBaseURL != "" {
+			localProbes = append(localProbes, localProbe{
+				name: "vllm",
+				cfg: llm.LocalAutoConfig{
+					BaseURL: cfg.VLLMBaseURL,
+					Model:   cfg.VLLMModel,
+					Tier:    cfg.LocalModelTier,
+					Backend: llm.BackendVLLM,
+				},
+			})
+		}
+	} else if cfg.OllamaBaseURL != "" || cfg.VLLMBaseURL != "" {
+		slog.Info("local model auto-registration skipped (set LOCAL_MODELS_ENABLED=true to enable)")
 	}
 	if len(localProbes) > 0 {
 		var localWg sync.WaitGroup
@@ -195,4 +223,12 @@ func initLLM(app *agentrt.App) error {
 	}
 
 	return nil
+}
+
+func isLocalProviderConfig(pc llm.ProviderConfig) bool {
+	return pc.Source == llm.ProviderSourceLocal ||
+		pc.ID == "local-ollama" ||
+		pc.ID == "local-vllm" ||
+		pc.BaseURL == "http://localhost:11434/v1" ||
+		pc.BaseURL == "http://127.0.0.1:11434/v1"
 }

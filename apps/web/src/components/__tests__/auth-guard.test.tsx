@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import AuthGuard from "../auth-guard";
+import { setApiKey } from "@/lib/api-core";
 
 const navMocks = vi.hoisted(() => ({
   replace: vi.fn(),
@@ -26,6 +27,7 @@ describe("AuthGuard", () => {
     vi.restoreAllMocks();
     navMocks.replace.mockReset();
     navMocks.usePathname.mockReset();
+    setApiKey("");
     localStorage.clear();
   });
 
@@ -52,6 +54,48 @@ describe("AuthGuard", () => {
 
     expect(screen.getByTestId("spinner")).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText("protected page")).toBeInTheDocument());
+    expect(navMocks.replace).not.toHaveBeenCalled();
+  });
+
+  it("uses stored API key credentials on protected pages", async () => {
+    navMocks.usePathname.mockReturnValue("/settings");
+    localStorage.setItem("yunque_api_key", "dev-key");
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ authenticated: true, password_set: true }),
+    } as Response);
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<AuthGuard><div>settings page</div></AuthGuard>);
+
+    await waitFor(() => expect(screen.getByText("settings page")).toBeInTheDocument());
+    expect(fetchMock).toHaveBeenCalledWith("/v1/auth/status", expect.objectContaining({
+      headers: { "X-API-Key": "dev-key" },
+    }));
+    expect(navMocks.replace).not.toHaveBeenCalled();
+  });
+
+  it("bootstraps a desktop JWT before redirecting to login", async () => {
+    navMocks.usePathname.mockReturnValue("/settings");
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ token: "desktop-jwt" }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ authenticated: true, password_set: true }),
+      } as Response);
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<AuthGuard><div>settings page</div></AuthGuard>);
+
+    await waitFor(() => expect(screen.getByText("settings page")).toBeInTheDocument());
+    expect(fetchMock).toHaveBeenNthCalledWith(1, "/v1/auth/desktop-bootstrap", expect.objectContaining({ method: "POST" }));
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/v1/auth/status", expect.objectContaining({
+      headers: { Authorization: "Bearer desktop-jwt" },
+    }));
+    expect(localStorage.getItem("yunque_token")).toBe("desktop-jwt");
     expect(navMocks.replace).not.toHaveBeenCalled();
   });
 
