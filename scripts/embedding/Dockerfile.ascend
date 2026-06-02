@@ -1,0 +1,17 @@
+# 昇腾(Ascend)嵌入微调镜像。
+# 基础镜像 = 官方昇腾 PyTorch 镜像（已内置 CANN + torch + torch_npu）。
+# 按你的 CANN/驱动版本到 https://www.hiascend.com/developer/ascendhub 选对应 tag，
+# 用 --build-arg BASE_IMAGE=... 覆盖下面的占位值。
+ARG BASE_IMAGE=ascendhub.huawei.com/public-ascendhub/ascend-pytorch:latest
+FROM ${BASE_IMAGE}
+
+WORKDIR /workspace
+
+# torch / torch_npu 来自基础镜像；这里只装其余依赖（requirements.txt 不含 torch）。
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY finetune.py distill.py ./
+
+# 训练数据(train.jsonl/eval.jsonl)与产物目录建议用挂载卷传入，见 run_ascend.sh。
+CMD ["bash"]

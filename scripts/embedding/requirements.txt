@@ -1,0 +1,12 @@
+# 运行在 GPU/NPU 机器上（本 Go 仓库不执行）。
+#
+# torch 按硬件单独装（不要直接 pip install torch 就跑昇腾）：
+#   NVIDIA CUDA: https://pytorch.org/get-started/locally/
+#   华为昇腾 800I A2/A3 (CANN): 先装 CANN，再装 torch + torch_npu
+#       参考 https://gitee.com/ascend/pytorch  (版本需与 CANN 对齐)
+#       脚本会在检测到 torch_npu 时自动用 NPU + bf16。
+sentence-transformers>=3.0
+datasets>=2.19
+accelerate>=0.30
+# 静态蒸馏（可选，得到 ~几十MB 静态嵌入）：
+model2vec>=0.3

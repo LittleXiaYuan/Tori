@@ -190,7 +190,14 @@ func initPerceptionWiring(app *agentrt.App, gw *gateway.Gateway) (*perceptionRes
 				dims = v
 			}
 		}
-		emb, err := embeddings.NewOpenAI(cfg.LLMAPIKey, embedURL, embedModel, dims)
+		// Embeddings can come from a different provider than the chat LLM (e.g.
+		// DeepSeek/Kimi for chat but a dedicated or local embedder for vectors).
+		// Use EMBED_API_KEY when set, otherwise fall back to the LLM key.
+		embedKey := os.Getenv("EMBED_API_KEY")
+		if embedKey == "" {
+			embedKey = cfg.LLMAPIKey
+		}
+		emb, err := embeddings.NewOpenAI(embedKey, embedURL, embedModel, dims)
 		if err == nil {
 			r.embedRes.Register("openai", emb)
 			slog.Info("embeddings provider registered", "model", embedModel, "dims", dims)

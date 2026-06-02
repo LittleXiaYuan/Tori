@@ -120,9 +120,14 @@ func NewOpenAI(apiKey, baseURL, model string, dims int) (*OpenAIEmbedder, error)
 	if dims <= 0 {
 		dims = 1536
 	}
+	// The request path appends "/v1/embeddings", so tolerate base URLs given
+	// either as the provider root or with a trailing "/v1" (matching the
+	// LLM_BASE_URL convention) without producing a doubled "/v1/v1".
+	normalized := strings.TrimRight(strings.TrimSpace(baseURL), "/")
+	normalized = strings.TrimSuffix(normalized, "/v1")
 	return &OpenAIEmbedder{
 		apiKey:  apiKey,
-		baseURL: strings.TrimRight(baseURL, "/"),
+		baseURL: normalized,
 		model:   model,
 		dims:    dims,
 		client:  &http.Client{Timeout: 30 * time.Second},
