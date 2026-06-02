@@ -10,6 +10,7 @@ import (
 // Entity represents a node in the knowledge graph.
 type Entity struct {
 	ID         string            `json:"id"`
+	TenantID   string            `json:"tenant_id"` // "" = global (visible to all tenants)
 	Name       string            `json:"name"`
 	Type       string            `json:"type"` // person, place, concept, event, project, skill, preference
 	Properties map[string]string `json:"properties"`
@@ -133,14 +134,30 @@ func (g *Graph) FindByName(name string) (*Entity, bool) {
 	return &cp, true
 }
 
-// SearchEntities finds entities matching a query string in name/type/properties.
+// SearchEntities finds entities matching a query across all tenants.
+// Use SearchEntitiesForTenant on user-facing recall paths to avoid cross-tenant leaks.
 func (g *Graph) SearchEntities(query string, limit int) []Entity {
+	return g.searchEntities("", query, limit)
+}
+
+// SearchEntitiesForTenant finds entities visible to tenantID: its own entities
+// plus global ones (empty TenantID, e.g. persona/system facts). An empty
+// tenantID returns all entities (admin/global callers).
+func (g *Graph) SearchEntitiesForTenant(tenantID, query string, limit int) []Entity {
+	return g.searchEntities(tenantID, query, limit)
+}
+
+func (g *Graph) searchEntities(tenantID, query string, limit int) []Entity {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 
 	lower := strings.ToLower(query)
 	var results []Entity
 	for _, e := range g.entities {
+		// Tenant visibility: skip entities owned by a different tenant.
+		if tenantID != "" && e.TenantID != "" && e.TenantID != tenantID {
+			continue
+		}
 		if strings.Contains(strings.ToLower(e.Name), lower) ||
 			strings.Contains(strings.ToLower(e.Type), lower) {
 			cp := *e

@@ -68,25 +68,31 @@ therefore always empty. Fixed by the tenant-aware + `∪ system` recall above.
 | distilled-rules `CompileContext("system", …)` | OK — rules are intentionally global |
 | reverie `SetRecall` → `CompileContext("system", …)` | Intentional — reverie is bot-global, not per-user |
 
-## Over-sharing leak — contained (full scoping = backlog)
+## Over-sharing leak — fixed (per-tenant scoping)
 
-The in-memory **knowledge graph (`KnGraph`) and editable-memory blocks have no
-`TenantID` at the data model** (`Entity` / `Block` are global). Left unguarded,
-`CompileContext` would surface one channel user's graph entities / editable
-blocks to another (tenant = identity).
+`Entity` (knowledge graph) and `Block` (editable memory) now carry a `TenantID`.
+The rule is **empty `TenantID` = global** (persona, system, migrated data —
+visible to every tenant); a non-empty `TenantID` scopes the item to that tenant.
 
-Containment (current): `CompileContext` injects the global layers only when
-`tenantSeesGlobalLayers(tenantID)` is true — i.e. the empty/primary tenant
-(`OrchestratorConfig.PrimaryTenant`, set from `DEFAULT_TENANT_ID`, default
-`default`). `"system"` and channel identity tenants are excluded, and global-layer
-items are filtered out of the system-union, so there is no cross-person leak.
+Reads on the recall path are tenant-aware:
 
-Full fix (backlog): add `TenantID` to `Entity` + `Block`, scope all writes /
-reads / persistence, then drop the containment gate.
+- `Graph.SearchEntitiesForTenant(tenantID, …)` returns the tenant's own entities
+  plus global ones; `Orchestrator.Recall` uses it.
+- `EditableMemory.CompileForTenant(tenantID)` / `BlocksForTenant(tenantID)` do the
+  same for editable blocks, so the bot persona (global) stays visible to all
+  channel users while `human`/`notes` (per-tenant) are scoped.
+
+Writes set the owner: the memory pipeline tags extracted entities with the
+active tenant and namespaces their IDs by tenant (`tenantID + ":" + raw`) so
+two users mentioning the same thing do not merge into one shared entity.
+
+The earlier `tenantSeesGlobalLayers` / `PrimaryTenant` containment has been
+removed — proper per-tenant filtering supersedes it.
 
 ## Cleanup backlog (non-blocking)
 
 - Rename/clarify the channel path so `identity → tenant` is explicit (the word
   "tenant" doing triple duty is the real smell, not the mechanism).
-- Full per-tenant scoping of `KnGraph` + editable memory (then remove the
-  `tenantSeesGlobalLayers` containment gate).
+- Add a per-tenant write API for editable blocks (`AddBlockForTenant`) when
+  per-user editable memory is needed; today user-specific blocks are rare and
+  most blocks are intentionally global.

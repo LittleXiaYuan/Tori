@@ -55,13 +55,6 @@ type OrchestratorConfig struct {
 	ShortToMidAge         time.Duration `json:"short_to_mid_age"`    // promote items older than this
 	DecayHalfLife         time.Duration `json:"decay_half_life"`     // score halves after this duration
 	MaxRecallResults      int           `json:"max_recall_results"`
-
-	// PrimaryTenant is the account-level tenant (web/desktop, default "default").
-	// The knowledge graph and editable-memory blocks are global (not yet
-	// tenant-scoped at the data model), so they are only surfaced for this tenant.
-	// Channel identity tenants (per-end-user) must not see another person's
-	// global layers. See docs/spec/tenant-identity-boundary.md.
-	PrimaryTenant string `json:"primary_tenant"`
 }
 
 func DefaultOrchestratorConfig() OrchestratorConfig {
@@ -77,7 +70,6 @@ func DefaultOrchestratorConfig() OrchestratorConfig {
 		ShortToMidAge:         15 * time.Minute,
 		DecayHalfLife:         7 * 24 * time.Hour, // 1 week
 		MaxRecallResults:      20,
-		PrimaryTenant:         "default",
 	}
 }
 
@@ -213,7 +205,7 @@ func (o *Orchestrator) Recall(ctx context.Context, tenantID, query string, limit
 	// 2. Knowledge Graph — builds results outside any shared lock
 	if o.graph != nil {
 		safego.Go("memory-recall-graph", func() {
-			entities := o.graph.SearchEntities(query, perLayer)
+			entities := o.graph.SearchEntitiesForTenant(tenantID, query, perLayer)
 			local := make([]RecallItem, 0, len(entities))
 			for _, e := range entities {
 				ctx := o.graph.ContextFor(e.ID)
@@ -234,7 +226,7 @@ func (o *Orchestrator) Recall(ctx context.Context, tenantID, query string, limit
 	// 3. Editable Memory blocks
 	if o.editable != nil {
 		safego.Go("memory-recall-editable", func() {
-			blocks := o.editable.AllBlocks()
+			blocks := o.editable.BlocksForTenant(tenantID)
 			queryLower := strings.ToLower(query)
 			var local []RecallItem
 			for _, b := range blocks {
@@ -520,15 +512,10 @@ func (o *Orchestrator) RecallForEntity(ctx context.Context, tenantID, entityName
 func (o *Orchestrator) CompileContext(ctx context.Context, tenantID, currentQuery string) string {
 	var sb strings.Builder
 
-	// The knowledge graph and editable blocks are global (not tenant-scoped at
-	// the data model), so only surface them for the primary/account tenant.
-	// Channel identity tenants (per-end-user) must not see another person's
-	// global layers. See docs/spec/tenant-identity-boundary.md.
-	globalLayers := o.tenantSeesGlobalLayers(tenantID)
-
-	// 1. Editable memory blocks (primary tenant only)
-	if globalLayers && o.editable != nil {
-		compiled := o.editable.Compile()
+	// 1. Editable memory blocks — global blocks (empty TenantID, e.g. persona)
+	// plus this tenant's own blocks. Per-tenant scoping happens in CompileForTenant.
+	if o.editable != nil {
+		compiled := o.editable.CompileForTenant(tenantID)
 		if compiled != "" {
 			sb.WriteString(compiled)
 		}
@@ -536,14 +523,12 @@ func (o *Orchestrator) CompileContext(ctx context.Context, tenantID, currentQuer
 
 	// 2. Relevant recalled memories — union the active tenant with the shared
 	// "system" namespace so background/global writes (e.g. reverie insights)
-	// surface regardless of which tenant is asking.
+	// surface regardless of which tenant is asking. Graph + editable recall
+	// items are already tenant-scoped inside Recall.
 	if currentQuery != "" {
 		items := o.Recall(ctx, tenantID, currentQuery, 10)
 		if tenantID != "" && tenantID != "system" {
 			items = mergeRecallItems(items, o.Recall(ctx, "system", currentQuery, 10), 10)
-		}
-		if !globalLayers {
-			items = filterGlobalLayerItems(items)
 		}
 		if len(items) > 0 {
 			sb.WriteString("<recalled_memories>\n")
@@ -555,34 +540,6 @@ func (o *Orchestrator) CompileContext(ctx context.Context, tenantID, currentQuer
 	}
 
 	return sb.String()
-}
-
-// tenantSeesGlobalLayers reports whether the global (non-tenant-scoped) layers —
-// knowledge graph and editable blocks — should be surfaced for tenantID. Only
-// the empty/primary tenant qualifies; "system" and channel identity tenants do
-// not, so the system-union in CompileContext cannot re-leak global layers.
-func (o *Orchestrator) tenantSeesGlobalLayers(tenantID string) bool {
-	if tenantID == "" {
-		return true
-	}
-	primary := o.config.PrimaryTenant
-	if primary == "" {
-		primary = "default"
-	}
-	return tenantID == primary
-}
-
-// filterGlobalLayerItems drops graph/editable recall items. Used to keep the
-// global layers out of non-primary tenants' recalled context.
-func filterGlobalLayerItems(items []RecallItem) []RecallItem {
-	out := make([]RecallItem, 0, len(items))
-	for _, it := range items {
-		if it.Source == "graph" || it.Source == "editable" {
-			continue
-		}
-		out = append(out, it)
-	}
-	return out
 }
 
 // mergeRecallItems combines two recall slices, de-duplicating by content,

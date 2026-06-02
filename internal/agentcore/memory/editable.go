@@ -17,6 +17,7 @@ import (
 // Block represents an in-context, agent-editable memory block (inspired by Letta).
 type Block struct {
 	ID        string    `json:"id"`
+	TenantID  string    `json:"tenant_id"` // "" = global (e.g. persona), visible to all tenants
 	Label     string    `json:"label"`     // e.g. "persona", "human", "notes"
 	Content   string    `json:"content"`
 	MaxChars  int       `json:"max_chars"` // 0 = unlimited
@@ -328,15 +329,41 @@ func (em *EditableMemory) doDelete(b *Block, lineNum, count int) error {
 // Query & compile
 // ──────────────────────────────────────────────
 
-// Compile combines all blocks into a system prompt snippet.
+// Compile combines all blocks into a system prompt snippet (all tenants).
 func (em *EditableMemory) Compile() string {
+	return em.CompileForTenant("")
+}
+
+// CompileForTenant combines blocks visible to tenantID — global blocks (empty
+// TenantID, e.g. persona) plus the tenant's own blocks. Empty tenantID includes
+// everything. This keeps the bot persona visible to every channel user while
+// scoping per-user blocks (human/notes) to their owner.
+func (em *EditableMemory) CompileForTenant(tenantID string) string {
 	em.mu.RLock()
 	defer em.mu.RUnlock()
 	var sb strings.Builder
 	for _, b := range em.blocks {
+		if tenantID != "" && b.TenantID != "" && b.TenantID != tenantID {
+			continue
+		}
 		sb.WriteString(fmt.Sprintf("<%s>\n%s\n</%s>\n\n", b.Label, b.Content, b.Label))
 	}
 	return sb.String()
+}
+
+// BlocksForTenant returns blocks visible to tenantID (global + own).
+func (em *EditableMemory) BlocksForTenant(tenantID string) []*Block {
+	em.mu.RLock()
+	defer em.mu.RUnlock()
+	out := make([]*Block, 0, len(em.blocks))
+	for _, b := range em.blocks {
+		if tenantID != "" && b.TenantID != "" && b.TenantID != tenantID {
+			continue
+		}
+		cp := *b
+		out = append(out, &cp)
+	}
+	return out
 }
 
 // History returns edit history.

@@ -92,6 +92,7 @@ func (g *Gateway) registerMemoryRoutes() {
 	// Memory
 	g.mux.HandleFunc("/v1/memory/stats", g.requireAuth(g.handleMemoryStats))
 	g.mux.HandleFunc("/v1/memory/search", g.requireAuth(g.handleMemorySearch))
+	g.mux.HandleFunc("/v1/memory/recall/debug", g.requireAuth(g.handleMemoryRecallDebug))
 	g.mux.HandleFunc("/v1/memory/add", g.requireAuth(g.handleMemoryAdd))
 	g.mux.HandleFunc("/v1/memory/compact", g.requireAuth(g.handleMemoryCompact))
 

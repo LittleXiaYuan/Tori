@@ -150,7 +150,7 @@ func (p *Pipeline) Process(ctx context.Context, tenantID string, messages []Chat
 
 	// Phase 5: Extract entities and relations into knowledge graph
 	if p.graph != nil {
-		result.Entities, result.Relations = p.extractToGraphLLM(ctx, extracted.Facts)
+		result.Entities, result.Relations = p.extractToGraphLLM(ctx, tenantID, extracted.Facts)
 	}
 
 	// Phase 6: Persist extracted facts to daily markdown file
@@ -253,21 +253,21 @@ func (p *Pipeline) Compact(ctx context.Context, tenantID string, targetCount, de
 // LLM fails or returns nothing useful. This addresses the historical
 // keyword-only HACK while keeping a no-dependency fallback for offline /
 // degraded deployments.
-func (p *Pipeline) extractToGraphLLM(ctx context.Context, facts []string) (entities, relations int) {
+func (p *Pipeline) extractToGraphLLM(ctx context.Context, tenantID string, facts []string) (entities, relations int) {
 	if p.extractor != nil {
 		if res, err := p.extractor.ExtractGraph(ctx, facts); err == nil && res != nil && len(res.Items) > 0 {
-			return p.applyGraphItems(res.Items)
+			return p.applyGraphItems(tenantID, res.Items)
 		} else if err != nil {
 			slog.Warn("memory pipeline: LLM graph extract failed, falling back to keyword extractor", "err", err)
 		}
 	}
-	return p.extractToGraph(facts)
+	return p.extractToGraph(tenantID, facts)
 }
 
 // applyGraphItems writes structured triples returned by ExtractGraph into the
 // knowledge graph. Subject and object become entities; predicate becomes the
 // relation type. Falls through silently for malformed items.
-func (p *Pipeline) applyGraphItems(items []GraphFact) (entities, relations int) {
+func (p *Pipeline) applyGraphItems(tenantID string, items []GraphFact) (entities, relations int) {
 	for _, item := range items {
 		if item.Object == "" || item.Predicate == "" {
 			continue
@@ -277,7 +277,8 @@ func (p *Pipeline) applyGraphItems(items []GraphFact) (entities, relations int) 
 			objKind = "concept"
 		}
 		objEnt := p.graph.PutEntity(Entity{
-			ID:         entityID(item.Object),
+			ID:         entityID(tenantID + ":" + item.Object),
+			TenantID:   tenantID,
 			Name:       truncateName(item.Object),
 			Type:       objKind,
 			Properties: map[string]string{"source_fact": item.Fact},
@@ -288,9 +289,10 @@ func (p *Pipeline) applyGraphItems(items []GraphFact) (entities, relations int) 
 			subj = "用户"
 		}
 		subjEnt := p.graph.PutEntity(Entity{
-			ID:   entityID("__user__" + subj),
-			Name: subj,
-			Type: "person",
+			ID:       entityID(tenantID + ":__user__" + subj),
+			TenantID: tenantID,
+			Name:     subj,
+			Type:     "person",
 		})
 		p.graph.PutRelation(Relation{
 			ID:      fmt.Sprintf("r_%s_%s_%s", subjEnt.ID, item.Predicate, objEnt.ID),
@@ -307,7 +309,7 @@ func (p *Pipeline) applyGraphItems(items []GraphFact) (entities, relations int) 
 // extractToGraph: keyword-only pattern-match fallback used when no structured
 // extractor is configured or the LLM call fails. Retained as a deterministic,
 // dependency-free path for offline/personal deployments.
-func (p *Pipeline) extractToGraph(facts []string) (entities, relations int) {
+func (p *Pipeline) extractToGraph(tenantID string, facts []string) (entities, relations int) {
 	// Entity type detection patterns (Chinese + English)
 	personPatterns := []string{"用户", "他", "她", "我", "Alice", "Bob", "老师", "同事", "朋友", "user", "person"}
 	placePatterns := []string{"在", "位于", "住在", "located", "lives in", "city", "country", "公司", "学校"}
@@ -349,9 +351,10 @@ func (p *Pipeline) extractToGraph(facts []string) (entities, relations int) {
 		}
 
 		// Create entity from the fact
-		eid := entityID(fact)
+		eid := entityID(tenantID + ":" + fact)
 		p.graph.PutEntity(Entity{
 			ID:         eid,
+			TenantID:   tenantID,
 			Name:       truncateName(fact),
 			Type:       entityType,
 			Properties: map[string]string{"source_fact": fact},
@@ -363,9 +366,10 @@ func (p *Pipeline) extractToGraph(facts []string) (entities, relations int) {
 			if matchAny(lower, rp.keywords) {
 				// Create a relation from a generic "user" entity to this fact-entity
 				userEnt := p.graph.PutEntity(Entity{
-					ID:   "user_self",
-					Name: "用户",
-					Type: "person",
+					ID:       entityID(tenantID + ":user_self"),
+					TenantID: tenantID,
+					Name:     "用户",
+					Type:     "person",
 				})
 				rid := fmt.Sprintf("r_%s_%s", userEnt.ID, eid)
 				p.graph.PutRelation(Relation{

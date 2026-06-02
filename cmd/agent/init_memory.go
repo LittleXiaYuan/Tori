@@ -133,9 +133,6 @@ func initMemory(app *agentrt.App) error {
 
 	// Orchestrator ?five-layer unified recall
 	orchCfg := memory.DefaultOrchestratorConfig()
-	if v := os.Getenv("DEFAULT_TENANT_ID"); v != "" {
-		orchCfg.PrimaryTenant = v
-	}
 	app.Orchestrator = memory.NewOrchestrator(orchCfg, app.MemManager, app.KnGraph, app.EditableMem)
 	app.Orchestrator.SetOnPromote(func() { app.Metrics.Cognitive().MemoryPromote.Add(1) })
 

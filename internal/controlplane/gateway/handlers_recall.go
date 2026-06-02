@@ -35,6 +35,74 @@ func (g *Gateway) handleMemorySearch(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]any{"results": items, "count": len(items)})
 }
 
+// handleMemoryRecallDebug exposes what the orchestrator recalls for a query,
+// scoped to the caller's tenant: per-item score breakdown (layer, raw score,
+// final score, access count, age) plus the final compiled context string that
+// would be injected into the planner. Use it to validate that "记得你" recall
+// actually surfaces the right memories and to debug ranking during experiments.
+func (g *Gateway) handleMemoryRecallDebug(w http.ResponseWriter, r *http.Request) {
+	if g.orchestrator == nil {
+		apperror.WriteCode(w, apperror.CodeInternal, "memory orchestrator not configured")
+		return
+	}
+	tid := tenantFromCtx(r.Context())
+	query := r.URL.Query().Get("q")
+	limit := 10
+	if r.Method == http.MethodPost {
+		var req struct {
+			Query string `json:"query"`
+			Limit int    `json:"limit"`
+		}
+		json.NewDecoder(r.Body).Decode(&req)
+		if req.Query != "" {
+			query = req.Query
+		}
+		if req.Limit > 0 {
+			limit = req.Limit
+		}
+	}
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if n, err := strconv.Atoi(l); err == nil && n > 0 {
+			limit = n
+		}
+	}
+	if query == "" {
+		apperror.WriteCode(w, apperror.CodeMissingField, "query is required (q= or body.query)")
+		return
+	}
+
+	items := g.orchestrator.Recall(r.Context(), tid, query, limit)
+	type debugItem struct {
+		Content     string  `json:"content"`
+		Source      string  `json:"source"`
+		Category    string  `json:"category,omitempty"`
+		Score       float64 `json:"score"`
+		RawScore    float64 `json:"raw_score"`
+		AccessCount int     `json:"access_count"`
+		AgeSeconds  float64 `json:"age_seconds"`
+	}
+	out := make([]debugItem, 0, len(items))
+	for _, it := range items {
+		out = append(out, debugItem{
+			Content:     it.Content,
+			Source:      it.Source,
+			Category:    it.Category,
+			Score:       it.Score,
+			RawScore:    it.RawScore,
+			AccessCount: it.AccessCount,
+			AgeSeconds:  it.Age.Seconds(),
+		})
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"tenant":           tid,
+		"query":            query,
+		"items":            out,
+		"count":            len(out),
+		"compiled_context": g.orchestrator.CompileContext(r.Context(), tid, query),
+	})
+}
+
 func (g *Gateway) handleMemoryAdd(w http.ResponseWriter, r *http.Request) {
 	tid := tenantFromCtx(r.Context())
 	var req struct {
