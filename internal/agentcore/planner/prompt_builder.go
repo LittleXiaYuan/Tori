@@ -175,10 +175,10 @@ func (pb *PromptBuilder) BuildDynamicContext(ctx context.Context, req DynamicCon
 			}
 		})
 	}
-	if injectGraphEnabled && pb.contextAssembly != nil && pb.contextAssembly.graphContext != nil && !skipRetrieval {
+	if injectGraphEnabled && pb.contextAssembly != nil && pb.contextAssembly.HasGraphContext() && !skipRetrieval {
 		pending++
 		safego.Go("prompt-graph-context", func() {
-			if graphCtx := pb.contextAssembly.GraphContextFor(req.LastMessage); graphCtx != "" {
+			if graphCtx := pb.contextAssembly.GraphContextForRequest(ctx, req.TenantID, req.LastMessage); graphCtx != "" {
 				results <- layerResult{"graph", ctxwindow.LayerPriorityRetrieval, "## 知识图谱\n", graphCtx}
 			} else {
 				results <- layerResult{}

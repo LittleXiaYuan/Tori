@@ -20,6 +20,7 @@ import (
 type ContextAssemblyService struct {
 	memory             MemorySearchFunc
 	graphContext       func(query string) string
+	graphContextTenant func(ctx context.Context, tenantID, query string) string
 	codeContext        func(query string) string
 	stateContext       func() string
 	strategyContext    func() string
@@ -84,6 +85,37 @@ func (s *ContextAssemblyService) GraphContextFor(query string) string {
 		return ""
 	}
 	return s.graphContext(query)
+}
+
+// SetGraphContextForTenant attaches a tenant-aware graph/recall context source.
+// Preferred over SetGraphContext when the source needs the per-request tenant
+// (for example Ledger recall, which scopes memories by tenant).
+func (s *ContextAssemblyService) SetGraphContextForTenant(fn func(ctx context.Context, tenantID, query string) string) {
+	if s != nil {
+		s.graphContextTenant = fn
+	}
+}
+
+// HasGraphContext reports whether any graph context source (tenant-aware or
+// query-only) is wired.
+func (s *ContextAssemblyService) HasGraphContext() bool {
+	return s != nil && (s.graphContext != nil || s.graphContextTenant != nil)
+}
+
+// GraphContextForRequest assembles graph context from both the tenant-aware and
+// query-only sources (whichever are wired), joined as sections.
+func (s *ContextAssemblyService) GraphContextForRequest(ctx context.Context, tenantID, query string) string {
+	if s == nil {
+		return ""
+	}
+	var sections []string
+	if s.graphContextTenant != nil {
+		sections = append(sections, s.graphContextTenant(ctx, tenantID, query))
+	}
+	if s.graphContext != nil {
+		sections = append(sections, s.graphContext(query))
+	}
+	return JoinContextSections(sections...)
 }
 
 func JoinContextSections(sections ...string) string {

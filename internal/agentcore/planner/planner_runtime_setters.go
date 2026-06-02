@@ -1,6 +1,7 @@
 package planner
 
 import (
+	"context"
 	"time"
 
 	ldg "yunque-agent/internal/ledgercore"
@@ -43,6 +44,14 @@ func (p *Planner) SetGraphContext(fn func(query string) string) {
 func (p *Planner) AppendGraphContext(fn func(query string) string) {
 	contextAssembly := p.ensureContextAssembly()
 	contextAssembly.AppendGraphContext(fn)
+}
+
+// SetGraphContextForTenant attaches a tenant-aware graph/recall context source
+// (e.g. Ledger recall). Unlike SetGraphContext, the source receives the
+// per-request tenant so recall stays correctly scoped per user.
+func (p *Planner) SetGraphContextForTenant(fn func(ctx context.Context, tenantID, query string) string) {
+	contextAssembly := p.ensureContextAssembly()
+	contextAssembly.SetGraphContextForTenant(fn)
 }
 
 // SetBrowser is a no-op kept for backward compatibility — browser skills are now in the skill registry.

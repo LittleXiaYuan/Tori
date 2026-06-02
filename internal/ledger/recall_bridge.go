@@ -3,10 +3,15 @@ package ledger
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 
 	"yunque-agent/internal/ledgercore"
 )
+
+// systemTenant is the shared namespace for background/global memories (reverie,
+// internal writes) that should surface for every tenant during recall.
+const systemTenant = "system"
 
 // RecallBridge wraps Ledger Recall into a function signature compatible
 // with Planner.SetGraphContext: func(query string) string.
@@ -24,41 +29,87 @@ func NewRecallBridge(ldg *ledger.Ledger, defaultTenantID string) *RecallBridge {
 	return &RecallBridge{ldg: ldg, tenantID: defaultTenantID}
 }
 
-// Query performs a Ledger recall and returns formatted context for the Planner.
-// This is the function to pass to Planner.SetGraphContext().
+// Query performs a Ledger recall against the bridge's default tenant.
+// Kept for backward compatibility; prefer QueryTenant for tenant-correct recall.
 func (rb *RecallBridge) Query(query string) string {
-	ctx := context.Background()
-
-	result, err := rb.ldg.Recall.Recall(ctx, ledger.RecallQuery{
-		TenantID: rb.tenantID,
-		Query:    query,
-		TaskType: ledger.TaskTypeGoal,
-		Limit:    5,
-		MinScore: 0.2,
-	})
-	if err != nil || result == nil || len(result.Entries) == 0 {
-		return ""
-	}
-
-	return formatRecallEntries(result)
+	return rb.QueryTenant(context.Background(), rb.tenantID, query)
 }
 
 // QueryForTenant returns a tenant-specific query function.
 func (rb *RecallBridge) QueryForTenant(tenantID string) func(string) string {
 	return func(query string) string {
-		ctx := context.Background()
-		result, err := rb.ldg.Recall.Recall(ctx, ledger.RecallQuery{
-			TenantID: tenantID,
-			Query:    query,
-			TaskType: ledger.TaskTypeGoal,
-			Limit:    5,
-			MinScore: 0.2,
-		})
-		if err != nil || result == nil || len(result.Entries) == 0 {
-			return ""
-		}
-		return formatRecallEntries(result)
+		return rb.QueryTenant(context.Background(), tenantID, query)
 	}
+}
+
+// QueryTenant performs a recall scoped to tenantID, unioned with the shared
+// "system" namespace so background/global memories surface for every tenant.
+// This is the tenant-aware entry point wired into the planner graph context,
+// fixing the prior mismatch where writes used the active tenant but recall was
+// pinned to "system".
+func (rb *RecallBridge) QueryTenant(ctx context.Context, tenantID, query string) string {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if tenantID == "" {
+		tenantID = rb.tenantID
+	}
+
+	merged := rb.recall(ctx, tenantID, query)
+	if tenantID != systemTenant {
+		merged = mergeRecall(merged, rb.recall(ctx, systemTenant, query))
+	}
+	if merged == nil || len(merged.Entries) == 0 {
+		return ""
+	}
+	return formatRecallEntries(merged)
+}
+
+// recall runs the underlying Ledger recall for a single tenant.
+func (rb *RecallBridge) recall(ctx context.Context, tenantID, query string) *ledger.RecallResult {
+	result, err := rb.ldg.Recall.Recall(ctx, ledger.RecallQuery{
+		TenantID: tenantID,
+		Query:    query,
+		TaskType: ledger.TaskTypeGoal,
+		Limit:    5,
+		MinScore: 0.2,
+	})
+	if err != nil {
+		return nil
+	}
+	return result
+}
+
+// mergeRecall combines two recall results, de-duplicating by entry ID,
+// re-sorting by score, and capping to the per-query limit.
+func mergeRecall(a, b *ledger.RecallResult) *ledger.RecallResult {
+	if a == nil {
+		return b
+	}
+	if b == nil {
+		return a
+	}
+	all := make([]ledger.ScoredEntry, 0, len(a.Entries)+len(b.Entries))
+	all = append(all, a.Entries...)
+	all = append(all, b.Entries...)
+
+	seen := make(map[string]bool, len(all))
+	out := &ledger.RecallResult{QueryTimeMs: a.QueryTimeMs + b.QueryTimeMs}
+	for _, e := range all {
+		if e.Entry.ID != "" && seen[e.Entry.ID] {
+			continue
+		}
+		seen[e.Entry.ID] = true
+		out.Entries = append(out.Entries, e)
+	}
+	sort.Slice(out.Entries, func(i, j int) bool {
+		return out.Entries[i].Score > out.Entries[j].Score
+	})
+	if len(out.Entries) > 5 {
+		out.Entries = out.Entries[:5]
+	}
+	out.TotalFound = len(out.Entries)
+	return out
 }
 
 func formatRecallEntries(result *ledger.RecallResult) string {

@@ -143,9 +143,9 @@ func initPlanner(app *agentrt.App) error {
 	// using 7-factor scoring (keyword, goal, kind, recency, confidence, frequency, trust).
 	if ldgRaw, ok := app.Get(agentrt.CompLedger); ok {
 		if ldg, ok := ldgRaw.(*ledger.Ledger); ok {
-			recallBridge := iledger.NewRecallBridge(ldg, "system")
-			p.SetGraphContext(recallBridge.Query)
-			slog.Info("ledger recall bridge attached to planner")
+			recallBridge := iledger.NewRecallBridge(ldg, defaultTenantID())
+			p.SetGraphContextForTenant(recallBridge.QueryTenant)
+			slog.Info("ledger recall bridge attached to planner (tenant-aware, union with system)")
 
 			// Wire Ledger instance → Planner for ReAct/Reasoning/Eval
 			p.SetLedger(ldg)

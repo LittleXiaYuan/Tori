@@ -55,6 +55,13 @@ type OrchestratorConfig struct {
 	ShortToMidAge         time.Duration `json:"short_to_mid_age"`    // promote items older than this
 	DecayHalfLife         time.Duration `json:"decay_half_life"`     // score halves after this duration
 	MaxRecallResults      int           `json:"max_recall_results"`
+
+	// PrimaryTenant is the account-level tenant (web/desktop, default "default").
+	// The knowledge graph and editable-memory blocks are global (not yet
+	// tenant-scoped at the data model), so they are only surfaced for this tenant.
+	// Channel identity tenants (per-end-user) must not see another person's
+	// global layers. See docs/spec/tenant-identity-boundary.md.
+	PrimaryTenant string `json:"primary_tenant"`
 }
 
 func DefaultOrchestratorConfig() OrchestratorConfig {
@@ -70,6 +77,7 @@ func DefaultOrchestratorConfig() OrchestratorConfig {
 		ShortToMidAge:         15 * time.Minute,
 		DecayHalfLife:         7 * 24 * time.Hour, // 1 week
 		MaxRecallResults:      20,
+		PrimaryTenant:         "default",
 	}
 }
 
@@ -512,17 +520,31 @@ func (o *Orchestrator) RecallForEntity(ctx context.Context, tenantID, entityName
 func (o *Orchestrator) CompileContext(ctx context.Context, tenantID, currentQuery string) string {
 	var sb strings.Builder
 
-	// 1. Editable memory blocks (always included)
-	if o.editable != nil {
+	// The knowledge graph and editable blocks are global (not tenant-scoped at
+	// the data model), so only surface them for the primary/account tenant.
+	// Channel identity tenants (per-end-user) must not see another person's
+	// global layers. See docs/spec/tenant-identity-boundary.md.
+	globalLayers := o.tenantSeesGlobalLayers(tenantID)
+
+	// 1. Editable memory blocks (primary tenant only)
+	if globalLayers && o.editable != nil {
 		compiled := o.editable.Compile()
 		if compiled != "" {
 			sb.WriteString(compiled)
 		}
 	}
 
-	// 2. Relevant recalled memories
+	// 2. Relevant recalled memories — union the active tenant with the shared
+	// "system" namespace so background/global writes (e.g. reverie insights)
+	// surface regardless of which tenant is asking.
 	if currentQuery != "" {
 		items := o.Recall(ctx, tenantID, currentQuery, 10)
+		if tenantID != "" && tenantID != "system" {
+			items = mergeRecallItems(items, o.Recall(ctx, "system", currentQuery, 10), 10)
+		}
+		if !globalLayers {
+			items = filterGlobalLayerItems(items)
+		}
 		if len(items) > 0 {
 			sb.WriteString("<recalled_memories>\n")
 			for _, item := range items {
@@ -533,6 +555,61 @@ func (o *Orchestrator) CompileContext(ctx context.Context, tenantID, currentQuer
 	}
 
 	return sb.String()
+}
+
+// tenantSeesGlobalLayers reports whether the global (non-tenant-scoped) layers —
+// knowledge graph and editable blocks — should be surfaced for tenantID. Only
+// the empty/primary tenant qualifies; "system" and channel identity tenants do
+// not, so the system-union in CompileContext cannot re-leak global layers.
+func (o *Orchestrator) tenantSeesGlobalLayers(tenantID string) bool {
+	if tenantID == "" {
+		return true
+	}
+	primary := o.config.PrimaryTenant
+	if primary == "" {
+		primary = "default"
+	}
+	return tenantID == primary
+}
+
+// filterGlobalLayerItems drops graph/editable recall items. Used to keep the
+// global layers out of non-primary tenants' recalled context.
+func filterGlobalLayerItems(items []RecallItem) []RecallItem {
+	out := make([]RecallItem, 0, len(items))
+	for _, it := range items {
+		if it.Source == "graph" || it.Source == "editable" {
+			continue
+		}
+		out = append(out, it)
+	}
+	return out
+}
+
+// mergeRecallItems combines two recall slices, de-duplicating by content,
+// re-sorting by score, and capping to limit. Used to union a tenant's memories
+// with the shared "system" namespace so background/global memories surface.
+func mergeRecallItems(a, b []RecallItem, limit int) []RecallItem {
+	if len(b) == 0 {
+		return a
+	}
+	all := make([]RecallItem, 0, len(a)+len(b))
+	all = append(all, a...)
+	all = append(all, b...)
+
+	seen := make(map[string]bool, len(all))
+	merged := make([]RecallItem, 0, len(all))
+	for _, it := range all {
+		if it.Content != "" && seen[it.Content] {
+			continue
+		}
+		seen[it.Content] = true
+		merged = append(merged, it)
+	}
+	sort.Slice(merged, func(i, j int) bool { return merged[i].Score > merged[j].Score })
+	if limit > 0 && len(merged) > limit {
+		merged = merged[:limit]
+	}
+	return merged
 }
 
 // ---- FSRS (Free Spaced Repetition Scheduler) memory decay ----
