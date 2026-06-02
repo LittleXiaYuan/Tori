@@ -68,6 +68,39 @@ type BudgetAllocation struct {
 var adaptiveBudgetEnabled = strings.EqualFold(strings.TrimSpace(os.Getenv("ADAPTIVE_BUDGET_ENABLED")), "true") ||
 	os.Getenv("ADAPTIVE_BUDGET_ENABLED") == "1"
 
+// layerInjectionEnabled reports whether a dynamic-context layer should be
+// injected. Default (env unset) is true so production behavior is unchanged;
+// only an explicit falsy value ("false"/"0"/"off"/"no") disables the layer.
+// Intended for single-blind A/B isolation of context sources — set the flag
+// and restart the process to toggle a layer.
+func layerInjectionEnabled(env string) bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(env))) {
+	case "false", "0", "off", "no":
+		return false
+	default:
+		return true
+	}
+}
+
+// Per-layer injection gates, cached at package init (require restart to change).
+// All default ON; set the corresponding env to false/0/off to isolate a source.
+// User-history channels (toggle these together to A/B "does it remember me"):
+//   - INJECT_MEMORY:   per-user recalled memory (orchestrator.CompileContext)
+//   - INJECT_STRATEGY: distilled experience/strategy
+//   - INJECT_REVERIE:  idle inner-thought journal
+//   - INJECT_GRAPH:    knowledge-graph entity relations
+// Non-personalized controls (usually kept constant ON):
+//   - INJECT_COGNI:    declarative Cogni registry context
+//   - INJECT_BELIEF:   Cognition SDK pack disposition/inner-state
+var (
+	injectMemoryEnabled   = layerInjectionEnabled("INJECT_MEMORY")
+	injectStrategyEnabled = layerInjectionEnabled("INJECT_STRATEGY")
+	injectReverieEnabled  = layerInjectionEnabled("INJECT_REVERIE")
+	injectGraphEnabled    = layerInjectionEnabled("INJECT_GRAPH")
+	injectCogniEnabled    = layerInjectionEnabled("INJECT_COGNI")
+	injectBeliefEnabled   = layerInjectionEnabled("INJECT_BELIEF")
+)
+
 // AllocateBudget returns per-layer budget proportions based on the user's
 // intent classification. When intent is empty or adaptive budget is disabled,
 // returns uniform allocation.
@@ -132,7 +165,7 @@ func (pb *PromptBuilder) BuildDynamicContext(ctx context.Context, req DynamicCon
 	pending := 0
 	skipRetrieval := len([]rune(req.LastMessage)) < 6
 
-	if pb.contextAssembly != nil && pb.contextAssembly.memory != nil && !skipRetrieval {
+	if injectMemoryEnabled && pb.contextAssembly != nil && pb.contextAssembly.memory != nil && !skipRetrieval {
 		pending++
 		safego.Go("prompt-memory-recall", func() {
 			if memCtx := pb.contextAssembly.Memory(ctx, req.TenantID, req.LastMessage); memCtx != "" {
@@ -142,7 +175,7 @@ func (pb *PromptBuilder) BuildDynamicContext(ctx context.Context, req DynamicCon
 			}
 		})
 	}
-	if pb.contextAssembly != nil && pb.contextAssembly.graphContext != nil && !skipRetrieval {
+	if injectGraphEnabled && pb.contextAssembly != nil && pb.contextAssembly.graphContext != nil && !skipRetrieval {
 		pending++
 		safego.Go("prompt-graph-context", func() {
 			if graphCtx := pb.contextAssembly.GraphContextFor(req.LastMessage); graphCtx != "" {
@@ -244,7 +277,7 @@ func (pb *PromptBuilder) BuildDynamicContext(ctx context.Context, req DynamicCon
 	// P3.6: Declarative Cogni context — assembled from cogni.Registry.Active()
 	// declarations whose ActivationRules match the current message/tenant/channel.
 	// The hook (pkg/cogni.Hook) handles evaluation, exclusivity, and rendering.
-	if pb.contextAssembly != nil {
+	if injectCogniEnabled && pb.contextAssembly != nil {
 		if cgCtx := pb.contextAssembly.CogniContext(ctx, req.LastMessage, req.TenantID, req.Channel); cgCtx != "" {
 			layers = append(layers, ctxwindow.Layer{
 				Name:     "cogni",
@@ -255,7 +288,7 @@ func (pb *PromptBuilder) BuildDynamicContext(ctx context.Context, req DynamicCon
 	}
 
 	// P3.7: Cognition SDK belief context — packed inner state and disposition.
-	if pb.contextAssembly != nil && pb.contextAssembly.beliefContext != nil {
+	if injectBeliefEnabled && pb.contextAssembly != nil && pb.contextAssembly.beliefContext != nil {
 		if beliefCtx := pb.contextAssembly.beliefContext(ctx, req.LastMessage, req.TenantID, req.Channel); beliefCtx != "" {
 			layers = append(layers, ctxwindow.Layer{
 				Name:     "belief",
@@ -277,7 +310,7 @@ func (pb *PromptBuilder) BuildDynamicContext(ctx context.Context, req DynamicCon
 			})
 		}
 	}
-	if pb.contextAssembly != nil && (pb.contextAssembly.strategyContextFor != nil || pb.contextAssembly.strategyContext != nil) {
+	if injectStrategyEnabled && pb.contextAssembly != nil && (pb.contextAssembly.strategyContextFor != nil || pb.contextAssembly.strategyContext != nil) {
 		strCtx := ""
 		if pb.contextAssembly.strategyContextFor != nil {
 			strCtx = pb.contextAssembly.strategyContextFor(req.LastMessage)
@@ -305,7 +338,7 @@ func (pb *PromptBuilder) BuildDynamicContext(ctx context.Context, req DynamicCon
 		}
 	}
 	// Reverie: inject only high-relevance inner thoughts with natural delivery guidance
-	if pb.proactiveCog != nil {
+	if injectReverieEnabled && pb.proactiveCog != nil {
 		if jctx := pb.proactiveCog.JournalContext(2, req.LastMessage); jctx != "" {
 			layers = append(layers, ctxwindow.Layer{
 				Name:     "reverie",
