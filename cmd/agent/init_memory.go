@@ -223,6 +223,43 @@ func initMemory(app *agentrt.App) error {
 	}
 	slog.Info("adaptive loop initialized")
 
+	// Interval persistence for graph + editable memory. They are otherwise only
+	// saved on graceful shutdown, so a hard crash (kill -9 / power loss) would
+	// lose all knowledge-graph and editable-memory changes since boot. Flush on
+	// a dirty flag so unchanged state is not rewritten.
+	app.Lifecycle.RegisterFunc("orch_persist_flush", func(ctx context.Context) error {
+		safego.Go("orch-persist-flush-ticker", func() {
+			ticker := time.NewTicker(60 * time.Second)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					if !app.KnGraph.Dirty() && !app.EditableMem.Dirty() {
+						continue
+					}
+					op, ok := app.Get(agentrt.CompOrchPersist)
+					if !ok {
+						continue
+					}
+					saver, ok := op.(interface{ Save() error })
+					if !ok {
+						continue
+					}
+					// Clear before snapshotting so concurrent writes re-mark dirty
+					// and get picked up on the next tick instead of being lost.
+					app.KnGraph.ClearDirty()
+					app.EditableMem.ClearDirty()
+					if err := saver.Save(); err != nil {
+						slog.Warn("orch persist flush failed", "err", err)
+					}
+				}
+			}
+		})
+		return nil
+	}, nil)
+
 	// Persona
 	personaDir := os.Getenv("PERSONA_DIR")
 	if personaDir == "" {

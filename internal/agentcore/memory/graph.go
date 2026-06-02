@@ -38,6 +38,21 @@ type Graph struct {
 	nameIdx   map[string]string    // lowercase_name -> entity_id (for quick lookup)
 	adjOut    map[string][]string  // entity_id -> []relation_id (outgoing)
 	adjIn     map[string][]string  // entity_id -> []relation_id (incoming)
+	dirty     bool                 // set on mutation; consumed by interval persistence
+}
+
+// Dirty reports whether the graph has unsaved mutations.
+func (g *Graph) Dirty() bool {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	return g.dirty
+}
+
+// ClearDirty resets the dirty flag (call before persisting a snapshot).
+func (g *Graph) ClearDirty() {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.dirty = false
 }
 
 // NewGraph creates a knowledge graph.
@@ -55,6 +70,7 @@ func NewGraph() *Graph {
 func (g *Graph) PutEntity(e Entity) *Entity {
 	g.mu.Lock()
 	defer g.mu.Unlock()
+	g.dirty = true
 
 	if existing, ok := g.entities[e.ID]; ok {
 		existing.Mentions++
@@ -152,6 +168,7 @@ func (g *Graph) SearchEntities(query string, limit int) []Entity {
 func (g *Graph) PutRelation(r Relation) *Relation {
 	g.mu.Lock()
 	defer g.mu.Unlock()
+	g.dirty = true
 
 	// Check if a similar relation already exists
 	for _, rid := range g.adjOut[r.FromID] {
@@ -312,6 +329,7 @@ func (g *Graph) RemoveEntity(id string) bool {
 	if !ok {
 		return false
 	}
+	g.dirty = true
 
 	// Remove all outgoing relations
 	for _, rid := range g.adjOut[id] {

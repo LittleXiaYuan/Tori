@@ -33,6 +33,15 @@ func initLedgerStateEngine(app *agentrt.App, typedLdg *ledger.Ledger, taskStore 
 				})
 				typedLdg.Vector.SetDimensions(emb.Dimensions())
 				slog.Info("ledger vector index: embed function attached", "dims", emb.Dimensions())
+
+				// Wire the in-memory long-term layer's embedder too. This runs
+				// after initMemory's persister load (Phase 3 < Phase 7), so boot
+				// rehydration does not re-embed; only new runtime Puts embed,
+				// enabling in-memory semantic recall without a startup cost spike.
+				if app.MemManager != nil {
+					app.MemManager.SetEmbedFunc(emb.EmbedBatch)
+					slog.Info("in-memory long-term: embed function attached (semantic recall for new items)")
+				}
 			}
 		}
 	}

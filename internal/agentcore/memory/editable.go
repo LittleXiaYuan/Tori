@@ -87,6 +87,7 @@ type EditableMemory struct {
 	mu     sync.RWMutex
 	blocks map[string]*Block
 	history []EditResult
+	dirty   bool // set on mutation; consumed by interval persistence
 }
 
 // NewEditableMemory creates an editable memory store.
@@ -96,10 +97,25 @@ func NewEditableMemory() *EditableMemory {
 	}
 }
 
+// Dirty reports whether editable memory has unsaved mutations.
+func (em *EditableMemory) Dirty() bool {
+	em.mu.RLock()
+	defer em.mu.RUnlock()
+	return em.dirty
+}
+
+// ClearDirty resets the dirty flag (call before persisting a snapshot).
+func (em *EditableMemory) ClearDirty() {
+	em.mu.Lock()
+	defer em.mu.Unlock()
+	em.dirty = false
+}
+
 // AddBlock creates a new memory block.
 func (em *EditableMemory) AddBlock(label, content string, maxChars int) *Block {
 	em.mu.Lock()
 	defer em.mu.Unlock()
+	em.dirty = true
 
 	b := &Block{
 		ID:        uuid.New().String(),
@@ -146,6 +162,7 @@ func (em *EditableMemory) RemoveBlock(label string) bool {
 		return false
 	}
 	delete(em.blocks, label)
+	em.dirty = true
 	return true
 }
 
@@ -163,6 +180,7 @@ func (em *EditableMemory) RenameBlock(oldLabel, newLabel string) error {
 	delete(em.blocks, oldLabel)
 	b.Label = newLabel
 	em.blocks[newLabel] = b
+	em.dirty = true
 	return nil
 }
 
@@ -227,6 +245,7 @@ func (em *EditableMemory) Edit(req EditRequest) EditResult {
 
 	b.Version++
 	b.UpdatedAt = time.Now()
+	em.dirty = true
 	result.Success = true
 	result.NewVersion = b.Version
 	result.CharsAfter = len(b.Content)

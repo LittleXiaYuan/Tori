@@ -12,6 +12,7 @@ import (
 
 	"yunque-agent/internal/agentcore/adaptive"
 	ctxwindow "yunque-agent/internal/agentcore/context"
+	"yunque-agent/internal/agentcore/knowledge"
 	"yunque-agent/internal/agentcore/memory"
 	"yunque-agent/internal/agentcore/persona"
 	"yunque-agent/internal/agentcore/planner"
@@ -21,6 +22,25 @@ import (
 	reflectpkg "yunque-agent/internal/experimental/reflect"
 	iledger "yunque-agent/internal/ledger"
 )
+
+// buildRecallReranker constructs a cross-encoder reranker for memory recall from
+// env (Jina preferred, then Cohere). Returns nil when neither is configured, in
+// which case recall keeps the Ledger engine's built-in multi-signal ordering.
+func buildRecallReranker() knowledge.Reranker {
+	if jinaKey := os.Getenv("JINA_API_KEY"); jinaKey != "" {
+		return knowledge.NewJinaReranker(knowledge.JinaRerankerConfig{
+			APIKey: jinaKey,
+			Model:  os.Getenv("JINA_RERANK_MODEL"),
+		})
+	}
+	if cohereKey := os.Getenv("COHERE_API_KEY"); cohereKey != "" {
+		return knowledge.NewCohereReranker(knowledge.CohereRerankerConfig{
+			APIKey: cohereKey,
+			Model:  os.Getenv("COHERE_RERANK_MODEL"),
+		})
+	}
+	return nil
+}
 
 // initPlanner initializes the Planner, context manager, skill optimizer,
 // Reverie system, and learning loop.
@@ -144,6 +164,20 @@ func initPlanner(app *agentrt.App) error {
 	if ldgRaw, ok := app.Get(agentrt.CompLedger); ok {
 		if ldg, ok := ldgRaw.(*ledger.Ledger); ok {
 			recallBridge := iledger.NewRecallBridge(ldg, defaultTenantID())
+			if kr := buildRecallReranker(); kr != nil {
+				recallBridge.SetReranker(func(ctx context.Context, query string, docs []string, topK int) ([]int, error) {
+					res, err := kr.Rerank(ctx, query, docs, topK)
+					if err != nil {
+						return nil, err
+					}
+					idx := make([]int, 0, len(res))
+					for _, r := range res {
+						idx = append(idx, r.Index)
+					}
+					return idx, nil
+				})
+				slog.Info("ledger recall: cross-encoder reranker attached", "provider", kr.Name())
+			}
 			p.SetGraphContextForTenant(recallBridge.QueryTenant)
 			slog.Info("ledger recall bridge attached to planner (tenant-aware, union with system)")
 
