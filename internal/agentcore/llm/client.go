@@ -54,7 +54,7 @@ func newOptimizedTransport() *http.Transport {
 		IdleConnTimeout:       90 * time.Second, // kill idle connections after 90s
 		TLSHandshakeTimeout:   15 * time.Second, // TLS handshake limit
 		ExpectContinueTimeout: 1 * time.Second,  // 100-continue wait
-		ResponseHeaderTimeout: 60 * time.Second, // time to first response byte (tool calls need more)
+		ResponseHeaderTimeout: 300 * time.Second, // time to first response byte. Reasoning models (gpt-5.5 等) "think" silently before any header on large generations (e.g. file_exec building PPT+Word); 60s tripped "timeout awaiting response headers" and failed the whole turn.
 		ForceAttemptHTTP2:     false,            // disable HTTP/2 — causes h2 timeout with some CN proxies
 		TLSClientConfig: &tls.Config{
 			MinVersion: tls.VersionTLS12,
@@ -257,7 +257,7 @@ func (c *Client) Chat(ctx context.Context, messages []Message, temperature float
 	// Streaming responses need generous timeout (LLM generation can take time)
 	if _, ok := ctx.Deadline(); !ok {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, 120*time.Second)
+		ctx, cancel = context.WithTimeout(ctx, 300*time.Second)
 		defer cancel()
 	}
 	ctx, span := observe.StartSpan(ctx, "llm.Chat")
@@ -317,7 +317,7 @@ func (c *Client) Chat(ctx context.Context, messages []Message, temperature float
 func (c *Client) ChatFull(ctx context.Context, messages []Message, temperature float64, onDelta ...StreamDeltaFunc) (ChatResult, error) {
 	if _, ok := ctx.Deadline(); !ok {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, 120*time.Second)
+		ctx, cancel = context.WithTimeout(ctx, 300*time.Second)
 		defer cancel()
 	}
 	if err := c.breaker.Allow(); err != nil {
@@ -581,7 +581,7 @@ func (c *Client) chatJSONOnce(ctx context.Context, messages []Message) (string, 
 func (c *Client) ChatWithModel(ctx context.Context, model string, messages []Message, temperature float64) (string, error) {
 	if _, ok := ctx.Deadline(); !ok {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, 120*time.Second)
+		ctx, cancel = context.WithTimeout(ctx, 300*time.Second)
 		defer cancel()
 	}
 	ctx, span := observe.StartSpan(ctx, "llm.ChatWithModel")

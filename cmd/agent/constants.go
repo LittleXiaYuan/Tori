@@ -41,8 +41,13 @@ const (
 	MaxKnowledgeResults       = 5
 
 	// Network / HTTP
-	DefaultHTTPReadTimeout  = 30 * time.Second
-	DefaultHTTPWriteTimeout = 150 * time.Second
+	DefaultHTTPReadTimeout = 30 * time.Second
+	// WriteTimeout caps the entire response write, including long SSE streams
+	// (agentic chat). Multi-subagent tasks — research_exec then file_exec
+	// generating PPT/Word — can stream for several minutes; the old 150s cut the
+	// stream mid-task before the deliverable arrived. 900s comfortably covers a
+	// chained multi-agent run while still bounding stuck connections.
+	DefaultHTTPWriteTimeout = 900 * time.Second
 	DefaultHTTPIdleTimeout  = 60 * time.Second
 	GracefulShutdownTimeout = 15 * time.Second
 

@@ -645,7 +645,7 @@ export default function ChatPage() {
         }));
       }
 
-      const INITIAL_RESPONSE_TIMEOUT = 180_000;
+      const INITIAL_RESPONSE_TIMEOUT = 240_000;
       let initialResponseTimedOut = false;
       const initialResponseTimer = window.setTimeout(() => {
         initialResponseTimedOut = true;
@@ -671,7 +671,11 @@ export default function ChatPage() {
       if (!resp.ok) throw new Error(await chatHttpErrorMessage(resp));
       if (!resp.body) throw new Error("连接暂时中断，现场已保留；如果任务已经推进，可以从最近可恢复任务继续。");
 
-      const IDLE_TIMEOUT = 180_000;
+      // Subagents (esp. file_exec generating whole PPT/Word docs) run a single
+      // long LLM turn that emits no intermediate SSE events. The backend handoff
+      // cap is 240s, so the idle window must exceed it or the stream is killed
+      // mid-generation right before the deliverable arrives.
+      const IDLE_TIMEOUT = 420_000;
 
       for await (const item of parseAgenticChatStream(resp.body, { idleTimeoutMs: IDLE_TIMEOUT })) {
         if (abort.signal.aborted) break;

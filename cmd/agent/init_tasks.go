@@ -276,6 +276,7 @@ func initTasks(app *agentrt.App) error {
 }
 
 func initSubagentHandoff(app *agentrt.App, gw *gateway.Gateway, p *planner.Planner) {
+	cfg := app.Config
 	initExecProvider := os.Getenv("EXEC_PROVIDER")
 	if initExecProvider == "" {
 		var persisted struct {
@@ -290,8 +291,33 @@ func initSubagentHandoff(app *agentrt.App, gw *gateway.Gateway, p *planner.Plann
 	if initExecProvider == "" {
 		initExecProvider = "smart"
 	}
+	if strings.HasPrefix(initExecProvider, "local-") && !cfg.LocalModelsEnabled {
+		slog.Info("exec provider ignored because local models are disabled", "provider", initExecProvider)
+		initExecProvider = "smart"
+	}
+	if initExecProvider != "smart" && initExecProvider != "" && app.Providers != nil {
+		provider := app.Providers.Get(initExecProvider)
+		if provider == nil || !provider.Enabled() {
+			slog.Warn("exec provider unavailable, falling back to smart", "provider", initExecProvider)
+			initExecProvider = "smart"
+		}
+	}
 	gw.SetExecProvider(initExecProvider)
 	slog.Info("exec agent provider configured", "provider", initExecProvider)
+
+	// file_exec generates whole documents (PPT/Word) in a single long LLM turn.
+	// A slow reasoning model (e.g. gpt-5.5) stalls tens of seconds before the
+	// first byte and repeatedly blew past the handoff timeout mid-generation —
+	// the roadshow demo's main failure mode. Route document generation to the
+	// fast (non-reasoning) tier when one is configured; fall back to the exec
+	// provider otherwise so nothing breaks when no fast model exists.
+	fileExecProvider := strings.TrimSpace(os.Getenv("FILE_EXEC_PROVIDER"))
+	if fileExecProvider == "" && app.LLMPool != nil && app.LLMPool.Has("fast") {
+		fileExecProvider = "fast"
+	}
+	if fileExecProvider != "" {
+		slog.Info("file_exec provider configured (split from main brain)", "provider", fileExecProvider)
+	}
 
 	subMgr := subagent.NewManager()
 	gw.SetSubagentManager(subMgr)
@@ -344,7 +370,8 @@ func initSubagentHandoff(app *agentrt.App, gw *gateway.Gateway, p *planner.Plann
 		Name:        "file_exec",
 		Description: "文件执行代理：只处理本地文件读取、搜索、生成和编辑（Word/Excel/PPT/PDF/HTML）。如果用户只是要求查看已上传文件，优先调用 file_open/file_search 或直接根据已解析内容回答，不要再委派其他代理。",
 		Skills:      []string{"file_open", "file_search", "file_create", "file_generate", "docx_create", "docx_edit", "docx_fill", "xlsx_create", "xlsx_edit", "xlsx_fill", "xlsx_split", "pptx_create", "pptx_edit", "pptx_fill", "pptx_template_search", "pdf_create", "html_export"},
-		SystemNote:  "你是文件执行代理。你只能使用文件/文档相关工具完成任务；不要调用浏览器、搜索网页或代码执行。若输入里已经包含 [Parsed document] 或文档正文，直接整理内容并回答；若只有文件名，先用 file_open/file_search 在工作区查找和读取。",
+		ProviderID:  fileExecProvider,
+		SystemNote:  "你是文件执行代理。你只能使用文件/文档相关工具完成任务；不要调用浏览器、搜索网页或代码执行。若输入里已经包含 [Parsed document] 或文档正文，直接整理内容并回答；若只有文件名，先用 file_open/file_search 在工作区查找和读取。\n\n生成纪律：若一次需要产出多份文档（例如同时要 PPT 和 Word），逐份生成——先完整做完一份、调用对应生成工具落盘，再开始下一份；单轮不要并行拼装多份大文档，避免一次生成内容过长导致超时。",
 	})
 	handoffReg.Register(subagent.HandoffConfig{
 		Name:        "code_exec",

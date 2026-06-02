@@ -38,7 +38,7 @@ func NewBuiltin(workDir string) *Builtin {
 		workDir: workDir,
 		apiBase: "http://127.0.0.1:" + port,
 		apiKey:  os.Getenv("AGENT_INTERNAL_KEY"),
-		client:  &http.Client{Timeout: 15 * time.Second},
+		client:  &http.Client{Timeout: 30 * time.Second},
 	}
 }
 
@@ -170,7 +170,12 @@ func (b *Builtin) webFetch(ctx context.Context, args map[string]any) (*mcp.CallR
 	if err != nil {
 		return mcp.ErrorResult(err.Error()), nil
 	}
-	req.Header.Set("User-Agent", "YunqueAgent/1.0")
+	// Many sites (Stanford, news/CMS, Cloudflare-fronted) 403 or serve a bot
+	// wall to non-browser User-Agents, which made web_fetch return useless
+	// block pages or fail outright. Present as a normal browser.
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+	req.Header.Set("Accept-Language", "en-US,en;q=0.9,zh-CN;q=0.8")
 
 	resp, err := b.client.Do(req)
 	if err != nil {
@@ -178,7 +183,9 @@ func (b *Builtin) webFetch(ctx context.Context, args map[string]any) (*mcp.CallR
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 32*1024))
+	// Read up to 256KB (was 32KB, which truncated most articles before any
+	// real body content was captured).
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 256*1024))
 	if err != nil {
 		return mcp.ErrorResult(err.Error()), nil
 	}

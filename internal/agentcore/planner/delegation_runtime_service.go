@@ -95,7 +95,13 @@ func (s *DelegationRuntimeService) IsHandoffCall(name string) (string, bool) {
 
 func (s *DelegationRuntimeService) HandoffTimeoutForTool(name string, fallback time.Duration) time.Duration {
 	if _, ok := s.IsHandoffCall(name); ok {
-		return 90 * time.Second
+		// Subagents do real multi-step work — research_exec runs several
+		// searches, file_exec generates whole documents (PPT/Word) in a single
+		// long LLM turn. With a slow reasoning model 90s truncated them into
+		// partial results before the deliverable existed. 240s gives a document
+		// generation turn room to finish. 360s ≥ the 300s single-call ceiling so
+		// a slow reasoning-model document turn isn't cut by the handoff itself.
+		return 360 * time.Second
 	}
 	return fallback
 }
