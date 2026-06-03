@@ -285,7 +285,12 @@ func (g *Gateway) runPostChatHooks(ctx context.Context, req *ChatRequest, result
 		reply := result.Reply
 		tid := req.TenantID
 		safego.Go("memory-pipeline", func() {
-			pCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			// Generous timeout: this runs async (off the request path) and the
+			// pipeline makes TWO LLM calls (extract + decide). 30s was too tight
+			// for slower providers (DeepSeek ~5-9s/call) → "context deadline
+			// exceeded" dropped facts. 120s gives comfortable margin without any
+			// UX impact since the user's reply already returned.
+			pCtx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 			defer cancel()
 			chatMsgs := []memory.ChatMessage{
 				{Role: "user", Content: userMsg},

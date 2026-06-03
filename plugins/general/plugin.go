@@ -22,6 +22,12 @@ func (p *GeneralPlugin) SetHostWritePaths(paths []string) {
 	p.hostWritePaths = paths
 }
 
+// SetHostReadPaths updates the host read allowlist. Paired with a skill-registry
+// rebuild it lets HOST_READ_PATHS changes take effect without a process restart.
+func (p *GeneralPlugin) SetHostReadPaths(paths []string) {
+	p.hostReadPaths = paths
+}
+
 func (p *GeneralPlugin) Name() string { return "general" }
 func (p *GeneralPlugin) Description() string {
 	return "通用插件：搜索、代码执行、文件浏览"

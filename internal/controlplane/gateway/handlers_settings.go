@@ -375,9 +375,38 @@ func (g *Gateway) handleConfigReload(w http.ResponseWriter, r *http.Request) {
 		os.Setenv(k, v)
 	}
 
-	// Hot-reload file system paths into the general plugin (if paths changed)
-	if hrp := vals["HOST_READ_PATHS"]; hrp != "" {
-		reloaded = append(reloaded, "fs_read_paths")
+	// Hot-reload file-system paths: push the new read/write allowlists into every
+	// path-configurable plugin, then rebuild the skill registry so the file skills
+	// (file_search / doc_parse / zip / xlsx_split …) pick them up WITHOUT a restart.
+	if g.pluginReg != nil {
+		parse := func(s string) []string {
+			var out []string
+			for _, p := range strings.Split(s, ",") {
+				if p = strings.TrimSpace(p); p != "" {
+					out = append(out, p)
+				}
+			}
+			return out
+		}
+		rp := parse(vals["HOST_READ_PATHS"])
+		wp := parse(vals["HOST_WRITE_PATHS"])
+		applied := false
+		for _, pl := range g.pluginReg.All() {
+			if pc, ok := pl.(interface {
+				SetHostReadPaths([]string)
+				SetHostWritePaths([]string)
+			}); ok {
+				pc.SetHostReadPaths(rp)
+				if len(wp) > 0 {
+					pc.SetHostWritePaths(wp)
+				}
+				applied = true
+			}
+		}
+		if applied {
+			g.rebuildSkillsFromPlugins()
+			reloaded = append(reloaded, "fs_paths")
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")

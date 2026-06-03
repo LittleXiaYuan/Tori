@@ -29,7 +29,10 @@ func NewCodeGenSkillWithRunner(runner sandbox.Runner) *CodeGenSkill {
 
 func (s *CodeGenSkill) Name() string { return "code_execute" }
 func (s *CodeGenSkill) Description() string {
-	return "生成并执行代码片段（数据分析、计算、文件处理）"
+	return "生成并执行 Python/Node 代码片段。进程后端下运行在本机，可读写本地文件、遍历目录、" +
+		"并通过 subprocess 运行 shell 命令（如 git log / dir / tree）。" +
+		"需要检查本地项目结构、读取 git 历史、或批处理文件时优先用它——直接执行并返回结果，" +
+		"不要让用户手动粘贴命令输出。"
 }
 func (s *CodeGenSkill) Parameters() map[string]any {
 	return map[string]any{
