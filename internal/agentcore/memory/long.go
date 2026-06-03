@@ -68,6 +68,21 @@ func (l *LongTerm) Put(ctx context.Context, tenantID string, item Item) error {
 	}
 
 	l.mu.Lock()
+	// Content dedup: repeated /v1/memory/add of the same fact, re-extracted
+	// facts, and duplicate Ledger entries (which are re-Put on load) would
+	// otherwise pile up identical items that waste recall slots and tokens.
+	// If an identical fact already exists for this tenant, refresh its access
+	// instead of appending a duplicate.
+	if norm := strings.TrimSpace(item.Value); norm != "" {
+		for i := range l.items[tenantID] {
+			if strings.TrimSpace(l.items[tenantID][i].Value) == norm {
+				l.items[tenantID][i].AccessCnt++
+				l.items[tenantID][i].LastAccess = time.Now()
+				l.mu.Unlock()
+				return nil
+			}
+		}
+	}
 	l.items[tenantID] = append(l.items[tenantID], item)
 	l.mu.Unlock()
 	l.statsMu.Lock()

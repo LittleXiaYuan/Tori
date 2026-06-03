@@ -55,6 +55,12 @@ type OrchestratorConfig struct {
 	ShortToMidAge         time.Duration `json:"short_to_mid_age"`    // promote items older than this
 	DecayHalfLife         time.Duration `json:"decay_half_life"`     // score halves after this duration
 	MaxRecallResults      int           `json:"max_recall_results"`
+	// MinRecallScore drops recalled memories whose final score is below this
+	// value before they are injected into the prompt. Keeps irrelevant "filler"
+	// memories out of the context (saves tokens, avoids pollution) when a query
+	// has no good match. 0 = disabled (inject all top-K). Tune per embedder via
+	// RECALL_MIN_SCORE; only applied in CompileContext, not raw Recall.
+	MinRecallScore float64 `json:"min_recall_score"`
 }
 
 func DefaultOrchestratorConfig() OrchestratorConfig {
@@ -529,6 +535,19 @@ func (o *Orchestrator) CompileContext(ctx context.Context, tenantID, currentQuer
 		items := o.Recall(ctx, tenantID, currentQuery, 10)
 		if tenantID != "" && tenantID != "system" {
 			items = mergeRecallItems(items, o.Recall(ctx, "system", currentQuery, 10), 10)
+		}
+		// Drop low-relevance "filler" memories before injection: when a query has
+		// no good match, top-K still returns the least-irrelevant items; injecting
+		// them wastes tokens and pollutes context. Skip in raw Recall so debug/eval
+		// still see the full ranking.
+		if min := o.config.MinRecallScore; min > 0 {
+			kept := items[:0]
+			for _, item := range items {
+				if item.Score >= min {
+					kept = append(kept, item)
+				}
+			}
+			items = kept
 		}
 		if len(items) > 0 {
 			sb.WriteString("<recalled_memories>\n")

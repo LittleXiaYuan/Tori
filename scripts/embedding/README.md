@@ -14,10 +14,14 @@
        -out train.jsonl -eval eval.jsonl
    # 产出 (anchor=改写问句, positive=记忆事实) 训练对
 
-② 微调 (GPU 机)
-   pip install -r requirements.txt          # 另装匹配 CUDA 的 torch
+② 微调 (GPU/NPU 机)
+   pip install -r requirements.txt          # 另装匹配 CUDA/CANN 的 torch
    python finetune.py --train train.jsonl --eval eval.jsonl \
-       --base BAAI/bge-base-zh-v1.5 --out ./yunque-embed --epochs 2 --batch 64
+       --base BAAI/bge-base-zh-v1.5 --out ./yunque-embed \
+       --epochs 2 --batch 64 --hard-negatives 4
+   # --hard-negatives N        : 挖 N 个难负例(像但不对的记忆)→ 把无关项压下去
+   # --matryoshka-dims a,b,c   : 一次训出可截断向量(默认 768,512,256,128;端侧截 256/云端 768)
+   # 训练后自动用 eval.jsonl 做 held-out，打印各维度 Recall@k / MRR(取代假满分)
 
 ③ (可选) 蒸馏成静态小模型 (~几十MB)
    python distill.py --model ./yunque-embed --out ./yunque-embed-static --dims 256

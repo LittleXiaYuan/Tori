@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"yunque-agent/internal/agentcore/emotion"
@@ -185,16 +186,46 @@ func (g *Gateway) handleSkillSuggestions(w http.ResponseWriter, r *http.Request)
 	})
 }
 
+const maxFactLines = 4000 // cap conversation_facts.md so it cannot grow unbounded
+
+var factsFileMu sync.Mutex // serializes dedup-read + append + rotate of the facts file
+
 // ingestFactsToRAG writes extracted conversation facts into the knowledge store
-// and persists them to data/knowledge/ so they survive restarts.
+// and persists them to data/knowledge/ so they survive restarts. Facts already
+// stored are skipped (dedup) and the backing file is rotated to a bounded size,
+// so repeated conversations don't bloat the index or the disk.
 func (g *Gateway) ingestFactsToRAG(ctx context.Context, facts []string) {
 	if g.knowledgeStore == nil || len(facts) == 0 {
 		return
 	}
-	combined := strings.Join(facts, "\n")
+
+	factsFileMu.Lock()
+	defer factsFileMu.Unlock()
+
+	factsPath := ""
+	if g.knowledgeDir != "" {
+		factsPath = filepath.Join(g.knowledgeDir, "conversation_facts.md")
+	}
+
+	// Dedup against already-stored facts (and within this batch) so repeated
+	// conversations don't re-ingest identical lines into the index/file.
+	seen := loadExistingFactLines(factsPath)
+	fresh := make([]string, 0, len(facts))
+	for _, fact := range facts {
+		key := strings.TrimSpace(fact)
+		if key == "" || seen[key] {
+			continue
+		}
+		seen[key] = true
+		fresh = append(fresh, fact)
+	}
+	if len(fresh) == 0 {
+		return // nothing new — skip index rebuild and file append
+	}
+
+	combined := strings.Join(fresh, "\n")
 	name := fmt.Sprintf("对话事实 %s", time.Now().Format("2006-01-02 15:04"))
-	_, err := g.knowledgeStore.IngestText(name, combined)
-	if err != nil {
+	if _, err := g.knowledgeStore.IngestText(name, combined); err != nil {
 		slog.Warn("facts→RAG ingest failed", "err", err)
 		return
 	}
@@ -202,20 +233,70 @@ func (g *Gateway) ingestFactsToRAG(ctx context.Context, facts []string) {
 		slog.Warn("facts→RAG index rebuild failed", "err", err)
 	}
 
-	// Persist to disk so facts survive restarts
-	if g.knowledgeDir != "" {
+	// Persist to disk so facts survive restarts.
+	if factsPath != "" {
 		if mkErr := os.MkdirAll(g.knowledgeDir, 0o755); mkErr == nil {
-			filename := filepath.Join(g.knowledgeDir, "conversation_facts.md")
-			if f, openErr := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644); openErr == nil {
+			if f, openErr := os.OpenFile(factsPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644); openErr == nil {
 				ts := time.Now().Format("2006-01-02 15:04:05")
 				fmt.Fprintf(f, "\n## %s\n\n", ts)
-				for _, fact := range facts {
+				for _, fact := range fresh {
 					fmt.Fprintf(f, "- %s\n", fact)
 				}
 				f.Close()
 			}
+			rotateFactsFile(factsPath, maxFactLines)
 		}
 	}
 
-	slog.Info("facts→RAG ingested", "count", len(facts), "source", name)
+	slog.Info("facts→RAG ingested", "new", len(fresh), "skipped_dup", len(facts)-len(fresh), "source", name)
+}
+
+// loadExistingFactLines returns the set of fact lines (text after "- ") already
+// present in the facts file, used to skip duplicates.
+func loadExistingFactLines(path string) map[string]bool {
+	set := make(map[string]bool)
+	if path == "" {
+		return set
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return set
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "- ") {
+			set[strings.TrimSpace(line[2:])] = true
+		}
+	}
+	return set
+}
+
+// rotateFactsFile keeps only the most recent maxLines fact entries so the file
+// cannot grow without bound. conversation_facts.md is never read back by the
+// runtime (the in-memory knowledge index is the source of truth), so flattening
+// older section headers on rotation is safe.
+func rotateFactsFile(path string, maxLines int) {
+	if maxLines <= 0 {
+		return
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return
+	}
+	var factLines []string
+	for _, l := range strings.Split(string(data), "\n") {
+		if t := strings.TrimSpace(l); strings.HasPrefix(t, "- ") {
+			factLines = append(factLines, t)
+		}
+	}
+	if len(factLines) <= maxLines {
+		return
+	}
+	factLines = factLines[len(factLines)-maxLines:]
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "# 对话事实（滚动保留最近 %d 条）\n\n", maxLines)
+	for _, l := range factLines {
+		sb.WriteString(l + "\n")
+	}
+	os.WriteFile(path, []byte(sb.String()), 0o644)
 }
