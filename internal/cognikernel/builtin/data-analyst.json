@@ -31,7 +31,7 @@
       "doc_parse",
       "docx_create", "pdf_create", "html_export",
       "image_gen",
-      "file_write", "file_search", "file_open",
+      "file_write", "file_search", "file_find", "file_open",
       "web_search"
     ]
   },

@@ -35,7 +35,7 @@
       "pptx_create", "pptx_fill", "pptx_edit", "pptx_template_search",
       "deck_create",
       "pdf_create", "html_export",
-      "image_gen", "file_write", "file_search", "file_open",
+      "image_gen", "file_write", "file_search", "file_find", "file_open",
       "zip_unpack", "zip_pack",
       "web_search", "translate", "doc_parse"
     ]

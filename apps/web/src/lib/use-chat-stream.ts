@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { AgentEvent } from "@/components/execution-trace";
+import { BASE, getAuthHeaders } from "./api-core";
 
 interface UseChatStreamOptions {
   onTraceEvent: (event: AgentEvent) => void;
@@ -14,15 +15,14 @@ export function useChatStream({ onTraceEvent, onShouldOpenComputer }: UseChatStr
 
   useEffect(() => {
     let cancelled = false;
-    const token = typeof window !== "undefined" ? localStorage.getItem("yunque_token") || "" : "";
-    const key = typeof window !== "undefined" ? localStorage.getItem("yunque_api_key") || "" : "";
-    const headers: Record<string, string> = {};
-    if (token) headers["Authorization"] = `Bearer ${token}`;
-    else if (key) headers["X-API-Key"] = key;
 
     (async () => {
       try {
-        const res = await fetch(`/v1/events/stream`, { headers });
+        // Use the shared API base (NEXT_PUBLIC_API_BASE) + auth headers so the
+        // SSE stream hits the Go backend (:9090) just like every other /v1 call.
+        // A bare relative `/v1/events/stream` went to the Next dev server (:3001)
+        // which doesn't serve it → "Failed to fetch" + an empty trace panel.
+        const res = await fetch(`${BASE}/v1/events/stream`, { headers: getAuthHeaders() });
         if (!res.ok || !res.body) return;
         const reader = res.body.getReader();
         const decoder = new TextDecoder();

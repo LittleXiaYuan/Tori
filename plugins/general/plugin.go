@@ -66,6 +66,7 @@ func (p *GeneralPlugin) Skills() []skills.Skill {
 		NewComputerUseSkill(),
 		NewCodeGenSkill(),
 		NewFileSearchSkill(p.hostReadPaths),
+		NewFileFindSkill(p.hostReadPaths),
 		NewDocParseSkill(p.hostReadPaths),
 		NewTranslateSkill(),
 		NewImageGenSkill(),
