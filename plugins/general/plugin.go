@@ -77,6 +77,7 @@ func (p *GeneralPlugin) Skills() []skills.Skill {
 		NewXlsxSplitSkill(readDirs, writeDirs),
 		NewPdfCreateSkill(writeDirs),
 		NewHtmlExportSkill(writeDirs),
+		NewDeckCreateSkill(readDirs, writeDirs),
 		p.pptxSkill(writeDirs),
 		NewPptxFillSkill(readDirs, writeDirs),
 		NewPptxEditSkill(readDirs, writeDirs),
@@ -135,6 +136,8 @@ func (p *GeneralPlugin) SystemPrompt() string {
 - 生成 PDF → pdf_create
 - 导出 HTML 报告 → html_export
 - 生成 PPT(.pptx) → pptx_create（--- 分隔幻灯片）
+- 生成"原创设计"的漂亮演示文稿(PDF) → deck_create（内置品牌设计系统:4 风格/SVG 图标/环形·条形图/封面背景图/图文分栏/全幅/画廊,用户零依赖。要"做一份好看的 PPT/汇报/路演"时优先用它）
+  · 配图自动化(重要):用户给了图片就把"逗号分隔的图片路径"或"图片所在目录"用 images 参数传给 deck_create;用户给的是压缩包(.zip)就【自己先调 zip_unpack 解压到 data/output/】再把解压目录作为 images 传入。全程你自主完成,不要让用户手动解压或配置路径。
 - 填充 PPT 模板 → pptx_fill
 - 编辑 PPT → pptx_edit
 

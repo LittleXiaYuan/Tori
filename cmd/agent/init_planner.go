@@ -297,6 +297,17 @@ func initPlanner(app *agentrt.App) error {
 		slog.Info("trust gate disabled (TRUST_GATE_DISABLED=true)")
 	}
 
+	// Per-tool execution timeout. Default 60s is too short for slow generative
+	// tools (e.g. deck_create asks an LLM to design a full HTML deck, which can
+	// take 1-3 min on a reasoning model). Override via TOOL_TIMEOUT (Go duration,
+	// e.g. "240s" or "4m").
+	if v := os.Getenv("TOOL_TIMEOUT"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil && d > 0 {
+			p.SetToolTimeout(d)
+			slog.Info("planner: tool timeout overridden", "timeout", d)
+		}
+	}
+
 	// ── CognitivePlugin Context Injection ──
 	// Wire CognitivePlugin.DynamicContext into every planning request so
 	// plugins can inject domain-specific knowledge into the LLM's thinking.

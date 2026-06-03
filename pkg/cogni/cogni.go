@@ -153,6 +153,30 @@ type ActivationRules struct {
 
 	// Perception declares multi-modal activation signals beyond keywords/regex.
 	Perception []PerceptionRule `json:"perception,omitempty"`
+
+	// Semantic enables embedding-based activation: the user message is matched
+	// against Examples by cosine similarity, adding to the keyword/regex score.
+	// Requires an embedder wired into the Hook (SetEmbedder); inert otherwise,
+	// so existing keyword-only Cognis are unaffected.
+	Semantic *SemanticActivation `json:"semantic,omitempty"`
+}
+
+// SemanticActivation declares embedding-based activation signals. The example
+// phrases are embedded once (centroid, cached) and compared to the user message
+// vector by cosine similarity. The contribution to the activation score is
+//
+//	Weight * max(0, (sim - Floor) / (1 - Floor))
+//
+// so only a meaningfully-similar message contributes, and a strong match can
+// cross MinScore on its own — making activation robust to paraphrases that the
+// literal keyword list would miss.
+type SemanticActivation struct {
+	// Examples are representative user utterances for this Cogni.
+	Examples []string `json:"examples,omitempty"`
+	// Weight scales the semantic contribution (default 0.5).
+	Weight float64 `json:"weight,omitempty"`
+	// Floor is the minimum cosine similarity that contributes (default 0.55).
+	Floor float64 `json:"floor,omitempty"`
 }
 
 // ToolSurface describes which skills get exposed to the planner once this

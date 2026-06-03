@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"yunque-agent/internal/agentcore/embeddings"
 	"yunque-agent/internal/agentcore/llm"
 	"yunque-agent/internal/agentcore/planner"
 	agentrt "yunque-agent/internal/agentcore/runtime"
@@ -388,6 +389,29 @@ func (m *cogniModule) Init(ctx context.Context, app *agentrt.App) error {
 		hook.SetExperienceProvider(func(cogniID string) *cogni.ExperienceStore {
 			return m.experiences[cogniID]
 		})
+		// Semantic Cogni activation: wire the embedder so Cognis declaring
+		// `activation.semantic.examples` activate on meaning (paraphrase-robust),
+		// not just literal keywords. No-op when the embed resolver is unavailable
+		// or COGNI_SEMANTIC_ACTIVATION=false — keyword/regex scoring is unaffected.
+		if os.Getenv("COGNI_SEMANTIC_ACTIVATION") != "false" {
+			if raw, ok := app.Get("embed_resolver"); ok {
+				if res, ok := raw.(*embeddings.Resolver); ok {
+					if emb, ok := res.Primary(); ok {
+						hook.SetEmbedder(func(text string) []float32 {
+							cctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+							defer cancel()
+							v, err := emb.Embed(cctx, text)
+							if err != nil {
+								slog.Debug("cogni: semantic embed failed", "err", err)
+								return nil
+							}
+							return v
+						})
+						slog.Info("cogni: semantic activation enabled (embedder wired)")
+					}
+				}
+			}
+		}
 		app.Planner.SetCogniRuntime(plannerCogniRuntime{
 			enabled: m.cogniKernelPackEnabled,
 			hook:    hook,

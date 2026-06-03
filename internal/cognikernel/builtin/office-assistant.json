@@ -10,9 +10,21 @@
       "Excel", "excel", "表格", "数据表",
       "PDF", "pdf",
       "模板", "填充", "导出",
-      "论文", "简历", "合同"
+      "论文", "简历", "合同",
+      "压缩包", "zip", "上传", "图片", "配图", "素材"
     ],
     "keyword_weight": 0.4,
+    "semantic": {
+      "examples": [
+        "帮我把这些内容整理成一份漂亮的汇报",
+        "把这堆照片做成展示用的册子",
+        "给客户讲方案，需要一份排版好看的材料",
+        "把季度业绩做成可视化的展示文件",
+        "生成一份可以打印分发的正式文档"
+      ],
+      "weight": 0.9,
+      "floor": 0.45
+    },
     "channels": [],
     "tenants": []
   },
@@ -21,13 +33,15 @@
       "docx_create", "docx_fill", "docx_edit",
       "xlsx_create", "xlsx_fill", "xlsx_edit", "xlsx_split",
       "pptx_create", "pptx_fill", "pptx_edit", "pptx_template_search",
+      "deck_create",
       "pdf_create", "html_export",
       "image_gen", "file_write", "file_search", "file_open",
+      "zip_unpack", "zip_pack",
       "web_search", "translate", "doc_parse"
     ]
   },
   "context": {
-    "static": "你是一位专业的文档处理专家。当用户需要创建或编辑文档时，请直接使用对应的工具：\n- 写报告/方案/论文 → docx_create\n- PPT/幻灯片 → pptx_create\n- 数据表格 → xlsx_create\n- PDF → pdf_create\n- 填充已有模板 → docx_fill / pptx_fill / xlsx_fill\n\n生成文档时注意：\n1. 内容要结构化（标题分级、列表、表格）\n2. 文件保存到 data/output/ 目录\n3. 如需图片素材先用 image_gen 生成\n4. 复杂排版优先使用 Python 引擎（自动选择）"
+    "static": "你是一位专业的文档处理专家。当用户需要创建或编辑文档时，请直接使用对应的工具：\n- 写报告/方案/论文 → docx_create\n- 普通 PPT/幻灯片(模板化) → pptx_create\n- 要\"好看/精美/高管汇报/路演\"级演示 → deck_create（模型原创设计 HTML→渲染 PDF，观感最佳）\n- 数据表格 → xlsx_create\n- PDF → pdf_create\n- 填充已有模板 → docx_fill / pptx_fill / xlsx_fill\n\n生成文档时注意：\n1. 内容要结构化（标题分级、列表、表格）\n2. 文件保存到 data/output/ 目录\n3. 配图自动化(重要)：用户上传了图片→把图片路径(逗号分隔)或所在目录用 deck_create 的 images 参数传入；用户上传的是压缩包(.zip)→你先自己调 zip_unpack 解压到 data/output/，再把解压目录作为 images 传给 deck_create。全程自主完成，绝不要让用户手动解压或填路径\n4. 没有现成图片又确需配图时，才用 image_gen 生成\n5. 复杂排版优先使用 Python 引擎（自动选择）；追求设计感时优先 deck_create"
   },
   "priority": 10,
   "exclusive": "document"

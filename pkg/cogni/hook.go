@@ -65,7 +65,34 @@ type Hook struct {
 	actMu        sync.RWMutex
 	onActivation func(cogniID string, score float64)
 
+	embedMu  sync.RWMutex
+	embedder EmbedderFunc
+
 	turnCache *turnCache
+}
+
+// SetEmbedder wires the host embedder used for semantic Cogni activation. It is
+// propagated to the Evaluator (which lazily caches each Cogni's example vector).
+// Passing nil disables semantic activation, leaving keyword/regex scoring intact.
+func (h *Hook) SetEmbedder(fn EmbedderFunc) {
+	if h == nil {
+		return
+	}
+	h.embedMu.Lock()
+	h.embedder = fn
+	h.embedMu.Unlock()
+	if h.eval != nil {
+		h.eval.SetEmbedder(fn)
+	}
+}
+
+func (h *Hook) embedderFn() EmbedderFunc {
+	if h == nil {
+		return nil
+	}
+	h.embedMu.RLock()
+	defer h.embedMu.RUnlock()
+	return h.embedder
 }
 
 // NewHook constructs a Hook around the given Registry.
@@ -271,6 +298,12 @@ func (h *Hook) evaluate(req ContextRequest) *turnState {
 	}
 
 	st := h.turnCache.getOrInit(req, func() *turnState {
+		// Embed the message once per turn (only on cache-miss) so semantic
+		// activation costs at most one embed call per turn, shared by
+		// BuildContext/FilterSkills/Trace via the turn cache.
+		if fn := h.embedderFn(); fn != nil && strings.TrimSpace(session.Message) != "" {
+			session.MessageVec = fn(session.Message)
+		}
 		raw := h.eval.Evaluate(decls, session)
 		// Track per-id raw activation + score so suppression can be reasoned
 		// about even after exclusivity collapses the list.

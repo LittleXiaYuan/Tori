@@ -11,7 +11,18 @@
       "配图", "插画", "素材", "视觉",
       "generate image", "create image", "draw"
     ],
-    "keyword_weight": 0.4
+    "keyword_weight": 0.4,
+    "semantic": {
+      "examples": [
+        "给我做一张吸引眼球的宣传图",
+        "帮我把产品拍得好看一点的那种图",
+        "做个有视觉冲击力的活动展示图",
+        "需要一张电商详情页用的主视觉",
+        "画一个有创意的封面"
+      ],
+      "weight": 0.9,
+      "floor": 0.45
+    }
   },
   "surface": {
     "only": [
