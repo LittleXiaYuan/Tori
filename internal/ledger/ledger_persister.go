@@ -167,6 +167,15 @@ func (p *LedgerPersister) load() {
 	longCount := 0
 	if err == nil {
 		for _, entry := range longEntries {
+			// Skip auto-collected training-data experiences. The DataCollector
+			// stores raw conversation pairs (JSON {"user_message":...}) in the
+			// Ledger for nightly training export — they are NOT user-facing
+			// memory. Loading them into the recall layer pollutes "记得你"
+			// recall (raw JSON, heavy BM25 weight, ranks above clean facts) and
+			// wastes prompt tokens. They stay in the Ledger for export.
+			if entry.Source == "training_data" {
+				continue
+			}
 			item := ledgerEntryToItem(entry)
 			_ = p.long.Put(ctx, entry.TenantID, item)
 			longCount++

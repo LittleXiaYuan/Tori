@@ -5,8 +5,8 @@
 #   华为昇腾 800I A2/A3 (CANN): 先装 CANN，再装 torch + torch_npu
 #       参考 https://gitee.com/ascend/pytorch  (版本需与 CANN 对齐)
 #       脚本会在检测到 torch_npu 时自动用 NPU + bf16。
-sentence-transformers>=3.0
+sentence-transformers>=3.3   # mine_hard_negatives(output_format=) + IR evaluator truncate_dim
 datasets>=2.19
-accelerate>=0.30
+accelerate>=1.1.0            # required by Transformers v5 Trainer
 # 静态蒸馏（可选，得到 ~几十MB 静态嵌入）：
 model2vec>=0.3

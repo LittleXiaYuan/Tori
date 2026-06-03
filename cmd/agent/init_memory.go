@@ -23,6 +23,7 @@ import (
 	"yunque-agent/internal/ledgercore"
 
 	"os"
+	"strconv"
 )
 
 // initMemory initializes the memory subsystem, guardrails, persona, reflect, and tenant.
@@ -131,8 +132,24 @@ func initMemory(app *agentrt.App) error {
 	app.KnGraph = memory.NewGraph()
 	app.EditableMem = memory.NewEditableMemory()
 
+	// Share the orchestrator's knowledge graph with the pipeline. NewPipeline
+	// creates its own empty graph; without this wire the pipeline (and the
+	// /v1/graph/* HTTP API, which uses pipeline.Graph()) writes to a different
+	// instance than the one the orchestrator recalls from and persists — so
+	// extracted entities never reach recall and are lost on restart.
+	app.MemPipeline.SetGraph(app.KnGraph)
+
 	// Orchestrator ?five-layer unified recall
 	orchCfg := memory.DefaultOrchestratorConfig()
+	// Optional: drop low-relevance recalled memories before injection (token
+	// savings + anti-pollution). Off unless RECALL_MIN_SCORE is set; tune per
+	// embedder (≈0.2 works for bge-base/yunque-embed cosine scores).
+	if v := os.Getenv("RECALL_MIN_SCORE"); v != "" {
+		if f, err := strconv.ParseFloat(v, 64); err == nil && f >= 0 {
+			orchCfg.MinRecallScore = f
+			slog.Info("recall: min-score filter enabled", "min_score", f)
+		}
+	}
 	app.Orchestrator = memory.NewOrchestrator(orchCfg, app.MemManager, app.KnGraph, app.EditableMem)
 	app.Orchestrator.SetOnPromote(func() { app.Metrics.Cognitive().MemoryPromote.Add(1) })
 

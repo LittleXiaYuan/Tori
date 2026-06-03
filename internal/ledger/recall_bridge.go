@@ -114,6 +114,13 @@ func (rb *RecallBridge) recall(ctx context.Context, tenantID, query string) *led
 		TaskType: ledger.TaskTypeGoal,
 		Limit:    5,
 		MinScore: 0.2,
+		// Only surface user-facing memory kinds. Exclude experience (raw
+		// training-data conversation pairs collected for nightly export) and
+		// artifact refs — they would pollute recall and waste prompt tokens.
+		MemoryKinds: []ledger.MemoryKind{
+			ledger.MemoryFact, ledger.MemoryRule,
+			ledger.MemorySummary, ledger.MemoryPreference,
+		},
 	})
 	if err != nil {
 		return nil
