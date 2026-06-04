@@ -243,6 +243,12 @@ type Gateway struct {
 	workflowStore      workflow.Store
 	workflowEngine     *workflow.Engine
 	workflowAPIHandler *workflowapi.Handler
+	// Sub-package API handlers retained so their dependencies (injected via
+	// setters AFTER NewFromConfig) can be late-bound. Without this they would
+	// keep the nil deps captured at routes() time and degrade permanently.
+	costAPIHandler      *costapi.Handler
+	connectorAPIHandler *connectorapi.Handler
+	forkAPIHandler      *forkapi.Handler
 
 	// RBAC
 	rbacEnforcer   *rbac.Enforcer
@@ -714,13 +720,11 @@ func (g *Gateway) routes() {
 	g.registerOrchestratorRoutes() // orchestrator daemon control
 
 	// Extracted handler groups (sub-packages)
-	(&costapi.Handler{
-		Tracker: g.costTracker,
-	}).RegisterRoutes(g.mux, g.requireAuth)
+	g.costAPIHandler = &costapi.Handler{Tracker: g.costTracker}
+	g.costAPIHandler.RegisterRoutes(g.mux, g.requireAuth)
 
-	(&connectorapi.Handler{
-		Registry: g.connectorReg,
-	}).RegisterRoutes(g.mux, g.requireAuth)
+	g.connectorAPIHandler = &connectorapi.Handler{Registry: g.connectorReg}
+	g.connectorAPIHandler.RegisterRoutes(g.mux, g.requireAuth)
 
 	(&notifyapi.Handler{
 		NotifierFunc: func() *notify.Notifier {
@@ -739,10 +743,11 @@ func (g *Gateway) routes() {
 		Scheduler: g.scheduler,
 	}).RegisterRoutes(g.mux, g.requireAuth)
 
-	(&forkapi.Handler{
+	g.forkAPIHandler = &forkapi.Handler{
 		ForkTree:  g.forkTree,
 		Persister: g.forkPersister,
-	}).RegisterRoutes(g.mux, g.requireAuth)
+	}
+	g.forkAPIHandler.RegisterRoutes(g.mux, g.requireAuth)
 
 	// Root "/" serves the embedded Next.js static UI (SPA).
 	// Falls back to pure HTML dashboard if no frontend build is available.

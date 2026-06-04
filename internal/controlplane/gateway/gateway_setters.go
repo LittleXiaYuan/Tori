@@ -160,14 +160,31 @@ func (g *Gateway) SetSkillGrowthPipeline(p skillgrowth.GapHandler) {
 // SetPersonaChain attaches a persona priority chain for session/conversation overrides.
 func (g *Gateway) SetPersonaChain(pc *persona.PriorityChain) { g.personaChain = pc }
 
-// SetCostTracker attaches a cost tracking module.
-func (g *Gateway) SetCostTracker(ct *costtrack.Tracker) { g.costTracker = ct }
+// SetCostTracker attaches a cost tracking module. It also late-binds the
+// already-registered /v1/cost/* handler, which was constructed with a nil
+// tracker during NewFromConfig (before this setter runs).
+func (g *Gateway) SetCostTracker(ct *costtrack.Tracker) {
+	g.costTracker = ct
+	if g.costAPIHandler != nil {
+		g.costAPIHandler.Tracker = ct
+	}
+}
 
-// SetForkTree attaches a conversation fork tree.
-func (g *Gateway) SetForkTree(ft *session.ForkTree) { g.forkTree = ft }
+// SetForkTree attaches a conversation fork tree. Late-binds the /v1/fork/* handler.
+func (g *Gateway) SetForkTree(ft *session.ForkTree) {
+	g.forkTree = ft
+	if g.forkAPIHandler != nil {
+		g.forkAPIHandler.ForkTree = ft
+	}
+}
 
 // SetForkPersister attaches a fork tree persister for saving state to disk.
-func (g *Gateway) SetForkPersister(fp *session.ForkPersister) { g.forkPersister = fp }
+func (g *Gateway) SetForkPersister(fp *session.ForkPersister) {
+	g.forkPersister = fp
+	if g.forkAPIHandler != nil {
+		g.forkAPIHandler.Persister = fp
+	}
+}
 
 // SetEmbeddings attaches an embeddings resolver.
 func (g *Gateway) SetEmbeddings(er *embeddings.Resolver) { g.embedResolver = er }
@@ -475,7 +492,12 @@ func (g *Gateway) SetUpdateChecker(fn func() (tagName, htmlURL string, hasNew bo
 func (g *Gateway) SetToriTokenStore(ts *tori.TokenStore) { g.toriTokenStore = ts }
 
 // SetConnectorRegistry sets the connector registry.
-func (g *Gateway) SetConnectorRegistry(reg *connectors.Registry) { g.connectorReg = reg }
+func (g *Gateway) SetConnectorRegistry(reg *connectors.Registry) {
+	g.connectorReg = reg
+	if g.connectorAPIHandler != nil {
+		g.connectorAPIHandler.Registry = reg
+	}
+}
 
 // ConnectorRegistry returns the connector registry.
 func (g *Gateway) ConnectorRegistry() *connectors.Registry { return g.connectorReg }
