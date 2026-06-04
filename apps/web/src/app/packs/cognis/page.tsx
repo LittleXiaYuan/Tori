@@ -8,6 +8,7 @@ import {
 import type {
   CogniAlert,
   CogniCheckResult,
+  CogniDeclaration,
   CogniEntryStatus,
   CogniEvolutionResponse,
   CogniExperiencePattern,
@@ -23,11 +24,12 @@ import { Button, Card, Chip, Switch } from "@heroui/react";
 import {
   Activity,
   AlertTriangle,
-  Boxes,
   CheckCircle2,
+  ChevronDown,
   Download,
   FlaskConical,
   Globe,
+  Lightbulb,
   Play,
   RefreshCw,
   Search,
@@ -36,6 +38,7 @@ import {
   Target,
   Trash2,
   Upload,
+  Wand2,
   Workflow,
   XCircle,
 } from "lucide-react";
@@ -78,7 +81,28 @@ function runtimeGateColor(ready?: boolean): { bg: string; fg: string } {
 
 const DEMO_COGNI_ID = "code-reviewer";
 
+const ASSISTANT_EXAMPLES = [
+  "一个帮我整理每周工作周报、能查资料还能做成 PPT 的助手",
+  "一个专门审查代码、盯安全漏洞和风格问题的助手",
+  "一个帮我做数据分析、把表格画成图表的助手",
+  "一个回复客户咨询、语气亲切专业的客服助手",
+];
+
 const cogniPack = createCogniKernelPackClient();
+
+// Deterministic avatar so each assistant gets a stable, distinct colour.
+function avatarGradient(seed: string): string {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) % 360;
+  return `linear-gradient(135deg, hsl(${h}, 62%, 55%), hsl(${(h + 38) % 360}, 62%, 46%))`;
+}
+
+function avatarInitial(name: string): string {
+  const s = name.trim();
+  if (!s) return "·";
+  const ch = s[0];
+  return /[a-z]/i.test(ch) ? ch.toUpperCase() : ch;
+}
 
 export default function CognisPage() {
   const [cognis, setCognis] = useState<CogniEntryStatus[]>([]);
@@ -93,9 +117,10 @@ export default function CognisPage() {
   const [detailWorkflows, setDetailWorkflows] = useState<CogniWorkflowDef[]>([]);
   const [detailExperience, setDetailExperience] = useState<CogniExperienceResponse | null>(null);
   const [detailEvolution, setDetailEvolution] = useState<CogniEvolutionResponse | null>(null);
-  const [generateOpen, setGenerateOpen] = useState(false);
   const [generateDesc, setGenerateDesc] = useState("");
   const [generating, setGenerating] = useState(false);
+  const [generatePreview, setGeneratePreview] = useState<CogniDeclaration | null>(null);
+  const heroInputRef = useRef<HTMLTextAreaElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const [demoVerify, setDemoVerify] = useState<CogniVerifyResponse | null>(null);
   const [demoTraces, setDemoTraces] = useState<CogniTrace[]>([]);
@@ -104,6 +129,12 @@ export default function CognisPage() {
   const [refreshingHealth, setRefreshingHealth] = useState(false);
   const [confirmingPatternID, setConfirmingPatternID] = useState<string | null>(null);
   const [runtimePackState, setRuntimePackState] = useState<CogniRuntimePackStateReport | null>(null);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+
+  const focusHeroCreate = useCallback(() => {
+    heroInputRef.current?.focus();
+    heroInputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -201,12 +232,12 @@ export default function CognisPage() {
     setGenerating(true);
     try {
       const r = await cogniPack.generate(generateDesc, true);
-      showToast(`智体 "${r.declaration.id}" 已生成并保存`, "success");
-      setGenerateOpen(false);
+      setGeneratePreview(r.declaration);
+      showToast(`助手「${r.declaration.display_name ?? r.declaration.id}」已创建`, "success");
       setGenerateDesc("");
       await load();
     } catch (e) {
-      showToast(e instanceof Error ? e.message : "生成失败", "error");
+      showToast(e instanceof Error ? e.message : "创建失败，请换个说法再试", "error");
     } finally {
       setGenerating(false);
     }
@@ -305,37 +336,125 @@ export default function CognisPage() {
   );
 
   return (
-    <div className="page-root space-y-5 animate-fade-in-up">
+    <div className="page-root flex flex-col gap-5 animate-fade-in-up">
       <PageHeader
-        icon={<Boxes size={20} />}
-        title="智体内核 Pack"
+        icon={<Sparkles size={20} />}
+        title="我的助手"
+        description="用大白话描述你想要的助手，云雀自动配好技能、触发方式和人设。"
         onRefresh={load}
         actions={
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              onPress={() => setGenerateOpen(true)}
-              className="btn-accent"
+          <Button size="sm" className="btn-accent" onPress={focusHeroCreate}>
+            <Wand2 size={12} /> 新建助手
+          </Button>
+        }
+      />
+
+      {/* Hero — natural-language assistant creation */}
+      <Card className="section-card p-5" style={{ borderTop: "2px solid var(--yunque-accent)" }}>
+        <div className="flex items-center gap-2 mb-1" style={{ color: "var(--yunque-text)" }}>
+          <Wand2 size={16} style={{ color: "var(--yunque-accent)" }} />
+          <span className="text-base font-medium">描述你想要的助手，云雀帮你造一个</span>
+        </div>
+        <p className="text-xs mb-3" style={{ color: "var(--yunque-text-muted)" }}>
+          一句话说清它要做什么 —— 云雀会自动配好该用的技能、激活关键词和说话风格，创建后立即可用。
+        </p>
+        <textarea
+          ref={heroInputRef}
+          value={generateDesc}
+          onChange={(e) => setGenerateDesc(e.target.value)}
+          placeholder="例如：一个帮我整理周报、能查资料还能做成 PPT 的助手"
+          rows={3}
+          className="w-full p-3 text-sm rounded-lg"
+          style={{
+            background: "rgba(255,255,255,0.04)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            color: "var(--yunque-text)",
+            resize: "vertical",
+          }}
+        />
+        <div className="flex flex-wrap items-center gap-1.5 mt-2">
+          <span className="text-[11px] flex items-center gap-1" style={{ color: "var(--yunque-text-muted)" }}>
+            <Lightbulb size={11} /> 试试：
+          </span>
+          {ASSISTANT_EXAMPLES.map((ex) => (
+            <button
+              key={ex}
+              onClick={() => setGenerateDesc(ex)}
+              className="text-[11px] px-2 py-1 rounded-full transition-colors hover:opacity-80"
+              style={{
+                background: "rgba(255,255,255,0.04)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                color: "var(--yunque-text-muted)",
+              }}
             >
-              <Sparkles size={12} /> 自生成
-            </Button>
-            <Button
-              size="sm"
-              onPress={reload}
-              isPending={reloading}
-              variant="ghost"
-            >
-              <RefreshCw size={12} /> 热重载
+              {ex.length > 16 ? ex.slice(0, 16) + "…" : ex}
+            </button>
+          ))}
+        </div>
+        <div className="flex justify-end mt-3">
+          <Button
+            size="sm"
+            className="btn-accent"
+            onPress={generateCogni}
+            isPending={generating}
+            isDisabled={!generateDesc.trim()}
+          >
+            <Sparkles size={12} /> {generating ? "云雀正在造助手…" : "创建助手"}
+          </Button>
+        </div>
+        {generatePreview && (
+          <div
+            className="mt-4 p-3 rounded-lg"
+            style={{ background: "rgba(23,201,100,0.08)", border: "1px solid rgba(23,201,100,0.2)" }}
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <CheckCircle2 size={14} style={{ color: "#17c964" }} />
+              <span className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>
+                已为你创建：{generatePreview.display_name ?? generatePreview.id}
+              </span>
+            </div>
+            {generatePreview.description && (
+              <p className="text-xs mb-2" style={{ color: "var(--yunque-text-muted)" }}>
+                {generatePreview.description}
+              </p>
+            )}
+            {(generatePreview.surface?.only ?? []).length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>会用到：</span>
+                {(generatePreview.surface?.only ?? []).slice(0, 8).map((s) => (
+                  <Chip key={s} size="sm" style={{ background: "rgba(255,255,255,0.05)", color: "var(--yunque-text-muted)" }}>
+                    {s}
+                  </Chip>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </Card>
+
+      {/* Developer diagnostics — pushed to the page bottom via flex order so the page leads with assistants */}
+      <div className="flex items-center justify-between gap-2" style={{ order: 90 }}>
+        <button
+          onClick={() => setAdvancedOpen((v) => !v)}
+          className="flex items-center gap-1.5 text-xs"
+          style={{ color: "var(--yunque-text-muted)" }}
+        >
+          <ChevronDown
+            size={13}
+            style={{ transform: advancedOpen ? "none" : "rotate(-90deg)", transition: "transform .15s" }}
+          />
+          开发者诊断（运行态 Gate · 演示证据 · 导入导出）
+        </button>
+        {advancedOpen && (
+          <div className="flex gap-1.5">
+            <Button size="sm" variant="ghost" onPress={reload} isPending={reloading}>
+              <RefreshCw size={11} /> 热重载
             </Button>
             <Button size="sm" variant="ghost" onPress={exportBundle}>
-              <Download size={12} /> 导出
+              <Download size={11} /> 导出
             </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onPress={() => fileInput.current?.click()}
-            >
-              <Upload size={12} /> 导入
+            <Button size="sm" variant="ghost" onPress={() => fileInput.current?.click()}>
+              <Upload size={11} /> 导入
             </Button>
             <input
               ref={fileInput}
@@ -349,11 +468,11 @@ export default function CognisPage() {
               }}
             />
           </div>
-        }
-      />
+        )}
+      </div>
 
-      {runtimePackState && (
-        <Card className="section-card p-4 border-l-4" style={{ borderLeftColor: runtimePackState.runtime_loop_running ? "#17c964" : "#ffaa00" }}>
+      {advancedOpen && runtimePackState && (
+        <Card className="section-card p-4 border-l-4" style={{ order: 91, borderLeftColor: runtimePackState.runtime_loop_running ? "#17c964" : "#ffaa00" }}>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="space-y-2">
               <div className="flex flex-wrap items-center gap-2">
@@ -412,8 +531,8 @@ export default function CognisPage() {
       )}
 
       {/* Demo Evidence Panel */}
-      {!loading && (
-        <Card className="section-card p-4 border-l-4" style={{ borderLeftColor: "#0091ff" }}>
+      {advancedOpen && !loading && (
+        <Card className="section-card p-4 border-l-4" style={{ order: 92, borderLeftColor: "#0091ff" }}>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <Target size={14} style={{ color: "#0091ff" }} />
@@ -678,7 +797,7 @@ export default function CognisPage() {
             type="text"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            placeholder="搜索智体 ID 或名称…"
+            placeholder="搜索助手…"
             className="w-full pl-9 pr-3 py-1.5 text-sm rounded-md"
             style={{
               background: "rgba(255,255,255,0.04)",
@@ -702,7 +821,7 @@ export default function CognisPage() {
           className="section-card p-10 text-center text-sm"
           style={{ color: "var(--yunque-text-muted)" }}
         >
-          暂无智体。将 <code>*.json</code> 文件放入 <code>data/cognis/</code> 后点击「热重载」。
+          还没有助手 —— 在上面用一句话描述你想要的，云雀帮你造一个。
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -716,7 +835,21 @@ export default function CognisPage() {
                 onClick={() => openDetail(c.id)}
               >
                 <div className="flex items-start justify-between gap-3 mb-2">
-                  <div className="min-w-0 flex-1">
+                  <div className="flex items-start gap-3 min-w-0 flex-1">
+                    <div
+                      className="flex items-center justify-center rounded-xl shrink-0 font-semibold select-none"
+                      style={{
+                        width: 42,
+                        height: 42,
+                        background: avatarGradient(c.id),
+                        color: "#fff",
+                        fontSize: 17,
+                      }}
+                      aria-hidden
+                    >
+                      {avatarInitial(c.display_name ?? c.id)}
+                    </div>
+                    <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <span
                         className="font-medium truncate"
@@ -758,6 +891,7 @@ export default function CognisPage() {
                         {c.description}
                       </div>
                     )}
+                    </div>
                   </div>
                   <div
                     className="flex flex-col items-end gap-2"
@@ -828,51 +962,6 @@ export default function CognisPage() {
               </Card>
             );
           })}
-        </div>
-      )}
-
-      {/* Generate dialog */}
-      {generateOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center"
-          style={{ background: "rgba(0,0,0,0.5)" }}
-          onClick={() => setGenerateOpen(false)}
-        >
-          <Card
-            className="section-card p-6"
-            style={{ width: "min(480px, 90%)" }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center gap-2 mb-4" style={{ color: "var(--yunque-text)" }}>
-              <Sparkles size={16} />
-              <span className="font-medium">自生成智体</span>
-            </div>
-            <textarea
-              value={generateDesc}
-              onChange={(e) => setGenerateDesc(e.target.value)}
-              placeholder="用自然语言描述你想要的智体，例如：&#10;「我需要一个能自动审查 PR 的智体，关注安全漏洞和代码风格」"
-              rows={4}
-              className="w-full p-3 text-sm rounded-lg mb-4"
-              style={{
-                background: "rgba(255,255,255,0.04)",
-                border: "1px solid rgba(255,255,255,0.08)",
-                color: "var(--yunque-text)",
-                resize: "vertical",
-              }}
-            />
-            <div className="flex justify-end gap-2">
-              <Button size="sm" variant="ghost" onPress={() => setGenerateOpen(false)}>取消</Button>
-              <Button
-                size="sm"
-                className="btn-accent"
-                onPress={generateCogni}
-                isPending={generating}
-                isDisabled={!generateDesc.trim()}
-              >
-                <Sparkles size={12} /> 生成并保存
-              </Button>
-            </div>
-          </Card>
         </div>
       )}
 
