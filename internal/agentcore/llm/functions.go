@@ -56,10 +56,11 @@ const ToolChoiceRequired = "required"
 // Returns the response message and any tool calls.
 // ChatWithToolsOpts holds optional parameters for ChatWithTools.
 type ChatWithToolsOpts struct {
-	ThinkingEnabled    *bool
-	OnReasoning        func(reasoning string)      // called once with full reasoning_content
-	OnReasoningDelta   func(delta string)           // called per-chunk for streaming typewriter effect
-	LastReasoningOut   *string                      // if set, receives the reasoning_content from the response
+	ThinkingEnabled  *bool
+	OnReasoning      func(reasoning string) // called once with full reasoning_content
+	OnReasoningDelta func(delta string)     // called per-chunk for streaming typewriter effect
+	OnContentDelta   func(delta string)     // called per-chunk for streaming the final answer text live
+	LastReasoningOut *string                // if set, receives the reasoning_content from the response
 }
 
 func (c *Client) ChatWithTools(ctx context.Context, messages []Message, tools []FunctionDef, temperature float64, toolChoice ...string) (string, []ToolCall, error) {
@@ -211,11 +212,13 @@ func (c *Client) ChatWithToolsEx(ctx context.Context, messages []Message, tools 
 
 			ct := resp.Header.Get("Content-Type")
 			if strings.Contains(ct, "text/event-stream") {
-				var reasonDeltaFn []func(string)
-				if opts != nil && opts.OnReasoningDelta != nil {
-					reasonDeltaFn = append(reasonDeltaFn, opts.OnReasoningDelta)
+				var contentDeltaFn func(string)
+				var reasonDeltaFn func(string)
+				if opts != nil {
+					contentDeltaFn = opts.OnContentDelta
+					reasonDeltaFn = opts.OnReasoningDelta
 				}
-				content, reasoning, calls, err := c.readSSEToolCalls(resp.Body, reasonDeltaFn...)
+				content, reasoning, calls, err := c.readSSEToolCalls(resp.Body, contentDeltaFn, reasonDeltaFn)
 				if err != nil {
 					lastErr = err
 					return fcAttemptResult{}
@@ -325,16 +328,13 @@ type streamToolCallChunk struct {
 	} `json:"choices"`
 }
 
-func (c *Client) readSSEToolCalls(body io.Reader, onReasoningDelta ...func(string)) (content string, reasoning string, calls []ToolCall, err error) {
+func (c *Client) readSSEToolCalls(body io.Reader, onContentDelta func(string), onReasoningDelta func(string)) (content string, reasoning string, calls []ToolCall, err error) {
 	scanner := bufio.NewScanner(body)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 
 	var contentBuf, reasonBuf strings.Builder
 	toolMap := make(map[int]*ToolCall)
-	var reasonDeltaCb func(string)
-	if len(onReasoningDelta) > 0 {
-		reasonDeltaCb = onReasoningDelta[0]
-	}
+	reasonDeltaCb := onReasoningDelta
 
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -350,7 +350,12 @@ func (c *Client) readSSEToolCalls(body io.Reader, onReasoningDelta ...func(strin
 			continue
 		}
 		for _, choice := range chunk.Choices {
-			contentBuf.WriteString(choice.Delta.Content)
+			if choice.Delta.Content != "" {
+				contentBuf.WriteString(choice.Delta.Content)
+				if onContentDelta != nil {
+					onContentDelta(choice.Delta.Content)
+				}
+			}
 			if choice.Delta.ReasoningContent != "" {
 				reasonBuf.WriteString(choice.Delta.ReasoningContent)
 				if reasonDeltaCb != nil {

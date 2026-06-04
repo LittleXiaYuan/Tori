@@ -722,6 +722,13 @@ export default function ChatPage() {
             const cleaned = (doneData.reply || "").replace(/<\|ACT\s+\{[^|]*\}\s*\|>\n?/g, "").trim();
             if (cleaned) updates.content = cleaned;
           }
+          // Reconcile the live-streamed body with the authoritative final reply.
+          // During true token streaming the raw answer (including any trailing
+          // NEXT-move markers) is shown live; on done we settle to the clean
+          // reply so those markers render as suggestion chips, not inline text.
+          if (updates.content === undefined && typeof doneData.reply === "string" && doneData.reply.trim()) {
+            updates.content = doneData.reply;
+          }
           chatD({ type: "UPDATE_LAST", updates });
           if (doneData.browser_summary) {
             setLastArtifact(mapBrowserSummary(doneData.browser_summary));

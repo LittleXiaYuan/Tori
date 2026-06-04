@@ -27,6 +27,7 @@ type PlanRequest struct {
 	ChatType          string          // chat type ("group", "private", etc.)
 	InboxContext      string          // buffered group inbox messages for context
 	StepCallback      StepCallback    // optional: called for each intermediate step (thinking, tool call, etc.)
+	OnReplyDelta      func(string)    // optional: called per-chunk to stream the final answer text live (true token streaming)
 	TraceID           string          // trace context ID for unified event protocol
 	ThinkingEnabled   *bool           // nil = model default; true/false = explicit override
 	DisableDelegation bool            // when true, buildFunctionDefs exposes direct skills instead of handoff tools

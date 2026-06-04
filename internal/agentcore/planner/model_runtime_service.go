@@ -262,7 +262,7 @@ func (s *ModelRuntimeService) ChatWithToolsFallbackForRequest(ctx context.Contex
 		messages,
 		tools,
 		s.ThinkingFlagForRequest(req),
-		s.ReasoningCallbacks(reasoningEvents),
+		s.streamConfigurator(reasoningEvents, req.OnReplyDelta),
 		onFallback,
 	)
 }
@@ -287,6 +287,25 @@ func (s *ModelRuntimeService) ReasoningCallbacks(emit ModelReasoningEventFunc) f
 		}
 		fcOpts.OnReasoning = func(reasoning string) {
 			emit(reasoning, map[string]any{"stream_type": "reasoning_batch"})
+		}
+	}
+}
+
+// streamConfigurator composes the reasoning-delta callbacks with an optional
+// live content-delta callback, so the planner can stream the final answer text
+// token-by-token (true streaming) on top of the existing thinking deltas. When
+// both inputs are absent it returns nil, preserving the non-streaming path.
+func (s *ModelRuntimeService) streamConfigurator(emit ModelReasoningEventFunc, onContent func(string)) func(*llm.ChatWithToolsOpts) {
+	base := s.ReasoningCallbacks(emit)
+	if base == nil && onContent == nil {
+		return nil
+	}
+	return func(fcOpts *llm.ChatWithToolsOpts) {
+		if base != nil {
+			base(fcOpts)
+		}
+		if onContent != nil {
+			fcOpts.OnContentDelta = onContent
 		}
 	}
 }
