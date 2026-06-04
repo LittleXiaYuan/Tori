@@ -224,6 +224,37 @@ func (t *Tracker) Seed(slug string, score int) {
 	t.save()
 }
 
+// SeedMany pre-seeds several skills to the given score and persists ONCE at the
+// end, instead of once per skill. Seed() rewrites the whole JSON file on every
+// call, so seeding the ~34 built-in skills individually on first run meant ~34
+// disk writes on the boot critical path (~0.2s). Returns the number actually
+// seeded (skills already at/above the score are left untouched).
+func (t *Tracker) SeedMany(slugs []string, score int) int {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	seeded := 0
+	for _, slug := range slugs {
+		e := t.getOrCreate(slug)
+		if e.Score >= score {
+			continue
+		}
+		e.Score = score
+		if e.Score > 100 {
+			e.Score = 100
+		}
+		ratio := float64(score) / 100.0
+		totalObs := 20.0
+		e.Alpha = ratio*totalObs + 1
+		e.BetaParam = (1-ratio)*totalObs + 1
+		e.LastPromoted = time.Now()
+		seeded++
+	}
+	if seeded > 0 {
+		t.save()
+	}
+	return seeded
+}
+
 // RecordSuccess increments trust after a successful, safe execution.
 // Updates both legacy Score and Bayesian Alpha (success count).
 func (t *Tracker) RecordSuccess(slug string) {

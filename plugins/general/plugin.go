@@ -1,6 +1,8 @@
 package general
 
 import (
+	"sync"
+
 	"yunque-agent/internal/agentcore/workflow"
 	"yunque-agent/pkg/skills"
 )
@@ -11,7 +13,8 @@ type GeneralPlugin struct {
 	hostWritePaths []string
 	searchFn       SearchFunc
 	wfStore        workflow.Store
-	pythonBin      string // injected from PythonEnv; empty = auto-detect
+	mu             sync.RWMutex // guards pythonBin (resolved asynchronously after startup)
+	pythonBin      string       // injected from PythonEnv; empty = auto-detect
 }
 
 func New(hostReadPaths []string) *GeneralPlugin {
@@ -41,9 +44,20 @@ func (p *GeneralPlugin) SetWorkflowStore(s workflow.Store) {
 	p.wfStore = s
 }
 
-// SetPythonBin injects the resolved Python binary for Office skills.
+// SetPythonBin injects the resolved Python binary for Office skills. Python
+// detection runs off the startup critical path, so this may be called from a
+// background goroutine concurrently with skill-registry rebuilds that read the
+// value via getPythonBin — hence the lock.
 func (p *GeneralPlugin) SetPythonBin(bin string) {
+	p.mu.Lock()
 	p.pythonBin = bin
+	p.mu.Unlock()
+}
+
+func (p *GeneralPlugin) getPythonBin() string {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.pythonBin
 }
 
 func (p *GeneralPlugin) Skills() []skills.Skill {
@@ -96,16 +110,16 @@ func (p *GeneralPlugin) Skills() []skills.Skill {
 
 func (p *GeneralPlugin) docxSkill(dirs []string) skills.Skill {
 	s := NewDocxCreateSkill(dirs)
-	if p.pythonBin != "" {
-		s.SetPythonBin(p.pythonBin)
+	if bin := p.getPythonBin(); bin != "" {
+		s.SetPythonBin(bin)
 	}
 	return s
 }
 
 func (p *GeneralPlugin) pptxSkill(dirs []string) skills.Skill {
 	s := NewPptxCreateSkill(dirs)
-	if p.pythonBin != "" {
-		s.SetPythonBin(p.pythonBin)
+	if bin := p.getPythonBin(); bin != "" {
+		s.SetPythonBin(bin)
 	}
 	return s
 }

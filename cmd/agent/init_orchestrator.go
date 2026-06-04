@@ -7,6 +7,7 @@ import (
 	"yunque-agent/internal/agentcore/task"
 	"yunque-agent/internal/controlplane/gateway"
 	"yunque-agent/internal/orchestrator"
+	"yunque-agent/pkg/safego"
 )
 
 func initWorkOrchestrator(app *agentrt.App, gw *gateway.Gateway) {
@@ -39,8 +40,17 @@ func initWorkOrchestrator(app *agentrt.App, gw *gateway.Gateway) {
 	launcher.RegisterAdapter(orchestrator.NewCursorAdapter())
 	launcher.RegisterAdapter(orchestrator.NewWindsurfAdapter())
 	launcher.RegisterAdapter(orchestrator.NewTraeAdapter())
-	orchestrator.AutoRegisterAdapters(launcher)
-	slog.Info("orchestrator: adapters registered", "available", launcher.AvailableAdapters())
+	// Auto-detecting which external IDEs/tools are installed probes the filesystem and
+	// PATH (exec.LookPath + os.Stat over many binary-name variants and well-known install
+	// dirs) — ~0.5s on Windows — as does AvailableAdapters() (each adapter re-probes). None
+	// of it is needed to serve requests, and the launcher is concurrency-safe (RegisterAdapter
+	// is mutex-guarded), so do it off the boot critical path. The built-in adapters above are
+	// registered synchronously (cheap map inserts) so the daemon is usable immediately;
+	// auto-detected generic adapters simply appear shortly after boot.
+	safego.Go("orchestrator-detect-adapters", func() {
+		n := orchestrator.AutoRegisterAdapters(launcher)
+		slog.Info("orchestrator: adapters registered", "auto_detected", n, "available", launcher.AvailableAdapters())
+	})
 
 	daemon := orchestrator.NewDaemon(orchestrator.DaemonConfig{
 		TaskStore:  ts,

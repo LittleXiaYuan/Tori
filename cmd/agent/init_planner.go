@@ -243,15 +243,17 @@ func initPlanner(app *agentrt.App) error {
 	trustTracker := trust.NewTracker(cfg.DataPath("trust_scores.json"))
 
 	// Pre-seed trust for built-in skills so they don't get blocked on first run.
-	var seededCount int
+	// Collect the brand-new skills first, then seed+persist in one shot: Seed() rewrites
+	// the whole trust_scores.json on every call, so seeding ~34 skills individually used
+	// to cost ~34 disk writes on the boot critical path (~0.2s). SeedMany persists once.
+	var toSeed []string
 	for _, sk := range app.SkillRegistry.All() {
 		entry := trustTracker.Get(sk.Name())
 		if entry.Score == 0 && entry.Executions == 0 {
-			trustTracker.Seed(sk.Name(), 80)
-			seededCount++
+			toSeed = append(toSeed, sk.Name())
 		}
 	}
-	if seededCount > 0 {
+	if seededCount := trustTracker.SeedMany(toSeed, 80); seededCount > 0 {
 		slog.Info("trust: pre-seeded built-in skills", "count", seededCount, "score", 80)
 	}
 
