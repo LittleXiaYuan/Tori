@@ -186,7 +186,7 @@ func TestDelegationRuntimeServiceHandoffTimeoutAndNonHandoffRequest(t *testing.T
 		t.Fatalf("register handoff: %v", err)
 	}
 	service.SetHandoffRegistry(reg)
-	if got := service.HandoffTimeoutForTool("transfer_to_research", 5*time.Second); got != 90*time.Second {
+	if got := service.HandoffTimeoutForTool("transfer_to_research", 5*time.Second); got != 360*time.Second {
 		t.Fatalf("expected handoff timeout, got %v", got)
 	}
 }
