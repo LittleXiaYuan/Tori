@@ -11,10 +11,97 @@ import { formatErrorMessage } from "@/lib/error-utils";
 interface TaskStep {
   id: string;
   agent: string;
+  skill?: string;
   label: string;
   status: "pending" | "running" | "done" | "error";
   subSteps: { id: string; summary: string; status: "done" | "running" | "error" }[];
   durMs?: number;
+}
+
+// Map a raw skill name to one of the known agent categories so direct-mode
+// tool steps reuse the same friendly icon/label/colour as delegated agents.
+function skillCategory(skill: string): string {
+  const s = (skill || "").toLowerCase();
+  if (s.includes("browser") || s.includes("web") || s.includes("crawl")) return "browser_exec";
+  if (s.includes("file") || s.includes("doc") || s.includes("deck") || s.includes("excel") || s.includes("ppt") || s.includes("zip") || s.includes("image") || s.includes("pdf")) return "file_exec";
+  if (s.includes("code") || s.includes("exec") || s.includes("shell") || s.includes("python") || s.includes("script")) return "code_exec";
+  if (s.includes("search") || s.includes("find") || s.includes("research") || s.includes("recall") || s.includes("memory")) return "research_exec";
+  return "general_exec";
+}
+
+// buildDirectToolSteps renders a live checklist for direct-mode tasks (no
+// sub-agent handoffs): each tool call becomes one step, marked done/error when
+// its matching tool_result arrives.
+function buildDirectToolSteps(events: AgentEvent[]): TaskStep[] {
+  const steps: TaskStep[] = [];
+  for (const evt of events) {
+    if (evt.type === "tool_start") {
+      const detail = evt.detail as { skill?: string } | undefined;
+      const skill = detail?.skill || evt.meta?.skill || "";
+      steps.push({
+        id: evt.id,
+        agent: skillCategory(skill),
+        skill,
+        label: friendlyProgressText(evt.summary),
+        status: "running",
+        subSteps: [],
+      });
+    } else if (evt.type === "tool_result") {
+      const detail = evt.detail as { skill?: string; error?: string } | undefined;
+      const skill = detail?.skill || evt.meta?.skill || "";
+      const match =
+        steps.findLast((s) => s.skill === skill && s.status === "running") ||
+        steps.findLast((s) => s.status === "running");
+      if (match) match.status = detail?.error ? "error" : "done";
+    }
+  }
+  return steps;
+}
+
+interface PlanSnapshotStep {
+  id?: number;
+  action?: string;
+  skill?: string;
+  status?: string;
+  error?: string;
+}
+
+function mapPlanStatus(s?: string): TaskStep["status"] {
+  switch (s) {
+    case "done":
+    case "skipped":
+      return "done";
+    case "running":
+      return "running";
+    case "failed":
+      return "error";
+    default:
+      return "pending";
+  }
+}
+
+// buildCommittedPlanSteps renders the agent's declared upfront plan for
+// long-horizon tasks: it reads the latest plan_snapshot carried on the planner
+// checkpoint events and shows each declared step ticking off live. Returns []
+// when no committed plan was emitted (then the caller falls back to the
+// reactive handoff/tool checklist).
+function buildCommittedPlanSteps(events: AgentEvent[]): TaskStep[] {
+  let snapshot: PlanSnapshotStep[] | null = null;
+  for (const evt of events) {
+    const d = evt.detail as { plan_snapshot?: PlanSnapshotStep[] } | undefined;
+    if (d && Array.isArray(d.plan_snapshot) && d.plan_snapshot.length > 0) {
+      snapshot = d.plan_snapshot; // keep the most recent snapshot
+    }
+  }
+  if (!snapshot) return [];
+  return snapshot.map((s, i) => ({
+    id: `plan-${s.id ?? i}`,
+    agent: skillCategory(s.skill || ""),
+    skill: s.skill,
+    label: friendlyProgressText(s.action || `步骤 ${i + 1}`),
+    status: mapPlanStatus(s.status),
+    subSteps: [],
+  }));
 }
 
 const agentMeta: Record<string, { icon: React.ElementType; label: string; color: string }> = {
@@ -34,6 +121,12 @@ function friendlyProgressText(text: string): string {
 }
 
 function buildSteps(events: AgentEvent[]): TaskStep[] {
+  // 1) Committed upfront plan (long-horizon tasks) takes precedence — show the
+  //    agent's declared todo list, ticking off as steps complete.
+  const committed = buildCommittedPlanSteps(events);
+  if (committed.length > 0) return committed;
+
+  // 2) Otherwise fall back to the reactive handoff/tool checklist below.
   const steps: TaskStep[] = [];
   let current: TaskStep | null = null;
   const runningAgents = new Set<string>();
@@ -82,6 +175,12 @@ function buildSteps(events: AgentEvent[]): TaskStep[] {
         current.subSteps.push({ id: evt.id, summary: friendlyProgressText(evt.summary), status });
       }
     }
+  }
+
+  // No sub-agent handoffs → fall back to a direct-mode tool checklist so
+  // ordinary (non-delegated) tasks also get a live, ticking progress list.
+  if (steps.length === 0) {
+    return buildDirectToolSteps(events);
   }
 
   return steps;
