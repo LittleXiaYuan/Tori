@@ -281,6 +281,13 @@ type Gateway struct {
 	workerRegistry    *mcpserver.WorkerRegistry
 	mcpDispatchCtx    *mcpserver.DispatchContext
 
+	// baseCtx is a long-lived context (the app lifecycle context) used to launch
+	// background daemons from request handlers so they outlive the HTTP request
+	// that triggers them. Set via SetBaseContext at boot; defaults to
+	// context.Background(). Starting a daemon from r.Context() would cancel it as
+	// soon as the request returns.
+	baseCtx context.Context
+
 	// Project management (orchestrator)
 	projectStore *orchestrator.ProjectStore
 	orchDaemon   *orchestrator.Daemon
@@ -445,6 +452,7 @@ func NewFromConfig(cfg GatewayConfig) *Gateway {
 		usage:                 NewUsageTracker(),
 		mux:                   http.NewServeMux(),
 		startTime:             time.Now(),
+		baseCtx:               context.Background(),
 		browserSessions:       NewBrowserSessionStore(),
 		modelMgr:              newModelManager(),
 		oauthPending:          make(map[string]*oauthPendingState),

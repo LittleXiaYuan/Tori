@@ -74,7 +74,10 @@ func (g *Gateway) handleOrchestratorToggle(w http.ResponseWriter, r *http.Reques
 
 	switch body.Action {
 	case "start":
-		g.orchDaemon.Start(r.Context())
+		// Use the long-lived app context, not r.Context(): the request context is
+		// cancelled as soon as this handler returns, which would stop the daemon's
+		// loop before its first tick. Lifecycle shutdown still cancels baseCtx.
+		g.orchDaemon.Start(g.baseContext())
 		writeJSON(w, map[string]string{"status": "started"})
 	case "stop":
 		g.orchDaemon.Stop()

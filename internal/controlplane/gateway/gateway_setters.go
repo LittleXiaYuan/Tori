@@ -69,6 +69,26 @@ import (
 // They are called during init_tasks wiring phase and are kept in
 // a dedicated file to reduce noise in gateway.go.
 
+// SetBaseContext sets the long-lived context used to launch background daemons
+// (e.g. the orchestrator daemon) from request handlers. Passing a nil context
+// falls back to context.Background(). Without this, handlers that need to start
+// a daemon would have to use the request context, which is cancelled the moment
+// the request returns — killing the daemon immediately.
+func (g *Gateway) SetBaseContext(ctx context.Context) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	g.baseCtx = ctx
+}
+
+// baseContext returns the long-lived context for background daemons, never nil.
+func (g *Gateway) baseContext() context.Context {
+	if g.baseCtx != nil {
+		return g.baseCtx
+	}
+	return context.Background()
+}
+
 // SetPackRegistry attaches the Pack Runtime registry used by /v1/packs and frontend sync.
 func (g *Gateway) SetPackRegistry(r *packruntime.Registry) {
 	g.packRegistry = r

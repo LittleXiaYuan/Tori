@@ -215,6 +215,11 @@ func initGateway(app *agentrt.App) error {
 
 	// ── Start Lifecycle (memory GC, promoter, night scheduler, etc.) ──
 	lifecycleCtx, lifecycleCancel := context.WithCancel(context.Background())
+
+	// Hand the gateway a long-lived context so request handlers (e.g. the
+	// orchestrator toggle) can launch background daemons that outlive the
+	// triggering request and stop cleanly on lifecycle shutdown.
+	gw.SetBaseContext(lifecycleCtx)
 	if err := app.Lifecycle.Start(lifecycleCtx); err != nil {
 		lifecycleCancel()
 		channelCancel()
