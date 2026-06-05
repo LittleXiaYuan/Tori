@@ -9,6 +9,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"os"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -334,15 +337,12 @@ func (p *Planner) buildFunctionDefs(userMessage, tenantID, channelType string, d
 		directTools := []string{"generate_skill"}
 		for _, toolName := range directTools {
 			if sk, ok := p.registry.Get(toolName); ok {
-				defs = append(defs, llm.FunctionDef{
-					Name:        sk.Name(),
-					Description: sk.Description(),
-					Parameters:  sk.Parameters(),
-				})
+				defs = append(defs, p.functionDefFor(sk))
 			}
 		}
 
 		slog.Info("buildFunctionDefs", "mode", "delegation", "handoff_tools", len(defs), "total_skills", len(allSkills), "msg_prefix", truncate(userMessage, 50))
+		sortFunctionDefsStable(defs)
 		return defs
 	}
 
@@ -356,17 +356,14 @@ func (p *Planner) buildFunctionDefs(userMessage, tenantID, channelType string, d
 		filtered := p.registry.FilterByIntentScored(userMessage, skillScorer)
 		if len(filtered) < len(allSkills) && len(filtered) > 0 {
 			filtered = p.rankSkillsByRecommendation(userMessage, filtered)
+			filtered = p.capSkills(filtered)
 			slog.Info("skill dynamic filter applied",
 				"total", len(allSkills),
 				"filtered", len(filtered),
 				"message_prefix", truncate(userMessage, 50))
 			defs := make([]llm.FunctionDef, 0, len(filtered))
 			for _, s := range filtered {
-				defs = append(defs, llm.FunctionDef{
-					Name:        s.Name(),
-					Description: s.Description(),
-					Parameters:  s.Parameters(),
-				})
+				defs = append(defs, p.functionDefFor(s))
 			}
 			if !disableDelegation {
 				for _, hd := range delegationRuntime.HandoffToolDefinitions() {
@@ -380,19 +377,17 @@ func (p *Planner) buildFunctionDefs(userMessage, tenantID, channelType string, d
 					defs = append(defs, llm.FunctionDef{Name: name, Description: desc, Parameters: params})
 				}
 			}
+			sortFunctionDefsStable(defs)
 			return defs
 		}
 	}
 
 	allSkills = p.rankSkillsByRecommendation(userMessage, allSkills)
+	allSkills = p.capSkills(allSkills)
 
 	defs := make([]llm.FunctionDef, 0, len(allSkills))
 	for _, s := range allSkills {
-		defs = append(defs, llm.FunctionDef{
-			Name:        s.Name(),
-			Description: s.Description(),
-			Parameters:  s.Parameters(),
-		})
+		defs = append(defs, p.functionDefFor(s))
 	}
 
 	if !disableDelegation {
@@ -412,7 +407,71 @@ func (p *Planner) buildFunctionDefs(userMessage, tenantID, channelType string, d
 		}
 	}
 
+	sortFunctionDefsStable(defs)
 	return defs
+}
+
+// functionDefFor returns the LLM FunctionDef for a skill, memoized per skill
+// registry Version(). Skills rebuild their Parameters() schema map on every
+// call; on a multi-step FC run this avoids reconstructing each tool's schema on
+// every step. The cached Parameters map must be treated read-only.
+func (p *Planner) functionDefFor(s skills.Skill) llm.FunctionDef {
+	name := s.Name()
+	ver := p.registry.Version()
+
+	p.fnDefMu.RLock()
+	if p.fnDefCacheVer == ver && p.fnDefCache != nil {
+		if def, ok := p.fnDefCache[name]; ok {
+			p.fnDefMu.RUnlock()
+			return def
+		}
+	}
+	p.fnDefMu.RUnlock()
+
+	def := llm.FunctionDef{Name: name, Description: s.Description(), Parameters: s.Parameters()}
+
+	p.fnDefMu.Lock()
+	if p.fnDefCacheVer != ver || p.fnDefCache == nil {
+		p.fnDefCache = make(map[string]llm.FunctionDef)
+		p.fnDefCacheVer = ver
+	}
+	p.fnDefCache[name] = def
+	p.fnDefMu.Unlock()
+	return def
+}
+
+// maxFCTools returns the optional hard cap on how many skill tools are exposed
+// to the model per turn (env PLANNER_MAX_FC_TOOLS; 0/unset = unlimited). Applied
+// AFTER relevance ranking, so the most relevant tools are kept; it bounds the
+// worst-case tool-schema payload on the fallback (no-narrowing) path.
+func (p *Planner) maxFCTools() int {
+	v := strings.TrimSpace(os.Getenv("PLANNER_MAX_FC_TOOLS"))
+	if v == "" {
+		return 0
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n < 0 {
+		return 0
+	}
+	return n
+}
+
+// capSkills truncates a relevance-ranked skill slice to maxFCTools (when set).
+func (p *Planner) capSkills(list []skills.Skill) []skills.Skill {
+	limit := p.maxFCTools()
+	if limit > 0 && len(list) > limit {
+		slog.Info("buildFunctionDefs: tool cap applied", "from", len(list), "limit", limit)
+		return list[:limit]
+	}
+	return list
+}
+
+// sortFunctionDefsStable orders function defs deterministically by name. Tool
+// SELECTION is decided upstream (filters + ranking + cap); a stable final order
+// turns the tool block into a stable prefix so provider prompt caching can hit
+// across turns/steps instead of re-billing a reordered block.
+func sortFunctionDefsStable(defs []llm.FunctionDef) {
+	sort.SliceStable(defs, func(i, j int) bool { return defs[i].Name < defs[j].Name })
 }
 
 func extractUserMessage(req PlanRequest) string {

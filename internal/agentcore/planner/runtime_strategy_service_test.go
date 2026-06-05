@@ -55,6 +55,9 @@ func TestRuntimeStrategyServiceLocalBrainContextFilter(t *testing.T) {
 	if service.ShouldClassify(PlanRequest{ModelOverride: "expert"}) {
 		t.Fatal("model override should skip classification")
 	}
+	if !service.ShouldClassify(PlanRequest{RoutedTier: "smart"}) {
+		t.Fatal("auto-routed tier must NOT skip classification (tool-free fast path must still fire)")
+	}
 	if service.ShouldClassify(PlanRequest{DisableDelegation: true}) {
 		t.Fatal("disabled delegation should skip classification")
 	}
@@ -161,6 +164,45 @@ func TestRuntimeStrategyServiceClassifyRequestAppliesDecision(t *testing.T) {
 	skipped, err := service.ClassifyRequest(context.Background(), PlanRequest{ModelOverride: "expert"}, "hi")
 	if err != nil || skipped != nil {
 		t.Fatalf("model override should skip classification, got=%#v err=%v", skipped, err)
+	}
+}
+
+func TestRuntimeStrategyServiceClassifyRequestPreservesRoutedTier(t *testing.T) {
+	service := NewRuntimeStrategyService()
+	service.SetLocalBrain(localbrain.New(nil, nil))
+	// A gateway-routed tier must NOT suppress classification, and the local
+	// decision must NOT clobber that tier — it only contributes the tool-free
+	// decision. This is the core of the token-saving gating fix.
+	result, err := service.ClassifyRequest(context.Background(), PlanRequest{TenantID: "t", RoutedTier: "smart"}, "hi")
+	if err != nil {
+		t.Fatalf("classify request: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected classification to run for an auto-routed request")
+	}
+	if result.Request.ModelOverride != "" {
+		t.Fatalf("classification must not set ModelOverride when a routed tier exists, got %q", result.Request.ModelOverride)
+	}
+	if result.Request.RoutedTier != "smart" {
+		t.Fatalf("routed tier must be preserved, got %q", result.Request.RoutedTier)
+	}
+	if got := result.Request.EffectiveModelTier(); got != "smart" {
+		t.Fatalf("effective tier should be the routed tier, got %q", got)
+	}
+	if !result.ToolFree {
+		t.Fatal("greeting should still classify as tool-free")
+	}
+}
+
+func TestPlanRequestEffectiveModelTier(t *testing.T) {
+	if got := (PlanRequest{ModelOverride: "expert", RoutedTier: "fast"}).EffectiveModelTier(); got != "expert" {
+		t.Fatalf("explicit ModelOverride must win, got %q", got)
+	}
+	if got := (PlanRequest{RoutedTier: "fast"}).EffectiveModelTier(); got != "fast" {
+		t.Fatalf("routed tier should apply when no override, got %q", got)
+	}
+	if got := (PlanRequest{}).EffectiveModelTier(); got != "" {
+		t.Fatalf("expected empty when neither set, got %q", got)
 	}
 }
 

@@ -145,6 +145,12 @@ func TestModelRuntimeServiceAdaptiveRoute(t *testing.T) {
 	if got := service.AdaptiveRoute(PlanRequest{ModelOverride: "custom"}); got != "custom" {
 		t.Fatalf("expected explicit override, got %q", got)
 	}
+	if got := service.AdaptiveRoute(PlanRequest{RoutedTier: "smart"}); got != "smart" {
+		t.Fatalf("expected routed tier when no explicit override, got %q", got)
+	}
+	if got := service.AdaptiveRoute(PlanRequest{ModelOverride: "expert", RoutedTier: "fast"}); got != "expert" {
+		t.Fatalf("explicit override should win over routed tier, got %q", got)
+	}
 	if got := service.AdaptiveRoute(PlanRequest{Messages: []llm.Message{{Role: "user", Content: "请分析这个架构并重构"}}}); got != "expert" {
 		t.Fatalf("expected expert for complex intent, got %q", got)
 	}

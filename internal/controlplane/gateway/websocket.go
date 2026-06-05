@@ -264,7 +264,7 @@ func (g *Gateway) handleStreamChat(w http.ResponseWriter, r *http.Request) {
 		TeacherID:      req.TeacherID,
 		StudentID:      req.StudentID,
 		TenantID:       tid,
-		ModelOverride:  routedTier,
+		RoutedTier:     routedTier,
 		ClientOverride: streamSessionClient,
 		EmotionHint:    emotionHintForPlanner,
 		StepCallback:   stepCB,

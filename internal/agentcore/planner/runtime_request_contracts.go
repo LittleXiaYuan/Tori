@@ -17,7 +17,8 @@ type PlanRequest struct {
 	TeacherID         string
 	StudentID         string
 	TenantID          string
-	ModelOverride     string          // pool key (e.g. "fast","smart","expert") to override default model
+	ModelOverride     string          // pool key (e.g. "fast","smart","expert") — EXPLICIT caller override; suppresses LocalBrain classification
+	RoutedTier        string          // pool key chosen by the gateway smart router / thinking level — AUTOMATIC routing hint; lower precedence than ModelOverride and does NOT suppress classification (so the tool-free fast path can still fire)
 	EmotionHint       *emotion.Result // optional emotion detected from user input (STT or text analysis)
 	TaskID            string          // if set, this request is part of a task thread
 	TaskContext       string          // pre-rendered task working memory (injected by gateway)
@@ -35,6 +36,18 @@ type PlanRequest struct {
 	ClientOverride    *llm.Client     // if set, bypass pool and use this client directly (session-level provider override)
 	AllowedSkills     []string        // if non-empty, buildFunctionDefs restricts to exactly these skill names (user-picked tool whitelist)
 	WorkspacePaths    []string        // extra host dirs the conversation opened; merged into read-only file skills' allowed roots
+}
+
+// EffectiveModelTier resolves the pool key to use for model selection: an
+// explicit ModelOverride wins; otherwise the gateway's auto-routed RoutedTier.
+// Tier-resolution call sites use this instead of ModelOverride directly so the
+// smart-router tier still applies even though it no longer suppresses LocalBrain
+// chat-vs-tools classification.
+func (r PlanRequest) EffectiveModelTier() string {
+	if r.ModelOverride != "" {
+		return r.ModelOverride
+	}
+	return r.RoutedTier
 }
 
 // StepEventType classifies the kind of intermediate step event.

@@ -303,7 +303,10 @@ func (s *RuntimeStrategyService) ClassifyRequest(ctx context.Context, req PlanRe
 		return nil, err
 	}
 	classifiedReq := req
-	if decision.Handler != "local" {
+	// Only let the local decision pick the tier when nothing else routed one.
+	// A gateway-routed tier (RoutedTier) or an explicit ModelOverride takes
+	// precedence; classification then only contributes the tool-free decision.
+	if decision.Handler != "local" && req.ModelOverride == "" && req.RoutedTier == "" {
 		classifiedReq.ModelOverride = decision.Handler
 	}
 	return &RuntimeClassificationResult{
@@ -394,8 +397,8 @@ func (s *RuntimeStrategyService) SelectExecutionMode(req PlanExecutionModeReques
 }
 
 func (s *RuntimeStrategyService) SelectLongHorizonReasoningTier(ctx context.Context, req LongHorizonReasoningTierRequest) string {
-	if req.Request.ModelOverride != "" {
-		return req.Request.ModelOverride
+	if tier := req.Request.EffectiveModelTier(); tier != "" {
+		return tier
 	}
 	if s == nil {
 		return ""

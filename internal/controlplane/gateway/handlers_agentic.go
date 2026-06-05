@@ -409,7 +409,7 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 	planReq := planner.PlanRequest{
 		Messages:          msgs,
 		TenantID:          tid,
-		ModelOverride:     routedTier,
+		RoutedTier:        routedTier,
 		ClientOverride:    sessionClient,
 		TaskID:            req.TaskID,
 		TaskContext:       taskContext,

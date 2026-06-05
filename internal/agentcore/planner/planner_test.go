@@ -31,6 +31,47 @@ func (s dummyPlannerSkill) Execute(context.Context, map[string]any, *skills.Envi
 	return "ok", nil
 }
 
+type countingParamsSkill struct {
+	name  string
+	calls *int
+}
+
+func (s countingParamsSkill) Name() string        { return s.name }
+func (s countingParamsSkill) Description() string { return "desc" }
+func (s countingParamsSkill) Parameters() map[string]any {
+	*s.calls++
+	return map[string]any{"type": "object"}
+}
+func (s countingParamsSkill) Execute(context.Context, map[string]any, *skills.Environment) (string, error) {
+	return "ok", nil
+}
+
+func TestFunctionDefForCachesByRegistryVersion(t *testing.T) {
+	reg := skills.NewRegistry()
+	calls := 0
+	reg.Register(countingParamsSkill{name: "alpha", calls: &calls})
+	p := NewPlanner(nil, reg, 5)
+
+	sk, ok := reg.Get("alpha")
+	if !ok {
+		t.Fatal("skill not registered")
+	}
+	if d := p.functionDefFor(sk); d.Name != "alpha" {
+		t.Fatalf("unexpected def name %q", d.Name)
+	}
+	p.functionDefFor(sk)
+	if calls != 1 {
+		t.Fatalf("Parameters() built %d times across two calls, want 1 (cache hit)", calls)
+	}
+
+	// A registry mutation bumps Version() and must invalidate the cache.
+	reg.Register(countingParamsSkill{name: "beta", calls: new(int)})
+	p.functionDefFor(sk)
+	if calls != 2 {
+		t.Fatalf("Parameters() built %d times after registry version bump, want 2 (cache invalidated)", calls)
+	}
+}
+
 func TestCleanReplyRemovesToolCalls(t *testing.T) {
 	p := &Planner{}
 	input := `这是回答内容。{"tool_calls": [{"name": "test", "arguments": {}}]}后续文字`

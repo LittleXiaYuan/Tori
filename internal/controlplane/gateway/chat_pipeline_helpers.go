@@ -308,10 +308,17 @@ func (g *Gateway) runPostChatHooks(ctx context.Context, req *ChatRequest, result
 		})
 	}
 
-	// Learning loop
+	// Learning loop. The canonical post-turn evaluation now lives in the
+	// cognikernel ReflectiveLoop, fired async right after this hook via
+	// fireReflection (chat_pipeline.go). Skip the legacy synchronous
+	// Reflect().Evaluate LLM call when that loop is active to avoid a duplicate
+	// per-turn evaluation — it was billing a second eval call for the same turn.
+	// Keep it as a fallback only when no reflective loop will run (no loop wired
+	// or the evolution pack is disabled), so lean configs still get a signal.
 	if g.learning != nil && userMsg != "" {
 		quality := 7
-		if g.learning.Reflect() != nil {
+		reflectiveActive := g.reflectiveLoop != nil && g.evolutionEnabled()
+		if !reflectiveActive && g.learning.Reflect() != nil {
 			if eval, err := g.learning.Reflect().Evaluate(ctx, userMsg, result.Reply, nil); err == nil {
 				quality = eval.Quality
 			}

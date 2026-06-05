@@ -153,7 +153,7 @@ func (s *DelegationRuntimeService) ExecuteHandoffForRequest(ctx context.Context,
 	}
 
 	startedAt := time.Now()
-	hr, err := s.ExecuteHandoff(cbCtx, req.TenantID, agentName, input, req.ModelOverride)
+	hr, err := s.ExecuteHandoff(cbCtx, req.TenantID, agentName, input, req.EffectiveModelTier())
 	duration := time.Since(startedAt)
 	if hooks.Metrics != nil {
 		hooks.Metrics(toolName, duration, err)

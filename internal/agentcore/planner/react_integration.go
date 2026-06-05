@@ -61,7 +61,7 @@ func (p *Planner) runReAct(ctx context.Context, req PlanRequest) (*PlanResult, e
 	// 集成 AgenticThinking：小模型先判断思考深度，再选择对应层级的大模型
 	thinkFn := func(ctx context.Context, history []ldg.ReActStep) (*ldg.ThinkResult, error) {
 		// MetaCog escalation: force expert tier when critical anomalies accumulate
-		selectedTier := req.ModelOverride
+		selectedTier := req.EffectiveModelTier()
 		if taskID != "" && learningSidecar.ShouldEscalate(taskID) && selectedTier == "" {
 			selectedTier = "expert"
 			slog.Info("planner: metacog escalation → expert tier", "task", taskID)

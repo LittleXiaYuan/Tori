@@ -100,7 +100,7 @@ func (dc *DataCollector) Collect(ctx context.Context, req PlanRequest, result *P
 		SkillsUsed:  result.SkillsUsed,
 		Steps:       result.Steps,
 		TaskType:    classifyTaskType(req, result),
-		ModelUsed:   req.ModelOverride,
+		ModelUsed:   req.EffectiveModelTier(),
 	}
 
 	content, err := json.Marshal(pair)
