@@ -9,10 +9,10 @@ import (
 
 	"yunque-agent/internal/agentcore/approval"
 	"yunque-agent/internal/agentcore/trading"
+	corebrokers "yunque-agent/internal/agentcore/trading/brokers"
 	"yunque-agent/internal/cognikernel"
 	"yunque-agent/packs/trading/brokers"
 	"yunque-agent/packs/trading/market"
-	tradingstrategies "yunque-agent/packs/trading/strategies"
 )
 
 // ──────────────────────────────────────────────
@@ -31,7 +31,7 @@ type Pack struct {
 
 	// 集成组件
 	approvalMgr *approval.Manager
-	kernel      *cognikernel.Kernel
+	kernel      *cognikernel.CogniKernel
 
 	// 运行状态
 	running bool
@@ -51,7 +51,7 @@ type Config struct {
 }
 
 // NewPack 创建交易包
-func NewPack(cfg *Config, approvalMgr *approval.Manager, kernel *cognikernel.Kernel) (*Pack, error) {
+func NewPack(cfg *Config, approvalMgr *approval.Manager, kernel *cognikernel.CogniKernel) (*Pack, error) {
 	if cfg == nil {
 		cfg = &Config{
 			Broker:            "network",
@@ -70,7 +70,7 @@ func NewPack(cfg *Config, approvalMgr *approval.Manager, kernel *cognikernel.Ker
 	var broker trading.Broker
 	switch cfg.Broker {
 	case "simulate":
-		broker = trading.NewSimulateBroker(cfg.InitialCapital)
+		broker = corebrokers.NewSimulateBroker(cfg.InitialCapital)
 	case "network":
 		// 使用真实行情 + 模拟账户
 		provider := market.NewSinaProvider()
@@ -126,7 +126,7 @@ func (p *Pack) setupCallbacks() {
 	p.engine.OnSignal(func(signal *trading.Signal) {
 		// 发送到 CogniKernel
 		if p.kernel != nil {
-			p.kernel.PublishEvent(cognikernel.Event{
+			p.kernel.EventBus().Publish(cognikernel.Event{
 				Type: "strategy_signal",
 				Data: map[string]any{
 					"stock":      signal.Stock,
@@ -158,7 +158,7 @@ func (p *Pack) setupCallbacks() {
 
 		// 发送到 CogniKernel 进行反思
 		if p.kernel != nil {
-			p.kernel.PublishEvent(cognikernel.Event{
+			p.kernel.EventBus().Publish(cognikernel.Event{
 				Type: "trade_executed",
 				Data: map[string]any{
 					"stock":    order.Stock,
@@ -169,12 +169,18 @@ func (p *Pack) setupCallbacks() {
 				},
 			})
 
-			// 记录经验
-			p.kernel.IngestFeedback(cognikernel.Feedback{
-				Category: "trading",
-				Outcome:  "executed",
-				Lesson:   fmt.Sprintf("%s %s @ %.2f", order.Action, order.Stock, order.AvgPrice),
-				Context:  fmt.Sprintf("strategy: %s, confidence: %.2f", order.Strategy, order.Metadata["confidence"]),
+			// 记录经验（通过事件总线投递结构化反馈）
+			p.kernel.EventBus().Publish(cognikernel.Event{
+				Type:      cognikernel.EventExperienceAdded,
+				Timestamp: time.Now(),
+				Data: cognikernel.FeedbackData{
+					Source:    "trading_pack",
+					Category:  "trading",
+					Outcome:   "executed",
+					Lesson:    fmt.Sprintf("%s %s @ %.2f", order.Action, order.Stock, order.AvgPrice),
+					Context:   fmt.Sprintf("strategy: %s, confidence: %.2f", order.Strategy, order.Metadata["confidence"]),
+					CreatedAt: time.Now(),
+				},
 			})
 		}
 	})
@@ -185,7 +191,7 @@ func (p *Pack) setupCallbacks() {
 
 		// 发送到 CogniKernel
 		if p.kernel != nil {
-			p.kernel.PublishEvent(cognikernel.Event{
+			p.kernel.EventBus().Publish(cognikernel.Event{
 				Type: "risk_alert",
 				Data: map[string]any{
 					"reason": reason,
@@ -311,19 +317,23 @@ func (p *Pack) ExecuteTrade(ctx context.Context, stock string, action string, qu
 			Category:  approval.CatFinancial,
 			RiskLevel: approval.RiskHigh,
 			Summary:   fmt.Sprintf("%s %s × %d股 @ ¥%.2f", action, stock, quantity, quote.Price),
-			Details:   string(orderJSON),
+			Details: map[string]any{
+				"order":    string(orderJSON),
+				"stock":    stock,
+				"action":   action,
+				"quantity": quantity,
+				"price":    quote.Price,
+			},
 		}
 
-		// 提交审批
-		approved, err := p.approvalMgr.RequestApproval(ctx, req)
-		if err != nil {
-			return nil, fmt.Errorf("request approval: %w", err)
-		}
-
+		// 提交审批（同步阻塞至规则裁决 / 自动批准 / 人审）
+		resolved := p.approvalMgr.RequestApproval(req)
+		approved := resolved.Status == approval.StatusApproved || resolved.Status == approval.StatusAutoApproved
 		if !approved {
 			return map[string]any{
 				"status":  "rejected",
 				"message": "交易被拒绝",
+				"reason":  resolved.Reason,
 			}, nil
 		}
 	}

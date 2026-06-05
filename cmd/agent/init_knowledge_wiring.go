@@ -15,6 +15,7 @@ import (
 	agentrt "yunque-agent/internal/agentcore/runtime"
 	"yunque-agent/internal/controlplane/gateway"
 	iledger "yunque-agent/internal/ledger"
+	"yunque-agent/pkg/safego"
 
 	"yunque-agent/internal/ledgercore"
 )
@@ -101,13 +102,20 @@ func initKnowledgeWiring(app *agentrt.App, gw *gateway.Gateway, embedRes *embedd
 	gw.SetWikiStore(wikiStore)
 	app.Set("wiki_store", wikiStore)
 
-	// Wire embedder → knowledge store
+	// Wire embedder → knowledge store. Building the vector index embeds every KB chunk
+	// in batches (~1-2.4s, scales with corpus size + embedder latency) and used to run
+	// synchronously here — on the boot critical path before /healthz binds, so the desktop
+	// loader waited on it. Build it in the background instead: BuildIndex is concurrency-
+	// safe and SemanticSearch transparently falls back to keyword search until the index
+	// reports ready, so it is a search enhancement, not a prerequisite for serving.
 	if emb, ok := embedRes.Primary(); ok {
 		knowledgeStore.SetEmbedder(emb)
 		if kbStats.Chunks > 0 {
-			if err := knowledgeStore.BuildIndex(context.Background()); err != nil {
-				slog.Warn("knowledge: semantic index build failed", "err", err)
-			}
+			safego.Go("knowledge-build-index", func() {
+				if err := knowledgeStore.BuildIndex(context.Background()); err != nil {
+					slog.Warn("knowledge: semantic index build failed", "err", err)
+				}
+			})
 		}
 	}
 

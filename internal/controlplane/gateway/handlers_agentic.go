@@ -11,6 +11,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"yunque-agent/pkg/safego"
@@ -401,6 +402,10 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// ── Run planner with StepCallback → SSE ──
+	// streamedChars tracks how much of the final answer the planner streamed
+	// live via OnReplyDelta. When > 0 we skip the post-hoc pseudo-typing loop
+	// so the reply is not emitted twice.
+	var streamedChars atomic.Int64
 	planReq := planner.PlanRequest{
 		Messages:          msgs,
 		TenantID:          tid,
@@ -421,6 +426,16 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 			if g.eventTrail != nil {
 				g.eventTrail.Record(event)
 			}
+		},
+		// True token streaming: emit the final answer text live as the LLM
+		// generates it (instead of computing the full reply then pseudo-typing).
+		OnReplyDelta: func(delta string) {
+			if delta == "" {
+				return
+			}
+			streamedChars.Add(int64(len([]rune(delta))))
+			data, _ := json.Marshal(map[string]string{"content": delta})
+			sendEvent("delta", string(data))
 		},
 		TraceID: traceSpan.TraceID,
 	}
@@ -500,19 +515,24 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 		sendEvent("thinking", string(thinkData))
 	}
 
-	// Stream final reply as delta events (chunked for smooth UX)
+	// Final reply emission. If the planner already streamed the answer live via
+	// OnReplyDelta (true token streaming), don't re-emit it. Otherwise fall back
+	// to chunked pseudo-typing for providers/paths that didn't stream (non-SSE
+	// responses, cached replies, etc.).
 	reply := result.Reply
-	runes := []rune(reply)
-	chunkSize := 20 // ~20 CJK chars per chunk for smooth streaming
-	for i := 0; i < len(runes); i += chunkSize {
-		end := i + chunkSize
-		if end > len(runes) {
-			end = len(runes)
+	if streamedChars.Load() == 0 {
+		runes := []rune(reply)
+		chunkSize := 20 // ~20 CJK chars per chunk for smooth streaming
+		for i := 0; i < len(runes); i += chunkSize {
+			end := i + chunkSize
+			if end > len(runes) {
+				end = len(runes)
+			}
+			chunk := string(runes[i:end])
+			data, _ := json.Marshal(map[string]string{"content": chunk})
+			sendEvent("delta", string(data))
+			time.Sleep(30 * time.Millisecond) // simulate natural typing
 		}
-		chunk := string(runes[i:end])
-		data, _ := json.Marshal(map[string]string{"content": chunk})
-		sendEvent("delta", string(data))
-		time.Sleep(30 * time.Millisecond) // simulate natural typing
 	}
 
 	// Done event

@@ -403,6 +403,7 @@ impl FloatingState {
         }
     }
 
+    #[allow(dead_code)] // used by create_floating_ball (floating ball feature, off by default)
     fn load_ball_pos(&self) -> Option<BallPosition> {
         let guard = lock_or_recover(&self.data_path);
         let dir = guard.as_ref()?;
@@ -578,6 +579,7 @@ fn floating_send_to_chat(text: String, handle: AppHandle) {
     }
 }
 
+#[allow(dead_code)] // floating ball is opt-in; kept for the settings toggle path
 fn create_floating_ball(handle: &AppHandle, port: u16) {
     let url = format!("http://127.0.0.1:{port}/floating-ball");
     let parsed_url = match url.parse() {
@@ -766,6 +768,42 @@ fn show_floating_panel(handle: &AppHandle) {
     }
 }
 
+// ── System tray ─────────────────────────────────────────────────────────────
+//
+// Bring the main window back from the tray. Covers all three "hidden" states:
+// minimized (unminimize), hidden via close-to-tray (show), and not-focused
+// (set_focus). Without this the user could close/minimize the window and have
+// no way to summon the GUI again — the icon would sit dead in the tray.
+fn show_main_window(handle: &AppHandle) {
+    if let Some(main) = handle.get_webview_window("main") {
+        let _ = main.unminimize();
+        let _ = main.show();
+        let _ = main.set_focus();
+    }
+}
+
+/// Real quit path (tray menu "退出"). Closing the main window only hides it to
+/// the tray to keep the agent resident, so the *only* way to actually stop the
+/// backend + exit is here (plus the BackendState Drop safety net).
+fn quit_app(handle: &AppHandle) {
+    if let Some(state) = handle.try_state::<BackendState>() {
+        state.graceful_kill();
+    }
+    handle.exit(0);
+}
+
+/// Persist the floating-ball position from a window context. Shared by the
+/// close-to-tray and real-teardown paths.
+fn save_ball_pos_from(window: &tauri::Window) {
+    if let Some(ball) = window.app_handle().get_webview_window("floating-ball") {
+        if let Ok(pos) = ball.outer_position() {
+            if let Some(fs) = window.try_state::<FloatingState>() {
+                fs.save_ball_pos(pos.x as f64, pos.y as f64);
+            }
+        }
+    }
+}
+
 // ── Entry point ─────────────────────────────────────────────────────────────
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -791,6 +829,7 @@ pub fn run() {
         .manage(FloatingState::new())
         .manage(ThemeState::new())
         .invoke_handler(tauri::generate_handler![
+            backend_port,
             toggle_floating_panel,
             get_floating_items,
             get_floating_count,
@@ -830,6 +869,43 @@ pub fn run() {
                 apply_window_appearance(&main, "dark");
             }
 
+            // System tray: keep the agent resident and re-summonable. Left-click
+            // restores the main window; the menu offers explicit 显示/退出. This
+            // is what makes "close/minimize then click the tray icon" actually
+            // bring the GUI back instead of leaving a dead icon.
+            {
+                use tauri::menu::{Menu, MenuItem};
+                use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+
+                let show_i = MenuItem::with_id(app, "tray_show", "显示云雀", true, None::<&str>)?;
+                let quit_i = MenuItem::with_id(app, "tray_quit", "退出", true, None::<&str>)?;
+                let menu = Menu::with_items(app, &[&show_i, &quit_i])?;
+
+                let mut builder = TrayIconBuilder::with_id("yunque-tray")
+                    .tooltip("云雀 Agent")
+                    .menu(&menu)
+                    .show_menu_on_left_click(false)
+                    .on_menu_event(|app, event| match event.id.as_ref() {
+                        "tray_show" => show_main_window(app),
+                        "tray_quit" => quit_app(app),
+                        _ => {}
+                    })
+                    .on_tray_icon_event(|tray, event| {
+                        if let TrayIconEvent::Click {
+                            button: MouseButton::Left,
+                            button_state: MouseButtonState::Up,
+                            ..
+                        } = event
+                        {
+                            show_main_window(tray.app_handle());
+                        }
+                    });
+                if let Some(icon) = app.default_window_icon().cloned() {
+                    builder = builder.icon(icon);
+                }
+                builder.build(app)?;
+            }
+
             register_selection_shortcut(&handle);
             tauri::async_runtime::spawn(async move {
                 launch_backend(&handle).await;
@@ -837,15 +913,19 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| match event {
-            tauri::WindowEvent::CloseRequested { .. } | tauri::WindowEvent::Destroyed => {
+            // Close = hide to tray (keep the agent resident + backend alive).
+            // The real quit is the tray "退出" menu (-> quit_app) or teardown.
+            tauri::WindowEvent::CloseRequested { api, .. } => {
                 if window.label() == "main" {
-                    if let Some(ball) = window.app_handle().get_webview_window("floating-ball") {
-                        if let Ok(pos) = ball.outer_position() {
-                            if let Some(fs) = window.try_state::<FloatingState>() {
-                                fs.save_ball_pos(pos.x as f64, pos.y as f64);
-                            }
-                        }
-                    }
+                    save_ball_pos_from(window);
+                    let _ = window.hide();
+                    api.prevent_close();
+                }
+            }
+            // Real teardown (tray quit / app.exit): persist + reap the sidecar.
+            tauri::WindowEvent::Destroyed => {
+                if window.label() == "main" {
+                    save_ball_pos_from(window);
                     if let Some(state) = window.try_state::<BackendState>() {
                         state.graceful_kill();
                     }
@@ -930,6 +1010,21 @@ async fn launch_backend(handle: &AppHandle) {
             // wrapper rather than a headless server.
             cmd.env("YUNQUE_LAUNCHER", "tauri-desktop");
 
+            // The desktop UI is served from the embedded webview, whose origin
+            // is `tauri.localhost` (Windows/Linux) or `tauri://localhost`
+            // (macOS) — NOT a loopback host the backend auto-trusts. Without
+            // this the Go CORS layer returns no Access-Control-Allow-Origin and
+            // every UI→backend fetch is blocked, leaving the shell stuck on the
+            // "本地服务暂时不可用" splash. Whitelist the webview origins so the
+            // (loopback-bound) backend accepts cross-origin calls from the shell.
+            // Respect an operator override if AGENT/env already set it.
+            if std::env::var_os("ALLOWED_ORIGINS").is_none() {
+                cmd.env(
+                    "ALLOWED_ORIGINS",
+                    "http://tauri.localhost,https://tauri.localhost,tauri://localhost",
+                );
+            }
+
             // On Windows the sidecar MUST live in its own process group so
             // GenerateConsoleCtrlEvent(CTRL_BREAK_EVENT) does not also kill us.
             #[cfg(windows)]
@@ -997,6 +1092,15 @@ async fn launch_backend(handle: &AppHandle) {
     } else {
         emit_error(handle, "未检测到后端服务", port);
     }
+}
+
+/// Backend port exposed to the webview so the frontend can target the live Go
+/// sidecar even when AGENT_ADDR / auto-pick selects a non-default port. Keeps
+/// the desktop dev (next dev on :3001 + sidecar on :PORT) from polling a dead
+/// :9090 when the build-time NEXT_PUBLIC_API_BASE and the runtime port differ.
+#[tauri::command]
+fn backend_port() -> u16 {
+    resolve_backend_port()
 }
 
 /// Parse `AGENT_ADDR` (e.g. `":9090"`, `"0.0.0.0:9090"`, `"[::]:9090"`,

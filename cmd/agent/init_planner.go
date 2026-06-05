@@ -243,15 +243,17 @@ func initPlanner(app *agentrt.App) error {
 	trustTracker := trust.NewTracker(cfg.DataPath("trust_scores.json"))
 
 	// Pre-seed trust for built-in skills so they don't get blocked on first run.
-	var seededCount int
+	// Collect the brand-new skills first, then seed+persist in one shot: Seed() rewrites
+	// the whole trust_scores.json on every call, so seeding ~34 skills individually used
+	// to cost ~34 disk writes on the boot critical path (~0.2s). SeedMany persists once.
+	var toSeed []string
 	for _, sk := range app.SkillRegistry.All() {
 		entry := trustTracker.Get(sk.Name())
 		if entry.Score == 0 && entry.Executions == 0 {
-			trustTracker.Seed(sk.Name(), 80)
-			seededCount++
+			toSeed = append(toSeed, sk.Name())
 		}
 	}
-	if seededCount > 0 {
+	if seededCount := trustTracker.SeedMany(toSeed, 80); seededCount > 0 {
 		slog.Info("trust: pre-seeded built-in skills", "count", seededCount, "score", 80)
 	}
 
@@ -295,6 +297,17 @@ func initPlanner(app *agentrt.App) error {
 		slog.Info("trust gate enabled", "path", cfg.DataPath("trust_scores.json"))
 	} else {
 		slog.Info("trust gate disabled (TRUST_GATE_DISABLED=true)")
+	}
+
+	// Per-tool execution timeout. Default 60s is too short for slow generative
+	// tools (e.g. deck_create asks an LLM to design a full HTML deck, which can
+	// take 1-3 min on a reasoning model). Override via TOOL_TIMEOUT (Go duration,
+	// e.g. "240s" or "4m").
+	if v := os.Getenv("TOOL_TIMEOUT"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil && d > 0 {
+			p.SetToolTimeout(d)
+			slog.Info("planner: tool timeout overridden", "timeout", d)
+		}
 	}
 
 	// ── CognitivePlugin Context Injection ──

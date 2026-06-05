@@ -87,9 +87,9 @@ func (ct *CostTracker) DailySummary() map[string]CostSummary {
 	defer ct.mu.RUnlock()
 
 	out := make(map[string]CostSummary)
+	startOfDay := startOfToday()
 	for id, entries := range ct.entries {
 		var s CostSummary
-		startOfDay := time.Now().Truncate(24 * time.Hour)
 		for _, e := range entries {
 			if e.Timestamp.Before(startOfDay) {
 				continue
@@ -144,12 +144,21 @@ func (ct *CostTracker) PruneOld(maxAge time.Duration) int {
 }
 
 func dailyTotal(entries []CostEntry) float64 {
-	startOfDay := time.Now().Truncate(24 * time.Hour)
+	startOfDay := startOfToday()
 	var total float64
 	for _, e := range entries {
-		if e.Timestamp.After(startOfDay) {
+		if !e.Timestamp.Before(startOfDay) {
 			total += e.Cost
 		}
 	}
 	return total
+}
+
+// startOfToday returns local midnight for the current day. time.Truncate snaps
+// to a UTC day boundary, which misattributes spend for any operator not on UTC
+// (e.g. in UTC+8 the budget would reset at 08:00 local). Using the wall clock's
+// own location keeps daily budgets aligned with the calendar day.
+func startOfToday() time.Time {
+	now := time.Now()
+	return time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 }

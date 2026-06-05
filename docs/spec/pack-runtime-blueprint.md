@@ -50,6 +50,8 @@
 
 2026-05-20 更新：Pack 控制台的复制摘要实现已改为复用同名 `summarizeCapabilityPrepare()`，前端与 TypeScript SDK 共享同一份 `pack_capability_prepare_summary` shape，避免 UI 与外部 sidecar 分叉；同时 `run-incremental-tests.mjs` 的临时输出目录加入进程号隔离并恢复结束清理，减少并发验证互相删除 `.tmp/incremental-tests` 的风险。
 
+2026-05-30 更新：Pack Runtime 新增只读 `POST /v1/packs/release-catalog`，输入 GitHub Release URL 列表后由 Gateway 调用 GitHub Release API，读取 `.yqpack` assets，下载并仅检查压缩包内 `pack.json` manifest 以生成卡片化目录。`yunque-client/packs` SDK 同步 `releaseCatalog()`，并让 `install()` 接受 `packageUrl` / `sha256`，真正安装仍走显式 `POST /v1/packs/install`。这让前端能力包页可以展示“官方能力包”卡片（名称、描述、示例、版本、sha、安装/更新状态），用户不需要理解或手填 `pack.json` / `.yqpack` 链接；本地 manifest 路径保留为高级选项。
+
 ## 3. 蓝图能力 Pack 化优先级
 
 | 优先级 | 蓝图/文档 | 建议 Pack ID | 拆分边界 | 下一步 |

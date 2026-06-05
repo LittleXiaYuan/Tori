@@ -1,6 +1,8 @@
 package general
 
 import (
+	"sync"
+
 	"yunque-agent/internal/agentcore/workflow"
 	"yunque-agent/pkg/skills"
 )
@@ -11,7 +13,8 @@ type GeneralPlugin struct {
 	hostWritePaths []string
 	searchFn       SearchFunc
 	wfStore        workflow.Store
-	pythonBin      string // injected from PythonEnv; empty = auto-detect
+	mu             sync.RWMutex // guards pythonBin (resolved asynchronously after startup)
+	pythonBin      string       // injected from PythonEnv; empty = auto-detect
 }
 
 func New(hostReadPaths []string) *GeneralPlugin {
@@ -20,6 +23,12 @@ func New(hostReadPaths []string) *GeneralPlugin {
 
 func (p *GeneralPlugin) SetHostWritePaths(paths []string) {
 	p.hostWritePaths = paths
+}
+
+// SetHostReadPaths updates the host read allowlist. Paired with a skill-registry
+// rebuild it lets HOST_READ_PATHS changes take effect without a process restart.
+func (p *GeneralPlugin) SetHostReadPaths(paths []string) {
+	p.hostReadPaths = paths
 }
 
 func (p *GeneralPlugin) Name() string { return "general" }
@@ -35,9 +44,20 @@ func (p *GeneralPlugin) SetWorkflowStore(s workflow.Store) {
 	p.wfStore = s
 }
 
-// SetPythonBin injects the resolved Python binary for Office skills.
+// SetPythonBin injects the resolved Python binary for Office skills. Python
+// detection runs off the startup critical path, so this may be called from a
+// background goroutine concurrently with skill-registry rebuilds that read the
+// value via getPythonBin — hence the lock.
 func (p *GeneralPlugin) SetPythonBin(bin string) {
+	p.mu.Lock()
 	p.pythonBin = bin
+	p.mu.Unlock()
+}
+
+func (p *GeneralPlugin) getPythonBin() string {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.pythonBin
 }
 
 func (p *GeneralPlugin) Skills() []skills.Skill {
@@ -60,6 +80,7 @@ func (p *GeneralPlugin) Skills() []skills.Skill {
 		NewComputerUseSkill(),
 		NewCodeGenSkill(),
 		NewFileSearchSkill(p.hostReadPaths),
+		NewFileFindSkill(p.hostReadPaths),
 		NewDocParseSkill(p.hostReadPaths),
 		NewTranslateSkill(),
 		NewImageGenSkill(),
@@ -77,6 +98,7 @@ func (p *GeneralPlugin) Skills() []skills.Skill {
 		NewXlsxSplitSkill(readDirs, writeDirs),
 		NewPdfCreateSkill(writeDirs),
 		NewHtmlExportSkill(writeDirs),
+		NewDeckCreateSkill(readDirs, writeDirs),
 		p.pptxSkill(writeDirs),
 		NewPptxFillSkill(readDirs, writeDirs),
 		NewPptxEditSkill(readDirs, writeDirs),
@@ -88,16 +110,16 @@ func (p *GeneralPlugin) Skills() []skills.Skill {
 
 func (p *GeneralPlugin) docxSkill(dirs []string) skills.Skill {
 	s := NewDocxCreateSkill(dirs)
-	if p.pythonBin != "" {
-		s.SetPythonBin(p.pythonBin)
+	if bin := p.getPythonBin(); bin != "" {
+		s.SetPythonBin(bin)
 	}
 	return s
 }
 
 func (p *GeneralPlugin) pptxSkill(dirs []string) skills.Skill {
 	s := NewPptxCreateSkill(dirs)
-	if p.pythonBin != "" {
-		s.SetPythonBin(p.pythonBin)
+	if bin := p.getPythonBin(); bin != "" {
+		s.SetPythonBin(bin)
 	}
 	return s
 }
@@ -135,6 +157,8 @@ func (p *GeneralPlugin) SystemPrompt() string {
 - 生成 PDF → pdf_create
 - 导出 HTML 报告 → html_export
 - 生成 PPT(.pptx) → pptx_create（--- 分隔幻灯片）
+- 生成"原创设计"的漂亮演示文稿(PDF) → deck_create（内置品牌设计系统:4 风格/SVG 图标/环形·条形图/封面背景图/图文分栏/全幅/画廊,用户零依赖。要"做一份好看的 PPT/汇报/路演"时优先用它）
+  · 配图自动化(重要):用户给了图片就把"逗号分隔的图片路径"或"图片所在目录"用 images 参数传给 deck_create;用户给的是压缩包(.zip)就【自己先调 zip_unpack 解压到 data/output/】再把解压目录作为 images 传入。全程你自主完成,不要让用户手动解压或配置路径。
 - 填充 PPT 模板 → pptx_fill
 - 编辑 PPT → pptx_edit
 

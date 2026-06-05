@@ -19,6 +19,7 @@ import (
 	"yunque-agent/internal/observe"
 	"yunque-agent/pkg/document"
 	"yunque-agent/pkg/plugin"
+	"yunque-agent/pkg/safego"
 	"yunque-agent/pkg/skills"
 	"yunque-agent/plugins/airi"
 	"yunque-agent/plugins/education"
@@ -63,20 +64,20 @@ func initPlugins(app *agentrt.App) error {
 		}
 	}
 
-	// Python environment for Office skills (detect system Python or use Go fallback)
+	// Python environment for Office skills (detect system Python or use Go fallback).
+	// Detection touches the filesystem and, when a system Python is present, spawns the
+	// interpreter to probe packages (~0.2-0.4s warm, more on a cold disk). Running it
+	// synchronously here used to block bootstrap — and therefore the desktop loader,
+	// which waits on /healthz before revealing the app. We resolve it in the background
+	// instead (goroutine after the initial skill-registry build below): office skills
+	// serve via the Go engine immediately and upgrade to the Python engine once detection
+	// finishes, so startup / healthz never pay for interpreter probing.
 	pyEnv := sandbox.NewPythonEnv(cfg.DataDir)
-	pyEnv.Resolve()
 	app.Set("python_env", pyEnv)
 
 	// Plugin registry
 	app.PluginReg = plugin.NewRegistry()
 	generalPlugin := general.New(hostPaths)
-	if pyBin := pyEnv.PythonBin(); pyBin != "" {
-		generalPlugin.SetPythonBin(pyBin)
-		slog.Info("office skills: Python engine available", "bin", pyBin, "tier", pyEnv.Tier().String())
-	} else {
-		slog.Info("office skills: Go-only mode (no Python detected)")
-	}
 	// Bridge websearch →plugin search function
 	if len(searchReg.List()) > 0 {
 		generalPlugin.SetSearchFunc(func(ctx context.Context, query string, limit int) ([]general.SearchResult, error) {
@@ -167,6 +168,23 @@ func initPlugins(app *agentrt.App) error {
 
 	// Initial population from built-in plugins
 	rebuildSkillRegistry()
+
+	// Resolve the Python environment off the critical path. When a system Python with
+	// the Office packages is detected, inject it and rebuild the skill registry so the
+	// Docx/Pptx skills upgrade from the Go engine to the richer Python engine without a
+	// restart (ReplaceAll makes the swap concurrency-safe). The skills' LLM-facing
+	// names/descriptions are identical either way, so no planner prompt-cache flush is
+	// needed. Until detection finishes the Go fallback handles requests, and /healthz
+	// (hence the desktop loader) never blocks on interpreter probing.
+	safego.Go("python-env-resolve", func() {
+		if pyBin := pyEnv.PythonBin(); pyBin != "" {
+			generalPlugin.SetPythonBin(pyBin)
+			rebuildSkillRegistry()
+			slog.Info("office skills: Python engine available", "bin", pyBin, "tier", pyEnv.Tier().String())
+		} else {
+			slog.Info("office skills: Go-only mode (no Python detected)")
+		}
+	})
 
 	// SkillFileLoader → auto-scan data/skills/ for SKILL.md packages
 	skillFileLoader := skillmarket.NewSkillFileLoader(cfg.DataPath("skills"), app.SkillRegistry, func() {

@@ -327,13 +327,26 @@ func (s *Sandbox) SearchHostFiles(rootPath, pattern string) ([]string, error) {
 	}
 	pattern = strings.ToLower(pattern)
 	var matches []string
+	scanned := 0
+	const maxScan = 300000 // hard bound so a rare/zero-match query can't walk forever
 	_ = filepath.Walk(abs, func(p string, info os.FileInfo, err error) error {
 		if err != nil {
 			return nil
 		}
-		if len(matches) >= 100 {
+		if len(matches) >= 100 || scanned >= maxScan {
 			return filepath.SkipAll
 		}
+		if info.IsDir() {
+			// Prune high-volume / noise directories (node_modules, .git, AppData,
+			// Windows, recycle bin, caches…). Without this a query that matches
+			// few files walked the ENTIRE tree — the root cause of "file_search
+			// hangs on big directories". The root itself is never pruned.
+			if p != abs && hostSearchSkipDirs[strings.ToLower(info.Name())] {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		scanned++
 		if strings.Contains(strings.ToLower(info.Name()), pattern) {
 			rel, _ := filepath.Rel(abs, p)
 			matches = append(matches, rel)
@@ -341,6 +354,18 @@ func (s *Sandbox) SearchHostFiles(rootPath, pattern string) ([]string, error) {
 		return nil
 	})
 	return matches, nil
+}
+
+// hostSearchSkipDirs are directories pruned during host filename search: huge,
+// machine-generated, or privacy-sensitive trees the agent almost never wants to
+// scan by filename. Pruning them turns a multi-minute full walk into a fast one.
+var hostSearchSkipDirs = map[string]bool{
+	"node_modules": true, ".git": true, ".svn": true, ".hg": true,
+	"$recycle.bin": true, "system volume information": true,
+	"$windows.~bt": true, "$windows.~ws": true,
+	"appdata": true, "windows": true,
+	".cache": true, "__pycache__": true, ".venv": true, "venv": true,
+	".gradle": true, ".m2": true, ".npm": true, ".pnpm-store": true,
 }
 
 func (s *Sandbox) GrepHostFile(filePath, query string) ([]string, error) {

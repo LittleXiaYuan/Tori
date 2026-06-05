@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -301,7 +302,8 @@ func (p *Planner) persistLongHorizonCheckpoint(req PlanRequest, cp LongHorizonCh
 	}
 	if err := store.Save(context.Background(), cp); err != nil {
 		// Persistence is best-effort; never fail the planner because the local
-		// recovery log is temporarily unavailable.
+		// recovery log is temporarily unavailable — but keep it observable.
+		slog.Debug("long-horizon checkpoint persist failed", "err", err, "plan_id", cp.PlanID)
 	}
 }
 

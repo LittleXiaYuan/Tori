@@ -215,6 +215,11 @@ func initGateway(app *agentrt.App) error {
 
 	// ── Start Lifecycle (memory GC, promoter, night scheduler, etc.) ──
 	lifecycleCtx, lifecycleCancel := context.WithCancel(context.Background())
+
+	// Hand the gateway a long-lived context so request handlers (e.g. the
+	// orchestrator toggle) can launch background daemons that outlive the
+	// triggering request and stop cleanly on lifecycle shutdown.
+	gw.SetBaseContext(lifecycleCtx)
 	if err := app.Lifecycle.Start(lifecycleCtx); err != nil {
 		lifecycleCancel()
 		channelCancel()
@@ -301,15 +306,22 @@ func initGateway(app *agentrt.App) error {
 		slog.Info("console window hidden (set HIDE_CONSOLE=false to show)")
 	}
 
-	// Start system tray icon (Windows only, non-blocking on other platforms)
+	// Start system tray icon (Windows only, non-blocking on other platforms).
+	// SIGINT/SIGTERM is always wired so the process shuts down cleanly.
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	go desktop.StartTray(desktop.TrayConfig{
-		BrowserURL: browserURL,
-		OnQuit: func() {
-			quit <- syscall.SIGTERM
-		},
-	})
+	// When launched as a Tauri sidecar the DESKTOP app owns the system tray and
+	// the window. A second, Go-side tray only opens a browser (BrowserURL) and
+	// cannot summon the Tauri window — it's the "dead minimized icon" users hit.
+	// Skip it in that mode and let the Tauri tray be the single source of truth.
+	if os.Getenv("YUNQUE_LAUNCHER") != "tauri-desktop" {
+		go desktop.StartTray(desktop.TrayConfig{
+			BrowserURL: browserURL,
+			OnQuit: func() {
+				quit <- syscall.SIGTERM
+			},
+		})
+	}
 
 	sig := <-quit
 	slog.Info("shutdown signal received", "signal", sig.String())

@@ -132,3 +132,16 @@ packs/official/*.yqpack.backup-*
 
 # ── Production signing keys (never commit private bytes) ──
 .yunque-keys/
+
+# ── Local scratch screenshots (UI captures, not source assets) ──
+apps/desktop/desktop-launch-*.png
+apps/desktop/desktop-login-*.png
+apps/desktop/login-clean-*.png
+apps/desktop/packs-page-*.png
+
+# ── Local env backups (may contain secrets) ──
+apps/web/.env.local.bak*
+
+# ── Temp TypeScript build info / scratch tsconfigs ──
+apps/web/tsconfig*.tmp.*
+*.tmp.tsbuildinfo

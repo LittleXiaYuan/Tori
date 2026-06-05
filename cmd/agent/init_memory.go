@@ -228,6 +228,18 @@ func initMemory(app *agentrt.App) error {
 					loader.Load()
 				}
 			}
+			// Seed default core-memory ("记忆块") blocks if none were loaded. The
+			// editable/core memory is otherwise blank on first run: short/mid/
+			// long-term layers auto-fill from conversation, but editable blocks
+			// only exist when explicitly added — which is why the "记忆块" tab
+			// showed empty while the other layers had content. Mirrors MemGPT/
+			// Letta core memory: a persona block + a human block the agent keeps
+			// updating as it learns about the user.
+			if app.EditableMem != nil && len(app.EditableMem.AllBlocks()) == 0 {
+				app.EditableMem.AddBlock("persona", "我是云雀(Yunque),一个真正记得你的 AI 陪伴助手。我会记住你的偏好、背景与目标,主动理解并帮你把事做好。", 0)
+				app.EditableMem.AddBlock("human", "(关于你的关键信息——称呼、偏好、目标、正在做的事——会随对话逐步记录在这里。)", 0)
+				slog.Info("editable memory: seeded default core blocks (persona/human)")
+			}
 		})
 		safego.Go("adaptive-loop-load", func() {
 			defer loadWg.Done()

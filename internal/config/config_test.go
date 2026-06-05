@@ -8,6 +8,12 @@ import (
 )
 
 func TestLoadDefaults(t *testing.T) {
+	// Keep the defaults check hermetic: a developer shell (or CI) may export
+	// AGENT_ADDR / LLM_MODEL, which would otherwise override the values under
+	// test. getenv treats an empty value as unset and returns the built-in
+	// default, so clearing them here exercises the real defaults.
+	t.Setenv("AGENT_ADDR", "")
+	t.Setenv("LLM_MODEL", "")
 	cfg := Load()
 	if cfg.Addr != ":9090" {
 		t.Fatalf("expected :9090, got %s", cfg.Addr)

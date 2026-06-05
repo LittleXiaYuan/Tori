@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"yunque-agent/internal/agentcore/trading"
 	"yunque-agent/packs/trading/market"
@@ -107,7 +108,7 @@ func (nb *NetworkBroker) GetPortfolio(ctx context.Context) (*trading.Portfolio, 
 		Cash:       nb.cash,
 		TotalValue: totalValue,
 		Positions:  positions,
-		UpdatedAt:  quote.Timestamp,
+		UpdatedAt:  time.Now(),
 	}, nil
 }
 

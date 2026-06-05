@@ -26,12 +26,11 @@ type SkillCatalogFunc func() []SkillInfo
 // between "installed skills" and "intelligent cogni agents" by auto-generating
 // declarations with activation rules, tool surfaces, and workflows.
 type AutoOrganizer struct {
-	mu          sync.Mutex
-	registry    *Registry
-	catalog     SkillCatalogFunc
-	llm         LLMFunc
-	lastVersion int
-	managed     map[string]bool // IDs of auto-generated cognis
+	mu       sync.Mutex
+	registry *Registry
+	catalog  SkillCatalogFunc
+	llm      LLMFunc
+	managed  map[string]bool // IDs of auto-generated cognis
 }
 
 func NewAutoOrganizer(registry *Registry, catalog SkillCatalogFunc) *AutoOrganizer {

@@ -1,8 +1,10 @@
 package cogni
 
 import (
+	"math"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -28,6 +30,11 @@ type Session struct {
 
 	// Perception carries runtime multi-modal signals for advanced activation.
 	Perception *PerceptionSignal
+
+	// MessageVec is the precomputed embedding of Message, set by the Hook when an
+	// embedder is wired (SetEmbedder). It enables semantic activation without the
+	// Evaluator performing any I/O. Empty = semantic scoring is skipped.
+	MessageVec []float32
 }
 
 // Activation is the result of evaluating a single Cogni against a Session.
@@ -45,18 +52,100 @@ type Activation struct {
 	Reasons []string
 }
 
+// EmbedderFunc embeds a piece of text into a vector. It is injected via
+// Evaluator.SetEmbedder (typically wired to the host's yunque-embed client).
+// A nil embedder disables semantic activation entirely.
+type EmbedderFunc func(text string) []float32
+
 // Evaluator computes activation scores against a batch of Cogni declarations.
 // It caches compiled regexes internally; safe for concurrent use.
 type Evaluator struct {
 	mu         sync.RWMutex
 	regexCache map[string]*regexp.Regexp
+
+	embMu     sync.RWMutex
+	embedder  EmbedderFunc
+	cogniVecs map[string][]float32 // cogniID -> example-centroid vector (cached)
 }
 
 // NewEvaluator creates a fresh Evaluator.
 func NewEvaluator() *Evaluator {
 	return &Evaluator{
 		regexCache: make(map[string]*regexp.Regexp),
+		cogniVecs:  make(map[string][]float32),
 	}
+}
+
+// SetEmbedder wires (or clears) the embedder used for semantic activation.
+// Setting a new embedder invalidates the cached Cogni example vectors.
+func (e *Evaluator) SetEmbedder(fn EmbedderFunc) {
+	if e == nil {
+		return
+	}
+	e.embMu.Lock()
+	e.embedder = fn
+	e.cogniVecs = make(map[string][]float32)
+	e.embMu.Unlock()
+}
+
+// cogniVec returns the cached centroid embedding of a Cogni's example phrases,
+// lazily computing it on first use. Returns nil when no embedder is wired.
+func (e *Evaluator) cogniVec(id string, examples []string) []float32 {
+	e.embMu.RLock()
+	fn := e.embedder
+	cached, ok := e.cogniVecs[id]
+	e.embMu.RUnlock()
+	if fn == nil || len(examples) == 0 {
+		return nil
+	}
+	if ok {
+		return cached
+	}
+	var sum []float32
+	n := 0
+	for _, ex := range examples {
+		v := fn(ex)
+		if len(v) == 0 {
+			continue
+		}
+		if sum == nil {
+			sum = make([]float32, len(v))
+		}
+		if len(v) != len(sum) {
+			continue
+		}
+		for i := range v {
+			sum[i] += v[i]
+		}
+		n++
+	}
+	if n == 0 {
+		return nil
+	}
+	for i := range sum {
+		sum[i] /= float32(n)
+	}
+	e.embMu.Lock()
+	e.cogniVecs[id] = sum
+	e.embMu.Unlock()
+	return sum
+}
+
+// cosine returns the cosine similarity of two equal-length vectors in [-1, 1].
+func cosine(a, b []float32) float64 {
+	if len(a) == 0 || len(a) != len(b) {
+		return 0
+	}
+	var dot, na, nb float64
+	for i := range a {
+		dot += float64(a[i]) * float64(b[i])
+		na += float64(a[i]) * float64(a[i])
+		nb += float64(b[i]) * float64(b[i])
+	}
+	if na == 0 || nb == 0 {
+		return 0
+	}
+	return dot / (math.Sqrt(na) * math.Sqrt(nb))
 }
 
 // Evaluate returns activation results for every declaration provided,
@@ -152,6 +241,31 @@ func (e *Evaluator) evaluateOne(d *Declaration, s Session) Activation {
 		pScore, pReasons := evaluatePerception(d.Activation.Perception, s, s.Perception)
 		score += pScore
 		act.Reasons = append(act.Reasons, pReasons...)
+	}
+
+	// Semantic activation: cosine(message, cogni examples). Only contributes when
+	// an embedder is wired (s.MessageVec set) and the cogni declares examples, so
+	// keyword-only Cognis and embedder-less hosts are completely unaffected.
+	if sem := d.Activation.Semantic; sem != nil && len(s.MessageVec) > 0 {
+		if cv := e.cogniVec(d.ID, sem.Examples); len(cv) > 0 {
+			sim := cosine(s.MessageVec, cv)
+			floor := sem.Floor
+			if floor == 0 {
+				floor = 0.45
+			}
+			if sim > floor {
+				w := sem.Weight
+				if w == 0 {
+					w = 0.9
+				}
+				denom := 1 - floor
+				if denom <= 0 {
+					denom = 1
+				}
+				score += w * (sim - floor) / denom
+				act.Reasons = append(act.Reasons, "semantic: "+strconv.FormatFloat(sim, 'f', 2, 64))
+			}
+		}
 	}
 
 	if score > 1.0 {
