@@ -210,7 +210,7 @@ export default function CognisPage() {
     try {
       const r = await cogniPack.generate(generateDesc, true);
       setGeneratePreview(r.declaration);
-      showToast(`助手「${r.declaration.display_name ?? r.declaration.id}」已创建`, "success");
+      showToast(`Cogni「${r.declaration.display_name ?? r.declaration.id}」已创建`, "success");
       setGenerateDesc("");
       await load();
     } catch (e) {
@@ -227,7 +227,7 @@ export default function CognisPage() {
       if (!response.ok) throw new Error("模板文件不存在");
       const declaration = await response.json();
       await cogniPack.add(declaration);
-      showToast("助手已添加", "success");
+      showToast("Cogni 已添加", "success");
       await load();
     } catch (e) {
       showToast(formatErrorMessage(e, "添加失败"), "error");
@@ -247,7 +247,7 @@ export default function CognisPage() {
   };
 
   const remove = async (id: string) => {
-    if (!confirm(`确定删除助手「${id}」？此操作不可撤销。`)) return;
+    if (!confirm(`确定删除 Cogni「${id}」？此操作不可撤销。`)) return;
     setBusy(`remove:${id}`);
     try {
       await cogniPack.remove(id);
@@ -356,12 +356,12 @@ export default function CognisPage() {
     <div className="page-root flex flex-col gap-5 animate-fade-in-up">
       <PageHeader
         icon={<Sparkles size={20} aria-hidden="true" />}
-        title="我的助手"
-        description="用大白话描述你想要的助手，云雀自动配好技能、触发方式和人设。"
+        title="我的 Cogni"
+        description="用大白话描述你想要的 Cogni，云雀自动配好技能、触发方式和人设。"
         onRefresh={load}
         actions={
           <Button size="sm" className="btn-accent" onPress={focusHeroCreate}>
-            <Wand2 size={12} aria-hidden="true" /> 新建助手
+            <Wand2 size={12} aria-hidden="true" /> 新建 Cogni
           </Button>
         }
       />
@@ -370,10 +370,10 @@ export default function CognisPage() {
         <Card className="section-card p-4 border-l-4" style={{ borderLeftColor: "#ffaa00" }}>
           <div className="flex items-center gap-2 text-sm" style={{ color: "var(--yunque-text)" }}>
             <AlertTriangle size={15} style={{ color: "#ffaa00" }} aria-hidden="true" />
-            助手功能由「Cogni 内核」能力包提供，当前未启用。
+            Cogni 功能由「Cogni 内核」能力包提供，当前未启用。
           </div>
           <p className="text-xs mt-1" style={{ color: "var(--yunque-text-muted)" }}>
-            前往「能力包」启用 <span translate="no">yunque.pack.cogni-kernel</span> 后即可创建和管理助手。
+            前往「能力包」启用 <span translate="no">yunque.pack.cogni-kernel</span> 后即可创建和管理 Cogni。
           </p>
           <div className="mt-3">
             <Button size="sm" variant="ghost" onPress={() => (window.location.href = "/packs")}>
@@ -387,13 +387,13 @@ export default function CognisPage() {
       <Card className="section-card p-5" style={{ borderTop: "2px solid var(--yunque-accent)" }}>
         <div className="flex items-center gap-2 mb-1" style={{ color: "var(--yunque-text)" }}>
           <Wand2 size={16} style={{ color: "var(--yunque-accent)" }} aria-hidden="true" />
-          <span className="text-base font-medium">描述你想要的助手，云雀帮你造一个</span>
+          <span className="text-base font-medium">描述你想要的 Cogni，云雀帮你造一个</span>
         </div>
         <p className="text-xs mb-3" style={{ color: "var(--yunque-text-muted)" }}>
           一句话说清它要做什么 —— 云雀会自动配好该用的技能、激活关键词和说话风格，创建后立即可用。
         </p>
         <label htmlFor="assistant-desc" className="sr-only">
-          描述你想要的助手
+          描述你想要的 Cogni
         </label>
         <textarea
           id="assistant-desc"
@@ -439,7 +439,7 @@ export default function CognisPage() {
             isPending={generating}
             isDisabled={packOff || !generateDesc.trim()}
           >
-            <Sparkles size={12} aria-hidden="true" /> {generating ? "云雀正在造助手…" : "创建助手"}
+            <Sparkles size={12} aria-hidden="true" /> {generating ? "云雀正在造 Cogni…" : "创建 Cogni"}
           </Button>
         </div>
         {generatePreview && (
@@ -558,8 +558,8 @@ export default function CognisPage() {
             type="text"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            placeholder="搜索助手…"
-            aria-label="搜索助手"
+            placeholder="搜索 Cogni…"
+            aria-label="搜索 Cogni"
             spellCheck={false}
             className="w-full pl-9 pr-3 py-1.5 text-sm rounded-md"
             style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "var(--yunque-text)" }}
@@ -595,7 +595,7 @@ export default function CognisPage() {
         </Card>
       ) : filteredCognis.length === 0 ? (
         <Card className="section-card p-10 text-center text-sm" style={{ color: "var(--yunque-text-muted)" }}>
-          {packOff ? "启用「Cogni 内核」能力包后即可创建助手。" : "还没有助手 —— 在上面用一句话描述你想要的，云雀帮你造一个。"}
+          {packOff ? "启用「Cogni 内核」能力包后即可创建 Cogni。" : "还没有 Cogni —— 在上面用一句话描述你想要的，云雀帮你造一个。"}
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -607,7 +607,7 @@ export default function CognisPage() {
                 key={c.id}
                 role="button"
                 tabIndex={0}
-                aria-label={`查看助手 ${c.display_name ?? c.id} 详情`}
+                aria-label={`查看 Cogni ${c.display_name ?? c.id} 详情`}
                 className="section-card p-4 cursor-pointer focus-visible:ring-2"
                 style={{ touchAction: "manipulation" }}
                 onClick={() => openDetail(c.id)}
@@ -738,11 +738,11 @@ export default function CognisPage() {
         open={!!shareID}
         onClose={() => setShareID(null)}
         size="md"
-        ariaLabel="分享助手"
+        ariaLabel="分享 Cogni"
         header={
           <div className="flex items-center gap-2">
             <Share2 size={18} style={{ color: "var(--yunque-accent)" }} aria-hidden="true" />
-            <span>分享助手</span>
+            <span>分享 Cogni</span>
           </div>
         }
       >
@@ -772,7 +772,7 @@ export default function CognisPage() {
         {importPreview && (
           <div className="space-y-3">
             <div className="text-sm" style={{ color: "var(--yunque-text-secondary)" }}>
-              将要导入以下助手：
+              将要导入以下 Cogni：
             </div>
             <div className="space-y-2 max-h-96 overflow-y-auto" style={{ overscrollBehavior: "contain" }}>
               {((importPreview.cognis as Array<Record<string, unknown>>) ?? []).map((cogni, index) => (
@@ -807,7 +807,7 @@ export default function CognisPage() {
           style={{ background: "rgba(0,0,0,0.5)" }}
           role="dialog"
           aria-modal="true"
-          aria-label={`助手 ${detailID} 详情`}
+          aria-label={`Cogni ${detailID} 详情`}
           onClick={() => setDetailID(null)}
           onKeyDown={(e) => {
             if (e.key === "Escape") setDetailID(null);
@@ -857,7 +857,7 @@ export default function CognisPage() {
                 </div>
                 {detailTraces.length === 0 ? (
                   <div className="text-sm py-6 text-center" style={{ color: "var(--yunque-text-muted)" }}>
-                    暂无记录 —— 该助手还没参与过对话
+                    暂无记录 —— 该 Cogni 还没参与过对话
                   </div>
                 ) : (
                   <div className="space-y-2">
@@ -899,7 +899,7 @@ export default function CognisPage() {
                 </div>
                 {detailWorkflows.length === 0 ? (
                   <div className="text-sm py-6 text-center" style={{ color: "var(--yunque-text-muted)" }}>
-                    该助手未定义工作流
+                    该 Cogni 未定义工作流
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -949,7 +949,7 @@ export default function CognisPage() {
                 </div>
                 {!detailExperience?.enabled ? (
                   <div className="text-sm py-6 text-center" style={{ color: "var(--yunque-text-muted)" }}>
-                    该助手未启用经验引擎
+                    该 Cogni 未启用经验引擎
                   </div>
                 ) : (
                   <div className="space-y-3">

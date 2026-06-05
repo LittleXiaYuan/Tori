@@ -67,7 +67,7 @@ export const NAV_ITEMS: NavItem[] = [
 
   // 扩展 - 核心功能
   { id: "nav-packs", href: "/packs", label: "能力包", group: "扩展", layer: "pack", defaultVisible: true, icon: <Boxes size={16} />, keywords: "packs pack runtime 增量包 能力包 热插拔 可选能力 默认入口" },
-  { id: "nav-cognis", href: "/cognis", label: "助手", group: "扩展", layer: "core", defaultVisible: true, icon: <BrainCircuit size={16} />, keywords: "助手 assistant cognis cogni 智体 认知内核 我的助手" },
+  { id: "nav-cognis", href: "/cognis", label: "Cogni", group: "扩展", layer: "core", defaultVisible: true, icon: <BrainCircuit size={16} />, keywords: "Cogni cognis 助手 assistant 智体 认知内核 我的 Cogni" },
 
   // 扩展 - 开发工具（full 模式）
   { id: "nav-skills", href: "/skills", label: "技能库", group: "扩展", layer: "lab", icon: <Package size={16} />, keywords: "skills 技能 运行时技能 高级入口 legacy pack 的原子能力来源" },
