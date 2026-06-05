@@ -217,9 +217,8 @@ func containsAny(s string, needles ...string) bool {
 // containsAnyWord checks if any needle appears as a standalone word (surrounded by
 // non-letter boundaries) in the lowered string. Useful for short tokens like "X".
 func containsAnyWord(s string, needles ...string) bool {
-	wordRe := regexp.MustCompile(`\b` + regexp.QuoteMeta(strings.ToLower(needles[0])) + `\b`)
 	for _, needle := range needles {
-		wordRe = regexp.MustCompile(`(?i)\b` + regexp.QuoteMeta(needle) + `\b`)
+		wordRe := regexp.MustCompile(`(?i)\b` + regexp.QuoteMeta(needle) + `\b`)
 		if wordRe.MatchString(s) {
 			return true
 		}
