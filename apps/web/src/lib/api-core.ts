@@ -23,12 +23,25 @@ export function ensureApiBase(): Promise<void> {
     try {
       const port = await invoke("backend_port");
       if (typeof port === "number" && port > 0) {
-        // Use `localhost` (not 127.0.0.1) so it matches the desktop's
-        // capabilities.remote.urls (http://localhost:*) and the CSP
-        // connect-src. The Rust side navigates the window to
-        // http://localhost:{port}, so this keeps API calls same-origin and
-        // avoids the CORS/CSP block that left the shell stuck "offline".
-        BASE = `http://localhost:${port}`;
+        // Only adopt the absolute backend base in the PACKAGED desktop app,
+        // whose webview origin (tauri.localhost / tauri://localhost) is
+        // whitelisted by the backend's ALLOWED_ORIGINS. Using `localhost` here
+        // matches capabilities.remote.urls and the CSP connect-src.
+        //
+        // Under `tauri dev` the window is served by next dev
+        // (http://localhost:3001), NOT the backend port. Overriding BASE there
+        // makes every call cross-origin to :PORT — which the backend rejects
+        // (the dev origin :3001 isn't whitelisted) and, on Windows, resolves
+        // `localhost` to IPv6 ::1 where nothing listens. Both left the dev
+        // shell stuck on "本地服务暂时不可用". So in dev we keep BASE relative
+        // and let next.config.js rewrites proxy /v1 & /healthz same-origin to
+        // 127.0.0.1:<port>.
+        const packaged =
+          window.location.protocol === "tauri:" ||
+          window.location.hostname === "tauri.localhost";
+        if (packaged) {
+          BASE = `http://localhost:${port}`;
+        }
       }
     } catch {
       /* keep the build-time base */

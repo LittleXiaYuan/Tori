@@ -71,14 +71,22 @@ func TestMCP_CogniClosedLoop(t *testing.T) {
 		}
 	}
 
-	// ④ surface merge: native skills + this Cogni's MCP tools
-	native := []string{"web_search", "file_open"}
-	combined := append([]string{}, native...)
-	for _, mt := range tools {
-		combined = append(combined, "github__"+mt.Name)
+	// ④ ToolSurface further narrows MCP tools (same only/include/exclude/max_tools
+	// contract as skills); identity surface keeps the tool_filter result.
+	surface := ToolSurface{Only: []string{"create_issue"}}
+	surfaced := SurfaceMCPTools(tools, surface)
+	if len(surfaced) != 1 || surfaced[0].Name != "create_issue" {
+		t.Fatalf("ToolSurface should narrow MCP tools, got %v", mcpToolNames(surfaced))
 	}
 
-	// ⑤ call routes by cogniID to that Cogni's MCP server
+	// ⑤ surface merge: native skills + surfaced MCP tools
+	native := []string{"web_search", "file_open"}
+	combined := append([]string{}, native...)
+	for _, mt := range surfaced {
+		combined = append(combined, mt.Name)
+	}
+
+	// ⑥ call routes by cogniID to that Cogni's MCP server
 	res, err := mgr.CallTool(context.Background(), "github-helper", "create_issue", map[string]any{"title": "bug"})
 	if err != nil {
 		t.Fatalf("CallTool: %v", err)
@@ -91,6 +99,7 @@ func TestMCP_CogniClosedLoop(t *testing.T) {
 	t.Logf("  ① Cogni 'github-helper' 声明 mcp.servers + tool_filter[create_issue,list_pull_requests]")
 	t.Logf("  ② Register + EnsureConnected → 懒连接 + ListTools 发现 3 个工具")
 	t.Logf("  ③ tool_filter → 保留 %d 个: %v(delete_repository 被挡)", len(tools), mcpToolNames(tools))
-	t.Logf("  ④ 并入 Cogni surface(原生+MCP): %v", combined)
-	t.Logf("  ⑤ CallTool 按 cogniID 路由 → %v", res)
+	t.Logf("  ④ ToolSurface.only 收窄 MCP → %v", mcpToolNames(surfaced))
+	t.Logf("  ⑤ 并入 Cogni surface(原生+MCP): %v", combined)
+	t.Logf("  ⑥ CallTool 按 cogniID 路由 → %v", res)
 }

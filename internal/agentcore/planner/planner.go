@@ -1,6 +1,8 @@
 package planner
 
 import (
+	"sync"
+
 	ldg "yunque-agent/internal/ledgercore"
 
 	"yunque-agent/internal/agentcore/llm"
@@ -26,6 +28,18 @@ type Planner struct {
 	executionRuntime     *ExecutionRuntimeService     // step/time budgets, context budget and ack behavior
 	contextWindowRuntime *ContextWindowRuntimeService // compression and context-window trimming boundary
 	modelRuntime         *ModelRuntimeService         // default LLM, model pool and fallback lookup boundary
+
+	// fnDefCache memoizes per-skill LLM FunctionDefs (name/description/JSON
+	// schema). Skills rebuild their Parameters() schema map on every call, so on
+	// a multi-step function-calling run this avoids reconstructing every tool's
+	// schema each step. Keyed by the skill registry Version() so install /
+	// hot-reload invalidates it. Skill Parameters() are static schema literals
+	// (request-specific data like WorkspacePaths is applied at execution via the
+	// skills.Environment, not in the schema), so version-keyed caching is sound;
+	// the cached Parameters map is treated read-only by callers.
+	fnDefMu       sync.RWMutex
+	fnDefCache    map[string]llm.FunctionDef
+	fnDefCacheVer int
 }
 
 // NewPlanner creates a planner with the given LLM client and skill registry.

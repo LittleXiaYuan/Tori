@@ -77,18 +77,29 @@ func (s *SkillRuntimeService) RecordRecent(skillNames []string) {
 	}
 }
 
+// ScorerWithRecent returns the intent scorer enriched with the recently-used
+// skills tracked via RecordRecent. It returns a fresh scorer (never the shared
+// base) so callers can't mutate service state, and — critically — it activates
+// the recency signal even when no base scorer was set via SetScorer. Previously
+// it returned nil whenever the base scorer was unset (the production reality),
+// which silently discarded the tracked recency too, so ScoreCategories never got
+// its recency bonus. Returns nil only when there is genuinely no signal.
 func (s *SkillRuntimeService) ScorerWithRecent() *skills.SkillScorer {
-	if s == nil || s.scorer == nil {
+	if s == nil {
 		return nil
 	}
 	s.recentMu.Lock()
-	defer s.recentMu.Unlock()
-	if len(s.recent) > 0 {
-		recent := make([]string, len(s.recent))
-		copy(recent, s.recent)
-		s.scorer.RecentSkills = recent
+	recent := append([]string(nil), s.recent...)
+	s.recentMu.Unlock()
+
+	if s.scorer == nil && len(recent) == 0 {
+		return nil
 	}
-	return s.scorer
+	out := &skills.SkillScorer{RecentSkills: recent}
+	if s.scorer != nil {
+		out.SuccessRates = s.scorer.SuccessRates
+	}
+	return out
 }
 
 func (s *SkillRuntimeService) RankByRecommendation(userMessage string, candidates []skills.Skill) []skills.Skill {

@@ -21,14 +21,48 @@ type SkillIndexFunc func() []SkillIndexEntry
 // current turn — empty string when no pack activates.
 type BeliefContextFunc func(ctx context.Context, message, tenantID, channel string) string
 
+// CogniTool is an extra, runtime-resolved tool contributed by a Cogni that
+// activated for the current turn (today: the tools exposed by that Cogni's
+// connected MCP servers). Unlike skills it is NOT in the global skill registry,
+// so the planner injects it into the per-turn tool list and routes any matching
+// tool call back through Invoke. Parameters is a JSON-schema object; Invoke
+// returns the tool output as a string (already stringified by the host).
+type CogniTool struct {
+	Name        string
+	Description string
+	Parameters  map[string]any
+	Invoke      func(ctx context.Context, args map[string]any) (string, error)
+}
+
 // CogniRuntime is the planner-facing runtime boundary for declarative Cogni
 // activation. Implementations own declaration evaluation, context rendering,
-// tool-surface filtering, and trace snapshot conversion. Planner only passes
-// request data through this interface and consumes the rendered outputs.
+// tool-surface filtering, MCP tool resolution, and trace snapshot conversion.
+// Planner only passes request data through this interface and consumes the
+// rendered outputs.
 type CogniRuntime interface {
 	BuildContext(ctx context.Context, message, tenantID, channel string) string
 	FilterSkills(message, tenantID, channel string, in []skills.Skill) []skills.Skill
 	Trace(message, tenantID, channel string) (CogniTraceDetail, bool)
+	// Tools returns the extra tools contributed by the cognis activated for
+	// this turn — currently the tools of their connected MCP servers. Returns
+	// nil when no cogni activates or none declare MCP servers. Implementations
+	// must lazily connect and degrade gracefully: a slow or broken MCP server
+	// must never block the turn (skip its tools instead).
+	Tools(ctx context.Context, message, tenantID, channel string) []CogniTool
+	// SurfaceAuthoritative reports whether the cognis activated this turn applied
+	// a non-identity ToolSurface. When true the planner treats the cogni-surfaced
+	// capability set (skills ∪ MCP tools) as definitive and skips its own
+	// per-message intent re-ranking and tool cap, so the tool block stays a
+	// deterministic, prompt-cache-friendly prefix instead of a per-message
+	// (cache-busting) one. This is what lets a Cogni own tool orchestration above
+	// the flat skill/MCP layer rather than merely filtering it.
+	SurfaceAuthoritative(message, tenantID, channel string) bool
+	// RecordToolOutcome feeds a tool execution result back to the cognis active
+	// this turn so a Cogni can learn which of its surfaced tools actually work and
+	// self-tune its surface over time. Implementations attribute the outcome to
+	// the owning cogni(s) and record asynchronously; this must be cheap and
+	// no-op when experience is not configured.
+	RecordToolOutcome(message, tenantID, channel, tool string, success bool)
 }
 
 type MemorySearchFunc func(ctx context.Context, tenantID, query string) string

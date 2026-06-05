@@ -188,6 +188,38 @@ func (s *ContextAssemblyService) CogniContext(ctx context.Context, message, tena
 	return s.cogniService.Context(ctx, message, tenantID, channel)
 }
 
+// CogniTools resolves the extra tools (e.g. MCP-backed) contributed by the
+// cognis that activate for this turn. Returns nil when no cogni runtime is
+// wired or none activates. The planner merges these into the per-turn tool list
+// and routes their calls back through each tool's Invoke.
+func (s *ContextAssemblyService) CogniTools(ctx context.Context, message, tenantID, channel string) []CogniTool {
+	if s == nil || s.cogniService == nil {
+		return nil
+	}
+	return s.cogniService.Tools(ctx, message, tenantID, channel)
+}
+
+// CogniSurfaceAuthoritative reports whether an activated cogni applied a
+// non-identity ToolSurface this turn. The FC tool builder uses it to keep the
+// cogni-declared surface definitive (skip per-message intent ranking/cap) for a
+// deterministic, cache-stable tool prefix.
+func (s *ContextAssemblyService) CogniSurfaceAuthoritative(message, tenantID, channel string) bool {
+	if s == nil || s.cogniService == nil {
+		return false
+	}
+	return s.cogniService.SurfaceAuthoritative(message, tenantID, channel)
+}
+
+// RecordCogniToolOutcome feeds a tool execution result back to the active
+// cognis so a Cogni can self-tune its surface from accumulated outcomes. No-op
+// when no cogni runtime is wired.
+func (s *ContextAssemblyService) RecordCogniToolOutcome(message, tenantID, channel, tool string, success bool) {
+	if s == nil || s.cogniService == nil {
+		return
+	}
+	s.cogniService.RecordToolOutcome(message, tenantID, channel, tool, success)
+}
+
 func (s *ContextAssemblyService) ApplyCogniSkillFilter(message, tenantID, channel string, in []skills.Skill) []skills.Skill {
 	if s == nil || s.cogniService == nil || !s.cogniService.HasSkillFilter() {
 		return in

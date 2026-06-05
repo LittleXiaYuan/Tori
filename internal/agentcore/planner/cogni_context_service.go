@@ -43,6 +43,27 @@ func (s *CogniContextService) Trace(message, tenantID, channel string) (CogniTra
 	return s.runtime.Trace(message, tenantID, channel)
 }
 
+func (s *CogniContextService) Tools(ctx context.Context, message, tenantID, channel string) []CogniTool {
+	if s == nil || s.runtime == nil {
+		return nil
+	}
+	return s.runtime.Tools(ctx, message, tenantID, channel)
+}
+
+func (s *CogniContextService) SurfaceAuthoritative(message, tenantID, channel string) bool {
+	if s == nil || s.runtime == nil {
+		return false
+	}
+	return s.runtime.SurfaceAuthoritative(message, tenantID, channel)
+}
+
+func (s *CogniContextService) RecordToolOutcome(message, tenantID, channel, tool string, success bool) {
+	if s == nil || s.runtime == nil {
+		return
+	}
+	s.runtime.RecordToolOutcome(message, tenantID, channel, tool, success)
+}
+
 func (s *CogniContextService) HasSkillFilter() bool {
 	return s != nil && s.runtime != nil
 }

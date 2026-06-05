@@ -1,0 +1,55 @@
+{
+  "id": "mcp-demo-assistant",
+  "display_name": "MCP 演示助手",
+  "description": "演示 Cogni 完整能力面闭环：按关键词激活 → 懒连接声明的 MCP 服务器(server-everything) → 按 ToolSurface 收窄并使工具表权威/可缓存 → 参与能力级仲裁 → 记录工具成败用于经验自调。把本文件复制到 ${DataDir}/cognis/ 即可热插拔生效。",
+  "activation": {
+    "min_score": 0.3,
+    "keywords": [
+      "mcp 演示", "演示 mcp", "mcp demo", "demo mcp",
+      "echo 工具", "echo tool", "mcp 测试", "mcp test"
+    ],
+    "keyword_weight": 0.4,
+    "channels": [],
+    "tenants": []
+  },
+  "surface": {
+    "max_tools": 6
+  },
+  "mcp": {
+    "servers": [
+      {
+        "name": "everything",
+        "transport": "stdio",
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-everything"],
+        "timeout": 60
+      }
+    ],
+    "tool_filter": {
+      "include": ["echo", "get-sum", "get-env"]
+    }
+  },
+  "context": {
+    "static": "你接入了一个演示用 MCP 服务器(server-everything)。当用户想测试 MCP 工具时，可调用：\n- echo：回显一段消息\n- get-sum：两个数字相加\n- get-env：读取环境信息\n这些工具来自本 Cogni 声明的 MCP 服务器，由 Cogni 运行时按需懒连接，并受本 Cogni 的 ToolSurface 约束。"
+  },
+  "experience": {
+    "enabled": true,
+    "min_confidence": 0.6,
+    "auto_record": true
+  },
+  "priority": 20,
+  "exclusive": "mcp-demo",
+  "checks": [
+    {
+      "name": "activates on mcp demo keyword",
+      "message": "帮我跑一下 mcp 演示 的 echo 工具",
+      "expect_active": true,
+      "expect_score_at_least": 0.3
+    },
+    {
+      "name": "stays inactive on unrelated message",
+      "message": "今天天气怎么样",
+      "expect_active": false
+    }
+  ]
+}

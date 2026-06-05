@@ -81,7 +81,7 @@ func (s *ModelRuntimeService) ClientForRequest(req PlanRequest) *llm.Client {
 	if req.ClientOverride != nil {
 		return req.ClientOverride
 	}
-	return s.ClientFor(req.ModelOverride)
+	return s.ClientFor(req.EffectiveModelTier())
 }
 
 func (s *ModelRuntimeService) ClientForRequestTier(req PlanRequest, tier string) *llm.Client {
@@ -196,8 +196,8 @@ func (s *ModelRuntimeService) FallbackChain(targetModel string) []*llm.Client {
 }
 
 func (s *ModelRuntimeService) AdaptiveRoute(req PlanRequest) string {
-	if req.ModelOverride != "" {
-		return req.ModelOverride
+	if tier := req.EffectiveModelTier(); tier != "" {
+		return tier
 	}
 	if assessCognitiveLoad(req).NeedsLongHorizon() {
 		slog.Info("model runtime: adaptive reasoning activated (high cognitive load), elevating to expert tier")

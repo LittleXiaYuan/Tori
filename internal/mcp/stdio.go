@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -195,20 +196,55 @@ func (s *StdioProvider) call(method string, params any) (json.RawMessage, error)
 		return nil, fmt.Errorf("write request: %w", err)
 	}
 
-	// Read response line
-	line, err := s.stdout.ReadBytes('\n')
-	if err != nil {
-		return nil, fmt.Errorf("read response: %w", err)
-	}
+	// Read until we get the response whose id matches this request. A compliant
+	// MCP server may interleave server→client notifications (method, no id) and
+	// requests (method + id) on stdout between our request and its response —
+	// e.g. server-everything emits logging notifications. The previous code
+	// assumed the very next line was the response, so a single interleaved
+	// notification produced an empty result and "unexpected end of JSON input".
+	// Skip anything that is not our response instead of mistaking it for one.
+	for {
+		line, err := s.stdout.ReadBytes('\n')
+		if err != nil {
+			return nil, fmt.Errorf("read response: %w", err)
+		}
+		line = bytes.TrimSpace(line)
+		if len(line) == 0 {
+			continue
+		}
 
-	var resp jsonrpcResponse
-	if err := json.Unmarshal(line, &resp); err != nil {
-		return nil, fmt.Errorf("parse response: %w", err)
+		// Classify the message by the presence of id/method without committing
+		// to a full decode: notifications have no id, server requests carry a
+		// method, only a response has an id and no method.
+		var probe struct {
+			ID     *int64 `json:"id"`
+			Method string `json:"method"`
+		}
+		if err := json.Unmarshal(line, &probe); err != nil {
+			// Not JSON-RPC (e.g. a stray stdout banner) — skip rather than fail.
+			slog.Debug("mcp stdio: skipping non-jsonrpc line", "cmd", s.cmd)
+			continue
+		}
+		if probe.ID == nil || probe.Method != "" {
+			// Notification (no id) or server→client request (has method): not
+			// our response. We don't reply to server requests; skipping keeps
+			// the client unblocked and read-only.
+			continue
+		}
+		if *probe.ID != id {
+			// Stale/out-of-order response for a different request — skip.
+			continue
+		}
+
+		var resp jsonrpcResponse
+		if err := json.Unmarshal(line, &resp); err != nil {
+			return nil, fmt.Errorf("parse response: %w", err)
+		}
+		if resp.Error != nil {
+			return nil, fmt.Errorf("rpc error %d: %s", resp.Error.Code, resp.Error.Message)
+		}
+		return resp.Result, nil
 	}
-	if resp.Error != nil {
-		return nil, fmt.Errorf("rpc error %d: %s", resp.Error.Code, resp.Error.Message)
-	}
-	return resp.Result, nil
 }
 
 func (s *StdioProvider) notify(method string, params any) {

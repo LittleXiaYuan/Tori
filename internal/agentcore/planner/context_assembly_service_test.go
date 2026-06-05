@@ -27,6 +27,16 @@ func (s stubCogniRuntime) Trace(_ string, _ string, _ string) (CogniTraceDetail,
 	return s.trace, true
 }
 
+func (s stubCogniRuntime) Tools(_ context.Context, _, _, _ string) []CogniTool {
+	return nil
+}
+
+func (s stubCogniRuntime) SurfaceAuthoritative(_ string, _ string, _ string) bool {
+	return false
+}
+
+func (s stubCogniRuntime) RecordToolOutcome(_ string, _ string, _ string, _ string, _ bool) {}
+
 func TestContextAssemblyServiceMemoryAndGraph(t *testing.T) {
 	service := NewContextAssemblyService()
 	service.SetMemory(func(_ context.Context, tenantID, query string) string {

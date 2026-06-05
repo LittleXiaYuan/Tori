@@ -75,13 +75,23 @@ func initMemory(app *agentrt.App) error {
 		return nil
 	}, nil)
 
-	// Memory pipeline (LLM-driven fact extraction)
+	// Memory pipeline (LLM-driven fact extraction). Route to the fast tier:
+	// extract + decide are short structured-JSON tasks that run 2-3x per turn
+	// off the request path, so the cheaper fast model is sufficient and avoids
+	// billing the primary model for background memory work. Falls back to the
+	// default client when no fast tier is configured.
+	memChat := app.LLMClient
+	if app.LLMPool != nil {
+		if fast := app.LLMPool.GetOrFallback("fast"); fast != nil {
+			memChat = fast
+		}
+	}
 	app.MemPipeline = memory.NewPipeline(func(ctx context.Context, msgs []memory.ChatMessage) (string, error) {
 		llmMsgs := make([]llm.Message, len(msgs))
 		for i, m := range msgs {
 			llmMsgs[i] = llm.Message{Role: m.Role, Content: m.Content}
 		}
-		return app.LLMClient.ChatJSON(ctx, llmMsgs)
+		return memChat.ChatJSON(ctx, llmMsgs)
 	}, app.MemManager)
 	app.MemPipeline.SetDailyDir(cfg.DataPath("memory", "daily"))
 
