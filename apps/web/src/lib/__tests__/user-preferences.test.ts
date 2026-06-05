@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
   loadPreferences,
   savePreferences,
@@ -151,11 +151,17 @@ describe("User Preferences", () => {
     });
 
     it("should toggle group expanded", () => {
+      // "work" is expanded by default (see DEFAULT_PREFERENCES), so toggling
+      // must invert membership: the first call collapses it, the second
+      // re-expands it. Derive the starting state instead of assuming an empty
+      // set so this stays correct if the defaults change.
+      const wasExpanded = loadPreferences().navigation.expandedGroups.includes("work");
+
       const expanded1 = toggleGroupExpanded("work");
-      expect(expanded1).toContain("work");
+      expect(expanded1.includes("work")).toBe(!wasExpanded);
 
       const expanded2 = toggleGroupExpanded("work");
-      expect(expanded2).not.toContain("work");
+      expect(expanded2.includes("work")).toBe(wasExpanded);
     });
   });
 
