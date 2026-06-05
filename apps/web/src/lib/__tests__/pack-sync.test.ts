@@ -94,7 +94,8 @@ const cogniKernelPack: InstalledPack = {
       ],
     },
     frontend: {
-      menus: [{ key: "cognis", label: "智体内核", path: "/packs/cognis", icon: "brain-circuit", order: 80 }],
+      // Cogni assistant UI now lives in core (/cognis); the pack is backend + SDK only.
+      menus: [],
       routes: [{ path: "/packs/cognis", component: "cognis/CogniKernelPackPage", title: "智体内核" }],
     },
     sdk: { typescript: "yunque-client/cognis" },
@@ -107,12 +108,13 @@ afterEach(() => {
 
 describe("pack-sync frontend runtime", () => {
   it("builds sorted nav items from enabled pack menus", () => {
-    const items = buildPackNavItems([laterPack, backupPack, cogniKernelPack]);
+    const items = buildPackNavItems([laterPack, backupPack, loraPack, cogniKernelPack]);
 
-    expect(items.map((item) => item.href)).toEqual(["/packs/backup", "/packs/cognis", "/packs/later"]);
+    expect(items.map((item) => item.href)).toEqual(["/packs/backup", "/packs/later", "/packs/lora"]);
     expect(items[0]).toMatchObject({ packId: "yunque.pack.backup", label: "备份恢复", order: 20 });
     expect(items[0]?.keywords).toContain("yunque.pack.backup");
-    expect(items[1]).toMatchObject({ packId: "yunque.pack.cogni-kernel", label: "智体内核", order: 80 });
+    // cogni-kernel is backend-only now (assistant UI moved to core /cognis), so it adds no nav item.
+    expect(items.find((item) => item.packId === "yunque.pack.cogni-kernel")).toBeUndefined();
   });
 
   it("builds sdk entrypoints and import snippets", () => {
