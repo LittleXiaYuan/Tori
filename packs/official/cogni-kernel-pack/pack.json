@@ -69,15 +69,7 @@
     ]
   },
   "frontend": {
-    "menus": [
-      {
-        "key": "cognis",
-        "label": "智体内核",
-        "path": "/packs/cognis",
-        "icon": "brain-circuit",
-        "order": 80
-      }
-    ],
+    "menus": [],
     "routes": [
       {
         "path": "/packs/cognis",
