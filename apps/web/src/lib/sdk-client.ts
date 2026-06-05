@@ -18,18 +18,31 @@ function toAbsoluteBaseUrl(base: string): string {
   return new URL(trimmed, browserOrigin()).toString().replace(/\/+$/, "");
 }
 
-function normalizeSameOriginSDKUrl(input: RequestInfo | URL): RequestInfo | URL {
-  if (BASE) return input;
+// Re-target every SDK request at the CURRENT backend base. SDK clients capture
+// their baseUrl when constructed (often at module load, before the desktop
+// backend port is resolved), so a client built against the default :9090 would
+// otherwise keep hitting a dead port even after the real port is known. BASE is
+// a live binding, so reading it per request always reflects the resolved
+// backend (set by ensureApiBase in the desktop shell).
+function routeToCurrentBackend(input: RequestInfo | URL): RequestInfo | URL {
   if (typeof Request !== "undefined" && input instanceof Request) return input;
 
   let url: URL;
   try {
-    url = input instanceof URL ? input : new URL(String(input));
+    url = input instanceof URL ? input : new URL(String(input), browserOrigin());
   } catch {
     return input;
   }
-  if (url.origin !== browserOrigin()) return input;
-  return `${url.pathname}${url.search}${url.hash}`;
+  const base = BASE.trim();
+  if (base) {
+    const target = new URL(base, browserOrigin());
+    url.protocol = target.protocol;
+    url.host = target.host; // host includes the port
+    return url.toString();
+  }
+  // No explicit base configured → prefer same-origin relative URLs.
+  if (url.origin === browserOrigin()) return `${url.pathname}${url.search}${url.hash}`;
+  return url.toString();
 }
 
 export const yunqueSDKFetch: typeof fetch = async (input, init) => {
@@ -38,7 +51,7 @@ export const yunqueSDKFetch: typeof fetch = async (input, init) => {
     if (!headers.has(key)) headers.set(key, value);
   }
 
-  const response = await fetch(normalizeSameOriginSDKUrl(input), {
+  const response = await fetch(routeToCurrentBackend(input), {
     ...init,
     headers,
   });

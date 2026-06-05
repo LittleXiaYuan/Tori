@@ -403,6 +403,7 @@ impl FloatingState {
         }
     }
 
+    #[allow(dead_code)] // used by create_floating_ball (floating ball feature, off by default)
     fn load_ball_pos(&self) -> Option<BallPosition> {
         let guard = lock_or_recover(&self.data_path);
         let dir = guard.as_ref()?;
@@ -578,6 +579,7 @@ fn floating_send_to_chat(text: String, handle: AppHandle) {
     }
 }
 
+#[allow(dead_code)] // floating ball is opt-in; kept for the settings toggle path
 fn create_floating_ball(handle: &AppHandle, port: u16) {
     let url = format!("http://127.0.0.1:{port}/floating-ball");
     let parsed_url = match url.parse() {
@@ -827,6 +829,7 @@ pub fn run() {
         .manage(FloatingState::new())
         .manage(ThemeState::new())
         .invoke_handler(tauri::generate_handler![
+            backend_port,
             toggle_floating_panel,
             get_floating_items,
             get_floating_count,
@@ -1007,6 +1010,21 @@ async fn launch_backend(handle: &AppHandle) {
             // wrapper rather than a headless server.
             cmd.env("YUNQUE_LAUNCHER", "tauri-desktop");
 
+            // The desktop UI is served from the embedded webview, whose origin
+            // is `tauri.localhost` (Windows/Linux) or `tauri://localhost`
+            // (macOS) — NOT a loopback host the backend auto-trusts. Without
+            // this the Go CORS layer returns no Access-Control-Allow-Origin and
+            // every UI→backend fetch is blocked, leaving the shell stuck on the
+            // "本地服务暂时不可用" splash. Whitelist the webview origins so the
+            // (loopback-bound) backend accepts cross-origin calls from the shell.
+            // Respect an operator override if AGENT/env already set it.
+            if std::env::var_os("ALLOWED_ORIGINS").is_none() {
+                cmd.env(
+                    "ALLOWED_ORIGINS",
+                    "http://tauri.localhost,https://tauri.localhost,tauri://localhost",
+                );
+            }
+
             // On Windows the sidecar MUST live in its own process group so
             // GenerateConsoleCtrlEvent(CTRL_BREAK_EVENT) does not also kill us.
             #[cfg(windows)]
@@ -1074,6 +1092,15 @@ async fn launch_backend(handle: &AppHandle) {
     } else {
         emit_error(handle, "未检测到后端服务", port);
     }
+}
+
+/// Backend port exposed to the webview so the frontend can target the live Go
+/// sidecar even when AGENT_ADDR / auto-pick selects a non-default port. Keeps
+/// the desktop dev (next dev on :3001 + sidecar on :PORT) from polling a dead
+/// :9090 when the build-time NEXT_PUBLIC_API_BASE and the runtime port differ.
+#[tauri::command]
+fn backend_port() -> u16 {
+    resolve_backend_port()
 }
 
 /// Parse `AGENT_ADDR` (e.g. `":9090"`, `"0.0.0.0:9090"`, `"[::]:9090"`,

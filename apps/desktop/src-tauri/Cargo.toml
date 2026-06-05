@@ -5,7 +5,10 @@ edition = "2021"
 description = "Yunque Agent Desktop Client"
 
 [lib]
-name = "yunque_desktop"
+# Distinct from the binary's normalised name (`yunque_desktop`) so the bin and
+# lib targets don't emit the same `yunque_desktop.pdb` (output-collision warning
+# on Windows). Matches Tauri's `{app}_lib` convention.
+name = "yunque_desktop_lib"
 crate-type = ["lib", "cdylib", "staticlib"]
 
 [build-dependencies]
