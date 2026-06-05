@@ -550,3 +550,128 @@ func TestParseReActResponseHandlesBracesInsideStrings(t *testing.T) {
 		t.Fatalf("unexpected action: %#v", got.Action)
 	}
 }
+
+// mcpToolRuntime is a CogniRuntime that contributes exactly one MCP-backed
+// CogniTool. BuildContext/FilterSkills/Trace are inert so the test isolates the
+// FC executor's cogni-tool injection + dispatch routing path.
+type mcpToolRuntime struct {
+	tool CogniTool
+}
+
+func (m mcpToolRuntime) BuildContext(context.Context, string, string, string) string { return "" }
+func (m mcpToolRuntime) FilterSkills(_ string, _ string, _ string, in []skills.Skill) []skills.Skill {
+	return in
+}
+func (m mcpToolRuntime) Trace(string, string, string) (CogniTraceDetail, bool) {
+	return CogniTraceDetail{}, false
+}
+func (m mcpToolRuntime) Tools(context.Context, string, string, string) []CogniTool {
+	return []CogniTool{m.tool}
+}
+func (m mcpToolRuntime) SurfaceAuthoritative(string, string, string) bool       { return false }
+func (m mcpToolRuntime) RecordToolOutcome(string, string, string, string, bool) {}
+
+// TestRunNativeFCInvokesCogniMCPTool is the end-to-end proof that a Cogni's MCP
+// tool reaches the live FC loop: it is injected into the model's tool list,
+// the model calls it, the planner routes the call back through the tool's Invoke
+// (not the skill registry), and the result flows into the final answer.
+func TestRunNativeFCInvokesCogniMCPTool(t *testing.T) {
+	var llmCalls int32
+	var sawMCPTool int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// The cogni MCP tool must appear in the tools advertised to the model.
+		var payload struct {
+			Tools []struct {
+				Function struct {
+					Name string `json:"name"`
+				} `json:"function"`
+			} `json:"tools"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&payload)
+		for _, tl := range payload.Tools {
+			if tl.Function.Name == "github_create_issue" {
+				atomic.StoreInt32(&sawMCPTool, 1)
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if atomic.AddInt32(&llmCalls, 1) == 1 {
+			json.NewEncoder(w).Encode(map[string]any{
+				"choices": []map[string]any{{
+					"message": map[string]any{
+						"role":    "assistant",
+						"content": "",
+						"tool_calls": []map[string]any{{
+							"id":   "call-1",
+							"type": "function",
+							"function": map[string]any{
+								"name":      "github_create_issue",
+								"arguments": `{"title":"bug report"}`,
+							},
+						}},
+					},
+					"finish_reason": "tool_calls",
+				}},
+			})
+			return
+		}
+		json.NewEncoder(w).Encode(map[string]any{
+			"choices": []map[string]any{{
+				"message":       map[string]any{"role": "assistant", "content": "已创建 issue #42"},
+				"finish_reason": "stop",
+			}},
+		})
+	}))
+	defer srv.Close()
+
+	// A real skill coexists with the MCP tool to prove the unified tool table.
+	reg := skills.NewRegistry()
+	reg.Register(&mockSkill{
+		name: "web_search", desc: "search the web",
+		execFn: func(context.Context, map[string]any, *skills.Environment) (string, error) {
+			return "unused", nil
+		},
+	})
+
+	var invokeCount int32
+	var invokedArgs map[string]any
+	runtime := mcpToolRuntime{tool: CogniTool{
+		Name:        "github_create_issue",
+		Description: "Create a GitHub issue",
+		Parameters: map[string]any{
+			"type":       "object",
+			"properties": map[string]any{"title": map[string]any{"type": "string"}},
+		},
+		Invoke: func(_ context.Context, args map[string]any) (string, error) {
+			atomic.AddInt32(&invokeCount, 1)
+			invokedArgs = args
+			return "issue #42 created", nil
+		},
+	}}
+
+	p := NewPlanner(llm.NewClient(srv.URL, "test-key", "test-model"), reg, 3)
+	p.SetNativeFC(true)
+	p.SetCogniRuntime(runtime)
+
+	result, err := p.Run(context.Background(), PlanRequest{
+		Messages: []llm.Message{{Role: "user", Content: "create a github issue"}},
+		TenantID: "test",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if atomic.LoadInt32(&sawMCPTool) != 1 {
+		t.Fatal("cogni MCP tool was not injected into the LLM tool list")
+	}
+	if got := atomic.LoadInt32(&invokeCount); got != 1 {
+		t.Fatalf("cogni MCP tool Invoke called %d times, want 1 (dispatch routing)", got)
+	}
+	if invokedArgs["title"] != "bug report" {
+		t.Fatalf("MCP tool invoked with unexpected args: %#v", invokedArgs)
+	}
+	if !strings.Contains(result.Reply, "已创建 issue") {
+		t.Fatalf("unexpected final reply: %q", result.Reply)
+	}
+	if len(result.Plan) == 0 || result.Plan[0].Skill != "github_create_issue" || result.Plan[0].Status != StepDone {
+		t.Fatalf("expected completed MCP tool step routed by name, got %#v", result.Plan)
+	}
+}

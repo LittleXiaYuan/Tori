@@ -699,6 +699,42 @@ func initSkillRegistration(app *agentrt.App, gw *gateway.Gateway, searchReg *web
 		}
 	}
 
+	// file / image / research / workflow categories — assigned by skill-name
+	// prefix so (1) the intent router can actually narrow these domains
+	// (previously their keyword buckets were inert) and (2) AutoOrganizer can
+	// group these skills into structured cognis (FromCapsules). Skills that match
+	// no rule stay uncategorized = always available, so general tools like
+	// code_execute / computer_use are never narrowed out.
+	app.SkillRegistry.DefineCategory(skills.SkillCategory{
+		ID:          "file",
+		Name:        "文件与文档",
+		Description: "Create, edit, convert and manage documents/files: Word/Excel/PPT/PDF, HTML export, archives, file read/write, document parsing.",
+	})
+	app.SkillRegistry.DefineCategory(skills.SkillCategory{
+		ID:          "image",
+		Name:        "图像",
+		Description: "Generate and edit images and illustrations.",
+	})
+	app.SkillRegistry.DefineCategory(skills.SkillCategory{
+		ID:          "research",
+		Name:        "研究",
+		Description: "Research the web and produce analyses/reports: web search, deep research.",
+	})
+	app.SkillRegistry.DefineCategory(skills.SkillCategory{
+		ID:          "workflow",
+		Name:        "工作流",
+		Description: "Create, run and manage multi-step workflows and automations.",
+	})
+	for _, s := range app.SkillRegistry.All() {
+		n := s.Name()
+		if app.SkillRegistry.CategoryOf(n) != "" {
+			continue // already in browser/connector
+		}
+		if cat := categorizeSkillName(n); cat != "" {
+			app.SkillRegistry.AssignCategory(n, cat)
+		}
+	}
+
 	totalSkills := len(app.SkillRegistry.All())
 	totalCats := len(app.SkillRegistry.Categories())
 	uncategorized := len(app.SkillRegistry.UncategorizedSkills())
@@ -709,5 +745,42 @@ func initSkillRegistration(app *agentrt.App, gw *gateway.Gateway, searchReg *web
 		"hierarchical", totalSkills > 25 && totalCats > 0,
 	)
 
+	// Surface intent-router drift: keyword buckets without a backing category are
+	// inert (ScoreCategories skips them), so intent narrowing silently never
+	// fires for them. Wiring those categories is a deliberate taxonomy decision.
+	if dead := app.SkillRegistry.UnbackedIntentBuckets(); len(dead) > 0 {
+		slog.Warn("skill intent router: keyword buckets have no matching category and are inert; define these categories to enable intent narrowing",
+			"inert_buckets", dead)
+	}
+
 	p.InvalidatePromptCache()
+}
+
+// categorizeSkillName maps a skill name to one of the file/image/research/
+// workflow intent categories by name prefix, or "" when it belongs to none
+// (left uncategorized = always available). browser/connector are assigned by
+// their own rules before this runs. Keeping this as a pure function makes the
+// taxonomy unit-testable and the boundary explicit.
+func categorizeSkillName(name string) string {
+	switch {
+	case hasAnyPrefix(name, "docx_", "xlsx_", "pptx_", "pdf_", "file_", "zip_", "deck_", "html_") ||
+		name == "document_parse" || name == "doc_parse":
+		return "file"
+	case strings.HasPrefix(name, "image_"):
+		return "image"
+	case name == "deep_research" || name == "web_search" || strings.HasPrefix(name, "research_"):
+		return "research"
+	case strings.Contains(name, "workflow") || name == "orchestrate_task":
+		return "workflow"
+	}
+	return ""
+}
+
+func hasAnyPrefix(s string, prefixes ...string) bool {
+	for _, p := range prefixes {
+		if strings.HasPrefix(s, p) {
+			return true
+		}
+	}
+	return false
 }

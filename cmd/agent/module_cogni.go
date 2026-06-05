@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -34,6 +35,7 @@ const cogniHookEnabled = true
 type plannerCogniRuntime struct {
 	enabled func() bool
 	hook    *cogni.Hook
+	mcp     *cogni.MCPManager
 }
 
 func (r plannerCogniRuntime) active() bool {
@@ -67,6 +69,95 @@ func (r plannerCogniRuntime) Trace(message, tenantID, channel string) (planner.C
 		return planner.CogniTraceDetail{}, false
 	}
 	return plannerCogniTraceDetail(trace), true
+}
+
+// Tools surfaces MCP tools from every Cogni activated this turn. Skills are
+// narrowed by FilterSkills + ToolSurface; MCP tools follow the same surface
+// rules (only/include/exclude/max_tools) after mcp.tool_filter, so skill and
+// MCP exposure share one declarative contract per Cogni.
+func (r plannerCogniRuntime) Tools(ctx context.Context, message, tenantID, channel string) []planner.CogniTool {
+	if !r.active() || r.mcp == nil {
+		return nil
+	}
+	acts := r.hook.Activate(r.request(message, tenantID, channel))
+	if len(acts) == 0 {
+		return nil
+	}
+	var out []planner.CogniTool
+	seen := make(map[string]bool)
+	for _, a := range acts {
+		if a.Declaration == nil || len(a.Declaration.MCP.Servers) == 0 {
+			continue
+		}
+		cogniID := a.Declaration.ID
+		connectCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
+		err := r.mcp.EnsureConnected(connectCtx, cogniID)
+		cancel()
+		if err != nil {
+			slog.Warn("cogni: mcp connect failed; tools unavailable this turn", "cogni", cogniID, "err", err)
+			continue
+		}
+		raw := r.mcp.Tools(cogniID)
+		filtered := cogni.SurfaceMCPTools(raw, a.Declaration.Surface)
+		if before, after := len(raw), len(filtered); before != after {
+			slog.Info("cogni: mcp tools narrowed by surface", "cogni", cogniID, "before", before, "after", after)
+		}
+		for _, t := range filtered {
+			if seen[t.Name] {
+				continue
+			}
+			seen[t.Name] = true
+			id, name := cogniID, t.Name
+			out = append(out, planner.CogniTool{
+				Name:        name,
+				Description: t.Description,
+				Parameters:  t.InputSchema,
+				Invoke: func(ctx context.Context, args map[string]any) (string, error) {
+					res, callErr := r.mcp.CallTool(ctx, id, name, args)
+					if callErr != nil {
+						return "", callErr
+					}
+					return stringifyMCPResult(res), nil
+				},
+			})
+		}
+	}
+	return out
+}
+
+// SurfaceAuthoritative reports whether an activated cogni declared a non-identity
+// ToolSurface this turn, so the planner can treat the cogni's capability set
+// (skills ∪ MCP tools) as the definitive, cache-stable tool block.
+func (r plannerCogniRuntime) SurfaceAuthoritative(message, tenantID, channel string) bool {
+	if !r.active() {
+		return false
+	}
+	return r.hook.SurfaceAuthoritative(r.request(message, tenantID, channel))
+}
+
+// RecordToolOutcome feeds a tool result back into the experience self-tuning
+// loop. The hook attributes it to the owning cogni(s) and records via the
+// per-cogni ExperienceStore (debounced persist), so this is cheap and a no-op
+// unless a cogni with experience enabled surfaces the tool.
+func (r plannerCogniRuntime) RecordToolOutcome(message, tenantID, channel, tool string, success bool) {
+	if !r.active() {
+		return
+	}
+	r.hook.RecordToolOutcome(r.request(message, tenantID, channel), tool, success)
+}
+
+func stringifyMCPResult(v any) string {
+	switch t := v.(type) {
+	case nil:
+		return ""
+	case string:
+		return t
+	default:
+		if b, err := json.Marshal(t); err == nil {
+			return string(b)
+		}
+		return fmt.Sprintf("%v", t)
+	}
 }
 
 func plannerCogniTraceDetail(trace cogni.Trace) planner.CogniTraceDetail {
@@ -411,9 +502,24 @@ func (m *cogniModule) Init(ctx context.Context, app *agentrt.App) error {
 				}
 			}
 		}
+		// Capability arbitration ("top-K experts win"): opt-in via env. Default
+		// (unset) keeps legacy behavior where every activated cogni composes.
+		if arbCfg := cogniArbitrationFromEnv(); !arbCfg.IsZero() {
+			hook.SetArbitration(arbCfg)
+			slog.Info("cogni: capability arbitration enabled",
+				"max_active", arbCfg.MaxActive, "min_confidence", arbCfg.MinConfidence)
+		}
+		// Experience-driven surface self-tuning: opt-in via env. Default (unset)
+		// keeps legacy behavior; recording still happens but pruning is inert.
+		if tuneCfg := cogniExperienceTuningFromEnv(); !tuneCfg.IsZero() {
+			hook.SetExperienceTuning(tuneCfg)
+			slog.Info("cogni: experience surface tuning enabled",
+				"min_observations", tuneCfg.MinObservations, "min_success_rate", tuneCfg.MinSuccessRate)
+		}
 		app.Planner.SetCogniRuntime(plannerCogniRuntime{
 			enabled: m.cogniKernelPackEnabled,
 			hook:    hook,
+			mcp:     m.mcpMgr,
 		})
 		// Wire cost tracking + bus routing on activation
 		{
@@ -432,7 +538,7 @@ func (m *cogniModule) Init(ctx context.Context, app *agentrt.App) error {
 				}
 			})
 		}
-		slog.Info("cogni: planner context injection + surface filter + bus + cost + trace wired")
+		slog.Info("cogni: planner context injection + surface filter + mcp tools + bus + cost + trace wired")
 	}
 
 	// Adapt existing Plugins as Cogni declarations so they participate
@@ -763,6 +869,48 @@ func (b *mcpProviderBridge) Close() error {
 func cogniAutoDisableFromEnv() bool {
 	v := strings.ToLower(strings.TrimSpace(os.Getenv("COGNI_AUTO_DISABLE")))
 	return v == "true" || v == "1" || v == "yes" || v == "on"
+}
+
+// cogniArbitrationFromEnv reads per-turn capability arbitration settings:
+//   - COGNI_MAX_ACTIVE_COGNIS: cap how many cognis compose per turn (top-K).
+//   - COGNI_MIN_CONFIDENCE: drop activations below this score floor.
+//
+// Both default to 0 (disabled) so the legacy "every activated cogni composes"
+// behavior is preserved unless an operator opts in.
+func cogniArbitrationFromEnv() cogni.ArbitrationConfig {
+	cfg := cogni.ArbitrationConfig{}
+	if v := strings.TrimSpace(os.Getenv("COGNI_MAX_ACTIVE_COGNIS")); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			cfg.MaxActive = n
+		}
+	}
+	if v := strings.TrimSpace(os.Getenv("COGNI_MIN_CONFIDENCE")); v != "" {
+		if f, err := strconv.ParseFloat(v, 64); err == nil && f > 0 {
+			cfg.MinConfidence = f
+		}
+	}
+	return cfg
+}
+
+// cogniExperienceTuningFromEnv reads experience-driven surface pruning settings:
+//   - COGNI_EXP_MIN_OBSERVATIONS: minimum observations before a tool can be pruned.
+//   - COGNI_EXP_MIN_SUCCESS: success-rate floor below which a tool is pruned.
+//
+// Both default to 0 (disabled) so recording accrues but pruning stays inert
+// until an operator opts in.
+func cogniExperienceTuningFromEnv() cogni.ExperienceTuningConfig {
+	cfg := cogni.ExperienceTuningConfig{}
+	if v := strings.TrimSpace(os.Getenv("COGNI_EXP_MIN_OBSERVATIONS")); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			cfg.MinObservations = n
+		}
+	}
+	if v := strings.TrimSpace(os.Getenv("COGNI_EXP_MIN_SUCCESS")); v != "" {
+		if f, err := strconv.ParseFloat(v, 64); err == nil && f > 0 {
+			cfg.MinSuccessRate = f
+		}
+	}
+	return cfg
 }
 
 func (m *cogniModule) Status() agentrt.ModuleStatus {

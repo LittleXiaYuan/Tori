@@ -13,8 +13,8 @@ type fakeSkill struct {
 	name string
 }
 
-func (f *fakeSkill) Name() string             { return f.name }
-func (f *fakeSkill) Description() string      { return "" }
+func (f *fakeSkill) Name() string               { return f.name }
+func (f *fakeSkill) Description() string        { return "" }
 func (f *fakeSkill) Parameters() map[string]any { return nil }
 func (f *fakeSkill) Execute(ctx context.Context, args map[string]any, env *skills.Environment) (string, error) {
 	return "", nil
@@ -159,6 +159,47 @@ func TestMergeSurfaces_EmptyInputsSafe(t *testing.T) {
 	}
 	if out := MergeSurfaces(nil, nil); out != nil {
 		t.Fatalf("MergeSurfaces(nil, nil) should be nil-safe; got %v", out)
+	}
+}
+
+func TestSurfaceMCPTools_OnlyRestricts(t *testing.T) {
+	in := []MCPToolInfo{
+		{Name: "create_issue"}, {Name: "list_pull_requests"}, {Name: "delete_repository"},
+	}
+	out := SurfaceMCPTools(in, ToolSurface{Only: []string{"create_issue"}})
+	if names := mcpToolNames(out); !equal(names, []string{"create_issue"}) {
+		t.Fatalf("Only filter wrong for MCP: got %v", names)
+	}
+}
+
+func TestSurfaceMCPTools_ExcludeAndInclude(t *testing.T) {
+	in := []MCPToolInfo{{Name: "a"}, {Name: "b"}, {Name: "c"}}
+	out := SurfaceMCPTools(in, ToolSurface{
+		Only:    []string{"a"},
+		Include: []string{"c"},
+	})
+	if names := mcpToolNames(out); !equal(names, []string{"a", "c"}) {
+		t.Fatalf("Include must re-add MCP tools: got %v", names)
+	}
+}
+
+func TestSurfaceMCPTools_MaxToolsCaps(t *testing.T) {
+	in := []MCPToolInfo{{Name: "a"}, {Name: "b"}, {Name: "c"}}
+	out := SurfaceMCPTools(in, ToolSurface{MaxTools: 2})
+	if names := mcpToolNames(out); !equal(names, []string{"a", "b"}) {
+		t.Fatalf("MaxTools wrong for MCP: got %v", names)
+	}
+}
+
+func TestMergeMCPTools_DedupesByName(t *testing.T) {
+	a := []MCPToolInfo{{Name: "shared", Server: "s1"}, {Name: "only-a", Server: "s1"}}
+	b := []MCPToolInfo{{Name: "shared", Server: "s2"}, {Name: "only-b", Server: "s2"}}
+	out := MergeMCPTools(a, b)
+	if names := mcpToolNames(out); !equal(names, []string{"shared", "only-a", "only-b"}) {
+		t.Fatalf("MergeMCPTools wrong: got %v", names)
+	}
+	if out[0].Server != "s1" {
+		t.Fatalf("first cogni should win on name collision, got server %q", out[0].Server)
 	}
 }
 

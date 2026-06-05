@@ -6,6 +6,33 @@ import (
 	"time"
 )
 
+func TestExperienceStore_RecordToolOutcome(t *testing.T) {
+	es := NewExperienceStore("rec-cogni", ExperienceConfig{Enabled: true, StoreDir: t.TempDir()})
+	defer es.Flush()
+
+	// 3 successes, 1 failure → rate 0.75 over 4 observations.
+	es.RecordToolOutcome("web_search", true)
+	es.RecordToolOutcome("web_search", true)
+	es.RecordToolOutcome("web_search", false)
+	es.RecordToolOutcome("web_search", true)
+
+	rate, count, ok := es.ToolSuccess("web_search")
+	if !ok {
+		t.Fatal("expected tool success data")
+	}
+	if count != 4 {
+		t.Fatalf("count = %d, want 4", count)
+	}
+	if rate < 0.74 || rate > 0.76 {
+		t.Fatalf("rate = %.3f, want ~0.75", rate)
+	}
+
+	// Unknown tool → not ok (distinguishes unknown from known-bad).
+	if _, _, ok := es.ToolSuccess("never_used"); ok {
+		t.Fatal("unknown tool should report ok=false")
+	}
+}
+
 func TestExperienceStore_ToolMemory(t *testing.T) {
 	es := NewExperienceStore("test-cogni", ExperienceConfig{
 		Enabled:  true,

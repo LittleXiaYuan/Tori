@@ -68,7 +68,116 @@ type Hook struct {
 	embedMu  sync.RWMutex
 	embedder EmbedderFunc
 
+	arbMu       sync.RWMutex
+	arbitration ArbitrationConfig
+
+	expTuneMu        sync.RWMutex
+	experienceTuning ExperienceTuningConfig
+
 	turnCache *turnCache
+}
+
+// SetExperienceTuning enables experience-driven surface pruning (drop a cogni's
+// consistently-failing tools from its surface). The zero config (default) keeps
+// legacy behavior. Intended to be set once at wiring time.
+func (h *Hook) SetExperienceTuning(cfg ExperienceTuningConfig) {
+	if h == nil {
+		return
+	}
+	h.expTuneMu.Lock()
+	h.experienceTuning = cfg
+	h.expTuneMu.Unlock()
+}
+
+func (h *Hook) experienceTuningCfg() ExperienceTuningConfig {
+	if h == nil {
+		return ExperienceTuningConfig{}
+	}
+	h.expTuneMu.RLock()
+	defer h.expTuneMu.RUnlock()
+	return h.experienceTuning
+}
+
+// RecordToolOutcome attributes a tool execution result to every activated cogni
+// whose non-identity surface includes that tool and that has an experience
+// store, feeding the self-tuning loop. Cheap: activation is turn-cached and the
+// store debounces its disk writes. No-op when experience isn't wired.
+func (h *Hook) RecordToolOutcome(req ContextRequest, tool string, success bool) {
+	if h == nil {
+		return
+	}
+	provider := h.experienceProviderFn()
+	if provider == nil {
+		return
+	}
+	tool = strings.TrimSpace(tool)
+	if tool == "" {
+		return
+	}
+	for _, a := range h.Activate(req) {
+		d := a.Declaration
+		if d == nil || isIdentitySurface(d.Surface) || !d.Surface.AllowsName(tool) {
+			continue
+		}
+		if store := provider(d.ID); store != nil {
+			store.RecordToolOutcome(tool, success)
+		}
+	}
+}
+
+// pruneByExperience drops tools from a single cogni's surfaced set when its own
+// experience shows them consistently failing (>= MinObservations observations
+// with success rate < MinSuccessRate). No-op when tuning is disabled, no
+// experience store exists, or there is no data — and never prunes to empty (a
+// degenerate surface would lock the model out of every tool).
+func (h *Hook) pruneByExperience(cogniID string, in []skills.Skill) []skills.Skill {
+	cfg := h.experienceTuningCfg()
+	if cfg.IsZero() || len(in) == 0 {
+		return in
+	}
+	provider := h.experienceProviderFn()
+	if provider == nil {
+		return in
+	}
+	store := provider(cogniID)
+	if store == nil {
+		return in
+	}
+	out := make([]skills.Skill, 0, len(in))
+	for _, sk := range in {
+		rate, count, ok := store.ToolSuccess(sk.Name())
+		if ok && count >= cfg.MinObservations && rate < cfg.MinSuccessRate {
+			slog.Debug("cogni: pruning low-success tool from surface",
+				"cogni", cogniID, "tool", sk.Name(), "rate", rate, "obs", count)
+			continue
+		}
+		out = append(out, sk)
+	}
+	if len(out) == 0 {
+		return in
+	}
+	return out
+}
+
+// SetArbitration enables per-turn capability arbitration (top-K bidding +
+// confidence floor). The zero config (default) keeps the legacy behavior where
+// every activated cogni composes. Intended to be set once at wiring time.
+func (h *Hook) SetArbitration(cfg ArbitrationConfig) {
+	if h == nil {
+		return
+	}
+	h.arbMu.Lock()
+	h.arbitration = cfg
+	h.arbMu.Unlock()
+}
+
+func (h *Hook) arbitrationCfg() ArbitrationConfig {
+	if h == nil {
+		return ArbitrationConfig{}
+	}
+	h.arbMu.RLock()
+	defer h.arbMu.RUnlock()
+	return h.arbitration
 }
 
 // SetEmbedder wires the host embedder used for semantic Cogni activation. It is
@@ -309,6 +418,10 @@ func (h *Hook) evaluate(req ContextRequest) *turnState {
 		// about even after exclusivity collapses the list.
 		excl := ApplyExclusivity(raw)
 		final := Filtered(excl)
+		// Capability arbitration ("top-K experts win"): after exclusivity, cap
+		// the composing set by bid (score) + confidence floor. Identity when no
+		// host opted in, so legacy "all activated compose" is preserved.
+		final = Arbitrate(final, h.arbitrationCfg())
 
 		ts := &turnState{
 			created:     time.Now(),
@@ -489,7 +602,11 @@ func (h *Hook) FilterSkills(req ContextRequest, in []skills.Skill) []skills.Skil
 		}
 		copied := make([]SurfaceInput, len(candidates))
 		copy(copied, candidates)
-		allSurfaces = append(allSurfaces, Surface(copied, s))
+		surfaced := Surface(copied, s)
+		// Self-tuning: drop this cogni's consistently-failing tools (no-op unless
+		// experience tuning is enabled and the cogni has accumulated outcomes).
+		surfaced = h.pruneByExperience(a.Declaration.ID, surfaced)
+		allSurfaces = append(allSurfaces, surfaced)
 		appliedBy = append(appliedBy, a.Declaration.ID)
 	}
 
@@ -548,6 +665,30 @@ func isIdentitySurface(s ToolSurface) bool {
 		len(s.Exclude) == 0 &&
 		len(s.FromCapsules) == 0 &&
 		s.MaxTools == 0
+}
+
+// SurfaceAuthoritative reports whether any cogni activated for this turn applies
+// a non-identity ToolSurface. When true the host planner should treat the
+// surfaced capability set as definitive — skipping its own per-message intent
+// re-ranking and tool cap — so the tool block stays deterministic and
+// prompt-cache friendly. Turn-cached: shares the same evaluation as
+// BuildContext/FilterSkills, so it costs nothing extra within a turn.
+func (h *Hook) SurfaceAuthoritative(req ContextRequest) bool {
+	if h == nil {
+		return false
+	}
+	st := h.evaluate(req)
+	if st == nil {
+		return false
+	}
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	for _, a := range st.activations {
+		if a.Declaration != nil && !isIdentitySurface(a.Declaration.Surface) {
+			return true
+		}
+	}
+	return false
 }
 
 // ActiveIDs returns the IDs of every activated cogni for audit/UI purposes.

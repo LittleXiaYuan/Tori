@@ -87,6 +87,147 @@ func Surface(candidates []SurfaceInput, s ToolSurface) []skills.Skill {
 	return out
 }
 
+// SurfaceMCPTools applies ToolSurface name-based rules to MCP tools for a
+// Cogni. FromCapsules is ignored — MCP tools are not bound to skill capsules.
+// A zero-valued surface is identity and returns all candidates (already narrowed
+// by mcp.tool_filter at connect time).
+func SurfaceMCPTools(candidates []MCPToolInfo, s ToolSurface) []MCPToolInfo {
+	if len(candidates) == 0 {
+		return nil
+	}
+	if isIdentitySurface(s) {
+		return candidates
+	}
+	idx := make(map[string]MCPToolInfo, len(candidates))
+	names := make([]string, 0, len(candidates))
+	seen := make(map[string]bool, len(candidates))
+	for _, t := range candidates {
+		if seen[t.Name] {
+			continue
+		}
+		seen[t.Name] = true
+		idx[t.Name] = t
+		names = append(names, t.Name)
+	}
+	filtered := surfaceToolNames(names, s)
+	out := make([]MCPToolInfo, 0, len(filtered))
+	for _, n := range filtered {
+		if t, ok := idx[n]; ok {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+// MergeMCPTools unions MCP tool lists from multiple activated cognis, deduping
+// by tool name (first cogni wins on collision).
+func MergeMCPTools(lists ...[]MCPToolInfo) []MCPToolInfo {
+	seen := make(map[string]bool)
+	var out []MCPToolInfo
+	for _, list := range lists {
+		for _, t := range list {
+			if seen[t.Name] {
+				continue
+			}
+			seen[t.Name] = true
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+// surfaceToolNames applies the name-based ToolSurface rules shared by skills and
+// MCP tools. FromCapsules is intentionally excluded — callers apply capsule
+// narrowing before invoking this helper when needed.
+func surfaceToolNames(names []string, s ToolSurface) []string {
+	if len(names) == 0 {
+		return nil
+	}
+	filtered := names
+
+	if len(s.Only) > 0 {
+		set := make(map[string]bool, len(s.Only))
+		for _, n := range s.Only {
+			set[n] = true
+		}
+		filtered = filterStringsInPlace(filtered, func(n string) bool { return set[n] })
+	}
+
+	if len(s.Exclude) > 0 {
+		set := make(map[string]bool, len(s.Exclude))
+		for _, n := range s.Exclude {
+			set[n] = true
+		}
+		filtered = filterStringsInPlace(filtered, func(n string) bool { return !set[n] })
+	}
+
+	candidateSet := make(map[string]bool, len(names))
+	for _, n := range names {
+		candidateSet[n] = true
+	}
+
+	out := append([]string(nil), filtered...)
+	seen := make(map[string]bool, len(out))
+	for _, n := range out {
+		seen[n] = true
+	}
+
+	if len(s.Include) > 0 {
+		for _, n := range s.Include {
+			if seen[n] {
+				continue
+			}
+			if candidateSet[n] {
+				out = append(out, n)
+				seen[n] = true
+			}
+		}
+	}
+
+	if s.MaxTools > 0 && len(out) > s.MaxTools {
+		out = out[:s.MaxTools]
+	}
+	return out
+}
+
+func filterStringsInPlace(in []string, pred func(string) bool) []string {
+	out := in[:0]
+	for _, s := range in {
+		if pred(s) {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// AllowsName reports whether a tool/skill name survives this surface's
+// name-level rules (Only / Include / Exclude). FromCapsules and MaxTools are
+// intentionally ignored (they need the full candidate set / ranking), so this is
+// a fast membership check used for experience attribution — NOT the
+// authoritative filter (that is Surface()/SurfaceMCPTools()).
+func (s ToolSurface) AllowsName(name string) bool {
+	allowed := true
+	if len(s.Only) > 0 {
+		allowed = surfaceNameInList(s.Only, name)
+	}
+	if surfaceNameInList(s.Exclude, name) {
+		allowed = false
+	}
+	if surfaceNameInList(s.Include, name) {
+		allowed = true
+	}
+	return allowed
+}
+
+func surfaceNameInList(list []string, name string) bool {
+	for _, x := range list {
+		if x == name {
+			return true
+		}
+	}
+	return false
+}
+
 // MergeSurfaces combines multiple ToolSurface outputs into a deduplicated set.
 // Later surfaces add to the union of earlier ones.
 func MergeSurfaces(surfaces ...[]skills.Skill) []skills.Skill {

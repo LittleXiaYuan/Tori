@@ -83,6 +83,29 @@ type ExperienceStore struct {
 	toolMemory []ToolExperience
 	patterns   []BehaviorPattern
 	facts      []DomainFact
+
+	dirty      bool
+	flushTimer *time.Timer
+}
+
+// experienceFlushDebounce coalesces a burst of RecordToolOutcome writes into a
+// single disk persist, keeping live outcome recording off the execution hot
+// path (records mutate memory immediately; the file is written at most once per
+// window).
+const experienceFlushDebounce = 5 * time.Second
+
+// ExperienceTuningConfig controls experience-driven surface pruning: a tool is
+// dropped from a cogni's surface once it has been observed at least
+// MinObservations times with a success rate below MinSuccessRate. The zero value
+// disables tuning (no-op), so it is strictly opt-in and backward compatible.
+type ExperienceTuningConfig struct {
+	MinObservations int
+	MinSuccessRate  float64
+}
+
+// IsZero reports whether the config requests no experience tuning.
+func (c ExperienceTuningConfig) IsZero() bool {
+	return c.MinObservations <= 0 && c.MinSuccessRate <= 0
 }
 
 func NewExperienceStore(cogniID string, cfg ExperienceConfig) *ExperienceStore {
@@ -148,6 +171,104 @@ func (es *ExperienceStore) AddToolMemory(exp ToolExperience) {
 
 	es.toolMemory = append(es.toolMemory, exp)
 	es.persist()
+}
+
+// RecordToolOutcome accumulates a success/failure observation for a tool into a
+// running success rate WITHOUT a synchronous disk write — persistence is
+// debounced (experienceFlushDebounce) so this is cheap enough to call on the
+// execution hot path. Observations live in a dedicated per-tool entry (empty
+// Context/Learned) so they never collide with curated tool lessons.
+func (es *ExperienceStore) RecordToolOutcome(tool string, success bool) {
+	if es == nil {
+		return
+	}
+	tool = strings.TrimSpace(tool)
+	if tool == "" {
+		return
+	}
+	es.mu.Lock()
+	defer es.mu.Unlock()
+
+	now := time.Now()
+	var e *ToolExperience
+	for i := range es.toolMemory {
+		t := &es.toolMemory[i]
+		if t.Tool == tool && t.Context == "" && t.Learned == "" {
+			e = t
+			break
+		}
+	}
+	if e == nil {
+		es.toolMemory = append(es.toolMemory, ToolExperience{Tool: tool, CreatedAt: now})
+		e = &es.toolMemory[len(es.toolMemory)-1]
+	}
+	var s float64
+	if success {
+		s = 1
+	}
+	e.SuccessRate = (e.SuccessRate*float64(e.UsedCount) + s) / float64(e.UsedCount+1)
+	e.UsedCount++
+	e.LastUsed = now
+	es.scheduleFlushLocked()
+}
+
+// ToolSuccess returns the aggregate success rate and observation count for a
+// tool across all of its memory entries. ok is false when there is no data, so
+// callers can treat "unknown" differently from "known-bad".
+func (es *ExperienceStore) ToolSuccess(tool string) (rate float64, count int, ok bool) {
+	if es == nil {
+		return 0, 0, false
+	}
+	es.mu.RLock()
+	defer es.mu.RUnlock()
+	var total int
+	var weighted float64
+	for _, t := range es.toolMemory {
+		if t.Tool == tool && t.UsedCount > 0 {
+			total += t.UsedCount
+			weighted += t.SuccessRate * float64(t.UsedCount)
+		}
+	}
+	if total == 0 {
+		return 0, 0, false
+	}
+	return weighted / float64(total), total, true
+}
+
+// scheduleFlushLocked arms a one-shot debounce timer to persist pending outcome
+// updates. Caller must hold es.mu.
+func (es *ExperienceStore) scheduleFlushLocked() {
+	es.dirty = true
+	if es.flushTimer != nil {
+		return
+	}
+	es.flushTimer = time.AfterFunc(experienceFlushDebounce, func() {
+		es.mu.Lock()
+		es.flushTimer = nil
+		if es.dirty {
+			es.dirty = false
+			es.persist()
+		}
+		es.mu.Unlock()
+	})
+}
+
+// Flush persists any pending debounced outcome updates immediately and cancels
+// the pending timer. Safe to call on shutdown or in tests.
+func (es *ExperienceStore) Flush() {
+	if es == nil {
+		return
+	}
+	es.mu.Lock()
+	defer es.mu.Unlock()
+	if es.flushTimer != nil {
+		es.flushTimer.Stop()
+		es.flushTimer = nil
+	}
+	if es.dirty {
+		es.dirty = false
+		es.persist()
+	}
 }
 
 func (es *ExperienceStore) ToolMemory(tool string) []ToolExperience {

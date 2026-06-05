@@ -214,6 +214,134 @@ func TestHook_FilterSkills_OnlyNarrowsSurface(t *testing.T) {
 	}
 }
 
+func TestHook_SurfaceAuthoritative(t *testing.T) {
+	// Identity surface (no narrowing) → not authoritative.
+	rIdentity := NewRegistry()
+	_ = rIdentity.Add(&Declaration{
+		ID:         "ambient",
+		Activation: ActivationRules{AlwaysOn: true},
+	}, "test")
+	if NewHook(rIdentity).SurfaceAuthoritative(ContextRequest{Message: "x"}) {
+		t.Fatal("identity surface must not be authoritative")
+	}
+
+	// Non-identity surface (Only) → authoritative.
+	rNarrow := NewRegistry()
+	_ = rNarrow.Add(&Declaration{
+		ID:         "narrow",
+		Activation: ActivationRules{AlwaysOn: true},
+		Surface:    ToolSurface{Only: []string{"github_get_diff"}},
+	}, "test")
+	if !NewHook(rNarrow).SurfaceAuthoritative(ContextRequest{Message: "x"}) {
+		t.Fatal("non-identity surface must be authoritative")
+	}
+
+	// No cogni activates → not authoritative.
+	rInactive := NewRegistry()
+	_ = rInactive.Add(&Declaration{
+		ID:         "kw",
+		Activation: ActivationRules{Keywords: []string{"deploy"}},
+		Surface:    ToolSurface{Only: []string{"shell"}},
+	}, "test")
+	if NewHook(rInactive).SurfaceAuthoritative(ContextRequest{Message: "unrelated message"}) {
+		t.Fatal("inactive cogni must not be authoritative")
+	}
+
+	// Nil hook is safe.
+	var nilHook *Hook
+	if nilHook.SurfaceAuthoritative(ContextRequest{Message: "x"}) {
+		t.Fatal("nil hook must not be authoritative")
+	}
+}
+
+func TestHook_ExperiencePrunesLowSuccessTool(t *testing.T) {
+	r := NewRegistry()
+	_ = r.Add(&Declaration{
+		ID:         "reviewer",
+		Activation: ActivationRules{AlwaysOn: true},
+		Surface:    ToolSurface{Only: []string{"good_tool", "bad_tool"}},
+	}, "test")
+
+	store := NewExperienceStore("reviewer", ExperienceConfig{Enabled: true, StoreDir: t.TempDir()})
+	defer store.Flush()
+	h := NewHook(r)
+	h.SetExperienceProvider(func(id string) *ExperienceStore {
+		if id == "reviewer" {
+			return store
+		}
+		return nil
+	})
+
+	in := []skills.Skill{sk("good_tool"), sk("bad_tool")}
+
+	// Before tuning is enabled: both tools survive even with bad data.
+	for i := 0; i < 5; i++ {
+		store.RecordToolOutcome("bad_tool", false)
+		store.RecordToolOutcome("good_tool", true)
+	}
+	if got := toolSet(h.FilterSkills(ContextRequest{Message: "x"}, in)); !equal(got, []string{"good_tool", "bad_tool"}) {
+		t.Fatalf("tuning disabled should keep both tools, got %v", got)
+	}
+
+	// Enable tuning → bad_tool (0%% over 5 obs) is pruned, good_tool stays.
+	h.SetExperienceTuning(ExperienceTuningConfig{MinObservations: 3, MinSuccessRate: 0.4})
+	got := toolSet(h.FilterSkills(ContextRequest{Message: "x"}, in))
+	if !equal(got, []string{"good_tool"}) {
+		t.Fatalf("low-success tool should be pruned, got %v", got)
+	}
+}
+
+func TestHook_ExperiencePruneNeverEmptiesSurface(t *testing.T) {
+	r := NewRegistry()
+	_ = r.Add(&Declaration{
+		ID:         "solo",
+		Activation: ActivationRules{AlwaysOn: true},
+		Surface:    ToolSurface{Only: []string{"only_tool"}},
+	}, "test")
+	store := NewExperienceStore("solo", ExperienceConfig{Enabled: true, StoreDir: t.TempDir()})
+	defer store.Flush()
+	for i := 0; i < 5; i++ {
+		store.RecordToolOutcome("only_tool", false)
+	}
+	h := NewHook(r)
+	h.SetExperienceProvider(func(string) *ExperienceStore { return store })
+	h.SetExperienceTuning(ExperienceTuningConfig{MinObservations: 3, MinSuccessRate: 0.5})
+
+	// Pruning the only tool would empty the surface → must keep it.
+	got := toolSet(h.FilterSkills(ContextRequest{Message: "x"}, []skills.Skill{sk("only_tool")}))
+	if !equal(got, []string{"only_tool"}) {
+		t.Fatalf("must never prune surface to empty, got %v", got)
+	}
+}
+
+func TestHook_ArbitrationCapsActiveCognis(t *testing.T) {
+	r := NewRegistry()
+	// Three always-on cognis (all score 1.0) with distinct priorities.
+	_ = r.Add(&Declaration{ID: "p_high", Activation: ActivationRules{AlwaysOn: true}, Priority: 1}, "test")
+	_ = r.Add(&Declaration{ID: "p_mid", Activation: ActivationRules{AlwaysOn: true}, Priority: 5}, "test")
+	_ = r.Add(&Declaration{ID: "p_low", Activation: ActivationRules{AlwaysOn: true}, Priority: 9}, "test")
+
+	// Default (no arbitration) → all three compose.
+	hAll := NewHook(r)
+	if got := hAll.ActiveIDs(ContextRequest{Message: "x"}); len(got) != 3 {
+		t.Fatalf("default hook should activate all 3, got %v", got)
+	}
+
+	// MaxActive=2 → only the two best (lowest priority numbers) win.
+	hCap := NewHook(r)
+	hCap.SetArbitration(ArbitrationConfig{MaxActive: 2})
+	got := hCap.ActiveIDs(ContextRequest{Message: "x"})
+	if len(got) != 2 {
+		t.Fatalf("arbitration should cap to 2 cognis, got %v", got)
+	}
+	if !contains(got, "p_high") || !contains(got, "p_mid") {
+		t.Fatalf("arbitration should keep the two highest-priority cognis, got %v", got)
+	}
+	if contains(got, "p_low") {
+		t.Fatalf("lowest-priority cogni should be capped out, got %v", got)
+	}
+}
+
 func TestHook_FilterSkills_UnionAcrossActivatedCognis(t *testing.T) {
 	r := NewRegistry()
 	_ = r.Add(&Declaration{

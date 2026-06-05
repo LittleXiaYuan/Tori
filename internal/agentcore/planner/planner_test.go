@@ -72,6 +72,106 @@ func TestFunctionDefForCachesByRegistryVersion(t *testing.T) {
 	}
 }
 
+func TestMergeCogniTools(t *testing.T) {
+	base := []llm.FunctionDef{{Name: "file_read", Description: "read"}}
+	invoked := false
+	cogniTools := []CogniTool{
+		{
+			Name:        "github_create_issue",
+			Description: "create issue",
+			Parameters:  map[string]any{"type": "object"},
+			Invoke: func(_ context.Context, _ map[string]any) (string, error) {
+				invoked = true
+				return "ok", nil
+			},
+		},
+		{Name: "file_read", Description: "dup"}, // collides with skill — dropped
+		{Name: "", Invoke: func(context.Context, map[string]any) (string, error) { return "", nil }},
+	}
+	merged, invokers := mergeCogniTools(base, cogniTools)
+	if len(merged) != 2 {
+		t.Fatalf("merged len = %d, want 2", len(merged))
+	}
+	if merged[0].Name != "file_read" || merged[1].Name != "github_create_issue" {
+		t.Fatalf("unexpected stable order: %#v", merged)
+	}
+	if len(invokers) != 1 {
+		t.Fatalf("invokers len = %d, want 1", len(invokers))
+	}
+	tool, ok := invokers["github_create_issue"]
+	if !ok {
+		t.Fatal("missing invoker for github_create_issue")
+	}
+	out, err := tool.Invoke(context.Background(), nil)
+	if err != nil || out != "ok" || !invoked {
+		t.Fatalf("invoke = %q err=%v invoked=%v", out, err, invoked)
+	}
+
+	unchanged, nilMap := mergeCogniTools(base, nil)
+	if len(unchanged) != 1 || nilMap != nil {
+		t.Fatalf("nil cogni tools should be no-op: %#v %v", unchanged, nilMap)
+	}
+}
+
+// surfaceAuthorityStub is a CogniRuntime that reports a configurable
+// authoritative flag and an identity skill filter, isolating the authoritative
+// tool-set branch in buildFunctionDefs.
+type surfaceAuthorityStub struct {
+	authoritative bool
+}
+
+func (s surfaceAuthorityStub) BuildContext(context.Context, string, string, string) string {
+	return ""
+}
+func (s surfaceAuthorityStub) FilterSkills(_ string, _ string, _ string, in []skills.Skill) []skills.Skill {
+	return in
+}
+func (s surfaceAuthorityStub) Trace(string, string, string) (CogniTraceDetail, bool) {
+	return CogniTraceDetail{}, false
+}
+func (s surfaceAuthorityStub) Tools(context.Context, string, string, string) []CogniTool { return nil }
+func (s surfaceAuthorityStub) SurfaceAuthoritative(string, string, string) bool {
+	return s.authoritative
+}
+func (s surfaceAuthorityStub) RecordToolOutcome(string, string, string, string, bool) {}
+
+// TestBuildFunctionDefsCogniSurfaceAuthoritativeBypassesCap proves the P1
+// paradigm change: when a cogni surface is authoritative the planner keeps the
+// declared set verbatim (skips the env tool cap + per-message ranking), giving a
+// deterministic, cache-stable prefix; the ambient (non-authoritative) path still
+// applies the cap.
+func TestBuildFunctionDefsCogniSurfaceAuthoritativeBypassesCap(t *testing.T) {
+	t.Setenv("PLANNER_MAX_FC_TOOLS", "3")
+	reg := skills.NewRegistry()
+	for _, n := range []string{"a", "b", "c", "d", "e", "f", "g", "h"} {
+		reg.Register(&mockSkill{name: n, desc: n})
+	}
+
+	authP := NewPlanner(nil, reg, 5)
+	authP.SetCogniRuntime(surfaceAuthorityStub{authoritative: true})
+	authDefs := authP.buildFunctionDefs("hello", "t", "web", false, nil,
+		authP.ensureContextAssembly(), authP.ensureDelegationRuntime(), authP.ensureSkillRuntime())
+	if len(authDefs) != 8 {
+		t.Fatalf("authoritative surface should bypass cap and keep all 8 tools, got %d", len(authDefs))
+	}
+
+	ambientP := NewPlanner(nil, reg, 5)
+	ambientP.SetCogniRuntime(surfaceAuthorityStub{authoritative: false})
+	ambientDefs := ambientP.buildFunctionDefs("hello", "t", "web", false, nil,
+		ambientP.ensureContextAssembly(), ambientP.ensureDelegationRuntime(), ambientP.ensureSkillRuntime())
+	if len(ambientDefs) != 3 {
+		t.Fatalf("ambient path should apply env cap of 3, got %d", len(ambientDefs))
+	}
+
+	// Authoritative output is deterministic across different messages (stable
+	// prefix) — the prompt-cache precondition.
+	authDefs2 := authP.buildFunctionDefs("totally different message", "t", "web", false, nil,
+		authP.ensureContextAssembly(), authP.ensureDelegationRuntime(), authP.ensureSkillRuntime())
+	if toolSetHash(authDefs) != toolSetHash(authDefs2) {
+		t.Fatalf("authoritative tool set should be deterministic across messages: %s vs %s", toolSetHash(authDefs), toolSetHash(authDefs2))
+	}
+}
+
 func TestCleanReplyRemovesToolCalls(t *testing.T) {
 	p := &Planner{}
 	input := `这是回答内容。{"tool_calls": [{"name": "test", "arguments": {}}]}后续文字`

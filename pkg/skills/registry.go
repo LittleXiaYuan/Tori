@@ -74,6 +74,7 @@ type SkillCategory struct {
 type Registry struct {
 	mu         sync.RWMutex
 	skills     map[string]Skill
+	pinned     map[string]Skill // skills added via Register; survive ReplaceAll (plugin hot-reload)
 	categories map[string]*SkillCategory
 	skillToCat map[string]string
 	version    int // monotonically increasing counter, incremented on any mutation
@@ -83,6 +84,7 @@ type Registry struct {
 func NewRegistry() *Registry {
 	return &Registry{
 		skills:     make(map[string]Skill),
+		pinned:     make(map[string]Skill),
 		categories: make(map[string]*SkillCategory),
 		skillToCat: make(map[string]string),
 	}
@@ -93,40 +95,62 @@ func (r *Registry) Clear() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.skills = make(map[string]Skill)
+	r.pinned = make(map[string]Skill)
 	r.categories = make(map[string]*SkillCategory)
 	r.skillToCat = make(map[string]string)
 	r.version++
 }
 
-// Register adds a skill to the registry.
+// Register adds a skill to the registry. Skills added this way are "pinned":
+// they survive a subsequent ReplaceAll (which swaps the plugin baseline on
+// hot-reload), so MCP-as-skill, file/marketplace/dynamic skills, generate_skill,
+// and post-init registrations are not silently wiped by a plugin toggle/reload.
 func (r *Registry) Register(s Skill) {
+	if s == nil {
+		return
+	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.skills[s.Name()] = s
+	r.pinned[s.Name()] = s
 	r.version++
 }
 
-// Remove deletes a skill from the registry.
+// Remove deletes a skill from the registry (and unpins it).
 func (r *Registry) Remove(name string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	delete(r.skills, name)
+	delete(r.pinned, name)
 	r.version++
 }
 
-// ReplaceAll atomically swaps the entire skill set. It preserves existing
-// category definitions so that intent-based filtering keeps working across
-// a plugin hot-reload. Used by gateway rebuild paths to avoid the brief
-// empty window between Clear() and a series of Register() calls.
+// ReplaceAll atomically swaps the plugin BASELINE skill set. It preserves
+// existing category definitions so that intent-based filtering keeps working
+// across a plugin hot-reload, and — critically — it re-applies skills that were
+// added via Register ("pinned": MCP-as-skill, file/marketplace/dynamic skills,
+// generate_skill, post-init registrations). Without that overlay a plugin
+// toggle/reload or python-engine swap would wipe every non-plugin skill until
+// the next restart. Used by gateway rebuild paths to avoid the brief empty
+// window between Clear() and a series of Register() calls.
 func (r *Registry) ReplaceAll(skills []Skill) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.skills = make(map[string]Skill, len(skills))
+	r.skills = make(map[string]Skill, len(skills)+len(r.pinned))
 	for _, s := range skills {
 		if s == nil {
 			continue
 		}
 		r.skills[s.Name()] = s
+	}
+	// Overlay pinned (Register-added) skills so they survive the baseline swap.
+	// Pinned wins on name collision, matching boot order where extras register
+	// after the plugin baseline.
+	for name, s := range r.pinned {
+		if s == nil {
+			continue
+		}
+		r.skills[name] = s
 	}
 	// Drop stale skill→category mappings that no longer point to a live skill.
 	for name := range r.skillToCat {
@@ -234,23 +258,6 @@ func (r *Registry) Categories() []*SkillCategory {
 		out = append(out, c)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
-	return out
-}
-
-// CategorySkills returns all skills belonging to a category.
-func (r *Registry) CategorySkills(catID string) []Skill {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	cat, ok := r.categories[catID]
-	if !ok {
-		return nil
-	}
-	out := make([]Skill, 0, len(cat.SkillNames))
-	for _, name := range cat.SkillNames {
-		if s, ok := r.skills[name]; ok {
-			out = append(out, s)
-		}
-	}
 	return out
 }
 
@@ -396,14 +403,28 @@ func (r *Registry) ScoreCategories(message string, scorer *SkillScorer) map[stri
 	return scores
 }
 
-// FilterByIntent returns skills relevant to the given user message using
-// multi-signal scoring: keyword matching + success rate + recency.
-// Always returns uncategorized skills + skills from matched categories.
-func (r *Registry) FilterByIntent(message string) []Skill {
-	return r.FilterByIntentScored(message, nil)
+// UnbackedIntentBuckets returns intent keyword categories that have NO matching
+// DefineCategory in this registry. Their keywords are therefore inert in
+// ScoreCategories (it skips categories that aren't defined), so intent-based
+// narrowing never fires for them. Surfaced at startup to make intent-router
+// drift visible instead of silently dead — e.g. "file"/"image"/"research"/
+// "workflow" keywords do nothing unless those categories are also defined.
+func (r *Registry) UnbackedIntentBuckets() []string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	var out []string
+	for catID := range intentKeywords {
+		if _, ok := r.categories[catID]; !ok {
+			out = append(out, catID)
+		}
+	}
+	sort.Strings(out)
+	return out
 }
 
-// FilterByIntentScored is like FilterByIntent but accepts a scorer
+// FilterByIntentScored returns skills relevant to the given user message using
+// multi-signal scoring: keyword matching + success rate + recency. Pass a nil
+// scorer for keyword-only matching. Accepts a scorer
 // for Ledger-driven success rate and recency data.
 func (r *Registry) FilterByIntentScored(message string, scorer *SkillScorer) []Skill {
 	// ScoreCategories takes its own RLock; call it before we take ours below to

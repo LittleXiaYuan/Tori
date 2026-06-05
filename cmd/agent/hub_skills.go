@@ -114,8 +114,10 @@ type installSkillTool struct {
 	installer *skillmarket.Installer
 }
 
-func (t *installSkillTool) Name() string        { return "install_skill" }
-func (t *installSkillTool) Description() string { return "安装指定技能到本地。支持 ClawHub 技能(slug)和 GitHub 仓库(owner/repo 或 owner/repo/path)" }
+func (t *installSkillTool) Name() string { return "install_skill" }
+func (t *installSkillTool) Description() string {
+	return "安装指定技能到本地。支持 ClawHub 技能(slug)和 GitHub 仓库(owner/repo 或 owner/repo/path)"
+}
 func (t *installSkillTool) Parameters() map[string]any {
 	return map[string]any{
 		"type": "object",
@@ -201,7 +203,7 @@ type generateSkillTool struct {
 
 func (t *generateSkillTool) Name() string { return "generate_skill" }
 func (t *generateSkillTool) Description() string {
-	return "根据自然语言描述生成新技能（含 SKILL.md、meta.json、可选脚本），保存到 data/skills/ 并自动注册。用户说\"创建/生成一个能做XX的技能\"时调用此工具。"
+	return "根据自然语言描述生成新技能包（SKILL.md 指令 + meta.json + 可选脚本），保存到 data/skills/ 并自动注册。生成的是\"指令型\"技能：调用它会返回 SKILL.md 指导内容；包内脚本需由 code_gen/computer_use 执行，不会自动运行。用户说\"创建/生成一个能做XX的技能\"时调用此工具。"
 }
 func (t *generateSkillTool) Parameters() map[string]any {
 	return map[string]any{
@@ -266,7 +268,13 @@ func (t *generateSkillTool) Execute(ctx context.Context, args map[string]any, en
 	for _, f := range writtenFiles {
 		sb.WriteString(fmt.Sprintf("   - %s\n", f))
 	}
-	sb.WriteString("\n技能已自动加载到系统中，可以立即使用。")
+	sb.WriteString("\n技能已注册（指令型）：调用它会返回上述 SKILL.md 指导内容。")
+	for _, f := range writtenFiles {
+		if strings.HasPrefix(f, "scripts/") || strings.Contains(f, "/scripts/") {
+			sb.WriteString("包内含脚本，需用 code_gen 或 computer_use 执行，不会自动运行。")
+			break
+		}
+	}
 	return sb.String(), nil
 }
 

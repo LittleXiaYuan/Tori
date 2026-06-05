@@ -167,6 +167,16 @@ func (m *MCPManager) EnsureConnected(ctx context.Context, cogniID string) error 
 			connectErrs = append(connectErrs, fmt.Errorf("%s: list tools: %w", def.Name, err))
 			continue
 		}
+		// Stamp the owning server name so CallTool can route back to the right
+		// connection. A connection bridge maps the provider's tools generically
+		// and usually can't know which configured server it represents, so the
+		// manager — which iterates per def — fills it in. Respect a Server the
+		// connection already set (e.g. multiplexed/aggregating connections).
+		for i := range tools {
+			if tools[i].Server == "" {
+				tools[i].Server = def.Name
+			}
+		}
 		state.tools = append(state.tools, applyToolFilter(tools, state.config.ToolFilter)...)
 	}
 
