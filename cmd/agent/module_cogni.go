@@ -173,7 +173,6 @@ func (m *cogniModule) Init(ctx context.Context, app *agentrt.App) error {
 
 	// Evolution engine with LLM-powered bench & analyze
 	evolutionEngine := cogni.NewEvolutionEngine(cogni.DefaultEvolutionConfig(), m.dir)
-	evolutionEngine.SetRegistry(m.registry)
 	if app.LLMPool != nil {
 		if cl := app.LLMPool.GetOrFallback("smart"); cl != nil {
 			evolutionEngine.SetBenchFunc(func(ctx context.Context, cogniID string) (*cogni.BenchResult, error) {
@@ -562,7 +561,7 @@ func (m *cogniModule) syncCogniKernelPackRuntime(ctx context.Context) {
 	}
 	if m.hook != nil {
 		if m.scheduler == nil {
-			m.scheduler = cogni.NewPerceptionScheduler(m.registry, m.hook, func(ctx context.Context, cogniID string, signal *cogni.PerceptionSignal) {
+			m.scheduler = cogni.NewPerceptionScheduler(m.registry, func(ctx context.Context, cogniID string, signal *cogni.PerceptionSignal) {
 				slog.Info("cogni: perception event", "cogni", cogniID, "schedule", signal.ScheduleTriggered, "webhook", signal.WebhookTriggered)
 			})
 		}

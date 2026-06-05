@@ -153,3 +153,24 @@ func TestDefaultBusConfig(t *testing.T) {
 		t.Errorf("BidTimeout = %v", cfg.BidTimeout)
 	}
 }
+
+func TestJoinReasons(t *testing.T) {
+	if got := joinReasons(nil); got != "" {
+		t.Errorf("empty = %q, want \"\"", got)
+	}
+	if got := joinReasons([]string{"only"}); got != "only" {
+		t.Errorf("single = %q, want \"only\"", got)
+	}
+	if got := joinReasons([]string{"a", "b", "c"}); got != "a (+2 more)" {
+		t.Errorf("three = %q, want \"a (+2 more)\"", got)
+	}
+	// Regression: string(rune('0'+n)) produced garbage glyphs (':','-',...) once
+	// the surplus count reached 10+. Decimal formatting must be used instead.
+	many := make([]string, 12)
+	for i := range many {
+		many[i] = "r"
+	}
+	if got := joinReasons(many); got != "r (+11 more)" {
+		t.Errorf("twelve = %q, want \"r (+11 more)\"", got)
+	}
+}

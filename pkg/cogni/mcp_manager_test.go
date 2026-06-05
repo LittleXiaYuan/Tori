@@ -222,3 +222,32 @@ func TestMatchesAny(t *testing.T) {
 		}
 	}
 }
+
+type failingConnector struct{}
+
+func (failingConnector) Connect(ctx context.Context, def MCPServerDef) (MCPConnection, error) {
+	return nil, fmt.Errorf("dial %s: connection refused", def.Name)
+}
+
+func TestMCPManager_AllServersFail(t *testing.T) {
+	mgr := NewMCPManager(failingConnector{})
+	mgr.Register("broken", MCPConfig{Servers: []MCPServerDef{{Name: "a"}, {Name: "b"}}})
+
+	// Regression: a cogni whose every MCP server is unreachable must report an
+	// error, not silently look "connected".
+	err := mgr.EnsureConnected(context.Background(), "broken")
+	if err == nil {
+		t.Fatal("expected error when all MCP servers fail to connect")
+	}
+
+	// And it must stay not-ready so a later call can retry the dead servers.
+	mgr.mu.RLock()
+	st := mgr.connections["broken"]
+	mgr.mu.RUnlock()
+	st.mu.Lock()
+	ready := st.ready
+	st.mu.Unlock()
+	if ready {
+		t.Error("state should not be ready after a total connect failure")
+	}
+}

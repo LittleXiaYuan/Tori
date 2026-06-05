@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"sort"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -210,5 +211,5 @@ func joinReasons(reasons []string) string {
 	if len(reasons) == 1 {
 		return reasons[0]
 	}
-	return reasons[0] + " (+" + string(rune('0'+len(reasons)-1)) + " more)"
+	return reasons[0] + " (+" + strconv.Itoa(len(reasons)-1) + " more)"
 }

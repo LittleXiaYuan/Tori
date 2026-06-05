@@ -2,6 +2,7 @@ package cogni
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -138,6 +139,7 @@ func (m *MCPManager) EnsureConnected(ctx context.Context, cogniID string) error 
 		return fmt.Errorf("mcp_manager: no connector configured")
 	}
 
+	var connectErrs []error
 	for _, def := range state.config.Servers {
 		if _, exists := state.servers[def.Name]; exists {
 			continue
@@ -150,6 +152,7 @@ func (m *MCPManager) EnsureConnected(ctx context.Context, cogniID string) error 
 				"server", def.Name,
 				"err", err,
 			)
+			connectErrs = append(connectErrs, fmt.Errorf("%s: %w", def.Name, err))
 			continue
 		}
 		state.servers[def.Name] = conn
@@ -161,15 +164,29 @@ func (m *MCPManager) EnsureConnected(ctx context.Context, cogniID string) error 
 				"server", def.Name,
 				"err", err,
 			)
+			connectErrs = append(connectErrs, fmt.Errorf("%s: list tools: %w", def.Name, err))
 			continue
 		}
 		state.tools = append(state.tools, applyToolFilter(tools, state.config.ToolFilter)...)
 	}
 
-	state.ready = true
+	// Only mark ready once every configured server is connected. A partial
+	// connection stays not-ready so a later EnsureConnected retries the
+	// missing servers instead of freezing a degraded surface as "done".
+	state.ready = len(state.servers) == len(state.config.Servers)
+
+	// Surface a hard failure when nothing connected at all. Previously this
+	// path always returned nil and set ready=true, so a cogni whose every MCP
+	// server was unreachable looked successfully connected to callers.
+	if len(state.config.Servers) > 0 && len(state.servers) == 0 {
+		return fmt.Errorf("mcp_manager: cogni %q: all %d MCP server(s) failed to connect: %w",
+			cogniID, len(state.config.Servers), errors.Join(connectErrs...))
+	}
+
 	slog.Info("mcp_manager: connected",
 		"cogni", cogniID,
 		"servers", len(state.servers),
+		"configured", len(state.config.Servers),
 		"tools", len(state.tools),
 	)
 	return nil

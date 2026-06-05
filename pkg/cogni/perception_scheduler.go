@@ -14,7 +14,6 @@ import (
 type PerceptionScheduler struct {
 	mu       sync.Mutex
 	registry *Registry
-	hook     *Hook
 	handler  PerceptionHandler
 	crons    map[string]*cronEntry // keyed by "cogni:cron_expr"
 	done     chan struct{}
@@ -32,10 +31,9 @@ type cronEntry struct {
 // provides this — it typically routes the activation through the planner.
 type PerceptionHandler func(ctx context.Context, cogniID string, signal *PerceptionSignal)
 
-func NewPerceptionScheduler(registry *Registry, hook *Hook, handler PerceptionHandler) *PerceptionScheduler {
+func NewPerceptionScheduler(registry *Registry, handler PerceptionHandler) *PerceptionScheduler {
 	return &PerceptionScheduler{
 		registry: registry,
-		hook:     hook,
 		handler:  handler,
 		crons:    make(map[string]*cronEntry),
 		done:     make(chan struct{}),

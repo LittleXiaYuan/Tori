@@ -77,3 +77,28 @@ func TestPruneOld(t *testing.T) {
 		t.Errorf("expected 1 removed, got %d", removed)
 	}
 }
+
+func TestDailyBoundaryUsesLocalMidnight(t *testing.T) {
+	ct := NewCostTracker()
+	ct.SetConfig("c1", EconomicsConfig{DailyBudget: 10})
+
+	start := startOfToday()
+	if start.Hour() != 0 || start.Minute() != 0 {
+		t.Fatalf("startOfToday = %v, want local midnight", start)
+	}
+	// Counted: 1h into today (local).
+	ct.Record(CostEntry{CogniID: "c1", Cost: 1.0, Timestamp: start.Add(time.Hour)})
+	// Excluded: 1h before today began (i.e. yesterday).
+	ct.Record(CostEntry{CogniID: "c1", Cost: 2.0, Timestamp: start.Add(-time.Hour)})
+
+	if got := dailyTotal(ct.entries["c1"]); got != 1.0 {
+		t.Errorf("dailyTotal = %v, want 1.0 (yesterday's entry must be excluded)", got)
+	}
+	s := ct.DailySummary()["c1"]
+	if s.TotalCost != 1.0 {
+		t.Errorf("DailySummary.TotalCost = %v, want 1.0", s.TotalCost)
+	}
+	if s.Operations != 1 {
+		t.Errorf("DailySummary.Operations = %d, want 1", s.Operations)
+	}
+}

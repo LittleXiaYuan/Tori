@@ -88,7 +88,6 @@ func DefaultEvolutionConfig() EvolutionConfig {
 // EvolutionEngine manages the benchmark-driven skill optimization loop.
 type EvolutionEngine struct {
 	mu          sync.Mutex
-	registry    *Registry
 	bench       BenchFunc
 	analyze     AnalyzeFunc
 	applyMut    func(cogniID string, mutations []SkillMutation) error
@@ -116,7 +115,6 @@ func NewEvolutionEngine(cfg EvolutionConfig, dataDir string) *EvolutionEngine {
 
 func (ee *EvolutionEngine) SetBenchFunc(fn BenchFunc)     { ee.bench = fn }
 func (ee *EvolutionEngine) SetAnalyzeFunc(fn AnalyzeFunc) { ee.analyze = fn }
-func (ee *EvolutionEngine) SetRegistry(r *Registry)       { ee.registry = r }
 
 func (ee *EvolutionEngine) SetApplyFunc(fn func(cogniID string, mutations []SkillMutation) error) {
 	ee.applyMut = fn
