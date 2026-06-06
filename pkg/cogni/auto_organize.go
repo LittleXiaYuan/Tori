@@ -323,9 +323,15 @@ func generateKeywords(category string, skills []SkillInfo) []string {
 
 	add(category)
 	for _, s := range skills {
-		for _, word := range strings.Fields(s.Name) {
-			word = strings.ReplaceAll(word, "_", "")
-			add(word)
+		// Split the skill name into meaningful tokens (docx_create → docx,
+		// create) so the generated keywords actually match natural language.
+		// Previously underscores were stripped into one mashed token
+		// ("docxcreate"), which never matched user text, leaving auto-organized
+		// cognis effectively un-activatable at runtime.
+		for _, part := range strings.FieldsFunc(s.Name, func(r rune) bool {
+			return r == '_' || r == '-' || r == ' '
+		}) {
+			add(part)
 		}
 	}
 
