@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"reflect"
 	"sync"
 )
 
@@ -89,6 +90,14 @@ func (m *MCPManager) Register(cogniID string, cfg MCPConfig) {
 	m.mu.Lock()
 
 	old, hasOld := m.connections[cogniID]
+	// Idempotent re-register: when the config is unchanged (the common case on
+	// every runtime sync), keep the live connections instead of tearing them down
+	// and lazily reconnecting — otherwise MCP child processes thrash (disconnect +
+	// respawn) on each cogni change.
+	if hasOld && reflect.DeepEqual(old.config, cfg) {
+		m.mu.Unlock()
+		return
+	}
 	newState := &cogniMCPState{
 		config:  cfg,
 		servers: make(map[string]MCPConnection),
@@ -97,9 +106,10 @@ func (m *MCPManager) Register(cogniID string, cfg MCPConfig) {
 	m.mu.Unlock()
 
 	if hasOld {
-		old.mu.Lock()
+		// close() acquires old.mu itself; do NOT hold it here or we self-deadlock
+		// (sync.Mutex is non-reentrant). Re-register happens on every runtime
+		// sync, so this path is hot.
 		old.close()
-		old.mu.Unlock()
 	}
 	slog.Debug("mcp_manager: registered",
 		"cogni", cogniID,
@@ -164,6 +174,12 @@ func (m *MCPManager) EnsureConnected(ctx context.Context, cogniID string) error 
 				"server", def.Name,
 				"err", err,
 			)
+			// Drop the half-connected server so a later EnsureConnected retries
+			// it. Otherwise it stays in state.servers (the retry loop skips
+			// already-present servers), so a transient ListTools failure would
+			// strand the server tool-less forever.
+			_ = conn.Close()
+			delete(state.servers, def.Name)
 			connectErrs = append(connectErrs, fmt.Errorf("%s: list tools: %w", def.Name, err))
 			continue
 		}

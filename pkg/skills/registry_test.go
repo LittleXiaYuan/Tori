@@ -81,6 +81,26 @@ func TestClear_DropsPins(t *testing.T) {
 	}
 }
 
+func TestDefineCategory_ClearsStaleMappings(t *testing.T) {
+	r := NewRegistry()
+	r.Register(testSkill{"a"})
+	r.Register(testSkill{"b"})
+	r.DefineCategory(SkillCategory{ID: "x", SkillNames: []string{"a", "b"}})
+	if r.CategoryOf("a") != "x" || r.CategoryOf("b") != "x" {
+		t.Fatalf("initial mapping wrong: a=%q b=%q", r.CategoryOf("a"), r.CategoryOf("b"))
+	}
+
+	// Redefine the category with a smaller set — the dropped skill's stale
+	// mapping must be cleared (else FilterByIntentScored would still expose it).
+	r.DefineCategory(SkillCategory{ID: "x", SkillNames: []string{"a"}})
+	if r.CategoryOf("a") != "x" {
+		t.Fatalf("a should remain in x, got %q", r.CategoryOf("a"))
+	}
+	if r.CategoryOf("b") != "" {
+		t.Fatalf("b's stale mapping not cleared: %q", r.CategoryOf("b"))
+	}
+}
+
 func TestUnbackedIntentBuckets(t *testing.T) {
 	r := NewRegistry()
 	// No categories defined → every intent keyword bucket is inert.

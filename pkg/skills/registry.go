@@ -223,6 +223,15 @@ func (r *Registry) Definitions() []map[string]any {
 func (r *Registry) DefineCategory(cat SkillCategory) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	// Clear stale skill→category mappings from a previous definition of this
+	// category. Without this, redefining a category with a smaller/changed
+	// SkillNames set leaves orphan mappings, so FilterByIntentScored would keep
+	// exposing skills that are no longer in the category.
+	for sn, cid := range r.skillToCat {
+		if cid == cat.ID {
+			delete(r.skillToCat, sn)
+		}
+	}
 	c := cat
 	r.categories[c.ID] = &c
 	for _, sn := range c.SkillNames {

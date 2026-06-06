@@ -291,6 +291,31 @@ func TestHook_ExperiencePrunesLowSuccessTool(t *testing.T) {
 	}
 }
 
+func TestHook_RecordToolOutcomeIdentitySurface(t *testing.T) {
+	r := NewRegistry()
+	// Identity surface (no only/include/exclude) + experience enabled.
+	_ = r.Add(&Declaration{
+		ID:         "ambient",
+		Activation: ActivationRules{AlwaysOn: true},
+	}, "test")
+	store := NewExperienceStore("ambient", ExperienceConfig{Enabled: true, StoreDir: t.TempDir()})
+	defer store.Flush()
+	h := NewHook(r)
+	h.SetExperienceProvider(func(id string) *ExperienceStore {
+		if id == "ambient" {
+			return store
+		}
+		return nil
+	})
+
+	h.RecordToolOutcome(ContextRequest{Message: "x"}, "web_search", true)
+
+	// Identity-surface cognis must still record (previously they were skipped).
+	if _, count, ok := store.ToolSuccess("web_search"); !ok || count != 1 {
+		t.Fatalf("identity-surface cogni should record tool outcome, got ok=%v count=%d", ok, count)
+	}
+}
+
 func TestHook_ExperiencePruneNeverEmptiesSurface(t *testing.T) {
 	r := NewRegistry()
 	_ = r.Add(&Declaration{

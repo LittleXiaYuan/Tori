@@ -154,20 +154,24 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 				timeout = 10 * time.Minute
 			}
 
-			toolParentCtx := ctx
-			if tc.Function.Name == "generate_skill" {
-				var gsCancel context.CancelFunc
-				toolParentCtx, gsCancel = context.WithTimeout(context.Background(), 10*time.Minute)
-				defer gsCancel()
-			}
-
-			go func(toolParentCtx context.Context, timeout time.Duration, idx int, tc llm.ToolCall) {
+			go func(timeout time.Duration, idx int, tc llm.ToolCall) {
 				defer func() {
 					if r := recover(); r != nil {
 						slog.Error("planner: tool goroutine panic", "panic", r, "skill", tc.Function.Name)
 						resultsCh <- ToolExecutionResult{Index: idx, ToolCallID: tc.ID, SkillName: tc.Function.Name, Err: fmt.Errorf("tool panic: %v", r)}
 					}
 				}()
+				// generate_skill can run for minutes; detach it from the request
+				// ctx so an SSE disconnect doesn't kill an in-flight generation.
+				// Both this detach and the timeout below are cancelled when THIS
+				// goroutine finishes — previously the detach used a loop-level
+				// defer that accumulated for the whole plan run.
+				toolParentCtx := ctx
+				if tc.Function.Name == "generate_skill" {
+					var detach context.CancelFunc
+					toolParentCtx, detach = context.WithCancel(context.Background())
+					defer detach()
+				}
 				var toolCtx context.Context
 				if timeout <= 0 {
 					toolCtx = toolParentCtx
@@ -228,7 +232,7 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 						resultsCh <- ToolExecutionResult{Index: idx, ToolCallID: tc.ID, SkillName: exec.SkillName, Args: exec.Args, Output: exec.Output}
 					}
 				}(toolCtx)
-			}(toolParentCtx, timeout, idx, tc)
+			}(timeout, idx, tc)
 		}
 		// Collect results in order
 		tcResults := executionRuntime.CollectToolResultsInOrder(resultsCh, len(toolCalls))
@@ -355,7 +359,12 @@ func (p *Planner) buildFunctionDefs(userMessage, tenantID, channelType string, d
 	// planner's heuristics step aside. The ambient path (no authoritative cogni)
 	// keeps the original behaviour, so this is fully backward compatible.
 	cogniAuthoritative := false
-	if !disableDelegation && len(allowedSkills) == 0 {
+	// In delegation mode the planner exposes handoff tools (not skills), so the
+	// cogni skill surface would be computed and then discarded by the delegation
+	// branch — and its trace would misleadingly claim a narrowing that never
+	// reached the model. Skip it there. (Cogni MCP tools are merged separately as
+	// additive capabilities, independent of this skill-surface filter.)
+	if !disableDelegation && len(allowedSkills) == 0 && !delegationRuntime.HasHandoffAgents(4) {
 		allSkills = contextAssembly.ApplyCogniSkillFilter(userMessage, tenantID, channelType, allSkills)
 		cogniAuthoritative = contextAssembly.CogniSurfaceAuthoritative(userMessage, tenantID, channelType)
 	}

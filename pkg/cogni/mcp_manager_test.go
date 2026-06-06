@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 )
 
 type mockConnection struct {
@@ -33,6 +34,110 @@ func (c *mockConnector) Connect(ctx context.Context, def MCPServerDef) (MCPConne
 		return conn, nil
 	}
 	return nil, fmt.Errorf("unknown server: %s", def.Name)
+}
+
+// TestMCPManager_ReRegisterDoesNotDeadlock guards the self-deadlock fix:
+// Register closing the old state must NOT hold old.mu while calling close()
+// (close() locks it itself). Re-register happens on every runtime sync.
+func TestMCPManager_ReRegisterDoesNotDeadlock(t *testing.T) {
+	connector := &mockConnector{connections: map[string]*mockConnection{
+		"github": {tools: []MCPToolInfo{{Server: "github", Name: "t1"}}},
+	}}
+	mgr := NewMCPManager(connector)
+	cfg := MCPConfig{Servers: []MCPServerDef{{Name: "github"}}}
+	mgr.Register("r", cfg)
+	if err := mgr.EnsureConnected(context.Background(), "r"); err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+
+	// A CHANGED config forces the old.close() teardown path (the deadlock site),
+	// past the idempotent-skip guard.
+	cfg2 := MCPConfig{
+		Servers:    []MCPServerDef{{Name: "github"}},
+		ToolFilter: &MCPToolFilter{Include: []string{"t1"}},
+	}
+	done := make(chan struct{})
+	go func() {
+		mgr.Register("r", cfg2) // hasOld=true → old.close(); must not deadlock
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("re-register deadlocked")
+	}
+	if err := mgr.EnsureConnected(context.Background(), "r"); err != nil {
+		t.Fatalf("reconnect: %v", err)
+	}
+}
+
+// TestMCPManager_ReRegisterSameConfigKeepsConnection guards the idempotency
+// optimization: re-registering the identical config (the common per-sync case)
+// must keep the live connection instead of tearing it down and respawning.
+func TestMCPManager_ReRegisterSameConfigKeepsConnection(t *testing.T) {
+	conn := &mockConnection{tools: []MCPToolInfo{{Server: "github", Name: "t1"}}}
+	connector := &mockConnector{connections: map[string]*mockConnection{"github": conn}}
+	mgr := NewMCPManager(connector)
+	cfg := MCPConfig{Servers: []MCPServerDef{{Name: "github"}}}
+	mgr.Register("r", cfg)
+	if err := mgr.EnsureConnected(context.Background(), "r"); err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+
+	mgr.Register("r", cfg) // identical → must be a no-op
+	if conn.closed {
+		t.Fatal("identical re-register should not close the live connection")
+	}
+	if got := len(mgr.Tools("r")); got != 1 {
+		t.Fatalf("tools lost after idempotent re-register: %d", got)
+	}
+}
+
+type flakyListConn struct {
+	calls int
+	tools []MCPToolInfo
+}
+
+func (f *flakyListConn) ListTools(context.Context) ([]MCPToolInfo, error) {
+	f.calls++
+	if f.calls == 1 {
+		return nil, fmt.Errorf("transient list failure")
+	}
+	return f.tools, nil
+}
+func (f *flakyListConn) CallTool(context.Context, string, map[string]any) (any, error) {
+	return nil, nil
+}
+func (f *flakyListConn) Close() error { return nil }
+
+type flakyListConnector struct{ conn MCPConnection }
+
+func (c flakyListConnector) Connect(context.Context, MCPServerDef) (MCPConnection, error) {
+	return c.conn, nil
+}
+
+// TestMCPManager_ListToolsFailureThenRetrySucceeds guards the stuck-server fix:
+// a ListTools failure after a successful connect must drop the half-connected
+// server so a later EnsureConnected retries it (instead of stranding it
+// tool-less forever).
+func TestMCPManager_ListToolsFailureThenRetrySucceeds(t *testing.T) {
+	conn := &flakyListConn{tools: []MCPToolInfo{{Server: "s", Name: "ok_tool"}}}
+	mgr := NewMCPManager(flakyListConnector{conn: conn})
+	mgr.Register("f", MCPConfig{Servers: []MCPServerDef{{Name: "s"}}})
+
+	if err := mgr.EnsureConnected(context.Background(), "f"); err == nil {
+		t.Fatal("expected first connect to fail on ListTools")
+	}
+	if got := len(mgr.Tools("f")); got != 0 {
+		t.Fatalf("expected no tools after failure, got %d", got)
+	}
+
+	if err := mgr.EnsureConnected(context.Background(), "f"); err != nil {
+		t.Fatalf("retry should succeed, got %v", err)
+	}
+	if got := len(mgr.Tools("f")); got != 1 {
+		t.Fatalf("expected 1 tool after retry, got %d", got)
+	}
 }
 
 func TestMCPManager_RegisterAndConnect(t *testing.T) {

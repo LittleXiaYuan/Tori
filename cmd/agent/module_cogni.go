@@ -766,6 +766,13 @@ func (m *cogniModule) initExperienceStores() {
 				m.experiences[d.ID] = cogni.NewExperienceStore(d.ID, cfg)
 				slog.Info("cogni: experience store initialized", "cogni", d.ID)
 			}
+		} else if store, exists := m.experiences[d.ID]; exists {
+			// Experience toggled off while the cogni stays active: flush pending
+			// outcomes and drop the store so we stop injecting/recording stale
+			// experience for it.
+			store.Flush()
+			delete(m.experiences, d.ID)
+			slog.Info("cogni: experience store removed (disabled)", "cogni", d.ID)
 		}
 
 		// MCP connections (lazy — registered but not connected until first use)
@@ -783,15 +790,21 @@ func (m *cogniModule) initExperienceStores() {
 			m.costTracker.SetConfig(d.ID, d.Economics)
 		}
 	}
-	for id := range m.experiences {
+	for id, store := range m.experiences {
 		if !seen[id] {
+			if store != nil {
+				store.Flush() // persist debounced outcomes before dropping
+			}
 			delete(m.experiences, id)
 		}
 	}
 }
 
 func (m *cogniModule) clearCogniRuntimeState() {
-	for id := range m.experiences {
+	for id, store := range m.experiences {
+		if store != nil {
+			store.Flush() // persist debounced outcomes before dropping
+		}
 		delete(m.experiences, id)
 	}
 	if m.mcpMgr != nil {
@@ -860,6 +873,12 @@ func (b *mcpProviderBridge) CallTool(ctx context.Context, name string, args map[
 func (b *mcpProviderBridge) Close() error {
 	if b.stopper != nil {
 		b.stopper.Stop()
+	}
+	// The internal/mcp Provider interface has no Stop(), but the concrete
+	// stdio/streamable-http providers do. Without this, Close() was a no-op and
+	// every disconnected cogni MCP server leaked its child process / connection.
+	if s, ok := b.provider.(interface{ Stop() }); ok {
+		s.Stop()
 	}
 	return nil
 }

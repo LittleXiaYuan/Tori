@@ -116,7 +116,14 @@ func (h *Hook) RecordToolOutcome(req ContextRequest, tool string, success bool) 
 	}
 	for _, a := range h.Activate(req) {
 		d := a.Declaration
-		if d == nil || isIdentitySurface(d.Surface) || !d.Surface.AllowsName(tool) {
+		// Record for any activated cogni that surfaces this tool by name. We do
+		// NOT skip identity surfaces: an identity-surface cogni effectively
+		// "uses" every tool, and its experience still feeds ContextHints (and any
+		// non-identity surface it later gains). Recording is naturally bounded to
+		// experience-enabled cognis because only those have a store. AllowsName is
+		// safe here because recording is triggered by an ACTUAL tool call (the
+		// tool was in the table), so it can't record a tool the model never saw.
+		if d == nil || !d.Surface.AllowsName(tool) {
 			continue
 		}
 		if store := provider(d.ID); store != nil {

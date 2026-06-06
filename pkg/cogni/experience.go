@@ -674,9 +674,12 @@ func (es *ExperienceStore) load() {
 func writeJSON(path string, v any) {
 	data, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
+		slog.Warn("experience: marshal failed", "path", path, "err", err)
 		return
 	}
-	os.WriteFile(path, data, 0644)
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		slog.Warn("experience: persist failed", "path", path, "err", err)
+	}
 }
 
 func readJSON(path string, v any) {
