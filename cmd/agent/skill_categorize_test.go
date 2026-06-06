@@ -17,9 +17,11 @@ func TestCategorizeSkillName(t *testing.T) {
 		"document_parse": "file",
 		// image
 		"image_generate": "image",
-		// research
+		// research (web_* fetch/search, deep research, translate)
 		"deep_research": "research",
 		"web_search":    "research",
+		"web_fetch":     "research",
+		"translate":     "research",
 		// workflow
 		"run_workflow":     "workflow",
 		"save_as_workflow": "workflow",
@@ -27,9 +29,7 @@ func TestCategorizeSkillName(t *testing.T) {
 		// uncategorized (general tools must stay always-available)
 		"code_execute": "",
 		"computer_use": "",
-		"web_fetch":    "",
 		"send_email":   "",
-		"translate":    "",
 		// browser/connector handled separately → not claimed here
 		"browser_click":          "",
 		"connector_github_issue": "",

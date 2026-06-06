@@ -768,7 +768,8 @@ func categorizeSkillName(name string) string {
 		return "file"
 	case strings.HasPrefix(name, "image_"):
 		return "image"
-	case name == "deep_research" || name == "web_search" || strings.HasPrefix(name, "research_"):
+	case name == "deep_research" || name == "translate" ||
+		strings.HasPrefix(name, "research_") || strings.HasPrefix(name, "web_"):
 		return "research"
 	case strings.Contains(name, "workflow") || name == "orchestrate_task":
 		return "workflow"
