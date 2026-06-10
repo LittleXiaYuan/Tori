@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { showToast } from "@/components/toast-provider";
 import { BASE, getAuthHeaders } from "@/lib/api-core";
+import { collectPackTheme, observePackTheme } from "@/lib/pack-theme";
 import { resolvePackUIOrigin } from "@/lib/pack-ui-origin";
 import { useI18n } from "@/lib/i18n";
 import {
@@ -109,7 +110,9 @@ export function PackDlcHost({ packId, entry, title, allowedRoutes, allowedNavPat
     const defaultHandlers: Record<string, BridgeMethodHandler> = {
       "host.handshake": () => {
         setReady(true);
-        return { v: BRIDGE_VERSION, packId, lang: langRef.current };
+        // Theme + language ride along so the pack UI can match the shell from
+        // its very first paint (live changes follow as theme/i18n events).
+        return { v: BRIDGE_VERSION, packId, lang: langRef.current, theme: collectPackTheme() };
       },
       "ui.toast": (payload) => {
         const p = (payload || {}) as { message?: string; type?: "success" | "error" | "warning" | "info" };
@@ -144,11 +147,30 @@ export function PackDlcHost({ packId, entry, title, allowedRoutes, allowedNavPat
     };
 
     window.addEventListener("message", onMessage);
+    // Live theme sync: shell theme mutations are pushed as theme.changed events.
+    const stopThemeObserver = observePackTheme((theme) => {
+      post({ v: BRIDGE_VERSION, kind: "event", method: "theme.changed", payload: { theme } });
+    });
     return () => {
       window.removeEventListener("message", onMessage);
+      stopThemeObserver();
       eventSubs.closeAll();
     };
   }, [packId]);
+
+  // Live language sync: locale switches are pushed as i18n.changed events.
+  const localePostedRef = useRef(false);
+  useEffect(() => {
+    if (!localePostedRef.current) {
+      // Skip the mount value — handshake already carried it.
+      localePostedRef.current = true;
+      return;
+    }
+    iframeRef.current?.contentWindow?.postMessage(
+      { v: BRIDGE_VERSION, kind: "event", method: "i18n.changed", payload: { lang: locale } },
+      "*",
+    );
+  }, [locale]);
 
   // Wait for the isolation-origin probe before mounting, so the iframe loads
   // exactly once from the right origin.

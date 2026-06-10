@@ -5,12 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>DLC Demo Pack</title>
   <style>
-    body { font: 14px/1.5 system-ui, sans-serif; margin: 0; padding: 20px; color: #1c2030; background: #fff; }
+    /* Tokens arrive from the host via host.handshake / theme.changed; the
+       fallbacks below only matter before the bridge connects. */
+    body { font: 14px/1.5 system-ui, sans-serif; margin: 0; padding: 20px;
+           color: var(--yunque-text, #1c2030); background: var(--yunque-surface, #fff); }
     h1 { font-size: 16px; margin: 0 0 4px; }
-    p.sub { margin: 0 0 16px; color: #6b7280; }
-    button { font: inherit; padding: 8px 14px; border-radius: 10px; border: 1px solid #d6dae3; background: #f7f8fb; cursor: pointer; }
-    button:hover { background: #eef1f6; }
-    pre { background: #0d1117; color: #c9d1d9; padding: 12px; border-radius: 10px; overflow: auto; min-height: 48px; }
+    p.sub { margin: 0 0 16px; color: var(--yunque-text-muted, #6b7280); }
+    button { font: inherit; padding: 8px 14px; border-radius: 10px;
+             border: 1px solid var(--yunque-border, #d6dae3);
+             background: transparent; color: var(--yunque-text, #1c2030); cursor: pointer; }
+    button:hover { border-color: var(--yunque-accent, #006fee); color: var(--yunque-accent, #006fee); }
+    pre { background: rgba(127,127,127,0.12); color: var(--yunque-text, #1c2030);
+          padding: 12px; border-radius: 10px; overflow: auto; min-height: 48px; }
     .row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
   </style>
 </head>
@@ -51,10 +57,12 @@
     window.addEventListener("message", (e) => {
       const msg = e.data;
       if (!msg) return;
-      // Host-pushed events (SSE-over-bridge).
+      // Host-pushed events (SSE-over-bridge + theme/i18n sync).
       if (msg.kind === "event") {
         if (msg.method === "events.message") eventLog(msg.payload);
         if (msg.method === "events.closed") { eventLog("stream closed: " + (msg.payload?.reason || "?")); setSub(null); }
+        if (msg.method === "theme.changed") applyTheme(msg.payload?.theme);
+        if (msg.method === "i18n.changed") eventLog("language switched: " + (msg.payload?.lang || "?"));
         return;
       }
       if (msg.kind !== "res" || !pending.has(msg.id)) return;
@@ -93,8 +101,19 @@
         .then(() => { eventLog("unsubscribed"); setSub(null); })
         .catch((err) => eventLog(err.message));
 
+    // Apply the shell theme tokens to this document so the pack UI matches the
+    // host (initial set from handshake; live updates via theme.changed).
+    function applyTheme(theme) {
+      if (!theme || !theme.vars) return;
+      const root = document.documentElement;
+      for (const [k, v] of Object.entries(theme.vars)) {
+        if (k.startsWith("--yunque-")) root.style.setProperty(k, String(v));
+      }
+      root.style.colorScheme = theme.mode === "light" ? "light" : "dark";
+    }
+
     call("host.handshake", {})
-      .then((info) => { log({ handshake: info }); reportHeight(); })
+      .then((info) => { applyTheme(info?.theme); log({ handshake: info }); reportHeight(); })
       .catch((err) => log("handshake failed: " + err.message));
   </script>
 </body>

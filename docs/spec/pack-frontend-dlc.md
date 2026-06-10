@@ -161,7 +161,7 @@ iframe 创建约束：
 
 | method | 作用 | 鉴权 |
 |---|---|---|
-| `host.handshake` | 协商版本、返回 Pack 元数据/主题变量 | 无条件 |
+| `host.handshake` | 协商版本，返回 `{v, packId, lang, theme}`（theme 为精选 `--yunque-*` 令牌快照 + dark/light 模式，使 Pack UI 首帧即与 shell 一致）| 无条件 |
 | `backend.call` | 代理一次后端调用（method+path+body）| 路径必须命中本 Pack 的 `backend.routeSpecs`；宿主注入 token；禁止越权访问他 Pack/核心 API |
 | `nav.push` | 请求宿主跳转到允许的路由 | 仅限本 Pack 的 `frontend.routes` |
 | `ui.toast` / `ui.resize` | 提示、自适应高度 | 无条件 |
@@ -181,6 +181,18 @@ iframe 创建约束：
 - 订阅目标用权限声明（如 `"events:subscribe:/v1/events/stream"`），**不要**写进 wasm `routeSpecs`——后者会被 mount 成 pack 路由，遮蔽宿主端点。
 - 每 Pack 并发流上限默认 4；iframe 卸载时宿主 `closeAll()` 终止全部流。
 - 流结束/出错发 `events.closed`，guest 可自行重订。
+
+### 7.2.2 主题与 i18n 同步
+
+宿主在 handshake 后持续推送外观/语言变化（同为 `kind:"event"` 信封）：
+
+```jsonc
+{ "v": 1, "kind": "event", "method": "theme.changed", "payload": { "theme": { "mode": "dark", "vars": { "--yunque-accent": "..." } } } }
+{ "v": 1, "kind": "event", "method": "i18n.changed",  "payload": { "lang": "zh" } }
+```
+
+- 令牌集为精选 `--yunque-*` 列表（`apps/web/src/lib/pack-theme.ts` 的 `PACK_THEME_TOKENS`）；宿主用 MutationObserver 监听 `<html>` 的 class/style/data-theme 变化，快照变更才推送。
+- Pack 侧把 `vars` 应用到自身 `:root` 并设置 `color-scheme`（参考 dlc-demo-pack 的 `applyTheme`）。
 
 关键安全点：**token 永不过桥**。`backend.call` 在宿主侧（同源、持 token）补 `Authorization`/`X-API-Key` 后转发，响应体回传 iframe。Pack 只表达「我要调用我声明过的这个路由」。
 
@@ -259,4 +271,4 @@ Pack 崩溃（iframe 内异常）天然被 origin 隔离，不波及宿主。
 - **WS 转发：暂不做（已决）**。理由：① 主前端零 WebSocket 消费（实时全走 SSE，`/v1/ws` 无前端调用方）；② 浏览器 WebSocket 无法携带 header，而 `requireAuth` 仅接受 header 鉴权——支持它需开放 query-token（token 进 URL/日志，安全退化）；③ SSE-over-bridge（§7.2.1）已覆盖实时面板需求。未来若出现双向交互需求再评估。
 - **第一方 inline 模式**：是否保留同源 `import()` 给完全可信的内置 Pack（性能/体验更好，需信任分级 gate）。
 - ~~桥能力面：事件订阅~~ 已实现：`events.subscribe/unsubscribe`（SSE-over-bridge，见 §7.2.1）。
-- **主题与 i18n**：经 `host.handshake` 下发主题变量与语言，保证 Pack UI 视觉一致。
+- ~~主题与 i18n~~ 已实现：`host.handshake` 携带 `{lang, theme}`，运行期经 `theme.changed` / `i18n.changed` 事件持续同步（§7.2.2）。
