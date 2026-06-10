@@ -53,8 +53,8 @@ func initPlugins(app *agentrt.App) error {
 
 	// Host paths for plugin file access — auto-discover user directories
 	// when not explicitly configured.
-	hostPaths := strings.Split(cfg.HostReadPaths, ",")
-	if len(hostPaths) == 1 && hostPaths[0] == "" {
+	hostPaths := splitConfiguredPaths(cfg.HostReadPaths)
+	if len(hostPaths) == 0 {
 		hostPaths = config.DefaultReadPaths()
 		if len(hostPaths) == 0 {
 			cwd, _ := os.Getwd()
@@ -63,6 +63,7 @@ func initPlugins(app *agentrt.App) error {
 			slog.Info("file access: auto-discovered user directories", "paths", hostPaths)
 		}
 	}
+	writePaths := splitConfiguredPaths(cfg.HostWritePaths)
 
 	// Python environment for Office skills (detect system Python or use Go fallback).
 	// Detection touches the filesystem and, when a system Python is present, spawns the
@@ -78,6 +79,10 @@ func initPlugins(app *agentrt.App) error {
 	// Plugin registry
 	app.PluginReg = plugin.NewRegistry()
 	generalPlugin := general.New(hostPaths)
+	if len(writePaths) > 0 {
+		generalPlugin.SetHostWritePaths(writePaths)
+		slog.Info("file access: configured writable directories", "paths", writePaths)
+	}
 	// Bridge websearch →plugin search function
 	if len(searchReg.List()) > 0 {
 		generalPlugin.SetSearchFunc(func(ctx context.Context, query string, limit int) ([]general.SearchResult, error) {
@@ -274,3 +279,14 @@ func initPlugins(app *agentrt.App) error {
 
 // llmCallForPlugin is the signature expected by qqchat.New.
 // This is handled by llmChatFunc in llmhelper.go.
+
+func splitConfiguredPaths(raw string) []string {
+	var out []string
+	for _, p := range strings.Split(raw, ",") {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}

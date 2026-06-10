@@ -122,6 +122,14 @@ type Gateway struct {
 	handoffReg    *subagent.HandoffRegistry
 	preAckEmojis  []string
 
+	// wasmPackKV backs the pack-scoped, permission-gated ledger_get/ledger_set
+	// WASM host functions (nil = the capability is never exported).
+	wasmPackKV wasmPackKVStore
+
+	// packUIOrigin is the dedicated pack-UI isolation listener origin
+	// ("" = disabled; bundles are served same-origin). Guarded by routesMu.
+	packUIOrigin string
+
 	// ── Memory & Knowledge ─────────────────────
 	memory         *memory.Manager
 	orchestrator   *memory.Orchestrator
@@ -224,6 +232,7 @@ type Gateway struct {
 	metrics         *observe.Metrics
 	usage           *UsageTracker
 	ledgerHealth    healthChecker
+	onboardingKV    onboardingKVStore
 	heartbeat       *heartbeat.Service
 	healer          *selfheal.Healer
 	lifecycle       *selfheal.Lifecycle
@@ -358,6 +367,7 @@ type Gateway struct {
 	cogniEvolution          *cogni.EvolutionEngine
 	cogniFederation         *cogni.CogniFederation
 	cogniCostTracker        *cogni.CostTracker
+	cogniBus                *cogni.CogniBus
 
 	// NL Config — natural-language → structured-config translator
 	nlConfigTranslator *cogni.NLConfigTranslator

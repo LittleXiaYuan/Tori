@@ -16,6 +16,9 @@ import { SlashCommandMenu } from "@/components/slash-command-menu";
 import { ConnectorPopover } from "@/components/connector-popover";
 import { ModelSelectorPopup, type ModelOption } from "@/components/model-selector-popup";
 import { type PendingFile } from "@/lib/use-chat-media";
+import { useI18n } from "@/lib/i18n";
+
+type Translate = (key: string) => string;
 
 export interface ChatInputAreaProps {
   input: string;
@@ -59,15 +62,18 @@ export interface ChatInputAreaProps {
   onOpenImagePicker: () => void;
 }
 
-function attachmentStatusLabel(file: PendingFile): string {
+function attachmentStatusLabel(file: PendingFile, t: Translate): string {
   if (file.note) return file.note;
-  if (file.status === "uploading") return "正在添加附件…";
-  if (file.status === "parsed") return "已添加，发送后由模型读取";
-  if (file.status === "error") return "附件添加失败，请重新添加";
-  return file.type === "image" || file.type === "video" ? "已添加" : "附件已添加";
+  if (file.status === "uploading") return t("composer.attach.uploading");
+  if (file.status === "parsed") return t("composer.attach.parsed");
+  if (file.status === "error") return t("composer.attach.error");
+  return file.type === "image" || file.type === "video"
+    ? t("composer.attach.addedMedia")
+    : t("composer.attach.addedFile");
 }
 
 export function ChatInputArea(props: ChatInputAreaProps) {
+  const { t } = useI18n();
   const {
     input,
     loading,
@@ -109,20 +115,23 @@ export function ChatInputArea(props: ChatInputAreaProps) {
     onOpenImagePicker,
   } = props;
 
+  const emptyComposer = !hasMessages;
+
   return (
     <div
-      className="px-5 py-2 shrink-0 xl:px-6"
+      className={`shrink-0 ${emptyComposer ? "chat-composer-shell--empty px-0 py-0" : "px-5 py-2 xl:px-6"}`}
       style={{ borderTop: hasMessages ? "1px solid var(--yunque-border)" : "none" }}
       onDrop={onDrop}
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
-      aria-label="消息输入区"
+      aria-label={t("composer.aria")}
     >
-      <div className="mx-auto" style={{ maxWidth: "min(860px, 92vw)" }}>
+      <div className="mx-auto" style={{ maxWidth: emptyComposer ? "min(720px, 92vw)" : "min(860px, 92vw)" }}>
         <div
           ref={inputShellRef}
-          className="chat-input-wrap chat-composer rounded-[24px] overflow-visible transition-all"
+          className={`chat-input-wrap chat-composer overflow-visible transition-all ${emptyComposer ? "chat-composer--empty rounded-[20px]" : "rounded-[24px]"}`}
           data-busy={loading ? "true" : "false"}
+          data-empty={emptyComposer ? "true" : undefined}
           style={{
             background:
               "linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.008)), var(--glass-card, var(--yunque-card))",
@@ -131,7 +140,9 @@ export function ChatInputArea(props: ChatInputAreaProps) {
               : "1px solid var(--glass-edge, var(--yunque-border))",
             boxShadow: isDragging
               ? "0 0 0 1px rgba(59,130,246,0.20), 0 12px 28px rgba(15,23,42,0.20)"
-              : "0 8px 22px rgba(15,23,42,0.12), inset 0 1px 0 rgba(255,255,255,0.035)",
+              : emptyComposer
+                ? "0 4px 16px rgba(15,23,42,0.08), inset 0 1px 0 rgba(255,255,255,0.04)"
+                : "0 8px 22px rgba(15,23,42,0.12), inset 0 1px 0 rgba(255,255,255,0.035)",
             backdropFilter:
               "blur(var(--yunque-glass-blur)) saturate(var(--yunque-glass-saturate))",
             WebkitBackdropFilter:
@@ -156,12 +167,12 @@ export function ChatInputArea(props: ChatInputAreaProps) {
                   <span className="flex items-center gap-1.5">
                     <Monitor size={11} />
                     <span className="w-1.5 h-1.5 rounded-full bg-blue-400 inline-block" />
-                    浏览器已连接
+                    {t("composer.browserConnected")}
                   </span>
                 ) : (
                   <span className="flex items-center gap-1.5">
                     <Sparkles size={11} />
-                    {activeSlashCommand ? `/${activeSlashCommand}` : "命令菜单"}
+                    {activeSlashCommand ? `/${activeSlashCommand}` : t("composer.commandMenu")}
                   </span>
                 )}
               </div>
@@ -175,7 +186,7 @@ export function ChatInputArea(props: ChatInputAreaProps) {
                   }
                   onPress={() => onSlashSelect("/")}
                 >
-                  <Sparkles size={11} /> 命令
+                  <Sparkles size={11} /> {t("composer.command")}
                 </Button>
               </div>
             </div>
@@ -236,7 +247,7 @@ export function ChatInputArea(props: ChatInputAreaProps) {
                             style={{ background: statusColor }}
                           />
                           <span className="truncate max-w-[160px]">
-                            {attachmentStatusLabel(f)}
+                            {attachmentStatusLabel(f, t)}
                           </span>
                         </div>
                       )}
@@ -297,7 +308,7 @@ export function ChatInputArea(props: ChatInputAreaProps) {
             value={input}
             onChange={onInputChange}
             onKeyDown={onKeyDown}
-            placeholder="描述要交付的工作，或输入 / 打开命令…"
+            placeholder={emptyComposer ? t("composer.placeholderEmpty") : t("composer.placeholder")}
             rows={1}
             className="chat-composer-textarea w-full resize-none bg-transparent px-4 pt-2.5 pb-1.5 text-[14px] outline-none"
             style={{
@@ -327,7 +338,7 @@ export function ChatInputArea(props: ChatInputAreaProps) {
                 >
                   <Paperclip size={14} />
                 </Button>
-                <Tooltip.Content>添加文件</Tooltip.Content>
+                <Tooltip.Content>{t("composer.addFile")}</Tooltip.Content>
               </Tooltip>
               <Tooltip delay={0}>
                 <Button
@@ -339,7 +350,7 @@ export function ChatInputArea(props: ChatInputAreaProps) {
                 >
                   <ImageIcon size={14} />
                 </Button>
-                <Tooltip.Content>添加图片</Tooltip.Content>
+                <Tooltip.Content>{t("composer.addImage")}</Tooltip.Content>
               </Tooltip>
               <Tooltip delay={0}>
                 <Button
@@ -357,7 +368,7 @@ export function ChatInputArea(props: ChatInputAreaProps) {
                   )}
                 </Button>
                 <Tooltip.Content>
-                  {isRecording ? "停止录音" : "语音输入"}
+                  {isRecording ? t("composer.stopRec") : t("composer.voice")}
                 </Tooltip.Content>
               </Tooltip>
               <div className="relative">
@@ -372,7 +383,7 @@ export function ChatInputArea(props: ChatInputAreaProps) {
                   >
                     <Plug size={14} />
                   </Button>
-                  <Tooltip.Content>连接器</Tooltip.Content>
+                  <Tooltip.Content>{t("composer.connector")}</Tooltip.Content>
                 </Tooltip>
                 <ConnectorPopover
                   open={showConnectors}
@@ -383,7 +394,7 @@ export function ChatInputArea(props: ChatInputAreaProps) {
             <ModelSelectorPopup
               models={availableModels}
               currentModelId={currentModelId}
-              currentModelLabel={currentModel || "选择模型"}
+              currentModelLabel={currentModel || t("composer.selectModel")}
               onSelect={onModelSelect}
               chatMode={chatMode}
               onModeChange={onModeChange}
@@ -395,14 +406,14 @@ export function ChatInputArea(props: ChatInputAreaProps) {
               className="hidden items-center gap-2 text-[10px] xl:flex"
               style={{ color: "var(--yunque-text-muted)" }}
             >
-              <span>Enter 发送</span>
+              <span>{t("composer.enterSend")}</span>
               <span>·</span>
-              <span>⇧↵ 换行</span>
+              <span>{t("composer.shiftNewline")}</span>
             </div>
             {loading ? (
               <Button
                 isIconOnly
-                aria-label="停止生成"
+                aria-label={t("composer.stop")}
                 size="sm"
                 className="rounded-2xl"
                 style={{
@@ -416,7 +427,7 @@ export function ChatInputArea(props: ChatInputAreaProps) {
             ) : (
               <Button
                 isIconOnly
-                aria-label="发送"
+                aria-label={t("composer.send")}
                 size="sm"
                 className={`chat-send-btn h-10 w-10 rounded-[18px] ${input.trim() ? "chat-send-active" : ""}`}
                 data-active={input.trim() ? "true" : "false"}
@@ -439,7 +450,7 @@ export function ChatInputArea(props: ChatInputAreaProps) {
               style={{ borderColor: "var(--yunque-border)" }}
             >
               <span className="text-[10px]" style={{ color: "#4ade80" }}>
-                {pendingFiles.length} 个附件待发送
+                {t("composer.pendingFiles").replace("{n}", String(pendingFiles.length))}
               </span>
             </div>
           )}

@@ -137,7 +137,19 @@ func initSessionAuth(app *agentrt.App) (*sessionAuthResult, error) {
 		})
 		r.hbService.SetOnResult(func(log *heartbeat.Log, policy *heartbeat.DeliveryPolicy) {
 			app.Metrics.Cognitive().HeartbeatRun.Add(1)
-			slog.Info("heartbeat delivered", "status", log.Status, "targets", len(policy.Targets))
+			// policy is nil when no delivery policy is configured (the default).
+			// Dereferencing policy.Targets here previously panicked the whole
+			// sidecar on the first heartbeat (e.g. when the LLM call failed),
+			// and the supervisor then refused to restart it.
+			targets := 0
+			if policy != nil {
+				targets = len(policy.Targets)
+			}
+			status := ""
+			if log != nil {
+				status = log.Status
+			}
+			slog.Info("heartbeat delivered", "status", status, "targets", targets)
 		})
 		r.hbService.Start(context.Background())
 		slog.Info("heartbeat started (inline)", "interval_min", hbInterval)

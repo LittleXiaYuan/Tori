@@ -144,7 +144,7 @@ func (p *GeneralPlugin) SystemPrompt() string {
 - 本地安全沙盒执行代码（Python/JavaScript/Go）→ code_gen（E2B不可用时回退）
 - 浏览和搜索主机文件 → file_search
 - 解析文档（PDF/Word/Excel/CSV/TXT/Markdown）→ doc_parse
-- 创建和写入文件 → file_write
+- 创建和写入文件 → file_create
 
 **文档生成（用户说"生成文档/写报告/做方案"时必须使用以下工具）**
 - 生成 Word(.docx) → docx_create（content 参数使用 Markdown 子集：# ## ### 标题、列表、表格、图片）

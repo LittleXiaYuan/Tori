@@ -102,6 +102,11 @@ type TaskOutcome struct {
 	Backtracks  int
 	Duration    time.Duration
 	CompletedAt time.Time
+	// Persona + RecalledMemory record the identity and memory block the turn was
+	// conditioned on, persisted so the distill exporter can replay them as the
+	// training system prompt (same contract as DataCollector's conversationPair).
+	Persona        string
+	RecalledMemory string
 }
 
 // EvolutionDecision reports what the coordinator did for a given task.
@@ -242,6 +247,14 @@ func (ec *EvolutionCoordinator) updateMemory(ctx context.Context, outcome TaskOu
 		"backtracks":   outcome.Backtracks,
 		"duration_ms":  outcome.Duration.Milliseconds(),
 		"completed_at": outcome.CompletedAt.Format(time.RFC3339),
+	}
+	// Persist persona/memory only when captured (key names match the distill
+	// exporter + DataCollector contract).
+	if outcome.Persona != "" {
+		content["persona"] = outcome.Persona
+	}
+	if outcome.RecalledMemory != "" {
+		content["recalled_memories"] = outcome.RecalledMemory
 	}
 	contentJSON, err := json.Marshal(content)
 	if err != nil {

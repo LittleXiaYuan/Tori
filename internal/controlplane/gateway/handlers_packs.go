@@ -96,6 +96,13 @@ func (g *Gateway) registerPackRoutes() {
 	g.mux.HandleFunc("/v1/packs/disable", g.requireAuth(g.handlePackDisable))
 	g.mux.HandleFunc("/v1/packs/rollback", g.requireAuth(g.handlePackRollback))
 	g.mux.HandleFunc("/v1/packs/prune", g.requireAuth(g.handlePackPrune))
+	// Pack UI bundles (DLC iframe host). Public static assets — see
+	// handlePackUIAsset; privileged actions go through the authed bridge. The
+	// bare-root form is registered separately because stripTrailingSlash rewrites
+	// "/ui/" → "/ui", which the subtree pattern would otherwise 307-redirect.
+	g.mux.HandleFunc("GET /v1/packs/{id}/ui", g.handlePackUIAsset)
+	g.mux.HandleFunc("GET /v1/packs/{id}/ui/{path...}", g.handlePackUIAsset)
+	g.mux.HandleFunc("/v1/packs/ui-origin", g.requireAuth(g.handlePackUIOrigin))
 	g.registerBuiltinBackendPacks()
 }
 

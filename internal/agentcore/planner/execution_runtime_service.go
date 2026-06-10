@@ -590,7 +590,7 @@ func (s *ExecutionRuntimeService) ApplyToolResultForRequest(req ToolResultPostpr
 		req.SkillRuntime.RecordRecommendationOutcome(req.SkillName, out.Success)
 	}
 
-	emitToolResultEvent(req.Request, req.SkillName, out.Output, out.FriendlyError)
+	emitToolResultEvent(req.Request, req.SkillName, out.Output, out.FriendlyError, req.Err)
 
 	if req.IncludeToolMessage {
 		pruned := pruneToolResult(out.Output, req.StepNumber)
@@ -728,7 +728,7 @@ func (s *ExecutionRuntimeService) PartialPlanResultForRequest(req PartialPlanRes
 	}
 }
 
-func emitToolResultEvent(req PlanRequest, skillName, output, friendlyError string) {
+func emitToolResultEvent(req PlanRequest, skillName, output, friendlyError string, rawErr error) {
 	if req.StepCallback == nil {
 		return
 	}
@@ -737,6 +737,13 @@ func emitToolResultEvent(req PlanRequest, skillName, output, friendlyError strin
 	if friendlyError != "" {
 		trSummary = fmt.Sprintf("⏸️ [%s] 暂未完成：%s", skillName, friendlyError)
 		detail = observe.ToolResultDetail{Skill: skillName, Error: friendlyError}
+		if rawErr != nil {
+			diagnostic := buildToolFailureDiagnostic(rawErr.Error())
+			detail.ErrorCode = diagnostic.ErrorCode
+			detail.Cause = diagnostic.Cause
+			detail.Recoverable = diagnostic.Recoverable
+			detail.NextStep = diagnostic.NextStep
+		}
 	}
 	trEvt := observe.NewEvent(req.TraceID, observe.DomainPlanner, observe.EventToolResult, trSummary)
 	trEvt.Meta.Skill = skillName

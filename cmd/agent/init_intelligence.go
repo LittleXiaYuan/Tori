@@ -1,18 +1,33 @@
 package main
 
 import (
+	"context"
 	"log/slog"
 	"os"
+	"time"
 
 	"yunque-agent/internal/ledgercore"
 
+	"yunque-agent/internal/agentcore/llm"
 	"yunque-agent/internal/agentcore/localbrain"
+	"yunque-agent/internal/agentcore/planner"
 	agentrt "yunque-agent/internal/agentcore/runtime"
 	"yunque-agent/internal/agentcore/tasksched/rlsched"
 	"yunque-agent/internal/cognicore/microagent"
 	"yunque-agent/internal/cognicore/recommend"
 	iledger "yunque-agent/internal/ledger"
 )
+
+// lastUserMessage extracts the most recent user message — the query the run
+// was answering — for evolution/outcome reporting.
+func lastUserMessage(messages []llm.Message) string {
+	for i := len(messages) - 1; i >= 0; i-- {
+		if messages[i].Role == "user" {
+			return messages[i].Content
+		}
+	}
+	return ""
+}
 
 // initIntelligence (Phase 6.8) registers the LocalBrain decision layer,
 // AgenticThinking router, LoRA scheduler, microagent registry, RL scheduler,
@@ -151,6 +166,31 @@ func initIntelligence(app *agentrt.App) error {
 		coordCfg.StateDir = metricsDir
 		coordinator := localbrain.NewEvolutionCoordinator(app.Ledger, brain, scheduler, metrics, coordCfg)
 		app.Set("evolution_coordinator", coordinator)
+		// Feed every planner run into the coordinator so the three evolution
+		// layers (memory → strategy → weights) actually receive task signals.
+		// The sink runs async on a detached context (see LearningSidecar).
+		if app.Planner != nil {
+			app.Planner.SetTaskOutcomeSink(func(ctx context.Context, req planner.PlanRequest, result *planner.PlanResult, runErr error, reflectScore float64, elapsed time.Duration) {
+				outcome := localbrain.TaskOutcome{
+					TaskID:      req.TaskID,
+					TenantID:    req.TenantID,
+					Success:     runErr == nil && result != nil && result.Reply != "",
+					UserQuery:   lastUserMessage(req.Messages),
+					Reward:      reflectScore,
+					Duration:    elapsed,
+					CompletedAt: time.Now(),
+				}
+				if outcome.TaskID == "" {
+					outcome.TaskID = "turn-" + time.Now().Format("20060102T150405.000")
+				}
+				if result != nil {
+					outcome.FinalReply = result.Reply
+					outcome.Steps = result.Steps
+				}
+				coordinator.OnTaskComplete(ctx, outcome)
+			})
+			slog.Info("evolution coordinator: task outcome sink wired to planner")
+		}
 		coordState := coordinator.State()
 		slog.Info("evolution coordinator: initialized",
 			"total_tasks", coordState.TotalTasks,
@@ -158,6 +198,17 @@ func initIntelligence(app *agentrt.App) error {
 			"strategy_interval", coordCfg.StrategyInterval,
 			"weight_threshold", coordCfg.WeightHitRateThreshold,
 		)
+
+		// Wire Self-Distill Pipeline (Collect → Score → Export → Train → Eval →
+		// Deploy). Exposed via /v1/lora/distill and the optional nightly hook;
+		// it reuses the scheduler/trainer/evaluator built above.
+		distillPipeline := localbrain.NewSelfDistillPipeline(
+			app.Ledger, scheduler, brain, trainer, evaluator,
+			localbrain.NewConversationScorer(nil),
+			app.Config.DataPath("distill"),
+		)
+		app.Set("self_distill_pipeline", distillPipeline)
+		slog.Info("self-distill pipeline: initialized", "data_dir", app.Config.DataPath("distill"))
 	} else if !app.Config.LocalLoRAEnabled {
 		slog.Info("lora scheduler: disabled (set LOCAL_LORA_ENABLED=true to enable local training)")
 	}

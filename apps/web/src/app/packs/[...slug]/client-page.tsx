@@ -9,6 +9,8 @@ import PageHeader from "@/components/page-header";
 import { formatErrorMessage } from "@/lib/error-utils";
 import type { InstalledPack } from "@/lib/pack-types";
 import { buildPackSdkEntrypoints, fetchEnabledPacks, findPackRouteBinding, formatBackendRouteSpec, packSdkImportSnippet } from "@/lib/pack-sync";
+import { PackDlcHost } from "@/lib/pack-dlc-host";
+import { eventPathsFromPermissions } from "@/lib/pack-bridge";
 
 export default function PackRuntimeRouteClientPage() {
   const pathname = usePathname() || "/packs";
@@ -71,15 +73,29 @@ export default function PackRuntimeRouteClientPage() {
   const distribution = match.distribution;
   const entries = match.sdk.length > 0 ? match.sdk : buildPackSdkEntrypoints(pack);
   const assets = match.assets;
+  const isIframeBundle = assets?.type === "iframe-bundle";
 
   return (
     <div className="page-root space-y-5 animate-fade-in-up">
       <PageHeader
         icon={<Boxes size={20} />}
         title={match.title || manifest.name}
-        description="这是由后端 enabled pack registry 同步出来的通用 Pack 页面。专属页面尚未随前端包加载时，先展示 manifest、资源入口和 SDK 调用面。"
+        description={isIframeBundle
+          ? "该 Pack 提供独立前端包，已在沙箱 iframe 中动态加载（DLC）。"
+          : "这是由后端 enabled pack registry 同步出来的通用 Pack 页面。专属页面尚未随前端包加载时，先展示 manifest、资源入口和 SDK 调用面。"}
         actions={<Link href="/packs" className="inline-flex items-center rounded-xl px-4 py-2 text-sm" style={{ border: "1px solid var(--yunque-border)", color: "var(--yunque-text)" }}>管理增量包</Link>}
       />
+
+      {isIframeBundle && (
+        <PackDlcHost
+          packId={manifest.id}
+          entry={assets?.entry}
+          title={match.title || manifest.name}
+          allowedRoutes={(manifest.backend?.routeSpecs || []).map((r) => ({ method: r.method, path: r.path }))}
+          allowedNavPaths={(manifest.frontend?.routes || []).map((r) => r.path)}
+          allowedEventPaths={eventPathsFromPermissions(manifest.backend?.permissions)}
+        />
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <Card className="section-card p-4">

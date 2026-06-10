@@ -48,6 +48,9 @@ func (g *Gateway) mountWasmPack(pack packruntime.InstalledPack, installedDir str
 	}
 	packID := pack.Manifest.ID
 	sb := g.wasmSandbox()
+	// Privileged host functions are scoped to this pack's declared permissions;
+	// unpermitted capabilities are never exported to the module.
+	hostFuncs := g.buildWasmHostFuncs(packID, pack.Manifest.Backend.Permissions)
 
 	g.routesMu.Lock()
 	defer g.routesMu.Unlock()
@@ -74,7 +77,7 @@ func (g *Gateway) mountWasmPack(pack packruntime.InstalledPack, installedDir str
 		}
 		methods := []string{strings.ToUpper(strings.TrimSpace(spec.Method))}
 		gated := g.backendPackAuth(packruntime.BackendRouteAuthDefault,
-			g.requirePackRoute(packID, methods, p, wasmroute.BuildRouteHandler(installedDir, *rt, spec, sb)))
+			g.requirePackRoute(packID, methods, p, wasmroute.BuildRouteHandler(installedDir, *rt, spec, sb, hostFuncs...)))
 		g.dynamicRoutes[p] = &dynRoute{packID: packID, methods: methods, path: p, handler: gated}
 		mounted++
 	}

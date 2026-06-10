@@ -21,6 +21,7 @@ type Options struct {
 	Scheduler *localbrain.LoRAScheduler
 	Metrics   *localbrain.TrainingMetrics
 	Evolution *localbrain.EvolutionCoordinator
+	Distill   *localbrain.SelfDistillPipeline
 }
 
 func NewHandler(opts Options) *Handler {
@@ -28,6 +29,7 @@ func NewHandler(opts Options) *Handler {
 		Scheduler: opts.Scheduler,
 		Metrics:   opts.Metrics,
 		Evolution: opts.Evolution,
+		Distill:   opts.Distill,
 	}}
 }
 
@@ -43,5 +45,6 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 		{Method: http.MethodPost, Path: "/v1/lora/rollback", Handler: h.api.HandleRollback},
 		{Method: http.MethodGet, Path: "/v1/lora/evolution", Handler: h.api.HandleEvolution},
 		{Methods: []string{http.MethodGet, http.MethodPut, http.MethodPatch}, Path: "/v1/lora/config", Handler: h.api.HandleConfig},
+		{Methods: []string{http.MethodGet, http.MethodPost}, Path: "/v1/lora/distill", Handler: h.api.HandleDistill},
 	}
 }

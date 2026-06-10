@@ -22,6 +22,55 @@ import (
 //   POST /v1/setup/test-provider test a provider connection from the backend
 //   POST /v1/setup/apply         apply a scenario template
 
+// onboardingKVStore abstracts Ledger KV (namespace baked in) to avoid import
+// cycles — same shape as the auth/model KV stores.
+type onboardingKVStore interface {
+	Put(ctx context.Context, key string, value any) error
+	Get(ctx context.Context, key string, dest any) (bool, error)
+}
+
+// onboardingState is the server-persisted first-run guide state. Storing it in
+// the Ledger (not browser localStorage) means the guide is shown exactly once
+// per install and stays consistent across web/desktop and device changes.
+type onboardingState struct {
+	Completed   bool   `json:"completed"`
+	CompletedAt string `json:"completed_at,omitempty"`
+}
+
+// handleOnboardingState reads (GET) or records (POST {completed:true}) whether
+// the first-run onboarding guide has been completed. Falls back gracefully to
+// "not completed" when no KV is wired so the client can still use localStorage.
+func (g *Gateway) handleOnboardingState(w http.ResponseWriter, r *http.Request) {
+	if g.onboardingKV == nil {
+		writeJSON(w, onboardingState{})
+		return
+	}
+	ctx := r.Context()
+	switch r.Method {
+	case http.MethodGet:
+		var st onboardingState
+		if _, err := g.onboardingKV.Get(ctx, "state", &st); err != nil {
+			slog.Warn("onboarding: kv get failed", "err", err)
+		}
+		writeJSON(w, st)
+	case http.MethodPost:
+		var req onboardingState
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		st := onboardingState{Completed: req.Completed}
+		if req.Completed {
+			st.CompletedAt = time.Now().UTC().Format(time.RFC3339)
+		}
+		if err := g.onboardingKV.Put(ctx, "state", st); err != nil {
+			slog.Warn("onboarding: kv put failed", "err", err)
+			http.Error(w, "persist failed", http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, st)
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
 // handleSetupDetect performs environment detection and returns the result.
 func (g *Gateway) handleSetupDetect(w http.ResponseWriter, r *http.Request) {
 	cfg := config.Load()

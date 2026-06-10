@@ -470,6 +470,12 @@ func TestExecutionRuntimeServiceApplyToolResultForRequestFailureUsesFriendlyText
 	if !ok || detail.Result != "" || !strings.Contains(detail.Error, "现场已保留") || strings.Contains(detail.Error, "context deadline exceeded") {
 		t.Fatalf("unexpected failure detail: %#v", event.Detail)
 	}
+	if detail.ErrorCode != "timeout_or_connection" || !detail.Recoverable || detail.Cause == "" || detail.NextStep == "" {
+		t.Fatalf("expected structured safe diagnostic fields, got %#v", detail)
+	}
+	if strings.Contains(detail.Cause, "context deadline exceeded") || strings.Contains(detail.NextStep, "context deadline exceeded") {
+		t.Fatalf("structured diagnostic should not leak raw error, got %#v", detail)
+	}
 }
 
 func TestExecutionRuntimeServiceApplyToolFailureRecoveryForRequestIgnoresSingleFailure(t *testing.T) {

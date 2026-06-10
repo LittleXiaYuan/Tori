@@ -1,0 +1,62 @@
+{
+  "id": "yunque.pack.dlc-demo",
+  "name": "DLC Demo Pack",
+  "version": "0.1.0",
+  "description": "前端 DLC（iframe 沙箱 + postMessage 桥）的参考增量包。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "disabled",
+  "backend": {
+    "capabilities": ["dlc.demo.ping"],
+    "routes": ["/v1/dlc-demo/ping"],
+    "permissions": ["dlc:demo", "events:subscribe:/v1/events/stream"],
+    "routeSpecs": [
+      {
+        "method": "POST",
+        "path": "/v1/dlc-demo/ping",
+        "description": "Echo a ping; demonstrates the bridge backend.call path.",
+        "entrypoint": "_start"
+      }
+    ],
+    "runtime": {
+      "type": "wasm",
+      "module": "module.wasm",
+      "sha256": "89112006887d4f4d68920a42f12ff6aa2a6886f0c643db73811035acfbd3d2ef"
+    }
+  },
+  "frontend": {
+    "menus": [
+      {
+        "key": "dlc-demo",
+        "label": "DLC 演示",
+        "path": "/packs/dlc-demo",
+        "icon": "puzzle",
+        "order": 98
+      }
+    ],
+    "routes": [
+      {
+        "path": "/packs/dlc-demo",
+        "component": "PackDlcHost",
+        "title": "DLC 演示"
+      }
+    ],
+    "assets": {
+      "type": "iframe-bundle",
+      "entry": "index.html"
+    }
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "spec": "docs/spec/pack-frontend-dlc.md",
+    "build": "runtime.sha256 is filled by scripts/release-pack when module.wasm is compiled via 'GOOS=wasip1 GOARCH=wasm go build -o module.wasm ./module'",
+    "descriptionStyle": "one-line-plus-three-examples",
+    "example1": "在沙箱 iframe 中加载自带前端，握手后自适应高度。",
+    "example2": "通过 postMessage 桥发起受白名单约束的 backend.call。",
+    "example3": "使用 pack 私有命名空间存取本地状态。"
+  },
+  "status": "alpha"
+}

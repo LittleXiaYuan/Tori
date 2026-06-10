@@ -90,6 +90,7 @@ export default function PacksPageOptimized() {
       await op();
       showToast("操作成功", "success");
       await refreshAll();
+      window.dispatchEvent(new CustomEvent("yunque:packs-changed"));
     } catch (e) {
       showToast(formatErrorMessage(e, "操作失败"), "error");
     } finally {

@@ -28,12 +28,12 @@ describe("chat-utils/friendlyError", () => {
     ["no provider configured for this request", /还没有配置可用模型/],
     ["planner_error: budget exceeded", /规划这一步暂时没有顺利完成/],
     ["context deadline exceeded after 30s", /响应暂时超时/],
-    ["429 Too Many Requests", /当前请求较多/],
+    ["429 Too Many Requests", /API 返回 429|当前请求较多/],
     ["401 Unauthorized: invalid api key", /模型密钥/],
     ["llm api 404: {\"error_message\":\"404, token not found\"}", /模型密钥/],
     ["502 Bad Gateway — upstream", /模型服务暂时不可用/],
     ["failed to fetch", /连接暂时中断/],
-    ["Request failed with status 500", /请求暂时没有完成/],
+    ["Request failed with status 500", /API 返回 500/],
   ];
   for (const [input, pattern] of cases) {
     it(`maps "${input}" to a friendly sentence`, () => {

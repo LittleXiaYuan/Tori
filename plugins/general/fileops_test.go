@@ -110,6 +110,36 @@ func TestFileWriteAccessDenied(t *testing.T) {
 	}
 }
 
+func TestFileWriteHonorsWorkspacePath(t *testing.T) {
+	workspace := t.TempDir()
+	sk := NewFileWriteSkill([]string{t.TempDir()})
+	path := filepath.Join(workspace, "generated.txt")
+
+	_, err := sk.Execute(context.Background(), map[string]any{
+		"path":    path,
+		"content": "hello workspace",
+	}, &skills.Environment{})
+	if err == nil {
+		t.Fatal("expected access denied without workspace path")
+	}
+
+	_, err = sk.Execute(context.Background(), map[string]any{
+		"path":    path,
+		"content": "hello workspace",
+	}, &skills.Environment{WorkspacePaths: []string{workspace}})
+	if err != nil {
+		t.Fatalf("write with workspace path failed: %v", err)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "hello workspace" {
+		t.Fatalf("unexpected content: %q", string(data))
+	}
+}
+
 func TestFileWriteSubdir(t *testing.T) {
 	dir := t.TempDir()
 	sk := NewFileWriteSkill([]string{dir})

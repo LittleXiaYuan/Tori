@@ -42,6 +42,11 @@ type SelfDistillConfig struct {
 	DaysLookback int     `json:"days_lookback"`
 	MaxSeqLength int     `json:"max_seq_length"`
 	AdapterDir   string  `json:"adapter_dir"`
+
+	// DefaultPersona is the identity/system block used for samples that did not
+	// capture their own persona. A 小羽 instance sets "你是小羽。…"; leave empty
+	// when training a generic base (export then falls back to a neutral system).
+	DefaultPersona string `json:"default_persona"`
 }
 
 // DefaultSelfDistillConfig returns a CPU-friendly demo configuration.
@@ -134,8 +139,14 @@ func NewConversationScorer(llm LLMScoreFunc) *ConversationScorer {
 // satisfaction signal for the distillation pipeline. These fields don't
 // exist on the core TrainingSample (which is intent-classification focused).
 type DistillSample struct {
-	Input     string `json:"input"`
-	Output    string `json:"output"`
+	Input  string `json:"input"`
+	Output string `json:"output"`
+	// Memory is the <recalled_memories> block that was injected at the time of
+	// this turn (empty when none). Persona is the identity block in effect then
+	// (小羽 or another). Both are replayed into the training system prompt so the
+	// model learns to USE memory under the right identity, not a generic assistant.
+	Memory    string `json:"memory,omitempty"`
+	Persona   string `json:"persona,omitempty"`
 	Tier      string `json:"tier"`
 	Upgraded  bool   `json:"upgraded"`
 	Satisfied bool   `json:"satisfied"`
@@ -162,14 +173,11 @@ func (cs *ConversationScorer) ScoreHeuristic(sample DistillSample) ScoredSample 
 		reasons = append(reasons, "was_upgraded")
 	}
 
-	replyLen := len(sample.Output)
-	if replyLen > 200 {
-		score += 0.1
-		reasons = append(reasons, "detailed_reply")
-	} else if replyLen < 20 {
-		score -= 0.1
-		reasons = append(reasons, "terse_reply")
-	}
+	// Reply length is intentionally NOT scored: it is a poor proxy for quality in
+	// a persona/companion model (a short, in-character reply can be ideal, and a
+	// long one can ramble out of character). Persona consistency, memory
+	// discipline (relevant→use, preference→quietly follow, irrelevant→ignore) and
+	// tone are judged by the LLMScoreFunc (0.6 weight) instead.
 
 	switch sample.Tier {
 	case "smart", "expert":
@@ -281,24 +289,16 @@ func (p *SelfDistillPipeline) stepCollect(ctx context.Context, cfg SelfDistillCo
 	start := time.Now()
 	var samples []DistillSample
 
-	// Convert LocalBrain's TrainingSample to DistillSample
-	if p.brain != nil {
-		tenantID := cfg.TenantID
-		if tenantID == "" {
-			tenantID = "default"
-		}
-		for _, ts := range p.brain.ExportTrainingData(tenantID) {
-			samples = append(samples, DistillSample{
-				Input:    ts.Input,
-				Output:   ts.Intent.Category,
-				Tier:     ts.Tier,
-				Upgraded: ts.Upgraded,
-			})
-		}
-	}
+	// NOTE: the LocalBrain ExportTrainingData path is deliberately NOT used for
+	// persona distillation. Its "Output" is the intent CATEGORY label (a
+	// classifier target like "chat"/"task"), not a real assistant reply — training
+	// a reply/persona model on category labels would teach it to emit labels. The
+	// brain handle stays on the pipeline for the intent-classifier flow elsewhere;
+	// here we use only the Ledger experience path, whose final_reply is the actual
+	// response said under a real persona + recalled memory.
 
-	// Also pull from Ledger experience entries
-	if p.ledger != nil && len(samples) < cfg.MinSamples {
+	// Pull conversation pairs from Ledger experience entries.
+	if p.ledger != nil {
 		entries, err := p.ledger.Memory.Search(ctx, ldg.MemoryQuery{
 			TenantID: cfg.TenantID,
 			Kinds:    []ldg.MemoryKind{ldg.MemoryExperience},
@@ -310,15 +310,32 @@ func (p *SelfDistillPipeline) stepCollect(ctx context.Context, cfg SelfDistillCo
 				if json.Unmarshal([]byte(e.Content), &data) != nil {
 					continue
 				}
+				// Two experience formats live in the Ledger: evolution_coordinator
+				// writes user_query/final_reply; the live DataCollector hook writes
+				// user_message/assist_reply. Read both so the actual online training
+				// data (DataCollector) feeds distillation — previously stepCollect
+				// only matched the evolution_coordinator keys and silently dropped it.
 				query, _ := data["user_query"].(string)
+				if query == "" {
+					query, _ = data["user_message"].(string)
+				}
 				reply, _ := data["final_reply"].(string)
+				if reply == "" {
+					reply, _ = data["assist_reply"].(string)
+				}
 				success, _ := data["success"].(bool)
+				// persona + recalled_memories: the identity/memory the turn faced,
+				// replayed into the training system prompt (export step).
+				memory, _ := data["recalled_memories"].(string)
+				persona, _ := data["persona"].(string)
 				if query == "" || reply == "" {
 					continue
 				}
 				samples = append(samples, DistillSample{
 					Input:     query,
 					Output:    reply,
+					Memory:    memory,
+					Persona:   persona,
 					Satisfied: success,
 					Tier:      "smart",
 				})
@@ -434,9 +451,30 @@ func (p *SelfDistillPipeline) stepExport(scored []ScoredSample, cfg SelfDistillC
 
 	enc := json.NewEncoder(f)
 	for _, s := range qualified {
+		// Reconstruct the system prompt the model actually faced: its persona
+		// (identity) plus the recalled-memory block injected at the time. This is
+		// what keeps an online distill loop from grinding a fine-tuned 小羽 back
+		// into a generic assistant — we train on "who it is + what it remembered",
+		// not a hardcoded "You are a helpful assistant."
+		persona := s.Persona
+		if persona == "" {
+			persona = cfg.DefaultPersona
+		}
+		system := persona
+		if s.Memory != "" {
+			if system != "" {
+				system += "\n"
+			}
+			system += s.Memory
+		}
+		if system == "" {
+			// Only when neither a per-sample persona nor a configured default
+			// exists (generic base training) do we fall back to a neutral system.
+			system = "You are a helpful assistant."
+		}
 		chatml := map[string]any{
 			"messages": []map[string]string{
-				{"role": "system", "content": "You are a helpful assistant."},
+				{"role": "system", "content": system},
 				{"role": "user", "content": s.Input},
 				{"role": "assistant", "content": s.Output},
 			},

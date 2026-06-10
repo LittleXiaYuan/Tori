@@ -80,6 +80,8 @@ func (g *Gateway) handleCognis(w http.ResponseWriter, r *http.Request) {
 		g.cogniFederationDiscover(w, r)
 	case path == "economics":
 		g.cogniEconomics(w, r)
+	case path == "route":
+		g.cogniRoute(w, r)
 	default:
 		segs := strings.SplitN(path, "/", 3)
 		id := segs[0]

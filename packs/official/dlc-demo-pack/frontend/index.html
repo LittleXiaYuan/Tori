@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DLC Demo Pack</title>
+  <style>
+    body { font: 14px/1.5 system-ui, sans-serif; margin: 0; padding: 20px; color: #1c2030; background: #fff; }
+    h1 { font-size: 16px; margin: 0 0 4px; }
+    p.sub { margin: 0 0 16px; color: #6b7280; }
+    button { font: inherit; padding: 8px 14px; border-radius: 10px; border: 1px solid #d6dae3; background: #f7f8fb; cursor: pointer; }
+    button:hover { background: #eef1f6; }
+    pre { background: #0d1117; color: #c9d1d9; padding: 12px; border-radius: 10px; overflow: auto; min-height: 48px; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+  <h1>DLC Demo Pack</h1>
+  <p class="sub">运行在沙箱 iframe（opaque origin）中，仅通过 postMessage 桥与宿主通信。</p>
+  <div class="row">
+    <button id="ping">backend.call → POST /v1/dlc-demo/ping</button>
+    <button id="toast">ui.toast</button>
+    <button id="save">storage.set theme=dark</button>
+    <button id="load">storage.get theme</button>
+    <button id="sub">events.subscribe /v1/events/stream</button>
+    <button id="unsub" disabled>events.unsubscribe</button>
+  </div>
+  <pre id="log">loading…</pre>
+  <pre id="events" style="min-height:32px">no events yet</pre>
+
+  <script>
+    // Minimal client for the Pack DLC bridge ABI (docs/spec/pack-frontend-dlc.md §7).
+    // The bundle holds no token and cannot reach the network directly (CSP
+    // connect-src 'none'); every backend access goes through the host bridge.
+    const log = (m) => { document.getElementById("log").textContent = typeof m === "string" ? m : JSON.stringify(m, null, 2); };
+    let seq = 0;
+    const pending = new Map();
+
+    function call(method, payload) {
+      return new Promise((resolve, reject) => {
+        const id = "m" + (++seq);
+        pending.set(id, { resolve, reject });
+        parent.postMessage({ v: 1, id, kind: "req", method, payload }, "*");
+        setTimeout(() => {
+          if (pending.has(id)) { pending.delete(id); reject(new Error("bridge timeout")); }
+        }, 30000);
+      });
+    }
+
+    const eventLog = (m) => { document.getElementById("events").textContent = typeof m === "string" ? m : JSON.stringify(m, null, 2); };
+    window.addEventListener("message", (e) => {
+      const msg = e.data;
+      if (!msg) return;
+      // Host-pushed events (SSE-over-bridge).
+      if (msg.kind === "event") {
+        if (msg.method === "events.message") eventLog(msg.payload);
+        if (msg.method === "events.closed") { eventLog("stream closed: " + (msg.payload?.reason || "?")); setSub(null); }
+        return;
+      }
+      if (msg.kind !== "res" || !pending.has(msg.id)) return;
+      const { resolve, reject } = pending.get(msg.id);
+      pending.delete(msg.id);
+      if (msg.error) reject(new Error(msg.error.message)); else resolve(msg.payload);
+    });
+
+    // Auto-resize to content and announce readiness via handshake.
+    function reportHeight() {
+      call("ui.resize", { height: document.body.scrollHeight + 40 }).catch(() => {});
+    }
+
+    document.getElementById("ping").onclick = () =>
+      call("backend.call", { method: "POST", path: "/v1/dlc-demo/ping", body: { hello: "dlc" } })
+        .then(log).catch((err) => log("ping failed: " + err.message));
+    document.getElementById("toast").onclick = () =>
+      call("ui.toast", { message: "Hello from the DLC pack!", type: "success" }).catch((err) => log(err.message));
+    document.getElementById("save").onclick = () =>
+      call("storage.set", { key: "theme", value: "dark" }).then(log).catch((err) => log(err.message));
+    document.getElementById("load").onclick = () =>
+      call("storage.get", { key: "theme" }).then(log).catch((err) => log(err.message));
+
+    let subID = null;
+    function setSub(id) {
+      subID = id;
+      document.getElementById("sub").disabled = !!id;
+      document.getElementById("unsub").disabled = !id;
+    }
+    document.getElementById("sub").onclick = () =>
+      call("events.subscribe", { path: "/v1/events/stream" })
+        .then((r) => { setSub(r.sub_id); eventLog("subscribed: " + r.sub_id); })
+        .catch((err) => eventLog("subscribe failed: " + err.message));
+    document.getElementById("unsub").onclick = () =>
+      call("events.unsubscribe", { sub_id: subID })
+        .then(() => { eventLog("unsubscribed"); setSub(null); })
+        .catch((err) => eventLog(err.message));
+
+    call("host.handshake", {})
+      .then((info) => { log({ handshake: info }); reportHeight(); })
+      .catch((err) => log("handshake failed: " + err.message));
+  </script>
+</body>
+</html>

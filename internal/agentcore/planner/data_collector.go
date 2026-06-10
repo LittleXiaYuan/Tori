@@ -36,6 +36,29 @@ type DataCollector struct {
 	minReplyLen int
 	minScore    float64
 	enabled     bool
+
+	// personaFunc / memoryFunc capture the identity + recalled-memory block a
+	// turn was conditioned on, so distillation can replay them as the training
+	// system prompt instead of a generic assistant. Optional; nil = not captured.
+	personaFunc func() string
+	memoryFunc  func(ctx context.Context, tenantID, query string) string
+}
+
+// SetPersonaProvider supplies the identity/system prompt in effect. Captured per
+// collected turn so the distill exporter trains under the real persona.
+func (dc *DataCollector) SetPersonaProvider(fn func() string) {
+	if dc != nil {
+		dc.personaFunc = fn
+	}
+}
+
+// SetMemoryProvider supplies the recalled-memory block for a (tenant, query).
+// Captured per collected turn (post-turn → minimal drift) so the exporter can
+// replay "what the model remembered" into the training system prompt.
+func (dc *DataCollector) SetMemoryProvider(fn func(ctx context.Context, tenantID, query string) string) {
+	if dc != nil {
+		dc.memoryFunc = fn
+	}
 }
 
 // DataCollectorConfig configures the training data collector.
@@ -74,6 +97,12 @@ type conversationPair struct {
 	Steps       int      `json:"steps"`
 	TaskType    string   `json:"task_type"`
 	ModelUsed   string   `json:"model_used,omitempty"`
+	// Persona + RecalledMemory record the identity and memory block the turn was
+	// conditioned on. The self-distill exporter replays them as the training
+	// system prompt so an online loop can't grind a fine-tuned persona back into
+	// a generic assistant. Key names match what self_distill stepCollect reads.
+	Persona        string `json:"persona,omitempty"`
+	RecalledMemory string `json:"recalled_memories,omitempty"`
 }
 
 // Collect records a successful conversation exchange.
@@ -94,6 +123,9 @@ func (dc *DataCollector) Collect(ctx context.Context, req PlanRequest, result *P
 		return
 	}
 
+	// Snapshot what's needed, then do persona/memory capture + marshal + store
+	// all in the background goroutine so the post-turn hook never blocks the
+	// response (memory capture may run a recall).
 	pair := conversationPair{
 		UserMessage: userMsg,
 		AssistReply: result.Reply,
@@ -102,39 +134,47 @@ func (dc *DataCollector) Collect(ctx context.Context, req PlanRequest, result *P
 		TaskType:    classifyTaskType(req, result),
 		ModelUsed:   req.EffectiveModelTier(),
 	}
-
-	content, err := json.Marshal(pair)
-	if err != nil {
-		slog.Warn("data_collector: marshal failed", "err", err)
-		return
-	}
-
+	tenantID := req.TenantID
 	taskID := req.TaskID
 	var taskPtr *string
 	if taskID != "" {
 		taskPtr = &taskID
 	}
-
+	personaFunc := dc.personaFunc
+	memoryFunc := dc.memoryFunc
 	key := fmt.Sprintf("train:%s-%d", time.Now().Format("20060102T150405"), dataCollectorSeq.Add(1))
 
 	safego.Go("data-collector-store", func() {
 		bgCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
-		err := dc.ledger.Memory.Put(bgCtx, &ldg.MemoryEntry{
-			TenantID:   req.TenantID,
+		if personaFunc != nil {
+			pair.Persona = personaFunc()
+		}
+		if memoryFunc != nil {
+			pair.RecalledMemory = memoryFunc(bgCtx, tenantID, userMsg)
+		}
+
+		content, err := json.Marshal(pair)
+		if err != nil {
+			slog.Warn("data_collector: marshal failed", "err", err)
+			return
+		}
+
+		err = dc.ledger.Memory.Put(bgCtx, &ldg.MemoryEntry{
+			TenantID:   tenantID,
 			TaskID:     taskPtr,
 			Kind:       ldg.MemoryExperience,
 			Key:        key,
 			Content:    string(content),
 			Source:     "training_data",
 			Confidence: clampScore(reflectScore),
-			Metadata:   ldg.JSON(`{"collector":"auto","version":"1"}`),
+			Metadata:   ldg.JSON(`{"collector":"auto","version":"2"}`),
 		})
 		if err != nil {
-			slog.Warn("data_collector: store failed", "err", err, "tenant", req.TenantID)
+			slog.Warn("data_collector: store failed", "err", err, "tenant", tenantID)
 		} else {
-			slog.Debug("data_collector: stored training pair", "tenant", req.TenantID, "key", key)
+			slog.Debug("data_collector: stored training pair", "tenant", tenantID, "key", key)
 		}
 	})
 }

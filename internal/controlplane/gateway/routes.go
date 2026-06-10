@@ -317,6 +317,7 @@ func (g *Gateway) registerSetupRoutes() {
 	g.mux.HandleFunc("/v1/setup/test-provider", g.requireSetupOrAuth(g.handleSetupTestProvider))
 	g.mux.HandleFunc("/v1/setup/apply", g.requireSetupOrAuth(g.handleSetupApply))
 	g.mux.HandleFunc("/v1/setup/install-component", g.requireSetupOrAuth(g.handleInstallComponent))
+	g.mux.HandleFunc("/v1/onboarding/state", g.requireSetupOrAuth(g.handleOnboardingState))
 }
 
 func (g *Gateway) registerQueueRoutes() {

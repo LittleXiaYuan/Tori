@@ -19,7 +19,6 @@ import { ExecutionTrace, type AgentEvent } from "@/components/execution-trace";
 import { ComputerPanel } from "@/components/computer-panel";
 import { TaskProgressPanel } from "@/components/task-progress-panel";
 // ConnectorPopover now used via ChatInputArea
-import { BrowserSessionCard, type BrowserActionArtifactSummary, type BrowserBridgeState, type BrowserSessionNotice } from "@/components/browser-session-card";
 import { BrowserConnectCard, type BrowserRequirement } from "@/components/browser-connect-card";
 import { SkillGrowthPanel } from "@/components/skill-growth-panel";
 // SlashCommandMenu now used via ChatInputArea
@@ -43,11 +42,12 @@ import {
   getSlashState,
   getActiveSlashCommand,
   mapBrowserSummary,
-  parseSlashBrowserCommand,
-  buildSlashBrowserAction,
-  summarizeSlashBrowserResult,
-  formatSlashBrowserResponse,
 } from "@/lib/slash-commands";
+import {
+  runSlashBrowserCommand,
+  runSocialPublish,
+  type ChatBrowserActionContext,
+} from "@/lib/chat-browser-actions";
 import { ThinkingTimer } from "@/components/chat/thinking-timer";
 import { ConversationSidebar } from "@/components/chat/conversation-sidebar";
 import { BrowserResumeBanner } from "@/components/chat/browser-resume-banner";
@@ -60,26 +60,20 @@ import { useChatMedia, type PendingFile } from "@/lib/use-chat-media";
 import { useChatRecording } from "@/lib/use-chat-recording";
 import { useShortcuts } from "@/lib/use-shortcuts";
 import { useChatStream } from "@/lib/use-chat-stream";
+import { useI18n } from "@/lib/i18n";
 import { ChatInputArea } from "@/components/chat/chat-input-area";
 import { TaskResourceMeter, type ResourceSnapshot } from "@/components/chat/task-resource-meter";
 import { ChatStreamTimeoutError, parseAgenticChatStream } from "@/lib/chat-sse";
 import { buildHiddenContextAttachments } from "@/lib/chat-attachments";
+import { workspacePathsFromProjects } from "@/lib/chat-workspace";
 import { PlannerRecoveryShelf } from "@/components/chat/planner-recovery-shelf";
 import { formatErrorMessage } from "@/lib/error-utils";
 import { providerModelLabel } from "@/lib/provider-ui";
-import {
-  buildSocialPublishActions,
-  detectSocialPublishIntent,
-  formatSocialPublishConnectorRequired,
-  formatSocialPublishResult,
-  socialPublishStepLabel,
-  stepRecordFromResult,
-  type SocialPublishStepRecord,
-} from "@/lib/social-publish-intent";
 
 const browserIntentClient = createBrowserIntentPackClient();
 
 export default function ChatPage() {
+  const { t } = useI18n();
   const router = useRouter();
   const [chat, chatD] = useReducer(chatReducer, chatInit);
   const [conv, convD] = useReducer(convReducer, convInit);
@@ -110,6 +104,7 @@ export default function ChatPage() {
   const resizingRef = useRef(false);
   const [resourceSnapshot, setResourceSnapshot] = useState<ResourceSnapshot | null>(null);
   const [prevResourceSnapshot, setPrevResourceSnapshot] = useState<ResourceSnapshot | null>(null);
+  const [workspacePaths, setWorkspacePaths] = useState<string[]>([]);
   const [plannerRecoveryRefreshSignal, setPlannerRecoveryRefreshSignal] = useState<number | undefined>(undefined);
   const sendStartRef = useRef<number>(0);
   const refreshPlannerRecovery = useCallback(() => setPlannerRecoveryRefreshSignal(Date.now()), []);
@@ -145,6 +140,18 @@ export default function ChatPage() {
   }, [conv.showArchived]);
 
   useEffect(() => { loadConversations(); }, [loadConversations]);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.listProjects()
+      .then((res) => {
+        if (!cancelled) setWorkspacePaths(workspacePathsFromProjects(res.projects || []));
+      })
+      .catch((e) => {
+        console.warn("[chat] load workspace projects failed:", e);
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   const restoredRef = useRef(false);
   useEffect(() => {
@@ -320,241 +327,25 @@ export default function ChatPage() {
       router.push("/settings/providers");
       return;
     }
-    const slashBrowserCommand = parseSlashBrowserCommand(displayText);
-    if (slashBrowserCommand) {
-      setSuggestedTab("browser");
-      setShowComputer(true);
-      const extStatus = await browserIntentClient.extensionStatus().catch(() => ({ connected: false }));
-      if (!extStatus.connected) {
-        setShowConnectors(true);
-        setResumePromptForBrowser(text);
-        setBridgeNotice({ tone: "warning", text: "Browser extension not connected. Opened install guide for you." });
-        pushBrowserTrace(makeBrowserTraceEvent(
-          "Browser extension required",
-          { command: slashBrowserCommand.command, args: slashBrowserCommand.args, summary: slashBrowserCommand.summary },
-          "reflect",
-        ));
-        const userMsg: Message = { role: "user", content: displayText, id: newId(), timestamp: Date.now() };
-        const asstMsg: Message = {
-          role: "assistant",
-          content: [
-            "The browser extension is not connected yet.",
-            "I opened the browser install guide for you. Connect **Yunque Browser Connector**, then run this command again.",
-            "",
-            "Open the workspace here: [/packs/browser](/packs/browser)",
-          ].join("\n"),
-          id: newId(),
-          browserRequirement: {
-            required: true,
-            reason: "browser_connector_required",
-            message: "This command needs the live Yunque Browser Connector before it can operate your real browser tab.",
-            install_path: "/packs/browser",
-            settings_path: "/packs/browser",
-          },
-          traceEvents: [makeBrowserTraceEvent("Opened browser install guide", { source: "chat-slash", command: slashBrowserCommand.command }, "reflect")],
-        };
-        chatD({ type: "SET_INPUT", value: "" });
-        chatD({ type: "ADD_PAIR", userMsg, asstMsg });
-        setActiveSlashCommand(null);
-        setShowSlashMenu(false);
-        if (typeof window !== "undefined") {
-          window.setTimeout(() => window.open("/packs/browser", "_blank", "noopener,noreferrer"), 80);
-        }
-        return;
-      }
-
-      const builtAction = buildSlashBrowserAction(slashBrowserCommand);
-      if ("error" in builtAction) {
-        const errorMessage = builtAction.error || "Browser command needs clarification.";
-        const userMsg: Message = { role: "user", content: displayText, id: newId(), timestamp: Date.now() };
-        const asstMsg: Message = {
-          role: "assistant",
-          content: errorMessage,
-          id: newId(),
-          traceEvents: [makeBrowserTraceEvent("Browser command needs clarification", { command: slashBrowserCommand.command, args: slashBrowserCommand.args }, "reflect")],
-        };
-        chatD({ type: "SET_INPUT", value: "" });
-        chatD({ type: "ADD_PAIR", userMsg, asstMsg });
-        setActiveSlashCommand(null);
-        setShowSlashMenu(false);
-        return;
-      }
-
-      const userMsg: Message = { role: "user", content: displayText, id: newId(), timestamp: Date.now() };
-      const asstMsg: Message = { role: "assistant", content: "", id: newId(), timestamp: Date.now(), traceEvents: [] };
-      setActiveSlashCommand(null);
-      setShowSlashMenu(false);
-      chatD({ type: "START_SEND" });
-      chatD({ type: "ADD_PAIR", userMsg, asstMsg });
-      pushBrowserTrace(makeBrowserTraceEvent(
-        browserTraceSummary(slashBrowserCommand.command, "start"),
-        { command: slashBrowserCommand.command, args: slashBrowserCommand.args, action: builtAction.action },
-        "tool_start",
-      ));
-
-      try {
-        const result = await browserIntentClient.extensionAction(builtAction.action);
-        if (!result?.ok) {
-          throw new Error(result?.error || "Browser action failed.");
-        }
-        const artifact = summarizeSlashBrowserResult(String(builtAction.action.type), result);
-        const content = formatSlashBrowserResponse(slashBrowserCommand, artifact, result);
-        chatD({ type: "UPDATE_LAST", updates: { content, browserSummary: artifact } });
-        setResumePromptForBrowser(null);
-        setLastArtifact(artifact);
-        setBridgeNotice({ tone: "success", text: browserTraceSummary(slashBrowserCommand.command, "success") });
-        pushBrowserTrace(makeBrowserTraceEvent(
-          browserTraceSummary(slashBrowserCommand.command, "success"),
-          { command: slashBrowserCommand.command, args: slashBrowserCommand.args, result },
-          "tool_result",
-        ));
-        syncBridgeState();
-      } catch (e: unknown) {
-        const message = friendlyError((e as Error).message || "Browser action failed.");
-        chatD({ type: "ERROR_LAST", error: message });
-        setBridgeNotice({ tone: "error", text: message });
-        pushBrowserTrace(makeBrowserTraceEvent(
-          browserTraceSummary(slashBrowserCommand.command, "error"),
-          { command: slashBrowserCommand.command, args: slashBrowserCommand.args, error: message },
-          "reflect",
-        ));
-      } finally {
-        chatD({ type: "FINISH_SEND" });
-      }
-      return;
-    }
-
-    const socialPublishIntent = detectSocialPublishIntent(displayText);
-    if (socialPublishIntent) {
-      setSuggestedTab("browser");
-      setShowComputer(true);
-      const extStatus = await browserIntentClient.extensionStatus().catch(() => ({ connected: false }));
-      if (!extStatus.connected) {
-        setShowConnectors(true);
-        setResumePromptForBrowser(text);
-        setBridgeNotice({ tone: "warning", text: `${socialPublishIntent.platformName}直发需要先连接浏览器。` });
-        pushBrowserTrace(makeBrowserTraceEvent(
-          "Social publish waiting for browser connector",
-          { platform: socialPublishIntent.platform, scenario: socialPublishIntent.scenarioId },
-          "reflect",
-        ));
-        const userMsg: Message = { role: "user", content: displayText, id: newId(), timestamp: Date.now() };
-        const asstMsg: Message = {
-          role: "assistant",
-          content: formatSocialPublishConnectorRequired(socialPublishIntent),
-          id: newId(),
-          browserRequirement: {
-            required: true,
-            reason: "browser_connector_required",
-            message: `${socialPublishIntent.platformName}直发需要连接 Yunque Browser Connector，才能在你的真实登录会话中打开页面、填写内容并点击发布。`,
-            install_path: "/packs/browser",
-            settings_path: "/packs/browser",
-          },
-          traceEvents: [makeBrowserTraceEvent("Opened browser install guide", { source: "chat-social-publish", platform: socialPublishIntent.platform }, "reflect")],
-        };
-        chatD({ type: "SET_INPUT", value: "" });
-        chatD({ type: "ADD_PAIR", userMsg, asstMsg });
-        setActiveSlashCommand(null);
-        setShowSlashMenu(false);
-        if (typeof window !== "undefined") {
-          window.setTimeout(() => window.open("/packs/browser", "_blank", "noopener,noreferrer"), 80);
-        }
-        return;
-      }
-
-      const actions = buildSocialPublishActions(socialPublishIntent);
-      const userMsg: Message = { role: "user", content: displayText, id: newId(), timestamp: Date.now() };
-      const asstMsg: Message = { role: "assistant", content: "", id: newId(), timestamp: Date.now(), traceEvents: [] };
-      setActiveSlashCommand(null);
-      setShowSlashMenu(false);
-      chatD({ type: "START_SEND" });
-      chatD({ type: "ADD_PAIR", userMsg, asstMsg });
-      const startEvent = makeBrowserTraceEvent(
-        `${socialPublishIntent.platformName}直发计划开始`,
-        {
-          source: "chat-social-publish",
-          platform: socialPublishIntent.platform,
-          scenario: socialPublishIntent.scenarioId,
-          targetUrl: socialPublishIntent.targetUrl,
-          steps: actions.map((action, index) => ({ index, label: socialPublishStepLabel(action, socialPublishIntent), type: action.type })),
-        },
-        "tool_start",
-      );
-      pushBrowserTrace(startEvent);
-      chatD({ type: "APPEND_LAST_TRACE", event: startEvent });
-
-      const stepRecords: SocialPublishStepRecord[] = [];
-      try {
-        for (const [index, action] of actions.entries()) {
-          const label = socialPublishStepLabel(action, socialPublishIntent);
-          const stepStart = makeBrowserTraceEvent(
-            label,
-            { source: "chat-social-publish", platform: socialPublishIntent.platform, action },
-            "tool_start",
-          );
-          pushBrowserTrace(stepStart);
-          chatD({ type: "APPEND_LAST_TRACE", event: stepStart });
-
-          const result = await browserIntentClient.extensionAction(action);
-          const record = stepRecordFromResult(index, label, action, result);
-          stepRecords.push(record);
-          if (!result?.ok) {
-            throw new Error(result?.error || `${label}失败`);
-          }
-
-          const stepDone = makeBrowserTraceEvent(
-            `${label}完成`,
-            { source: "chat-social-publish", platform: socialPublishIntent.platform, result: record },
-            "tool_result",
-          );
-          pushBrowserTrace(stepDone);
-          chatD({ type: "APPEND_LAST_TRACE", event: stepDone });
-        }
-
-        const lastStep = stepRecords[stepRecords.length - 1];
-        const artifact: BrowserActionArtifactSummary = {
-          action: `${socialPublishIntent.platform}_publish_direct`,
-          url: lastStep?.url || socialPublishIntent.targetUrl,
-          title: socialPublishIntent.title || `${socialPublishIntent.platformName}直发`,
-          hasScreenshot: stepRecords.some((step) => step.hasScreenshot),
-          preview: socialPublishIntent.body.slice(0, 240),
-          updatedAt: Date.now(),
-        };
-        const content = formatSocialPublishResult(socialPublishIntent, stepRecords);
-        chatD({ type: "UPDATE_LAST", updates: { content, browserSummary: artifact } });
-        setResumePromptForBrowser(null);
-        setLastArtifact(artifact);
-        setBridgeNotice({ tone: "success", text: `${socialPublishIntent.platformName}直发已完成。` });
-        pushBrowserTrace(makeBrowserTraceEvent(
-          `${socialPublishIntent.platformName}直发完成`,
-          { source: "chat-social-publish", platform: socialPublishIntent.platform, steps: stepRecords },
-          "tool_result",
-        ));
-        syncBridgeState();
-      } catch (e: unknown) {
-        const message = friendlyError((e as Error).message || `${socialPublishIntent.platformName}直发失败。`);
-        const lastStep = stepRecords[stepRecords.length - 1];
-        const artifact: BrowserActionArtifactSummary = {
-          action: `${socialPublishIntent.platform}_publish_direct`,
-          url: lastStep?.url || socialPublishIntent.targetUrl,
-          title: socialPublishIntent.title || `${socialPublishIntent.platformName}直发`,
-          hasScreenshot: stepRecords.some((step) => step.hasScreenshot),
-          preview: socialPublishIntent.body.slice(0, 240),
-          updatedAt: Date.now(),
-        };
-        chatD({ type: "UPDATE_LAST", updates: { content: formatSocialPublishResult(socialPublishIntent, stepRecords, message), browserSummary: artifact } });
-        setLastArtifact(artifact);
-        setBridgeNotice({ tone: "error", text: message });
-        pushBrowserTrace(makeBrowserTraceEvent(
-          `${socialPublishIntent.platformName}直发被中断`,
-          { source: "chat-social-publish", platform: socialPublishIntent.platform, error: message, steps: stepRecords },
-          "reflect",
-        ));
-      } finally {
-        chatD({ type: "FINISH_SEND" });
-      }
-      return;
-    }
+    // Browser-intent flows (slash `/browser …` and social-publish) live in
+    // chat-browser-actions.ts to keep this function focused on the agentic
+    // stream. Each returns true when it fully handled the message.
+    const browserActionCtx: ChatBrowserActionContext = {
+      browserIntentClient,
+      chatD,
+      pushBrowserTrace,
+      syncBridgeState,
+      setBridgeNotice,
+      setLastArtifact,
+      setSuggestedTab,
+      setShowComputer,
+      setShowConnectors,
+      setResumePromptForBrowser,
+      setActiveSlashCommand,
+      setShowSlashMenu,
+    };
+    if (await runSlashBrowserCommand(browserActionCtx, displayText, text)) return;
+    if (await runSocialPublish(browserActionCtx, displayText, text)) return;
 
     const mediaPreviews = pendingFiles.filter(f => (f.type === "image" || f.type === "video") && f.base64).map(f => f.base64!);
     const attachedFiles = pendingFiles
@@ -635,6 +426,7 @@ export default function ChatPage() {
       };
       if (cherryWebSearch) bodyObj.web_search = true;
       if (cherryToolIds) bodyObj.tool_ids = cherryToolIds;
+      if (workspacePaths.length > 0) bodyObj.workspace_paths = workspacePaths;
       const contextAttachments = buildHiddenContextAttachments(pendingFiles);
       const allAttachments = [...(cherryOpts?.attachments || []), ...contextAttachments];
       if (allAttachments.length > 0) {
@@ -1103,22 +895,30 @@ export default function ChatPage() {
     <div className="flex h-screen overflow-hidden" style={{ background: "transparent" }}>
       <div
         className="chat-sidebar-wrap"
+        data-open={showSidebar ? "true" : "false"}
         style={{
-          width: showSidebar ? "var(--conv-rail-w, 272px)" : "0px",
-          minWidth: showSidebar ? "var(--conv-rail-w, 272px)" : "0px",
+          width: showSidebar ? "var(--conv-rail-w, 248px)" : "0px",
+          minWidth: showSidebar ? "var(--conv-rail-w, 248px)" : "0px",
+          flexShrink: 0,
           opacity: showSidebar ? 1 : 0,
-          visibility: showSidebar ? "visible" : "hidden",
+          pointerEvents: showSidebar ? "auto" : "none",
           overflow: "hidden",
-          clipPath: "inset(0)",
+          borderRight: showSidebar ? "1px solid var(--glass-edge, var(--yunque-border))" : "none",
           transition: showSidebar
-            ? "width 0.25s cubic-bezier(.22,1,.36,1), min-width 0.25s cubic-bezier(.22,1,.36,1), opacity 0.2s ease, visibility 0s"
-            : "width 0.25s cubic-bezier(.22,1,.36,1), min-width 0.25s cubic-bezier(.22,1,.36,1), opacity 0.15s ease, visibility 0s 0.25s",
+            ? "width 0.25s cubic-bezier(.22,1,.36,1), min-width 0.25s cubic-bezier(.22,1,.36,1), opacity 0.2s ease, border-color 0.2s ease"
+            : "width 0.25s cubic-bezier(.22,1,.36,1), min-width 0.25s cubic-bezier(.22,1,.36,1), opacity 0.15s ease, border-color 0.15s ease",
         }}
       >
         <ConversationSidebar
           conv={conv}
           dispatch={convD}
           conversations={filteredConversations}
+          chatMode={chatMode}
+          onModeChange={(mode) => {
+            setChatMode(mode);
+            if (mode === "chat" && airiAvailable) setAiriMode(true);
+            else setAiriMode(false);
+          }}
           onNew={newConversation}
           onSwitch={switchConversation}
           onManage={manageConversation}
@@ -1143,7 +943,7 @@ export default function ChatPage() {
               onClick={() => setShowSidebar(!showSidebar)}
               className="p-1.5 rounded-lg transition-colors"
               style={{ color: "var(--yunque-text-muted)" }}
-              aria-label={showSidebar ? "隐藏对话列表" : "显示对话列表"}
+              aria-label={showSidebar ? t("convo.hideList") : t("convo.showList")}
             >
               <MessageCircle size={16} />
             </button>
@@ -1243,7 +1043,7 @@ export default function ChatPage() {
 
         {/* Chat Messages */}
         {chat.messages.length === 0 ? (
-          <div className="flex-1 overflow-y-auto chat-scroll-area px-5 py-4 xl:px-6">
+          <div className="flex-1 overflow-y-auto chat-scroll-area chat-scroll-area--empty px-5 py-4 xl:px-6">
             <ChatEmptyState setupNeeded={setupNeeded} chatD={chatD} inputRef={inputRef} composer={composer} />
           </div>
         ) : (

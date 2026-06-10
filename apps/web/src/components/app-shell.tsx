@@ -15,7 +15,7 @@ import { I18nProvider } from "@/lib/i18n";
 import { DragRegion } from "@/components/title-bar";
 
 const NO_SIDEBAR_PATHS = ["/login", "/setup"];
-const BARE_PATHS: string[] = [];
+const BARE_PATHS = ["/selection-popup"];
 
 function PageFallback() {
   return (

@@ -522,6 +522,13 @@ func initTaskEngine(
 		usageKV := iledger.NewKVConfigStore(app.Ledger, "usage")
 		gw.SetUsageKVStore(usageKV)
 		slog.Info("usage: using Ledger KV for persistence")
+
+		gw.SetOnboardingKVStore(iledger.NewKVConfigStore(app.Ledger, "onboarding"))
+		slog.Info("onboarding: using Ledger KV for persistence")
+
+		// Backs the pack-scoped ledger_get/ledger_set WASM host functions
+		// (permission-gated; keys are namespaced per pack + tenant).
+		gw.SetWasmPackKVStore(iledger.NewKVConfigStore(app.Ledger, "pack_kv"))
 	}
 
 	gw.SetOutputDir(filepath.Join(cfg.DataDir, "output"))

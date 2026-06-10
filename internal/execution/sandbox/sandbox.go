@@ -369,18 +369,76 @@ var hostSearchSkipDirs = map[string]bool{
 }
 
 func (s *Sandbox) GrepHostFile(filePath, query string) ([]string, error) {
-	content, err := s.ReadHostFile(filePath)
+	abs, err := filepath.Abs(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("invalid path: %w", err)
+	}
+	if !s.isHostPathAllowed(abs) {
+		return nil, fmt.Errorf("access denied: %s not in allowed host read paths", abs)
+	}
+	query = strings.ToLower(strings.TrimSpace(query))
+	if query == "" {
+		return nil, nil
+	}
+
+	info, err := os.Stat(abs)
 	if err != nil {
 		return nil, err
 	}
-	query = strings.ToLower(query)
+	if !info.IsDir() {
+		return s.grepOneHostFile(abs, "", query, 50)
+	}
+
+	var matches []string
+	scanned := 0
+	const maxScan = 20000
+	_ = filepath.Walk(abs, func(p string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+		if len(matches) >= 50 || scanned >= maxScan {
+			return filepath.SkipAll
+		}
+		if info.IsDir() {
+			if p != abs && hostSearchSkipDirs[strings.ToLower(info.Name())] {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		scanned++
+		if !s.isHostPathAllowed(p) {
+			return nil
+		}
+		rel, _ := filepath.Rel(abs, p)
+		fileMatches, err := s.grepOneHostFile(p, rel, query, 50-len(matches))
+		if err != nil {
+			return nil
+		}
+		matches = append(matches, fileMatches...)
+		return nil
+	})
+	return matches, nil
+}
+
+func (s *Sandbox) grepOneHostFile(path, label, query string, limit int) ([]string, error) {
+	if limit <= 0 {
+		return nil, nil
+	}
+	content, err := s.ReadHostFile(path)
+	if err != nil {
+		return nil, err
+	}
 	lines := strings.Split(content, "\n")
 	var matches []string
 	for i, line := range lines {
 		if strings.Contains(strings.ToLower(line), query) {
-			matches = append(matches, fmt.Sprintf("%d: %s", i+1, line))
+			prefix := fmt.Sprintf("%d: ", i+1)
+			if label != "" {
+				prefix = label + ":" + prefix
+			}
+			matches = append(matches, prefix+line)
 		}
-		if len(matches) >= 50 {
+		if len(matches) >= limit {
 			break
 		}
 	}

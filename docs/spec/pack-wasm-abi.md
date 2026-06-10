@@ -61,12 +61,29 @@
 
 ## 6. Host 函数（当前可用）
 
-沙箱在 `env` 模块下导出：
+沙箱在 `env` 模块下**无条件**导出（每次执行）：
 - `kv_set(key_ptr, key_len, val_ptr, val_len) -> i32`
 - `kv_get(key_ptr, key_len, buf_ptr, buf_cap) -> i32`（返回写入字节数）
 - `log_message(ptr, len) -> i32`
 
-> 特权 host 函数（memory_search / ledger / http_fetch 等）与 Host ABI 权限强制尚未接入，留待后续。当前切片仅依赖 stdin/stdout 信封 + 上述 KV/log。
+### 6.1 特权 host 函数（权限受限）
+
+特权能力按 Pack 的 `backend.permissions` **逐执行**导出：未声明对应权限时，该 host 函数根本不会出现在 `env` 模块里，模块若 import 它则实例化失败（宿主返回 502）。这就是强制边界——能力缺失即不可达，而非运行时再判断。
+
+所有特权 host 函数共享同一 **ptr/len 约定**：`fn(reqPtr, reqLen, respPtr, respCap) -> i32`，从 `reqPtr/reqLen` 读请求 JSON，把响应 JSON 写入 `respPtr`（容量 `respCap`）；返回值 `>=0` 为写入字节数，`<0` 为缓冲区不足时所需字节数的相反数（guest 扩容重试）。能力仅在「Pack 声明了权限 **且** 宿主侧 provider 已接线」时导出。
+
+| host 函数 | 所需权限 | provider | 请求 / 响应 JSON |
+|---|---|---|---|
+| `http_fetch` | `net:fetch` | 内置（SSRF 安全客户端） | `{"url","method","body","headers"}` → `{"status","body","error"}` |
+| `memory_search` | `memory:read` | `Orchestrator` | `{"query"}` → `{"context"}`（按请求 tenant 召回） |
+| `ledger_get` | `ledger:read` | Pack KV（Ledger） | `{"key"}` → `{"found","value"}` |
+| `ledger_set` | `ledger:write` | Pack KV（Ledger） | `{"key","value"}` → `{"ok","error"}` |
+
+- `http_fetch`：宿主对 `url` 执行 SSRF 校验（拒绝 loopback/私网/元数据，重定向与连接期二次校验），15s 超时，响应体上限 256 KiB；传输/SSRF 失败以 `{"status":0,"error":...}` 信封返回（仍是成功写入）。
+- `memory_search`：tenant 取自请求上下文，调用宿主内存编排器的召回。
+- `ledger_*`：键被命名空间化为 `{packID}:{tenant}:{key}`，Pack 之间、Tenant 之间互不可见。
+
+> 更多特权 host 函数沿用同一模式（权限门控 + provider 接线 + ptr/len 约定）按需扩展。
 
 ## 7. 示例模块（Go 原生 wasip1）
 

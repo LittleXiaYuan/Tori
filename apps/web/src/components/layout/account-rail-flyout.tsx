@@ -12,7 +12,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { NAV_ITEMS, NAV_GROUP_ORDER, type NavGroup, type NavItem, filterNavItemsByProfile, groupNavItems } from "@/lib/nav-items";
+import { NAV_ITEMS, NAV_GROUP_ORDER, type NavGroup, type NavItem, filterNavItemsByProfile, groupNavItems, navItemLabel } from "@/lib/nav-items";
 import { useI18n } from "@/lib/i18n";
 import { PROFILE_MODE_KEY, readProfileMode } from "@/lib/profile-mode";
 
@@ -37,7 +37,7 @@ const GROUP_LABEL_EN: Record<NavGroup, string> = {
 export default function AccountRailFlyout({ open, extItems = [], anchorTop = 0, onMouseEnter, onMouseLeave, onPick }: AccountRailFlyoutProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const { locale } = useI18n();
+  const { locale, t } = useI18n();
   const [profileMode, setProfileMode] = useState(readProfileMode);
 
   useEffect(() => {
@@ -102,7 +102,7 @@ export default function AccountRailFlyout({ open, extItems = [], anchorTop = 0, 
                       }}
                     >
                       <span className="account-rail-flyout-item-icon">{it.icon}</span>
-                      <span className="account-rail-flyout-item-label">{it.label}</span>
+                      <span className="account-rail-flyout-item-label">{navItemLabel(it, t)}</span>
                     </button>
                   );
                 })}

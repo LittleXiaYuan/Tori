@@ -123,6 +123,7 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 		observe.EndSpan(traceSpan, nil)
 		return
 	}
+	req.WorkspacePaths = inferWorkspacePathsFromMessages(req.WorkspacePaths, req.Messages)
 
 	// Send an immediate empty frame so the browser knows the stream is alive
 	// before guardrails, memory, routing, or the first upstream LLM token runs.
@@ -601,6 +602,7 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 	if req.SessionID != "" {
 		persistContent := embedSandboxMarker(reply, sandboxInfo)
 		g.convStore.Append(req.SessionID, llm.Message{Role: "assistant", Content: persistContent})
+		g.maybeAutoConversationMeta(req.SessionID, lastUserMessage(req.Messages), reply)
 	}
 
 	// Memory: write assistant reply

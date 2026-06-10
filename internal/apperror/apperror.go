@@ -16,6 +16,7 @@ const (
 	CodeForbidden      Code = "FORBIDDEN"
 	CodeNotFound       Code = "NOT_FOUND"
 	CodeMethodNotAllow Code = "METHOD_NOT_ALLOWED"
+	CodeConflict       Code = "CONFLICT"
 	CodeTooManyReqs    Code = "TOO_MANY_REQUESTS"
 	CodeQuotaExceeded  Code = "QUOTA_EXCEEDED"
 	CodePayloadTooLrg  Code = "PAYLOAD_TOO_LARGE"
@@ -42,6 +43,7 @@ var httpStatus = map[Code]int{
 	CodeForbidden:      http.StatusForbidden,
 	CodeNotFound:       http.StatusNotFound,
 	CodeMethodNotAllow: http.StatusMethodNotAllowed,
+	CodeConflict:       http.StatusConflict,
 	CodeTooManyReqs:    http.StatusTooManyRequests,
 	CodeQuotaExceeded:  http.StatusTooManyRequests,
 	CodePayloadTooLrg:  http.StatusRequestEntityTooLarge,

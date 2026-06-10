@@ -114,10 +114,29 @@ type FrontendRoute struct {
 	Title     string `json:"title,omitempty"`
 }
 
+// FrontendAssets describes how a pack's frontend is loaded by the web shell.
+//
+//   - "inline":        Routes[].Component resolves to a component pre-built into
+//     the main app (first-party packs only).
+//   - "iframe-bundle": the .yqpack carries a self-contained static bundle under
+//     frontend/ (Entry, default "index.html"); the shell loads it in a sandboxed
+//     iframe and talks to it over the postMessage bridge. See
+//     docs/spec/pack-frontend-dlc.md.
 type FrontendAssets struct {
 	Type  string `json:"type,omitempty"`
 	Entry string `json:"entry,omitempty"`
 }
+
+const (
+	// FrontendAssetsTypeBuiltin / Inline both mean "component pre-built into the
+	// main app" (first-party). "builtin" is the historical value; "inline" is an
+	// accepted synonym. "remote" is a reserved (pre-existing) value. "iframe-bundle"
+	// loads a self-contained bundle in a sandboxed iframe (docs/spec/pack-frontend-dlc.md).
+	FrontendAssetsTypeBuiltin      = "builtin"
+	FrontendAssetsTypeInline       = "inline"
+	FrontendAssetsTypeRemote       = "remote"
+	FrontendAssetsTypeIframeBundle = "iframe-bundle"
+)
 
 type SDKManifest struct {
 	TypeScript string `json:"typescript,omitempty"`
@@ -196,6 +215,12 @@ func (m Manifest) Validate() error {
 		if strings.TrimSpace(route.Path) == "" || strings.TrimSpace(route.Component) == "" {
 			return fmt.Errorf("frontend.routes[%d] requires path and component", i)
 		}
+	}
+	switch strings.TrimSpace(m.Frontend.Assets.Type) {
+	case "", FrontendAssetsTypeBuiltin, FrontendAssetsTypeInline, FrontendAssetsTypeRemote, FrontendAssetsTypeIframeBundle:
+		// ok
+	default:
+		return fmt.Errorf("frontend.assets.type %q is invalid", m.Frontend.Assets.Type)
 	}
 	if m.Distribution.PackageURL != "" && strings.TrimSpace(m.Distribution.SHA256) == "" {
 		return fmt.Errorf("distribution.sha256 is required when distribution.packageUrl is set")

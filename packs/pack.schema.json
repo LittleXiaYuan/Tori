@@ -166,7 +166,7 @@
           "required": ["type", "entry"],
           "properties": {
             "type": {
-              "enum": ["builtin", "remote"]
+              "enum": ["builtin", "remote", "iframe-bundle"]
             },
             "entry": {
               "type": "string",

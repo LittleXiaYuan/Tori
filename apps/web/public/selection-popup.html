@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>选区</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: transparent;
+      overflow: hidden;
+      font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+    }
+    /* Transparent full-window canvas; the pill is content-sized and centered,
+       so the surrounding window area is genuinely transparent (the app behind
+       shows through). No drop-shadow (window shadow is also disabled) → no dark
+       halo / block. */
+    .wrap {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+    }
+    .bar {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      padding: 4px 6px;
+      border-radius: 10px;
+      background: rgba(38, 38, 44, 0.98);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: rgba(255, 255, 255, 0.92);
+      user-select: none;
+    }
+    .btn {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 5px 9px;
+      border: none;
+      background: transparent;
+      color: inherit;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .btn:hover { background: rgba(255, 255, 255, 0.10); }
+    .grip { opacity: 0.4; padding: 0 4px 0 2px; font-size: 12px; cursor: default; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="bar" id="bar">
+      <span class="grip" aria-hidden>⋮⋮</span>
+    </div>
+  </div>
+  <script>
+    const params = new URLSearchParams(location.search);
+    let text = (params.get("text") || "").trim();
+    const actions = [
+      { id: "ai_search", label: "AI 搜索" },
+      { id: "translate", label: "翻译" },
+      { id: "explain", label: "解释" },
+      { id: "save", label: "存储" },
+      { id: "copy", label: "复制" },
+    ];
+    const invoke = window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke;
+    function dismiss() {
+      if (invoke) invoke("selection_popup_dismiss");
+    }
+    function run(id) {
+      if (!text || text === "…") return dismiss();
+      if (id === "copy") {
+        const done = () => dismiss();
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(done).catch(done);
+        } else {
+          done();
+        }
+        return;
+      }
+      const prompts = {
+        ai_search: "搜索：" + text,
+        translate: "翻译以下内容（如果是中文则翻译为英文，如果是英文则翻译为中文）：\n\n" + text,
+        explain: "解释：" + text,
+        save: "将以下内容保存到知识库：\n\n" + text,
+      };
+      if (invoke) invoke("floating_send_to_chat", { text: prompts[id] || text });
+      dismiss();
+    }
+    function render() {
+      const bar = document.getElementById("bar");
+      actions.forEach(function (a) {
+        const btn = document.createElement("button");
+        btn.className = "btn";
+        btn.type = "button";
+        btn.textContent = a.label;
+        btn.addEventListener("mousedown", function (e) {
+          e.preventDefault();
+          run(a.id);
+        });
+        bar.appendChild(btn);
+      });
+    }
+    render();
+    var tauri = window.__TAURI__;
+    if (tauri && tauri.event && tauri.event.listen) {
+      tauri.event.listen("yunque:selection-text", function (e) {
+        var p = typeof e.payload === "string" ? e.payload : String(e.payload || "");
+        if (p.trim()) text = p.trim();
+      });
+    }
+  </script>
+</body>
+</html>

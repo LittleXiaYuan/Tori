@@ -2,6 +2,8 @@ package localbrain
 
 import (
 	"context"
+	"os"
+	"strings"
 	"testing"
 )
 
@@ -101,6 +103,65 @@ func TestSelfDistillPipeline_InsufficientData(t *testing.T) {
 	}
 	if report.Error == "" {
 		t.Error("expected error message")
+	}
+}
+
+func TestStepExport_BuildsPersonaMemorySystem(t *testing.T) {
+	p := NewSelfDistillPipeline(nil, nil, nil, nil, nil, nil, t.TempDir())
+	cfg := DefaultSelfDistillConfig()
+	cfg.MinSamples = 1
+	cfg.MinScore = 0.0
+	cfg.DefaultPersona = "你是小羽。"
+
+	scored := []ScoredSample{
+		// has its own persona + recalled memory
+		{DistillSample: DistillSample{
+			Input: "在吗", Output: "在的~",
+			Persona: "你是小羽。温柔体贴。",
+			Memory:  "<recalled_memories>用户喜欢简短回复</recalled_memories>",
+		}, Score: 1.0},
+		// no per-sample persona → uses cfg.DefaultPersona
+		{DistillSample: DistillSample{Input: "几点了", Output: "三点"}, Score: 1.0},
+	}
+
+	report := &DistillReport{}
+	path := p.stepExport(scored, cfg, report)
+	if path == "" {
+		t.Fatalf("export failed: %s", report.Error)
+	}
+	data, _ := os.ReadFile(path)
+	text := string(data)
+
+	if strings.Contains(text, "You are a helpful assistant.") {
+		t.Fatalf("persona present but export still emits generic assistant system:\n%s", text)
+	}
+	if !strings.Contains(text, "你是小羽。温柔体贴。") {
+		t.Fatalf("per-sample persona missing from system:\n%s", text)
+	}
+	if !strings.Contains(text, "recalled_memories") {
+		t.Fatalf("recalled memory block missing from system:\n%s", text)
+	}
+	if !strings.Contains(text, "你是小羽。") {
+		t.Fatalf("default persona missing for persona-less sample:\n%s", text)
+	}
+}
+
+func TestStepExport_NeutralFallbackWhenNoPersona(t *testing.T) {
+	p := NewSelfDistillPipeline(nil, nil, nil, nil, nil, nil, t.TempDir())
+	cfg := DefaultSelfDistillConfig()
+	cfg.MinSamples = 1
+	cfg.MinScore = 0.0
+	// no DefaultPersona, sample has no persona → neutral fallback (generic base)
+	scored := []ScoredSample{{DistillSample: DistillSample{Input: "hi", Output: "hello"}, Score: 1.0}}
+
+	report := &DistillReport{}
+	path := p.stepExport(scored, cfg, report)
+	if path == "" {
+		t.Fatalf("export failed: %s", report.Error)
+	}
+	data, _ := os.ReadFile(path)
+	if !strings.Contains(string(data), "You are a helpful assistant.") {
+		t.Fatalf("expected neutral fallback when no persona/default:\n%s", string(data))
 	}
 }
 

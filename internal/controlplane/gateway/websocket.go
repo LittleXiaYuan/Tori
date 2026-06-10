@@ -349,6 +349,14 @@ func (g *Gateway) handleStreamChat(w http.ResponseWriter, r *http.Request) {
 		}
 		assistantContent = embedSandboxMarker(assistantContent, sandboxInfo)
 		g.convStore.Append(req.SessionID, llm.Message{Role: "assistant", Content: assistantContent})
+		lastUser := ""
+		for i := len(req.Messages) - 1; i >= 0; i-- {
+			if req.Messages[i].Role == "user" {
+				lastUser = req.Messages[i].Content
+				break
+			}
+		}
+		g.maybeAutoConversationMeta(req.SessionID, lastUser, result.Reply)
 	}
 
 	// Memory: write assistant reply to short-term

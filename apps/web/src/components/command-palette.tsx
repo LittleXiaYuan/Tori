@@ -6,7 +6,8 @@ import {
   Puzzle, Search, FileText, ArrowRight, Sparkles, Layers,
 } from "lucide-react";
 import { api, SearchResult } from "@/lib/api";
-import { NAV_ITEMS, NAV_GROUP_ORDER, filterNavItemsByProfile, type NavItem, type NavGroup } from "@/lib/nav-items";
+import { NAV_ITEMS, NAV_GROUP_ORDER, NAV_GROUP_LABEL_KEYS, navItemLabel, filterNavItemsByProfile, type NavItem, type NavGroup } from "@/lib/nav-items";
+import { useI18n } from "@/lib/i18n";
 import { buildPackNavItems, fetchEnabledPacks } from "@/lib/pack-sync";
 import { PROFILE_MODE_KEY, readProfileMode, writeProfileMode } from "@/lib/profile-mode";
 
@@ -21,6 +22,13 @@ interface CommandItem {
 }
 
 export default function CommandPalette() {
+  const { t } = useI18n();
+  const groupLabel = (g: string): string => {
+    if (g in NAV_GROUP_LABEL_KEYS) return t(NAV_GROUP_LABEL_KEYS[g as NavGroup]);
+    if (g === "操作") return t("cmd.group.action");
+    if (g === "搜索") return t("cmd.group.search");
+    return g;
+  };
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -150,8 +158,20 @@ export default function CommandPalette() {
         close();
       },
     };
+    const onboardingCmd: CommandItem = {
+      id: "open-onboarding",
+      label: "新手引导",
+      group: "操作",
+      icon: <Sparkles size={16} />,
+      keywords: "onboarding guide intro 引导 新手 教程 初始化 setup welcome",
+      action: () => {
+        window.dispatchEvent(new CustomEvent("yunque:open-onboarding"));
+        close();
+      },
+    };
     return [
       profileCmd,
+      onboardingCmd,
       ...visibleNavItems.map((item) => ({
         ...item,
         action: () => {
@@ -248,7 +268,7 @@ export default function CommandPalette() {
               if (!items || items.length === 0) return null;
               return (
                 <section key={g} className="cmd-browse-group">
-                  <h3 className="cmd-browse-group-title">{g}</h3>
+                  <h3 className="cmd-browse-group-title">{groupLabel(g)}</h3>
                   <div className="cmd-browse-grid">
                     {items.map((it) => (
                       <button
@@ -261,7 +281,7 @@ export default function CommandPalette() {
                         }}
                       >
                         <span className="cmd-browse-tile-icon">{it.icon}</span>
-                        <span className="cmd-browse-tile-label">{it.label}</span>
+                        <span className="cmd-browse-tile-label">{navItemLabel(it, t)}</span>
                       </button>
                     ))}
                   </div>
@@ -272,11 +292,11 @@ export default function CommandPalette() {
         ) : (
         <div className="cmd-list" ref={listRef}>
           {allItems.length === 0 && (
-            <div className="cmd-empty">{searching ? "搜索中..." : "没有匹配结果"}</div>
+            <div className="cmd-empty">{searching ? t("cmd.searching") : t("cmd.noResults")}</div>
           )}
           {Object.entries(groups).map(([group, items]) => (
             <div key={group}>
-              <div className="cmd-group-label">{group}</div>
+              <div className="cmd-group-label">{groupLabel(group)}</div>
               {items.map((item) => {
                 const idx = flatIdx++;
                 return (
@@ -289,7 +309,7 @@ export default function CommandPalette() {
                     onMouseEnter={() => setActiveIdx(idx)}
                   >
                     <span className="cmd-item-icon">{item.icon}</span>
-                    <span className="cmd-item-label">{item.label}</span>
+                    <span className="cmd-item-label">{navItemLabel(item, t)}</span>
                     {idx === activeIdx && <ArrowRight size={12} className="cmd-item-arrow" />}
                   </button>
                 );

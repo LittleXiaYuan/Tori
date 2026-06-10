@@ -16,6 +16,7 @@ import (
 	"yunque-agent/internal/agentcore/persona"
 	"yunque-agent/internal/agentcore/planner"
 	"yunque-agent/internal/agentcore/router"
+	"yunque-agent/internal/agentcore/session"
 	"yunque-agent/internal/observe"
 	"yunque-agent/pkg/safego"
 )
@@ -254,20 +255,90 @@ func (g *Gateway) persistChatResult(ctx context.Context, req *ChatRequest, resul
 	assistantContent = embedSandboxMarker(assistantContent, sandboxInfo)
 	g.convStore.Append(req.SessionID, llm.Message{Role: "assistant", Content: assistantContent})
 
-	sess := g.convStore.GetSession(req.SessionID)
-	if sess != nil && sess.Name == "" && len(req.Messages) > 0 {
+	if len(req.Messages) > 0 {
 		userMsg := req.Messages[len(req.Messages)-1].Content
-		assistReply := result.Reply
-		sessionID := req.SessionID
-		safego.Go("auto-title", func() {
+		g.maybeAutoConversationMeta(req.SessionID, userMsg, result.Reply)
+	}
+}
+
+// maybeAutoConversationMeta fills in an empty title/summary after a turn completes.
+// Summary uses a clipped assistant reply (cheap); title uses the fast LLM tier.
+// Called from every chat completion path (pipeline, agentic SSE, websocket).
+func (g *Gateway) maybeAutoConversationMeta(sessionID, userMsg, assistReply string) {
+	if g == nil || g.convStore == nil || sessionID == "" {
+		return
+	}
+	assistReply = strings.TrimSpace(assistReply)
+	if assistReply == "" {
+		return
+	}
+
+	sess := g.convStore.GetSession(sessionID)
+	if sess == nil {
+		return
+	}
+
+	needSummary := strings.TrimSpace(sess.Summary) == ""
+	needTitle := conversationNeedsTitle(sess)
+
+	if needSummary {
+		if summary := clipConversationSummary(assistReply); summary != "" {
+			g.convStore.SetSummary(sessionID, summary)
+		}
+	}
+
+	if needTitle && strings.TrimSpace(userMsg) != "" {
+		sid := sessionID
+		um := userMsg
+		ar := assistReply
+		safego.Go("auto-conv-meta", func() {
 			titleCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 			defer cancel()
-			title := g.generateConversationTitle(titleCtx, userMsg, assistReply)
-			if title != "" {
-				g.convStore.Rename(sessionID, title)
+			if title := g.generateConversationTitle(titleCtx, um, ar); title != "" {
+				g.convStore.Rename(sid, title)
 			}
 		})
 	}
+}
+
+func conversationNeedsTitle(sess *session.Session) bool {
+	if sess == nil {
+		return false
+	}
+	name := strings.TrimSpace(sess.Name)
+	if name == "" {
+		return true
+	}
+	if name == sess.ID {
+		return true
+	}
+	if strings.HasPrefix(name, "new-") {
+		return true
+	}
+	return false
+}
+
+func clipConversationSummary(reply string) string {
+	reply = strings.TrimSpace(reply)
+	if reply == "" {
+		return ""
+	}
+	// First non-empty line, strip light markdown decoration.
+	line := reply
+	if idx := strings.IndexAny(reply, "\n\r"); idx >= 0 {
+		line = reply[:idx]
+	}
+	line = strings.TrimSpace(line)
+	line = strings.TrimLeft(line, "#*>- ")
+	line = strings.TrimSpace(line)
+	if line == "" {
+		return ""
+	}
+	runes := []rune(line)
+	if len(runes) > 100 {
+		line = string(runes[:100]) + "…"
+	}
+	return line
 }
 
 // runPostChatHooks triggers async post-processing: memory pipeline, learning loop,

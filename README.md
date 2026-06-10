@@ -22,7 +22,7 @@ Cogni 不是一个可选 workload，也不是一个 prompt 模板。它是云雀
 
 所以云雀的默认界面才会先问“你要完成什么”，而不是先把模型、插件、渠道、API 端点全部铺出来。Browser/RPA、WASM、记忆回溯是云雀能做的事；Cogni 是云雀为什么这样做。
 
-进一步阅读：[What is Cogni, and why does Yunque need it?](docs/guide/cogni-what-and-why.md) / [Cogni 是什么，为什么云雀需要它？](docs/zh/guide/cogni-what-and-why.md)
+进一步阅读：[What is Cogni, and why does Yunque need it?](https://yunque.owo.today/guide/cogni-what-and-why) / [Cogni 是什么，为什么云雀需要它？](https://yunque.owo.today/zh/guide/cogni-what-and-why)
 
 ## 产品主线
 
@@ -51,9 +51,7 @@ Cogni 不是一个可选 workload，也不是一个 prompt 模板。它是云雀
 | `doc/` | 内部开发文档、连续性记录、设计蓝图 |
 | `apps/browser-extension/` | 浏览器连接器扩展（Chrome/Edge） |
 
-详细结构见 `docs/repo-layout.md`。
-
-更完整的构建说明见 `BUILD.md`。
+详细结构见 [repo-layout](https://yunque.owo.today/repo-layout)，构建说明见 `Makefile`（`make help`）。
 
 ## 30 秒上手
 

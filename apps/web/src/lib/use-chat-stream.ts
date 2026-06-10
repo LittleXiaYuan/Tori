@@ -14,20 +14,27 @@ export function useChatStream({ onTraceEvent, onShouldOpenComputer }: UseChatStr
   onOpenRef.current = onShouldOpenComputer;
 
   useEffect(() => {
-    let cancelled = false;
+    // CRITICAL: drive the stream's lifetime with an AbortController. The old
+    // implementation only flipped a `cancelled` flag that was checked *after*
+    // `reader.read()`, which blocks while the SSE is idle — so the underlying
+    // connection never closed on unmount/re-run. Those leaked connections piled
+    // up against the browser's ~6-per-origin limit and starved every other
+    // request (including /healthz), which surfaced as "本地服务超时" that only a
+    // full restart could clear.
+    const controller = new AbortController();
+    let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
 
     (async () => {
       try {
-        // Use the shared API base (NEXT_PUBLIC_API_BASE) + auth headers so the
-        // SSE stream hits the Go backend (:9090) just like every other /v1 call.
-        // A bare relative `/v1/events/stream` went to the Next dev server (:3001)
-        // which doesn't serve it → "Failed to fetch" + an empty trace panel.
-        const res = await fetch(`${BASE}/v1/events/stream`, { headers: getAuthHeaders() });
+        const res = await fetch(`${BASE}/v1/events/stream`, {
+          headers: getAuthHeaders(),
+          signal: controller.signal,
+        });
         if (!res.ok || !res.body) return;
-        const reader = res.body.getReader();
+        reader = res.body.getReader();
         const decoder = new TextDecoder();
         let buf = "";
-        while (!cancelled) {
+        while (true) {
           const { done, value } = await reader.read();
           if (done) break;
           buf += decoder.decode(value, { stream: true });
@@ -47,9 +54,15 @@ export function useChatStream({ onTraceEvent, onShouldOpenComputer }: UseChatStr
           }
         }
       } catch (e) {
-        console.warn("[chat] SSE connection failed, trace events unavailable:", e);
+        if (!controller.signal.aborted) {
+          console.warn("[chat] SSE connection failed, trace events unavailable:", e);
+        }
       }
     })();
-    return () => { cancelled = true; };
+
+    return () => {
+      controller.abort();
+      reader?.cancel().catch(() => {});
+    };
   }, []);
 }

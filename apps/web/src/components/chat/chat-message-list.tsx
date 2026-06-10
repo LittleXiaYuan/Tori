@@ -14,10 +14,11 @@ import { SkillGrowthPanel } from "@/components/skill-growth-panel";
 import { EmotionBadge, StickerView, SkillTags, AgentActions, type AgentAction } from "@/components/chat-extras";
 import { CognitiveStatusBar } from "@/components/cognitive-status-bar";
 import { ThinkingTimer } from "@/components/chat/thinking-timer";
+import { TaskPlanCard } from "@/components/chat/task-plan-card";
 import { openExternal } from "@/lib/safe-url";
 import { browserActionLabel } from "@/lib/browser-action-labels";
 import type { ChatSharePayload, Message } from "@/lib/chat-types";
-import { collectGeneratedFiles, summarizeAssistantWork } from "@/lib/chat-utils";
+import { collectGeneratedFiles } from "@/lib/chat-utils";
 import { formatErrorMessage } from "@/lib/error-utils";
 import type { BrowserBridgeState, BrowserSessionNotice } from "@/components/browser-session-card";
 
@@ -430,75 +431,13 @@ export function ChatMessageList({
                 )}
               </div>
             )}
-            {/* Step summary */}
-            {msg.role === "assistant" && msg.traceEvents && msg.traceEvents.length > 0 && (() => {
-              const isLive = streaming && msg.id === messages[messages.length - 1]?.id;
-              const toolEvents = msg.traceEvents.filter(e => e.type === "tool_start" || e.type === "tool_result");
-              const summary = summarizeAssistantWork(msg);
-              const warnEvents = msg.traceEvents.filter((e) => {
-                const summary = (e.summary || "").toLowerCase();
-                return e.type === "plan" && (summary.includes("warning") || summary.includes("risk") || summary.includes("blocked") || summary.includes("needs review"));
-              });
-              const showSummary = isLive || summary.toolCount > 0 || summary.fileCount > 0 || warnEvents.length > 0;
-              const statusLabel = isLive ? "云雀正在工作" : "工作过程已记录";
-              const latestSummary = displayChatText(summary.latestSummary) || (summary.primarySkill ? `使用 ${summary.primarySkill}` : "");
-              return (
-                <>
-                  {showSummary && (
-                    <div className="chat-inline-panel mb-1.5 rounded-xl border px-3 py-2" style={{ background: "linear-gradient(135deg, rgba(59,130,246,0.08), rgba(14,165,233,0.04))", borderColor: "rgba(59,130,246,0.16)" }}>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold" style={{ background: "var(--yunque-accent-muted)", color: "var(--yunque-accent)" }}>
-                          {isLive && <span className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ background: "var(--yunque-accent)" }} />}
-                          <Monitor size={10} /> {statusLabel}
-                        </span>
-                        {summary.sourceKinds.slice(0, 4).map((kind) => (
-                          <span key={kind} className="rounded-full px-2.5 py-1 text-[10px]" style={{ background: "rgba(255,255,255,0.04)", color: "var(--yunque-text-secondary)" }}>
-                            {kind}
-                          </span>
-                        ))}
-                        {summary.toolCount > 0 && (
-                          <span className="rounded-full px-2.5 py-1 text-[10px]" style={{ background: "rgba(255,255,255,0.04)", color: "var(--yunque-text-muted)" }}>
-                            {summary.toolCount} {t("chat.toolEvents")}
-                          </span>
-                        )}
-                        {summary.fileCount > 0 && (
-                          <span className="rounded-full px-2.5 py-1 text-[10px]" style={{ background: "rgba(34,197,94,0.1)", color: "#4ade80" }}>
-                            {summary.fileCount} {t("chat.files")}
-                          </span>
-                        )}
-                      </div>
-                      {latestSummary && (
-                        <div className="mt-1.5 truncate text-[11px] leading-5" style={{ color: "var(--yunque-text-muted)" }}>
-                          当前：{latestSummary}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  {warnEvents.length > 0 && (
-                    <div className="mb-2 rounded-lg px-3 py-1.5 text-[11px]" style={{ background: "rgba(245,158,11,0.08)", color: "#f59e0b", border: "1px solid rgba(245,158,11,0.15)" }}>
-                      {warnEvents.map((w, wi) => <div key={wi}>{displayChatText(w.summary)}</div>)}
-                    </div>
-                  )}
-                  {isLive && toolEvents.length > 0 && (() => {
-                    const uniqueSkills = [...new Set(toolEvents.map(e => e.meta?.skill).filter(Boolean))];
-                    const lastSkill = toolEvents[toolEvents.length - 1]?.meta?.skill || "";
-                    return (
-                      <div className="chat-inline-panel mb-1.5 flex items-center gap-2 rounded-xl px-2 py-1 text-[10px]" style={{ background: "rgba(59,130,246,0.06)", color: "var(--yunque-text-muted)" }}>
-                        {isLive && <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "var(--yunque-accent)" }} />}
-                        <span>
-                          {isLive ? t("chat.workingWith").replace("{skill}", lastSkill || "tools") : t("chat.usedTools").replace("{count}", String(uniqueSkills.length))}
-                          {uniqueSkills.length > 0 && !isLive && (
-                            <span style={{ color: "var(--yunque-text-muted)", marginLeft: 4 }}>
-                              ({uniqueSkills.slice(0, 3).join(", ")}{uniqueSkills.length > 3 ? "…" : ""})
-                            </span>
-                          )}
-                        </span>
-                      </div>
-                    );
-                  })()}
-                </>
-              );
-            })()}
+            {/* Task plan card (Qwen-style step list) */}
+            {msg.role === "assistant" && msg.traceEvents && msg.traceEvents.length > 0 && (
+              <TaskPlanCard
+                events={msg.traceEvents}
+                isLive={streaming && msg.id === messages[messages.length - 1]?.id}
+              />
+            )}
             {/* Message content */}
             <div
               className={`chat-message-card text-[14px] leading-7 whitespace-pre-wrap ${isBubble ? `px-3.5 py-2.5 rounded-[18px] ${msg.role === "assistant" ? "assistant-message-shell chat-message-card--assistant" : "chat-message-card--user"}` : "py-1"}`}
@@ -578,38 +517,35 @@ export function ChatMessageList({
               </div>
             )}
             {msg.role === "assistant" && msg.skills_used && msg.skills_used.length > 0 && <SkillTags skills={msg.skills_used} />}
-            {/* Context layers */}
-            {msg.role === "assistant" && msg.contextLayers && msg.contextLayers.length > 0 && (
-              <div className="mt-2 rounded-xl px-3 py-2" style={{ background: "rgba(139,92,246,0.06)", border: "1px solid rgba(139,92,246,0.12)" }}>
-                <div className="flex flex-wrap items-center gap-2">
-                  {msg.contextLayers.includes("memory") && (
+            {/* Context layers — only surface concrete signals (memory / knowledge
+                / emotion). The generic "strategy / 运用了积累的经验" badge was
+                noise: it appeared on essentially every reply, so it's dropped. */}
+            {msg.role === "assistant" && (() => {
+              const layers = msg.contextLayers || [];
+              const hasMemory = layers.includes("memory");
+              const hasKnowledge = layers.includes("graph") || layers.includes("code");
+              const hasEmotion = layers.includes("emotion");
+              if (!hasMemory && !hasKnowledge && !hasEmotion) return null;
+              return (
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  {hasMemory && (
                     <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium" style={{ background: "rgba(139,92,246,0.12)", color: "#a78bfa" }}>
                       <Brain size={11} /> 调用了你的记忆
                     </span>
                   )}
-                  {(msg.contextLayers.includes("graph") || msg.contextLayers.includes("code")) && (
+                  {hasKnowledge && (
                     <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium" style={{ background: "rgba(6,182,212,0.12)", color: "#22d3ee" }}>
                       <Library size={11} /> 参考了知识库
                     </span>
                   )}
-                  {msg.contextLayers.includes("emotion") && (
+                  {hasEmotion && (
                     <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium" style={{ background: "rgba(236,72,153,0.12)", color: "#f472b6" }}>
                       <Heart size={11} /> 感知了你的情绪
                     </span>
                   )}
-                  {msg.contextLayers.includes("strategy") && (
-                    <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium" style={{ background: "rgba(245,158,11,0.12)", color: "#fbbf24" }}>
-                      <Sparkles size={11} /> 运用了积累的经验
-                    </span>
-                  )}
                 </div>
-                <div className="mt-1.5 text-[10px] leading-4" style={{ color: "var(--yunque-text-muted)" }}>
-                  {msg.contextLayers.includes("memory") ? "这条回复参考了你过去的对话和偏好。" :
-                   msg.contextLayers.includes("graph") || msg.contextLayers.includes("code") ? "这条回复引用了知识库中的相关内容。" :
-                   "Agent 利用了积累的上下文来提升回复质量。"}
-                </div>
-              </div>
-            )}
+              );
+            })()}
             {/* Cognitive status bar */}
             {msg.role === "assistant" && (msg.cognitiveMemories?.length || msg.cognitiveReflections?.length || msg.cognitiveContextLayers?.length || msg.skills_used?.length) && (
               <CognitiveStatusBar

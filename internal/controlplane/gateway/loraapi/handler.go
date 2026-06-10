@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"sync/atomic"
 	"time"
 
 	"yunque-agent/internal/agentcore/localbrain"
 	"yunque-agent/internal/apperror"
 	"yunque-agent/internal/controlplane/gateway/gwshared"
+	"yunque-agent/pkg/safego"
 )
 
 // Handler serves LoRA training and evolution HTTP endpoints.
@@ -17,6 +19,9 @@ type Handler struct {
 	Scheduler *localbrain.LoRAScheduler
 	Metrics   *localbrain.TrainingMetrics
 	Evolution *localbrain.EvolutionCoordinator
+	Distill   *localbrain.SelfDistillPipeline
+
+	distillRunning atomic.Bool
 }
 
 // RegisterRoutes mounts all /v1/lora/* endpoints.
@@ -29,6 +34,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux, auth gwshared.AuthFunc) {
 	mux.HandleFunc("/v1/lora/rollback", auth(h.HandleRollback))
 	mux.HandleFunc("/v1/lora/evolution", auth(h.HandleEvolution))
 	mux.HandleFunc("/v1/lora/config", auth(h.HandleConfig))
+	mux.HandleFunc("/v1/lora/distill", auth(h.HandleDistill))
 }
 
 func (h *Handler) metrics() *localbrain.TrainingMetrics {
@@ -202,6 +208,70 @@ func (h *Handler) HandleEvolution(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{"state": h.Evolution.State()})
+}
+
+// HandleDistill serves the self-distillation pipeline:
+//
+//	GET  /v1/lora/distill — list past distill reports + running state
+//	POST /v1/lora/distill — start an async pipeline run (single-flight)
+func (h *Handler) HandleDistill(w http.ResponseWriter, r *http.Request) {
+	if h.Distill == nil {
+		apperror.WriteCode(w, apperror.CodeInternal, "self-distill pipeline not configured")
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		reports := h.Distill.ListReports()
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"running": h.distillRunning.Load(),
+			"reports": reports,
+			"count":   len(reports),
+		})
+
+	case http.MethodPost:
+		tenantID := gwshared.TenantFromCtx(r.Context())
+		if tenantID == "" || tenantID == "setup" {
+			tenantID = "default"
+		}
+		cfg := localbrain.DefaultSelfDistillConfig()
+		if r.Body != nil {
+			data, _ := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+			_ = r.Body.Close()
+			if len(data) > 0 {
+				if err := json.Unmarshal(data, &cfg); err != nil {
+					apperror.WriteCode(w, apperror.CodeBadRequest, "invalid JSON: "+err.Error())
+					return
+				}
+			}
+		}
+		if cfg.TenantID == "" {
+			cfg.TenantID = tenantID
+		}
+
+		if !h.distillRunning.CompareAndSwap(false, true) {
+			apperror.WriteCode(w, apperror.CodeConflict, "a distill run is already in progress")
+			return
+		}
+		pipeline := h.Distill
+		safego.Go("lora-distill-run", func() {
+			defer h.distillRunning.Store(false)
+			ctx, cancel := context.WithTimeout(context.Background(), 4*time.Hour)
+			defer cancel()
+			pipeline.Run(ctx, cfg)
+		})
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusAccepted)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"status":    "started",
+			"tenant_id": cfg.TenantID,
+		})
+
+	default:
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET or POST only")
+	}
 }
 
 func (h *Handler) HandleConfig(w http.ResponseWriter, r *http.Request) {

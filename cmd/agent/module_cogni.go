@@ -449,6 +449,7 @@ func (m *cogniModule) Init(ctx context.Context, app *agentrt.App) error {
 			gw.SetCogniEvolution(evolutionEngine)
 			gw.SetCogniFederation(federation)
 			gw.SetCogniCostTracker(m.costTracker)
+			gw.SetCogniBus(m.bus)
 			gw.SetNLConfigTranslator(nlTranslator)
 			cogniPackHandler := cognikernelpack.NewHandlerWithRuntimeState(gw, m)
 			gw.SetCogniKernelRuntimeStateHandler(cogniPackHandler.HandleRuntimePackState)
@@ -537,6 +538,15 @@ func (m *cogniModule) Init(ctx context.Context, app *agentrt.App) error {
 					slog.Debug("cogni_bus: activation", "cogni", cogniID, "score", score)
 				}
 			})
+			// Economics enforcement: a cogni whose daily budget is exhausted is
+			// dropped from the activation set until local midnight. estimatedCost=0
+			// gates on accumulated daily spend only — per-run budgets stay advisory
+			// (we can't estimate a turn's cost before running it).
+			if tracker != nil {
+				hook.SetBudgetGuard(func(cogniID string) error {
+					return tracker.CheckBudget(cogniID, 0)
+				})
+			}
 		}
 		slog.Info("cogni: planner context injection + surface filter + mcp tools + bus + cost + trace wired")
 	}

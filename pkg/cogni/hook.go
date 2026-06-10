@@ -74,7 +74,69 @@ type Hook struct {
 	expTuneMu        sync.RWMutex
 	experienceTuning ExperienceTuningConfig
 
+	budgetMu    sync.RWMutex
+	budgetGuard func(cogniID string) error
+
 	turnCache *turnCache
+}
+
+// SetBudgetGuard attaches an economics gate consulted at activation time:
+// when the guard returns a non-nil error for a cogni ID, that cogni is
+// dropped from the turn's activation set (its context is not injected and
+// its surface does not apply). Pass nil to disable enforcement.
+//
+// Typical wiring: guard = func(id) error { return tracker.CheckBudget(id, 0) }
+// so a cogni whose daily budget is exhausted stops engaging until midnight.
+func (h *Hook) SetBudgetGuard(fn func(cogniID string) error) {
+	if h == nil {
+		return
+	}
+	h.budgetMu.Lock()
+	h.budgetGuard = fn
+	h.budgetMu.Unlock()
+}
+
+func (h *Hook) budgetGuardFn() func(cogniID string) error {
+	if h == nil {
+		return nil
+	}
+	h.budgetMu.RLock()
+	defer h.budgetMu.RUnlock()
+	return h.budgetGuard
+}
+
+// applyBudgetGuard drops over-budget cognis from the activation set and
+// stamps the reason onto the matching raw entries so traces explain the
+// suppression. Identity when no guard is attached.
+func (h *Hook) applyBudgetGuard(raw, final []Activation) []Activation {
+	guard := h.budgetGuardFn()
+	if guard == nil || len(final) == 0 {
+		return final
+	}
+	kept := final[:0]
+	dropped := map[string]string{}
+	for _, a := range final {
+		if a.Declaration == nil {
+			continue
+		}
+		if err := guard(a.Declaration.ID); err != nil {
+			dropped[a.Declaration.ID] = err.Error()
+			slog.Warn("cogni: activation blocked by budget", "id", a.Declaration.ID, "reason", err)
+			continue
+		}
+		kept = append(kept, a)
+	}
+	if len(dropped) > 0 {
+		for i := range raw {
+			if raw[i].Declaration == nil {
+				continue
+			}
+			if reason, ok := dropped[raw[i].Declaration.ID]; ok {
+				raw[i].Reasons = append(raw[i].Reasons, "budget: "+reason)
+			}
+		}
+	}
+	return kept
 }
 
 // SetExperienceTuning enables experience-driven surface pruning (drop a cogni's
@@ -429,6 +491,8 @@ func (h *Hook) evaluate(req ContextRequest) *turnState {
 		// the composing set by bid (score) + confidence floor. Identity when no
 		// host opted in, so legacy "all activated compose" is preserved.
 		final = Arbitrate(final, h.arbitrationCfg())
+		// Economics enforcement: over-budget cognis don't engage this turn.
+		final = h.applyBudgetGuard(raw, final)
 
 		ts := &turnState{
 			created:     time.Now(),

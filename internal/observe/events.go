@@ -128,10 +128,14 @@ type ToolStartDetail struct {
 
 // ToolResultDetail is the Detail payload for tool_result events.
 type ToolResultDetail struct {
-	Skill  string      `json:"skill"`
-	Result string      `json:"result,omitempty"`
-	Error  string      `json:"error,omitempty"`
-	Files  []FileEntry `json:"files,omitempty"`
+	Skill       string      `json:"skill"`
+	Result      string      `json:"result,omitempty"`
+	Error       string      `json:"error,omitempty"`
+	ErrorCode   string      `json:"error_code,omitempty"`
+	Cause       string      `json:"cause,omitempty"`
+	Recoverable bool        `json:"recoverable,omitempty"`
+	NextStep    string      `json:"next_step,omitempty"`
+	Files       []FileEntry `json:"files,omitempty"`
 }
 
 // PartialResultDetail is emitted when the planner has useful stage results

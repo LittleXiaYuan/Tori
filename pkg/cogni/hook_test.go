@@ -76,6 +76,78 @@ func TestHook_BuildContextSkipsInactive(t *testing.T) {
 	}
 }
 
+func TestHook_BudgetGuardBlocksActivation(t *testing.T) {
+	r := NewRegistry()
+	_ = r.Add(&Declaration{
+		ID: "spender",
+		Activation: ActivationRules{
+			Keywords: []string{"review"},
+			MinScore: 0.2,
+		},
+		Context: ContextInjection{Static: "expensive context"},
+	}, "test")
+	_ = r.Add(&Declaration{
+		ID: "frugal",
+		Activation: ActivationRules{
+			Keywords: []string{"review"},
+			MinScore: 0.2,
+		},
+		Context: ContextInjection{Static: "cheap context"},
+	}, "test")
+
+	tracker := NewCostTracker()
+	tracker.SetConfig("spender", EconomicsConfig{DailyBudget: 0.05})
+	tracker.Record(CostEntry{CogniID: "spender", Cost: 0.10, Operation: "activation"})
+
+	h := NewHook(r)
+	h.SetBudgetGuard(func(id string) error {
+		return tracker.CheckBudget(id, 0)
+	})
+
+	req := ContextRequest{Message: "please review this PR"}
+	ids := h.ActiveIDs(req)
+	for _, id := range ids {
+		if id == "spender" {
+			t.Fatalf("over-budget cogni must not activate, got %v", ids)
+		}
+	}
+	found := false
+	for _, id := range ids {
+		if id == "frugal" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("within-budget cogni should still activate, got %v", ids)
+	}
+
+	got := h.BuildContext(req)
+	if strings.Contains(got, "expensive context") {
+		t.Fatalf("over-budget cogni context leaked: %q", got)
+	}
+	if !strings.Contains(got, "cheap context") {
+		t.Fatalf("within-budget cogni context missing: %q", got)
+	}
+}
+
+func TestHook_BudgetGuardNilIsIdentity(t *testing.T) {
+	r := NewRegistry()
+	_ = r.Add(&Declaration{
+		ID: "reviewer",
+		Activation: ActivationRules{
+			Keywords: []string{"review"},
+			MinScore: 0.2,
+		},
+		Context: ContextInjection{Static: "ctx"},
+	}, "test")
+
+	h := NewHook(r)
+	h.SetBudgetGuard(nil)
+	if ids := h.ActiveIDs(ContextRequest{Message: "review this"}); len(ids) != 1 {
+		t.Fatalf("nil guard should not filter, got %v", ids)
+	}
+}
+
 func TestHook_BuildContextRendersTemplate(t *testing.T) {
 	r := NewRegistry()
 	_ = r.Add(&Declaration{

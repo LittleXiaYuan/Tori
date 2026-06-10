@@ -2,8 +2,10 @@ import { Button } from "@heroui/react";
 import {
   Archive,
   ArchiveRestore,
+  Code2,
   Edit3,
   MessageCircle,
+  PenLine,
   Pin,
   PinOff,
   Plus,
@@ -12,7 +14,24 @@ import {
 } from "lucide-react";
 
 import type { ConversationInfo } from "@/lib/api";
+import { useI18n } from "@/lib/i18n";
 import type { ConvDispatch, ConvState } from "@/lib/conversation-state";
+
+function convDisplayTitle(c: ConversationInfo, untitled: string): string {
+  const name = (c.name || "").trim();
+  if (name && name !== c.id && !name.startsWith("new-")) {
+    return name;
+  }
+  const summary = (c.summary || "").trim();
+  if (summary) {
+    const runes = [...summary];
+    return runes.length > 24 ? runes.slice(0, 24).join("") + "…" : summary;
+  }
+  if (c.id.startsWith("new-")) {
+    return untitled;
+  }
+  return name || c.id;
+}
 
 /**
  * ManageConversationOpts is the shape the chat page's own
@@ -31,6 +50,8 @@ export interface ConversationSidebarProps {
   conv: ConvState;
   dispatch: ConvDispatch;
   conversations: ConversationInfo[];
+  chatMode: "agent" | "fast" | "chat";
+  onModeChange: (mode: "agent" | "fast" | "chat") => void;
   onNew: () => void;
   onSwitch: (id: string) => void;
   onManage: (
@@ -57,35 +78,59 @@ export function ConversationSidebar({
   conv,
   dispatch,
   conversations,
+  chatMode,
+  onModeChange,
   onNew,
   onSwitch,
   onManage,
   onDelete,
 }: ConversationSidebarProps) {
+  const { t } = useI18n();
+  const writingMode = chatMode === "chat";
+
   return (
     <div
-      className="flex flex-col h-full animate-slide-in-left w-[228px] xl:w-[244px] shrink-0"
+      className="conv-sidebar flex flex-col h-full w-full min-w-0"
       style={{
         background: "var(--glass-sidebar, var(--yunque-sidebar))",
-        borderRight: "1px solid var(--glass-edge, var(--yunque-border))",
-        transition: "width 0.2s ease",
         backdropFilter: "blur(var(--yunque-glass-blur)) saturate(var(--yunque-glass-saturate))",
         WebkitBackdropFilter: "blur(var(--yunque-glass-blur)) saturate(var(--yunque-glass-saturate))",
       }}
     >
+      {/* Mode toggle — DeepSeek-style pill switch */}
+      <div className="conv-sidebar__modes px-2.5 pt-3 pb-1">
+        <div className="conv-sidebar__mode-track" role="tablist" aria-label={t("convo.modeAria")}>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={!writingMode}
+            className="conv-sidebar__mode-btn"
+            data-active={!writingMode || undefined}
+            onClick={() => onModeChange("agent")}
+          >
+            <Code2 size={14} /> {t("convo.tab.agent")}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={writingMode}
+            className="conv-sidebar__mode-btn"
+            data-active={writingMode || undefined}
+            onClick={() => onModeChange("chat")}
+          >
+            <PenLine size={14} /> {t("convo.tab.writing")}
+          </button>
+        </div>
+      </div>
+
       {/* Sidebar Header */}
       <div className="p-2.5 space-y-2">
-        <div className="flex items-center justify-between px-1 pt-0.5">
-          <span className="text-xs font-semibold" style={{ color: "var(--yunque-text-muted)" }}>
-            {conv.showArchived ? "归档" : "对话"} · {conversations.length}
-          </span>
-        </div>
         <Button
           className="w-full justify-start gap-2 rounded-[14px] text-[13px] btn-accent"
           size="sm"
           onPress={onNew}
         >
-          <Plus size={14} /> 新对话
+          <Plus size={14} /> {t("convo.new")}
         </Button>
         <div
           className="flex items-center gap-2 rounded-[14px] px-2.5 py-1.5 text-[11px]"
@@ -93,7 +138,7 @@ export function ConversationSidebar({
         >
           <Search size={12} />
           <input
-            placeholder="搜索对话…"
+            placeholder={t("convo.search")}
             value={conv.searchQuery}
             onChange={(e) => dispatch({ type: "SET_SEARCH", query: e.target.value })}
             className="bg-transparent outline-none text-xs flex-1"
@@ -102,28 +147,30 @@ export function ConversationSidebar({
         </div>
       </div>
 
-      {/* Archive toggle */}
-      <div className="px-2.5 pb-2 flex gap-1">
-        <button
-          onClick={() => dispatch({ type: "SET_ARCHIVED", show: false })}
-          className="flex items-center gap-1.5 rounded-[12px] px-2 py-1.5 text-[10px] transition-colors flex-1 justify-center"
-          style={{
-            color: !conv.showArchived ? "var(--neutral-strong-fg)" : "var(--yunque-text-muted)",
-            background: !conv.showArchived ? "var(--neutral-strong-bg)" : "var(--yunque-bg-muted)",
-          }}
-        >
-          <MessageCircle size={13} /> 活跃
-        </button>
-        <button
-          onClick={() => dispatch({ type: "SET_ARCHIVED", show: true })}
-          className="flex items-center gap-1.5 rounded-[12px] px-2 py-1.5 text-[10px] transition-colors flex-1 justify-center"
-          style={{
-            color: conv.showArchived ? "var(--neutral-strong-fg)" : "var(--yunque-text-muted)",
-            background: conv.showArchived ? "var(--neutral-strong-bg)" : "var(--yunque-bg-muted)",
-          }}
-        >
-          <Archive size={13} /> 归档
-        </button>
+      {/* Active / archived filter — accent pill, distinct from mode toggle above */}
+      <div className="px-2.5 pb-2">
+        <div className="conv-sidebar__filter-track" role="tablist" aria-label={t("convo.filterAria")}>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={!conv.showArchived}
+            className="conv-sidebar__filter-btn"
+            data-active={!conv.showArchived || undefined}
+            onClick={() => dispatch({ type: "SET_ARCHIVED", show: false })}
+          >
+            <MessageCircle size={13} /> {t("convo.active")}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={conv.showArchived}
+            className="conv-sidebar__filter-btn"
+            data-active={conv.showArchived || undefined}
+            onClick={() => dispatch({ type: "SET_ARCHIVED", show: true })}
+          >
+            <Archive size={13} /> {t("convo.archived")}
+          </button>
+        </div>
       </div>
 
       {/* Conversation List */}
@@ -132,10 +179,10 @@ export function ConversationSidebar({
         style={{ overscrollBehavior: "contain", WebkitOverflowScrolling: "touch" }}
       >
         <div
-          className="px-2 py-2 text-[10px] font-semibold uppercase tracking-[0.22em]"
+          className="px-2 py-2 text-[11px] font-semibold"
           style={{ color: "var(--yunque-text-muted)" }}
         >
-          {conv.showArchived ? "归档对话" : "最近对话"} ({conversations.length})
+          {conv.showArchived ? t("convo.archived") : t("convo.recent")} · {conversations.length}
         </div>
         <div className="chat-thread-list space-y-1">
           {conversations.map((c) => (
@@ -195,13 +242,13 @@ export function ConversationSidebar({
                   onClick={(e) => e.stopPropagation()}
                 />
               ) : (
-                <div className="text-[12px] font-medium truncate pr-4">{c.name || c.id}</div>
+                <div className="text-[12px] font-medium truncate pr-4">{convDisplayTitle(c, t("convo.untitled"))}</div>
               )}
               <div
                 className="mt-0.5 truncate text-[10px]"
                 style={{ color: "var(--yunque-text-muted)" }}
               >
-                {c.summary || "暂无摘要"}
+                {(c.summary || "").trim() || t("convo.noSummary")}
               </div>
               <div className="mt-1.5 flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
@@ -219,14 +266,14 @@ export function ConversationSidebar({
                         color: "var(--yunque-accent)",
                       }}
                     >
-                      置顶
+                      {t("convo.pinned")}
                     </span>
                   )}
                 </div>
                 <div className="chat-thread-actions flex items-center gap-0.5">
                   <Button
                     isIconOnly
-                    aria-label="重命名对话"
+                    aria-label={t("convo.rename")}
                     variant="ghost"
                     size="sm"
                     onPress={() =>
@@ -237,7 +284,7 @@ export function ConversationSidebar({
                   </Button>
                   <Button
                     isIconOnly
-                    aria-label="置顶对话"
+                    aria-label={c.pinned ? t("convo.unpin") : t("convo.pin")}
                     variant="ghost"
                     size="sm"
                     onPress={() => onManage(c.id, { pinned: !c.pinned })}
@@ -250,7 +297,7 @@ export function ConversationSidebar({
                   </Button>
                   <Button
                     isIconOnly
-                    aria-label={conv.showArchived ? "恢复对话" : "归档对话"}
+                    aria-label={conv.showArchived ? t("convo.restore") : t("convo.archive")}
                     variant="ghost"
                     size="sm"
                     onPress={() => onManage(c.id, { archive: !conv.showArchived })}
@@ -263,7 +310,7 @@ export function ConversationSidebar({
                   </Button>
                   <Button
                     isIconOnly
-                    aria-label="删除对话"
+                    aria-label={t("convo.delete")}
                     variant="ghost"
                     size="sm"
                     onPress={() => onDelete(c.id)}
@@ -280,10 +327,10 @@ export function ConversationSidebar({
               style={{ color: "var(--yunque-text-muted)" }}
             >
               {conv.searchQuery
-                ? "没有匹配的对话。"
+                ? t("convo.emptyMatch")
                 : conv.showArchived
-                ? "暂时没有归档对话。"
-                : "还没有对话，开始新建一个吧。"}
+                ? t("convo.emptyArchived")
+                : t("convo.emptyActive")}
             </div>
           )}
         </div>

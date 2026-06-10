@@ -10,6 +10,10 @@ dist/
 yunque-agent-*
 yunque-agent.exe
 
+# ── Local training/eval data exports at repo root (never commit) ──
+/*.b64
+/*.jsonl
+
 # ── Test / coverage outputs ──
 coverage
 coverage_*
@@ -129,6 +133,9 @@ apps/desktop/src-tauri/frontend/
 # ── Pack release artifacts (built locally by scripts/release-pack.mjs) ──
 packs/official/*.yqpack
 packs/official/*.yqpack.backup-*
+
+# ── Compiled pack WASM modules (built from module/ source at release time) ──
+packs/official/*/module.wasm
 
 # ── Production signing keys (never commit private bytes) ──
 .yunque-keys/

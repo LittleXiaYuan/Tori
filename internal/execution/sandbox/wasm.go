@@ -57,6 +57,20 @@ type WasmSandbox struct {
 // HostFunc is a function exposed to WASM modules as an import.
 type HostFunc func(ctx context.Context, args []uint64) ([]uint64, error)
 
+// ModuleHostFunc is a privileged host function registered under the "env"
+// import for a single execution, with direct access to the guest module (and
+// thus its linear memory). Callers (e.g. the gateway) build these per pack,
+// gated by the pack's declared permissions, so an unpermitted capability is
+// simply never exported to the module. The stack-based signature mirrors
+// wazero's api.GoModuleFunc: read params from stack[i] (i32s) and write the
+// single i32 result back into stack[0].
+type ModuleHostFunc struct {
+	Name    string
+	Params  int // number of i32 params
+	Results int // number of i32 results (0 or 1)
+	Fn      func(ctx context.Context, m api.Module, stack []uint64)
+}
+
 // WasmResult is the output of a WASM execution.
 type WasmResult struct {
 	Stdout   string            `json:"stdout"`
@@ -116,6 +130,15 @@ func (ws *WasmSandbox) RegisterHostFunc(name string, fn HostFunc) {
 // The module must export a "_start" or "main" function (WASI convention),
 // or a custom entry point specified by entryPoint.
 func (ws *WasmSandbox) Execute(ctx context.Context, wasmBytes []byte, stdin string, entryPoint string) (*WasmResult, error) {
+	return ws.ExecuteWithHostFuncs(ctx, wasmBytes, stdin, entryPoint, nil)
+}
+
+// ExecuteWithHostFuncs is Execute plus a set of privileged host functions
+// exported under "env" for this single execution. They are registered after the
+// built-in kv_*/log_message imports, so a privileged func may shadow a built-in
+// of the same name. Per-execution registration keeps capabilities scoped to the
+// caller's permission set without leaking across concurrent module runs.
+func (ws *WasmSandbox) ExecuteWithHostFuncs(ctx context.Context, wasmBytes []byte, stdin string, entryPoint string, extra []ModuleHostFunc) (*WasmResult, error) {
 	ws.mu.Lock()
 	hostFuncs := make(map[string]HostFunc, len(ws.hostFuncs))
 	for k, v := range ws.hostFuncs {
@@ -198,6 +221,25 @@ func (ws *WasmSandbox) Execute(ctx context.Context, wasmBytes []byte, stdin stri
 				}
 				return 0
 			}).Export("log_message")
+
+		// Privileged, permission-scoped host functions for this execution.
+		for _, hf := range extra {
+			if hf.Name == "" || hf.Fn == nil {
+				continue
+			}
+			params := make([]api.ValueType, hf.Params)
+			for i := range params {
+				params[i] = api.ValueTypeI32
+			}
+			results := make([]api.ValueType, hf.Results)
+			for i := range results {
+				results[i] = api.ValueTypeI32
+			}
+			fn := hf.Fn
+			envBuilder.NewFunctionBuilder().
+				WithGoModuleFunction(api.GoModuleFunc(fn), params, results).
+				Export(hf.Name)
+		}
 
 		envBuilder.Instantiate(ctx)
 	}

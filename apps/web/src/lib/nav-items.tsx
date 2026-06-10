@@ -65,6 +65,13 @@ export const NAV_ITEMS: NavItem[] = [
   { id: "nav-knowledge", href: "/knowledge", label: "知识库", group: "智能", layer: "core", defaultVisible: true, icon: <BookOpen size={16} />, keywords: "knowledge 知识 RAG" },
   { id: "nav-memory", href: "/memory", label: "记忆", group: "智能", layer: "core", defaultVisible: true, icon: <Brain size={16} />, keywords: "memory 记忆 反馈 沉淀" },
 
+  // 智能 - 内省视图（原为薄壳 Pack，底层子系统始终运行，这里并入核心导航）
+  { id: "nav-inner-life", href: "/packs/inner-life", label: "内在生活", group: "智能", layer: "core", icon: <HeartPulse size={16} />, keywords: "inner life 内在生活 反思 好奇 dreaming 自省 内省" },
+  { id: "nav-night-school", href: "/packs/night-school", label: "夜校", group: "智能", layer: "core", icon: <Lightbulb size={16} />, keywords: "night school 夜校 蒸馏 特质 学习 内省" },
+  { id: "nav-experience", href: "/packs/experience", label: "经验", group: "智能", layer: "core", icon: <SmilePlus size={16} />, keywords: "experience 经验 推荐 评估 沉淀 内省" },
+  { id: "nav-world-model", href: "/packs/world-model", label: "世界模型", group: "智能", layer: "core", icon: <Globe size={16} />, keywords: "world model 世界模型 因果 causal 内省" },
+  { id: "nav-micro-agent", href: "/packs/micro-agent", label: "微代理", group: "智能", layer: "core", icon: <Bot size={16} />, keywords: "micro agent 微代理 react 子代理 内省" },
+
   // 扩展 - 核心功能
   { id: "nav-packs", href: "/packs", label: "能力包", group: "扩展", layer: "pack", defaultVisible: true, icon: <Boxes size={16} />, keywords: "packs pack runtime 增量包 能力包 热插拔 可选能力 默认入口" },
   { id: "nav-cognis", href: "/cognis", label: "Cogni", group: "扩展", layer: "core", defaultVisible: true, icon: <BrainCircuit size={16} />, keywords: "Cogni cognis 助手 assistant 智体 认知内核 我的 Cogni" },
@@ -90,6 +97,27 @@ export const NAV_ITEMS: NavItem[] = [
 ];
 
 export const NAV_GROUP_ORDER: NavGroup[] = ["概览", "工作", "智能", "系统", "扩展"];
+
+/** i18n keys for the structural group names (the NavGroup union stays Chinese
+ *  because it's used as object keys / ordering; only the *display* is localized). */
+export const NAV_GROUP_LABEL_KEYS: Record<NavGroup, string> = {
+  "概览": "nav.group.overview",
+  "工作": "nav.group.work",
+  "智能": "nav.group.intelligence",
+  "系统": "nav.group.system",
+  "扩展": "nav.group.extensions",
+};
+
+/** Localized label for a nav item. Core items (id `nav-*`) resolve via i18n
+ *  (`nav.item.<slug>`); dynamic pack/ext items keep their provided label. */
+export function navItemLabel(item: { id: string; label: string }, t: (key: string) => string): string {
+  if (item.id.startsWith("nav-")) {
+    const key = "nav.item." + item.id.replace(/^nav-/, "");
+    const v = t(key);
+    if (v !== key) return v;
+  }
+  return item.label;
+}
 
 export function filterNavItemsByProfile(items: NavItem[], mode: ProfileMode): NavItem[] {
   if (mode === "full") return items;

@@ -222,6 +222,13 @@ func (p *Planner) SetSkillGrowth(sg *SkillGrowth) {
 }
 
 // SetDataCollector attaches the training data collector for LoRA pipeline.
+// SetTaskOutcomeSink attaches a post-run outcome consumer (e.g. the evolution
+// coordinator). The sink runs on a background goroutine after every Run.
+func (p *Planner) SetTaskOutcomeSink(fn TaskOutcomeSink) {
+	learningSidecar := p.ensureLearningSidecar()
+	learningSidecar.SetTaskOutcomeSink(fn)
+}
+
 func (p *Planner) SetDataCollector(dc *DataCollector) {
 	learningSidecar := p.ensureLearningSidecar()
 	learningSidecar.SetDataCollector(dc)

@@ -59,3 +59,44 @@ func TestRuntimeRequestMessagesAssemblesStableDynamicConversationAndLayers(t *te
 		t.Fatalf("expected timestamp on last user message: %#v", msgs)
 	}
 }
+
+func TestRuntimeRequestMessagesIncludesWorkspaceContext(t *testing.T) {
+	p := NewPlanner(nil, skills.NewRegistry(), 8)
+
+	msgs, layers := p.BuildMessages(context.Background(), PlanRequest{
+		Messages: []llm.Message{{Role: "user", Content: "请修改校园管理项目里的页面"}},
+		WorkspacePaths: []string{
+			`C:\Users\Administrator\Documents\校园管理`,
+			`C:\Users\Administrator\Documents\校园管理\`,
+			`C:\Code\AI\云雀\yunque-agent`,
+		},
+	})
+
+	foundWorkspace := false
+	for _, msg := range msgs {
+		if msg.Role == "system" && strings.Contains(msg.Content, "[当前工作区]") {
+			foundWorkspace = true
+			if !strings.Contains(msg.Content, `C:\Users\Administrator\Documents\校园管理`) {
+				t.Fatalf("workspace context missing project path: %q", msg.Content)
+			}
+			if strings.Count(msg.Content, "校园管理") != 1 {
+				t.Fatalf("workspace context should deduplicate paths: %q", msg.Content)
+			}
+		}
+	}
+	if !foundWorkspace {
+		t.Fatalf("expected workspace context system message, got %#v", msgs)
+	}
+	if !containsString(layers, "workspace") {
+		t.Fatalf("expected workspace layer marker, got %#v", layers)
+	}
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
+}

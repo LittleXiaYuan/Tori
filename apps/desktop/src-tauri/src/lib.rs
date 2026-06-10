@@ -1,6 +1,8 @@
+mod selection_accessibility;
+
 use std::process::{Child, Command};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
@@ -10,8 +12,33 @@ use tokio::net::TcpStream as TokioTcpStream;
 use tauri_plugin_clipboard_manager::ClipboardExt;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
+static HOOK_SUPPRESS_UNTIL_MS: AtomicU64 = AtomicU64::new(0);
+
+fn hook_now_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64
+}
+
+fn hook_suppressed() -> bool {
+    hook_now_ms() < HOOK_SUPPRESS_UNTIL_MS.load(Ordering::Relaxed)
+}
+
+fn suppress_global_hook(ms: u64) {
+    HOOK_SUPPRESS_UNTIL_MS.store(hook_now_ms() + ms, Ordering::Relaxed);
+}
+
+fn selection_popup_visible(handle: &AppHandle) -> bool {
+    handle
+        .get_webview_window("selection-popup")
+        .and_then(|w| w.is_visible().ok())
+        .unwrap_or(false)
+}
+
 // ── Tunables ────────────────────────────────────────────────────────────────
 const DEFAULT_BACKEND_PORT: u16 = 9090;
+const DEFAULT_FRONTEND_PORT: u16 = 3001;
 const HEALTH_TIMEOUT: Duration = Duration::from_secs(60);
 const POLL_INTERVAL: Duration = Duration::from_millis(500);
 const HTTP_PROBE_TIMEOUT: Duration = Duration::from_millis(1_500);
@@ -265,7 +292,13 @@ fn apply_window_appearance(window: &WebviewWindow, theme: &str) {
 /// windows means the floating panel/ball pick up the new appearance even
 /// if they were created lazily after the user signed in.
 fn apply_appearance_all(handle: &AppHandle, theme: &str) {
-    for (_label, win) in handle.webview_windows() {
+    for (label, win) in handle.webview_windows() {
+        // The selection popup must stay fully transparent (only the pill shows).
+        // Applying Mica fills its whole window with a dark backdrop — the
+        // "black block" around the toolbar.
+        if label == "selection-popup" {
+            continue;
+        }
         apply_window_appearance(&win, theme);
     }
 }
@@ -415,7 +448,7 @@ impl FloatingState {
 
 #[tauri::command]
 fn toggle_floating_panel(handle: AppHandle) {
-    let port = resolve_backend_port();
+    let ui_port = resolve_frontend_port();
 
     if let Some(panel) = handle.get_webview_window("floating-panel") {
         if panel.is_visible().unwrap_or(false) {
@@ -428,7 +461,7 @@ fn toggle_floating_panel(handle: AppHandle) {
         return;
     }
 
-    let url = format!("http://127.0.0.1:{port}/floating-panel");
+    let url = format!("http://127.0.0.1:{ui_port}/floating-panel");
     let parsed_url = match url.parse() {
         Ok(u) => u,
         Err(e) => {
@@ -577,6 +610,8 @@ fn floating_send_to_chat(text: String, handle: AppHandle) {
     if let Some(panel) = handle.get_webview_window("floating-panel") {
         let _ = panel.hide();
     }
+    suppress_global_hook(180);
+    hide_selection_popup_window(&handle);
 }
 
 #[allow(dead_code)] // floating ball is opt-in; kept for the settings toggle path
@@ -699,6 +734,497 @@ fn simulate_ctrl_c() {
     log::warn!("simulate_ctrl_c not implemented on this platform");
 }
 
+#[cfg(windows)]
+fn focus_hwnd(hwnd: isize) {
+    use windows_sys::Win32::UI::WindowsAndMessaging::SetForegroundWindow;
+    if hwnd != 0 {
+        unsafe {
+            let _ = SetForegroundWindow(hwnd as _);
+        }
+    }
+}
+
+#[cfg(not(windows))]
+fn focus_hwnd(_hwnd: isize) {}
+
+#[cfg(windows)]
+fn request_copy_from_window(hwnd: isize) {
+    use windows_sys::Win32::UI::WindowsAndMessaging::SendMessageW;
+    const WM_COPY: u32 = 0x0301;
+    if hwnd != 0 {
+        unsafe {
+            SendMessageW(hwnd as _, WM_COPY, 0, 0);
+        }
+    }
+}
+
+#[cfg(not(windows))]
+fn request_copy_from_window(_hwnd: isize) {}
+
+#[cfg(windows)]
+fn hwnd_copy_chain(leaf: isize) -> Vec<isize> {
+    use windows_sys::Win32::UI::WindowsAndMessaging::GetParent;
+    let mut chain = Vec::new();
+    let mut cur = leaf;
+    for _ in 0..8 {
+        if cur == 0 {
+            break;
+        }
+        chain.push(cur);
+        cur = unsafe { GetParent(cur as _) as isize };
+    }
+    chain
+}
+
+#[cfg(not(windows))]
+fn hwnd_copy_chain(leaf: isize) -> Vec<isize> {
+    if leaf != 0 {
+        vec![leaf]
+    } else {
+        vec![]
+    }
+}
+
+fn read_clipboard_text(handle: &AppHandle) -> Option<String> {
+    let text = handle
+        .clipboard()
+        .read_text()
+        .unwrap_or_default()
+        .trim()
+        .to_string();
+    if text.len() >= 2 {
+        Some(text)
+    } else {
+        None
+    }
+}
+
+/// Clipboard-based fallback used when the accessibility (UIA) read returns
+/// nothing. Sends WM_COPY up the focused window's parent chain, then simulates
+/// Ctrl+C as a last resort. Runs on the capture worker thread, never the input
+/// hook thread, so its sleeps don't lag global input.
+fn capture_via_clipboard(handle: &AppHandle, fg_hwnd: Option<isize>) -> Option<String> {
+    let hwnds: Vec<isize> = fg_hwnd
+        .filter(|h| *h != 0)
+        .map(hwnd_copy_chain)
+        .unwrap_or_default();
+
+    for hwnd in hwnds {
+        focus_hwnd(hwnd);
+        request_copy_from_window(hwnd);
+        std::thread::sleep(Duration::from_millis(24));
+        if let Some(text) = read_clipboard_text(handle) {
+            return Some(text);
+        }
+    }
+
+    simulate_ctrl_c();
+    std::thread::sleep(Duration::from_millis(30));
+    read_clipboard_text(handle)
+}
+
+/// One-off capture for the Alt+Y shortcut (no persistent worker on this path).
+/// Tries accessibility first, then clipboard.
+fn capture_selection_oneoff(handle: &AppHandle, fg_hwnd: isize) -> Option<String> {
+    if let Some(reader) = selection_accessibility::SelectionReader::new() {
+        if let Some(text) = reader.read() {
+            return Some(text);
+        }
+    }
+    capture_via_clipboard(handle, Some(fg_hwnd))
+}
+
+#[cfg(windows)]
+fn is_child_of(child: isize, parent: isize) -> bool {
+    use windows_sys::Win32::UI::WindowsAndMessaging::IsChild;
+    if child == 0 || parent == 0 {
+        return false;
+    }
+    unsafe { IsChild(parent as _, child as _) != 0 }
+}
+
+#[cfg(windows)]
+fn hwnd_belongs_to_yunque(handle: &AppHandle, target: isize) -> bool {
+    if target == 0 {
+        return false;
+    }
+    for label in ["main", "selection-popup", "floating-panel", "floating-ball"] {
+        if let Some(win) = handle.get_webview_window(label) {
+            if let Ok(own) = win.hwnd() {
+                let own_hwnd = own.0 as isize;
+                if target as usize == own_hwnd as usize || is_child_of(target, own_hwnd) {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
+#[cfg(not(windows))]
+fn hwnd_belongs_to_yunque(handle: &AppHandle, _target: isize) -> bool {
+    for label in ["main", "selection-popup"] {
+        if let Some(win) = handle.get_webview_window(label) {
+            if win.is_focused().unwrap_or(false) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+static GLOBAL_LISTENER_APP: OnceLock<AppHandle> = OnceLock::new();
+static LAST_GLOBAL_TRIGGER_MS: AtomicU64 = AtomicU64::new(0);
+/// Gesture requests (anchor_x, anchor_y, target_hwnd) handed to the long-lived
+/// capture worker. Using a dedicated worker lets us build the UI Automation
+/// client exactly once instead of paying CoCreateInstance per selection, which
+/// was the dominant source of the "卡顿" lag.
+static SELECTION_CAPTURE_TX: OnceLock<std::sync::mpsc::Sender<(i32, i32, isize)>> = OnceLock::new();
+
+/// Spawn the persistent capture worker. It owns the UIA client and processes
+/// one (coalesced) gesture at a time: accessibility read first, clipboard
+/// fallback second, then shows the popup at the gesture anchor.
+fn start_selection_capture_worker(handle: AppHandle) {
+    let (tx, rx) = std::sync::mpsc::channel::<(i32, i32, isize)>();
+    if SELECTION_CAPTURE_TX.set(tx).is_err() {
+        return;
+    }
+    std::thread::Builder::new()
+        .name("selection-capture".into())
+        .spawn(move || {
+            // Built once on this thread; reused for every read.
+            let reader = selection_accessibility::SelectionReader::new();
+            log::info!("selection capture worker ready (uia={})", reader.is_some());
+
+            while let Ok(first) = rx.recv() {
+                // Coalesce: if the user dragged several times while we were
+                // busy, only honor the most recent gesture.
+                let mut latest = first;
+                while let Ok(newer) = rx.try_recv() {
+                    latest = newer;
+                }
+                let (ax, ay, hwnd) = latest;
+
+                let text = reader
+                    .as_ref()
+                    .and_then(|r| r.read())
+                    .or_else(|| capture_via_clipboard(&handle, Some(hwnd)));
+
+                if let Some(text) = text {
+                    show_selection_popup_at(&handle, &text, Some((ax, ay)));
+                }
+            }
+        })
+        .ok();
+}
+
+#[cfg(windows)]
+fn hwnd_at_screen_point(x: i32, y: i32) -> isize {
+    use windows_sys::Win32::Foundation::POINT;
+    use windows_sys::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, WindowFromPoint};
+    let pt = POINT { x, y };
+    let hwnd = unsafe { WindowFromPoint(pt) as isize };
+    if hwnd != 0 {
+        return hwnd;
+    }
+    unsafe { GetForegroundWindow() as isize }
+}
+
+#[cfg(not(windows))]
+fn hwnd_at_screen_point(_x: i32, _y: i32) -> isize {
+    0
+}
+
+fn try_schedule_global_selection(anchor: (i32, i32), target_hwnd: isize) {
+    let Some(handle) = GLOBAL_LISTENER_APP.get() else {
+        return;
+    };
+    if hook_suppressed() || selection_popup_visible(handle) {
+        return;
+    }
+    if hwnd_belongs_to_yunque(handle, target_hwnd) {
+        return;
+    }
+    let now = hook_now_ms();
+    let last = LAST_GLOBAL_TRIGGER_MS.load(Ordering::Relaxed);
+    if now.saturating_sub(last) < 80 {
+        return;
+    }
+    LAST_GLOBAL_TRIGGER_MS.store(now, Ordering::Relaxed);
+
+    // Hand off to the persistent worker; never block the input hook thread.
+    if let Some(tx) = SELECTION_CAPTURE_TX.get() {
+        let _ = tx.send((anchor.0, anchor.1, target_hwnd));
+    }
+}
+
+// State shared with the low-level mouse hook callback (an `extern "system"`
+// fn that can't capture, so it reads/writes these statics).
+#[cfg(windows)]
+static HOOK_DRAG_START: Mutex<Option<(i32, i32)>> = Mutex::new(None);
+#[cfg(windows)]
+static HOOK_LAST_UP: AtomicU64 = AtomicU64::new(0);
+#[cfg(windows)]
+static HOOK_CLICK_STREAK: AtomicU64 = AtomicU64::new(0);
+
+/// Low-level mouse hook. The callback is intentionally a *no-op for mouse
+/// movement* — it only does work on button down/up and returns immediately via
+/// CallNextHookEx. This is the key to keeping the cursor smooth: unlike rdev
+/// (which allocated an Event for every system-wide move), we never touch the
+/// high-frequency move stream.
+#[cfg(windows)]
+unsafe extern "system" fn selection_mouse_proc(
+    code: i32,
+    wparam: windows_sys::Win32::Foundation::WPARAM,
+    lparam: windows_sys::Win32::Foundation::LPARAM,
+) -> windows_sys::Win32::Foundation::LRESULT {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        CallNextHookEx, HC_ACTION, MSLLHOOKSTRUCT, WM_LBUTTONDOWN, WM_LBUTTONUP,
+    };
+
+    if code == HC_ACTION as i32 {
+        match wparam as u32 {
+            WM_LBUTTONDOWN => {
+                let info = &*(lparam as *const MSLLHOOKSTRUCT);
+                let now = hook_now_ms();
+                if now.saturating_sub(HOOK_LAST_UP.load(Ordering::Relaxed)) < 450 {
+                    HOOK_CLICK_STREAK.fetch_add(1, Ordering::Relaxed);
+                } else {
+                    HOOK_CLICK_STREAK.store(1, Ordering::Relaxed);
+                }
+                if let Ok(mut g) = HOOK_DRAG_START.lock() {
+                    *g = Some((info.pt.x, info.pt.y));
+                }
+            }
+            WM_LBUTTONUP => {
+                let info = &*(lparam as *const MSLLHOOKSTRUCT);
+                HOOK_LAST_UP.store(hook_now_ms(), Ordering::Relaxed);
+                let start = HOOK_DRAG_START.lock().ok().and_then(|mut g| g.take());
+                if let Some((sx, sy)) = start {
+                    let (ax, ay) = (info.pt.x, info.pt.y);
+                    // A real text selection is either a drag of a few px or a
+                    // double-click word select. A plain (even slightly-held)
+                    // single click is NOT a selection — it should *dismiss* a
+                    // stale popup, not re-trigger capture. The old `held>=35ms`
+                    // rule fired on virtually every click, so deselecting never
+                    // closed the toolbar.
+                    // Require a deliberate drag (≥8px) so accidental
+                    // click-jitter no longer pops the toolbar mid-interaction.
+                    let dragged = (ax - sx).abs() >= 8 || (ay - sy).abs() >= 8;
+                    let dbl = HOOK_CLICK_STREAK.load(Ordering::Relaxed) >= 2;
+                    let hwnd = hwnd_at_screen_point(ax, ay);
+                    let on_yunque = GLOBAL_LISTENER_APP
+                        .get()
+                        .map(|h| hwnd_belongs_to_yunque(h, hwnd))
+                        .unwrap_or(false);
+                    if on_yunque {
+                        // Click landed on our own popup/windows — let the web
+                        // layer handle it (button actions self-dismiss).
+                    } else if dragged || dbl {
+                        try_schedule_global_selection((ax, ay), hwnd);
+                    } else if let Some(h) = GLOBAL_LISTENER_APP.get() {
+                        if selection_popup_visible(h) {
+                            suppress_global_hook(250);
+                            hide_selection_popup_window(h);
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    CallNextHookEx(std::ptr::null_mut(), code, wparam, lparam)
+}
+
+#[cfg(windows)]
+fn register_global_selection_listener(handle: &AppHandle) {
+    let _ = GLOBAL_LISTENER_APP.set(handle.clone());
+    std::thread::Builder::new()
+        .name("global-selection-hook".into())
+        .spawn(|| unsafe {
+            use windows_sys::Win32::UI::WindowsAndMessaging::{
+                GetMessageW, SetWindowsHookExW, UnhookWindowsHookEx, MSG, WH_MOUSE_LL,
+            };
+            let hook =
+                SetWindowsHookExW(WH_MOUSE_LL, Some(selection_mouse_proc), std::ptr::null_mut(), 0);
+            if hook.is_null() {
+                log::error!("SetWindowsHookExW(WH_MOUSE_LL) failed");
+                return;
+            }
+            log::info!("global selection hook installed (WH_MOUSE_LL)");
+            let mut msg: MSG = std::mem::zeroed();
+            while GetMessageW(&mut msg, std::ptr::null_mut(), 0, 0) > 0 {}
+            let _ = UnhookWindowsHookEx(hook);
+        })
+        .ok();
+}
+
+#[cfg(not(windows))]
+fn register_global_selection_listener(handle: &AppHandle) {
+    let _ = GLOBAL_LISTENER_APP.set(handle.clone());
+    log::info!("global selection listener: Alt+Y only on this platform");
+}
+
+const SEL_POPUP_W: f64 = 340.0;
+const SEL_POPUP_H: f64 = 38.0;
+
+#[cfg(windows)]
+fn cursor_physical_position() -> (i32, i32) {
+    use windows_sys::Win32::Foundation::POINT;
+    use windows_sys::Win32::UI::WindowsAndMessaging::GetCursorPos;
+    let mut pt = POINT { x: 0, y: 0 };
+    unsafe {
+        GetCursorPos(&mut pt);
+    }
+    (pt.x, pt.y)
+}
+
+#[cfg(not(windows))]
+fn cursor_physical_position() -> (i32, i32) {
+    (0, 0)
+}
+
+fn selection_popup_origin_at(handle: &AppHandle, cx: i32, cy: i32) -> (i32, i32) {
+    let w = SEL_POPUP_W as i32;
+    let h = SEL_POPUP_H as i32;
+    let mut x = cx - w / 2;
+    let mut y = cy - h - 14;
+
+    if let Ok(Some(monitor)) = handle.primary_monitor() {
+        let pos = monitor.position();
+        let size = monitor.size();
+        let min_x = pos.x + 8;
+        let min_y = pos.y + 8;
+        let max_x = pos.x + size.width as i32 - w - 8;
+        let max_y = pos.y + size.height as i32 - h - 8;
+        x = x.clamp(min_x, max_x.max(min_x));
+        y = y.clamp(min_y, max_y.max(min_y));
+    }
+
+    (x, y)
+}
+
+fn show_selection_popup(handle: &AppHandle, text: &str) {
+    show_selection_popup_at(handle, text, None);
+}
+
+fn show_selection_popup_at(handle: &AppHandle, text: &str, anchor: Option<(i32, i32)>) {
+    let ui_port = resolve_frontend_port();
+    let (cx, cy) = anchor.unwrap_or_else(|| cursor_physical_position());
+    let (x, y) = selection_popup_origin_at(handle, cx, cy);
+
+    if let Some(popup) = handle.get_webview_window("selection-popup") {
+        let _ = popup.set_position(tauri::PhysicalPosition::new(x, y));
+        if let Err(e) = popup.emit("yunque:selection-text", text) {
+            log::warn!("emit yunque:selection-text failed: {e}");
+        }
+        let _ = popup.show();
+        return;
+    }
+
+    let url = format!(
+        "http://127.0.0.1:{ui_port}/selection-popup.html?text={}",
+        urlencoding::encode(text)
+    );
+    let parsed_url = match url.parse() {
+        Ok(u) => u,
+        Err(e) => {
+            log::error!("invalid selection-popup url {url:?}: {e}");
+            return;
+        }
+    };
+
+    let builder = tauri::WebviewWindowBuilder::new(
+        handle,
+        "selection-popup",
+        WebviewUrl::External(parsed_url),
+    )
+    .title("")
+    .inner_size(SEL_POPUP_W, SEL_POPUP_H)
+    .position(x as f64, y as f64)
+    .decorations(false)
+    .resizable(false)
+    .always_on_top(true)
+    .skip_taskbar(true)
+    .transparent(true)
+    .shadow(false)
+    .focused(false)
+    .accept_first_mouse(true);
+
+    match builder.build() {
+        Ok(popup) => {
+            // Deliberately NOT calling apply_window_appearance: the popup stays
+            // a bare transparent window so only the pill is visible (no Mica
+            // backdrop = no black block). shadow(false) removes the DWM window
+            // drop-shadow that otherwise paints a dark halo around it.
+            let _ = popup.show();
+            log::info!("selection popup created");
+        }
+        Err(e) => log::error!("failed to create selection popup: {e}"),
+    }
+}
+
+fn hide_selection_popup_window(handle: &AppHandle) {
+    LAST_GLOBAL_TRIGGER_MS.store(0, Ordering::Relaxed);
+    if let Some(popup) = handle.get_webview_window("selection-popup") {
+        let _ = popup.hide();
+    }
+}
+
+/// Create the popup webview once at startup so the first real selection
+/// doesn't pay window-creation + page-load latency.
+fn prewarm_selection_popup(handle: &AppHandle) {
+    if handle.get_webview_window("selection-popup").is_some() {
+        return;
+    }
+    let ui_port = resolve_frontend_port();
+    let url = format!("http://127.0.0.1:{ui_port}/selection-popup.html?text=");
+    let parsed_url = match url.parse() {
+        Ok(u) => u,
+        Err(e) => {
+            log::warn!("prewarm selection-popup url failed: {e}");
+            return;
+        }
+    };
+    let builder = tauri::WebviewWindowBuilder::new(
+        handle,
+        "selection-popup",
+        WebviewUrl::External(parsed_url),
+    )
+    .title("")
+    .inner_size(SEL_POPUP_W, SEL_POPUP_H)
+    .position(-32000.0, -32000.0)
+    .decorations(false)
+    .resizable(false)
+    .always_on_top(true)
+    .skip_taskbar(true)
+    .transparent(true)
+    .shadow(false)
+    .focused(false)
+    .visible(false);
+
+    match builder.build() {
+        Ok(_popup) => {
+            // No Mica — keep it transparent (see show_selection_popup_at).
+            log::info!("selection popup prewarmed");
+        }
+        Err(e) => log::warn!("selection popup prewarm failed: {e}"),
+    }
+}
+
+#[tauri::command]
+fn hide_selection_popup(handle: AppHandle) {
+    suppress_global_hook(180);
+    hide_selection_popup_window(&handle);
+}
+
+#[tauri::command]
+fn selection_popup_dismiss(handle: AppHandle) {
+    suppress_global_hook(180);
+    hide_selection_popup_window(&handle);
+}
+
 fn register_selection_shortcut(handle: &AppHandle) {
     // "Alt+Y" is a static literal — if this ever fails to parse, it's a
     // programmer error caught at first launch in dev, not a runtime
@@ -717,21 +1243,21 @@ fn register_selection_shortcut(handle: &AppHandle) {
         }
         log::info!("global shortcut Alt+Y triggered");
         let h = handle2.clone();
-        tauri::async_runtime::spawn(async move {
-            let old_clip = h.clipboard().read_text().unwrap_or_default();
-            simulate_ctrl_c();
-            tokio::time::sleep(Duration::from_millis(150)).await;
-            let new_clip = h.clipboard().read_text().unwrap_or_default();
-            let text = if new_clip != old_clip && !new_clip.trim().is_empty() {
-                new_clip.trim().to_string()
-            } else if !old_clip.trim().is_empty() {
-                old_clip.trim().to_string()
-            } else {
+        std::thread::spawn(move || {
+            let fg = {
+                #[cfg(windows)]
+                {
+                    use windows_sys::Win32::UI::WindowsAndMessaging::GetForegroundWindow;
+                    unsafe { GetForegroundWindow() as isize }
+                }
+                #[cfg(not(windows))]
+                {
+                    0
+                }
+            };
+            let Some(text) = capture_selection_oneoff(&h, fg) else {
                 return;
             };
-            if text.len() < 2 {
-                return;
-            }
 
             let state = h.state::<FloatingState>();
             let item = FloatingItem {
@@ -751,13 +1277,14 @@ fn register_selection_shortcut(handle: &AppHandle) {
             let _ = h.emit("yunque:floating-update", ());
             log::info!("added text to floating items ({} chars)", text.len());
 
-            show_floating_panel(&h);
+            show_selection_popup(&h, &text);
         });
     }) {
         log::error!("failed to register global shortcut: {e}");
     }
 }
 
+#[allow(dead_code)]
 fn show_floating_panel(handle: &AppHandle) {
     if let Some(panel) = handle.get_webview_window("floating-panel") {
         position_panel_near_ball(handle, &panel);
@@ -837,6 +1364,8 @@ pub fn run() {
             remove_floating_item,
             clear_floating_items,
             floating_send_to_chat,
+            hide_selection_popup,
+            selection_popup_dismiss,
             apply_window_theme,
         ])
         .setup(|app| {
@@ -907,6 +1436,13 @@ pub fn run() {
             }
 
             register_selection_shortcut(&handle);
+            start_selection_capture_worker(handle.clone());
+            register_global_selection_listener(&handle);
+            let prewarm_handle = handle.clone();
+            tauri::async_runtime::spawn(async move {
+                tokio::time::sleep(Duration::from_secs(3)).await;
+                prewarm_selection_popup(&prewarm_handle);
+            });
             tauri::async_runtime::spawn(async move {
                 launch_backend(&handle).await;
             });
@@ -932,9 +1468,6 @@ pub fn run() {
                 }
             }
             tauri::WindowEvent::Focused(false) => {
-                if window.label() == "selection-popup" {
-                    let _ = window.hide();
-                }
                 if window.label() == "floating-panel" {
                     let _ = window.hide();
                 }
@@ -1107,6 +1640,19 @@ fn backend_port() -> u16 {
 /// `"localhost:9090"`). Falls back to `DEFAULT_BACKEND_PORT` on any
 /// parse error — we prefer a live probe against the default over refusing
 /// to launch.
+/// Next.js / bundled UI port. Auxiliary webviews (selection popup, floating
+/// panel) must load the frontend, NOT the Go API port.
+fn resolve_frontend_port() -> u16 {
+    if let Ok(raw) = std::env::var("YUNQUE_FRONTEND_PORT") {
+        if let Ok(p) = raw.parse::<u16>() {
+            if p != 0 {
+                return p;
+            }
+        }
+    }
+    DEFAULT_FRONTEND_PORT
+}
+
 fn resolve_backend_port() -> u16 {
     let Ok(raw) = std::env::var("AGENT_ADDR") else {
         return DEFAULT_BACKEND_PORT;

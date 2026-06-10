@@ -122,6 +122,20 @@ func initTasks(app *agentrt.App) error {
 		gw.SetPackCatalogSources(cfg.PackCatalogSourceDirs())
 		app.Set(agentrt.CompPackRuntimeRegistry, packRegistry)
 		slog.Info("pack runtime registry initialized", "dir", cfg.DataPath("packs"), "installed", len(packRegistry.List()), "catalog_sources", cfg.PackCatalogSourceDirs())
+
+		// Optional pack-UI isolation listener: serving DLC bundles from their
+		// own loopback port gives iframes a real cross-origin boundary to the
+		// shell (defense in depth beyond the sandbox attribute). Opt-in because
+		// the packaged desktop webview CSP must whitelist the extra origin.
+		if addr := strings.TrimSpace(os.Getenv("PACK_UI_ADDR")); addr != "" {
+			if _, packUISrv, uiErr := gw.StartPackUIServer(addr); uiErr != nil {
+				slog.Warn("pack ui isolation listener failed", "addr", addr, "err", uiErr)
+			} else {
+				app.Lifecycle.RegisterFunc("pack_ui_server",
+					func(context.Context) error { return nil },
+					func(ctx context.Context) error { return packUISrv.Shutdown(ctx) })
+			}
+		}
 	}
 	if sa.hbService != nil {
 		gw.SetHeartbeat(sa.hbService)
@@ -173,6 +187,7 @@ func initTasks(app *agentrt.App) error {
 		Scheduler: loraScheduler,
 		Metrics:   trainingMetrics,
 		Evolution: evolutionCoordinator,
+		Distill:   appSelfDistillPipeline(app),
 	}))
 
 	// ── Phase 3: Perception (Identity/Emotion/Speech/Embeddings) ──
@@ -418,6 +433,15 @@ func appEvolutionCoordinator(app *agentrt.App) *localbrain.EvolutionCoordinator 
 	if v, ok := app.Get("evolution_coordinator"); ok {
 		if ec, ok := v.(*localbrain.EvolutionCoordinator); ok {
 			return ec
+		}
+	}
+	return nil
+}
+
+func appSelfDistillPipeline(app *agentrt.App) *localbrain.SelfDistillPipeline {
+	if v, ok := app.Get("self_distill_pipeline"); ok {
+		if p, ok := v.(*localbrain.SelfDistillPipeline); ok {
+			return p
 		}
 	}
 	return nil

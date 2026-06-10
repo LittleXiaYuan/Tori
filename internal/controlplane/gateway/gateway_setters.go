@@ -562,6 +562,10 @@ func (g *Gateway) SetUsageKVStore(kvs usageKVStore) {
 // SetLedgerHealthChecker attaches the persistent state health check used by probes.
 func (g *Gateway) SetLedgerHealthChecker(h healthChecker) { g.ledgerHealth = h }
 
+// SetOnboardingKVStore injects a Ledger KV store for persisting first-run
+// onboarding completion (replaces fragile browser localStorage).
+func (g *Gateway) SetOnboardingKVStore(kvs onboardingKVStore) { g.onboardingKV = kvs }
+
 // FlushUsageKV persists usage data before shutdown.
 func (g *Gateway) FlushUsageKV() {
 	if g.usage != nil {
@@ -616,6 +620,9 @@ func (g *Gateway) SetCogniFederation(cf *cogni.CogniFederation) { g.cogniFederat
 
 // SetCogniCostTracker attaches the economics cost tracker.
 func (g *Gateway) SetCogniCostTracker(ct *cogni.CostTracker) { g.cogniCostTracker = ct }
+
+// SetCogniBus attaches the bidding router for POST /v1/cognis/route.
+func (g *Gateway) SetCogniBus(b *cogni.CogniBus) { g.cogniBus = b }
 
 // SetNLConfigTranslator attaches the natural-language config translator.
 func (g *Gateway) SetNLConfigTranslator(t *cogni.NLConfigTranslator) { g.nlConfigTranslator = t }

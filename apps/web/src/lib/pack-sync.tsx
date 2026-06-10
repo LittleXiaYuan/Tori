@@ -69,8 +69,20 @@ export async function fetchEnabledPacks(): Promise<InstalledPack[]> {
   return Array.isArray(res?.packs) ? res.packs : [];
 }
 
+/** Thin-shell introspection packs whose underlying subsystems always run; they
+ *  are surfaced as core nav items (group 智能) instead of toggleable Packs, so
+ *  they no longer clutter the Pack menu or read as optional add-ons. */
+const CORE_PROMOTED_PACK_IDS = new Set<string>([
+  "yunque.pack.inner-life",
+  "yunque.pack.night-school",
+  "yunque.pack.experience",
+  "yunque.pack.world-model",
+  "yunque.pack.micro-agent",
+]);
+
 export function buildPackNavItems(packs: InstalledPack[]): PackNavItem[] {
   return packs
+    .filter((pack) => !CORE_PROMOTED_PACK_IDS.has(pack.manifest.id))
     .flatMap((pack) => {
       const manifest = pack.manifest;
       const menus = manifest.frontend?.menus || [];

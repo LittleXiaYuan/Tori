@@ -437,6 +437,11 @@ func plannerFriendlyFailureText(rawErr string) string {
 	switch {
 	case normalized == "":
 		return "现场已保留，可从恢复点继续或返回阶段结果。"
+	case strings.Contains(normalized, "access denied"),
+		strings.Contains(normalized, "not under an allowed"),
+		strings.Contains(normalized, "not under allowed"),
+		strings.Contains(normalized, "permission denied"):
+		return "文件访问范围不足，现场已保留；请把目标目录加入可写/可读路径，或使用当前打开的工作区路径继续。"
 	case strings.Contains(normalized, "unknown skill"):
 		return "所需工具暂时不可用，现场已保留，可换用可用工具或调整步骤继续。"
 	case strings.Contains(normalized, "blocked by trust gate") || strings.Contains(normalized, "trust gate"):

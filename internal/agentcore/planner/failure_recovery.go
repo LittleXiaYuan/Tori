@@ -24,11 +24,19 @@ type plannerFailureBucket string
 const (
 	failureBucketTimeout    plannerFailureBucket = "timeout_or_connection"
 	failureBucketTool       plannerFailureBucket = "tool_unavailable"
+	failureBucketPath       plannerFailureBucket = "path_or_file_error"
 	failureBucketTrust      plannerFailureBucket = "needs_confirmation"
 	failureBucketDependency plannerFailureBucket = "dependency_blocked"
 	failureBucketRuntime    plannerFailureBucket = "tool_runtime_error"
 	failureBucketRepeated   plannerFailureBucket = "repeated_same_path"
 )
+
+type ToolFailureDiagnostic struct {
+	ErrorCode   string `json:"error_code"`
+	Cause       string `json:"cause"`
+	Recoverable bool   `json:"recoverable"`
+	NextStep    string `json:"next_step"`
+}
 
 func buildPlannerFailureSummary(steps []PlanStep) (PlannerFailureSummary, bool) {
 	summary := PlannerFailureSummary{}
@@ -76,8 +84,21 @@ func buildPlannerFailureSummary(steps []PlanStep) (PlannerFailureSummary, bool) 
 func classifyPlannerFailure(rawErr string) plannerFailureBucket {
 	normalized := strings.ToLower(strings.TrimSpace(rawErr))
 	switch {
+	case strings.Contains(normalized, "access denied"),
+		strings.Contains(normalized, "not under an allowed"),
+		strings.Contains(normalized, "not under allowed"),
+		strings.Contains(normalized, "permission denied"):
+		return failureBucketTool
 	case strings.Contains(normalized, "unknown skill"), strings.Contains(normalized, "allowed tool surface"):
 		return failureBucketTool
+	case strings.Contains(normalized, "no such file"),
+		strings.Contains(normalized, "file not found"),
+		strings.Contains(normalized, "cannot find"),
+		strings.Contains(normalized, "is a directory"),
+		strings.Contains(normalized, "not a directory"),
+		strings.Contains(normalized, "invalid path"),
+		strings.Contains(normalized, "cannot read"):
+		return failureBucketPath
 	case strings.Contains(normalized, "blocked by trust gate"), strings.Contains(normalized, "trust gate"):
 		return failureBucketTrust
 	case strings.Contains(normalized, "dependency"),
@@ -126,6 +147,8 @@ func summarizePlannerFailurePattern(buckets map[plannerFailureBucket]int, failed
 		return "模型或子任务响应不稳定", "先返回阶段结果或切为后台任务；继续时降低任务粒度" + toolHint + "。"
 	case failureBucketTool:
 		return "所需工具不可用或不在当前工具范围", "改用当前可用工具，或先请求开放/替换工具后再继续。"
+	case failureBucketPath:
+		return "目标路径、文件类型或读取范围不匹配", "先确认路径存在且在允许范围内；如果要跨目录搜索，请传目录路径并缩小搜索范围。"
 	case failureBucketTrust:
 		return "需要用户确认或更高信任", "暂停自动推进，向用户说明需要确认的动作，确认后再继续。"
 	case failureBucketDependency:
@@ -143,15 +166,49 @@ func plannerFailureBucketPriority(bucket plannerFailureBucket) int {
 		return 0
 	case failureBucketTool:
 		return 1
-	case failureBucketTrust:
+	case failureBucketPath:
 		return 2
-	case failureBucketDependency:
+	case failureBucketTrust:
 		return 3
-	case failureBucketRuntime:
+	case failureBucketDependency:
 		return 4
+	case failureBucketRuntime:
+		return 5
 	default:
 		return 9
 	}
+}
+
+func buildToolFailureDiagnostic(rawErr string) ToolFailureDiagnostic {
+	bucket := classifyPlannerFailure(rawErr)
+	d := ToolFailureDiagnostic{
+		ErrorCode:   string(bucket),
+		Recoverable: true,
+	}
+	switch bucket {
+	case failureBucketTimeout:
+		d.Cause = "等待时间过长或连接中断"
+		d.NextStep = "稍后重试、缩小输入范围，或改为后台任务。"
+	case failureBucketTool:
+		d.Cause = "工具不可用或访问范围不足"
+		d.NextStep = "改用当前可用工具，或先开放/替换工具后继续。"
+	case failureBucketPath:
+		d.Cause = "目标路径、文件类型或读取范围不匹配"
+		d.NextStep = "确认路径存在且在允许读取范围内；跨目录搜索时传目录路径并缩小范围。"
+	case failureBucketTrust:
+		d.Cause = "需要用户确认或更高信任"
+		d.NextStep = "暂停自动推进，说明需要确认的动作，确认后继续。"
+	case failureBucketDependency:
+		d.Cause = "前置依赖尚未满足"
+		d.NextStep = "回到最早未完成的前置步骤，先补齐依赖。"
+	case failureBucketRuntime:
+		d.Cause = "工具运行时异常"
+		d.NextStep = "降低输入规模或切换等价工具；已有证据足够时先返回阶段结果。"
+	default:
+		d.Cause = "执行路径暂时不可完成"
+		d.NextStep = "停止重复同一路径，换一个工具、降低任务粒度，或先汇总已获得证据。"
+	}
+	return d
 }
 
 func formatFailureRecoveryPrompt(summary PlannerFailureSummary) string {

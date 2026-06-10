@@ -6,23 +6,41 @@ import {
   Sparkles, ArrowRight, X, CheckCircle2, Circle, Loader2,
   Zap, Layers,
 } from "lucide-react";
-import { useOnboarding, type OnboardingPhase } from "@/hooks/use-onboarding";
+import { useOnboarding, markOnboardingComplete, type OnboardingPhase } from "@/hooks/use-onboarding";
+import { useI18n } from "@/lib/i18n";
 import { formatErrorMessage } from "@/lib/error-utils";
 import { ONBOARDING_SCENARIOS, scenarioChatHref } from "@/lib/product-scenarios";
 import { writeProfileMode } from "@/lib/profile-mode";
 
+function WelcomeAuroraMark() {
+  return (
+    <svg viewBox="0 0 48 48" width="34" height="34" fill="none" aria-hidden>
+      <g stroke="currentColor" strokeLinecap="round" fill="none">
+        <path d="M14 38 C 11 28, 19 23, 15 10" strokeWidth="2.4" opacity="0.95" />
+        <path d="M24 40 C 21 27, 30 21, 25 9" strokeWidth="2.4" opacity="0.7" />
+        <path d="M34 38 C 33 28, 39 23, 35 12" strokeWidth="2.4" opacity="0.48" />
+      </g>
+    </svg>
+  );
+}
+
 function WelcomeStep({ onNext, onSkip }: { onNext: () => void; onSkip: () => void }) {
+  const { t } = useI18n();
   return (
     <div className="px-8 pt-12 pb-8 text-center animate-fade-in-up">
       <div
-        className="mx-auto w-20 h-20 rounded-3xl flex items-center justify-center mb-6"
-        style={{ background: "linear-gradient(135deg, rgba(59,130,246,0.15), rgba(168,85,247,0.10))", boxShadow: "0 0 32px rgba(59,130,246,0.2)" }}
+        className="mx-auto w-16 h-16 rounded-2xl flex items-center justify-center mb-6"
+        style={{
+          color: "var(--yunque-accent)",
+          background: "var(--yunque-accent-soft, rgba(2,132,199,0.08))",
+          border: "1px solid var(--yunque-accent-muted, rgba(2,132,199,0.14))",
+        }}
       >
-        <Sparkles size={36} style={{ color: "var(--yunque-accent)" }} />
+        <WelcomeAuroraMark />
       </div>
-      <h1 className="text-2xl font-bold" style={{ color: "var(--yunque-text)" }}>你好，我是云雀</h1>
+      <h1 className="text-2xl font-bold" style={{ color: "var(--yunque-text)" }}>{t("onboarding.welcome.title")}</h1>
       <p className="mt-3 text-sm leading-relaxed" style={{ color: "var(--yunque-text-secondary)", maxWidth: 340, margin: "12px auto 0" }}>
-        你的个人 AI 工作伙伴。先说目标，我会把它变成行动、产物和可继续迭代的记忆。
+        {t("onboarding.welcome.subtitle")}
       </p>
 
       <div className="mt-8 space-y-3">
@@ -30,24 +48,24 @@ function WelcomeStep({ onNext, onSkip }: { onNext: () => void; onSkip: () => voi
           className="w-full rounded-xl"
           style={{ background: "var(--neutral-strong-bg)", color: "var(--neutral-strong-fg)", fontWeight: 600 }}
           onPress={onNext}
-          aria-label="开始30秒体验"
+          aria-label={t("onboarding.welcome.start")}
         >
-          30 秒快速体验 <ArrowRight size={14} className="ml-1" />
+          {t("onboarding.welcome.start")} <ArrowRight size={14} className="ml-1" />
         </Button>
         <a
           href="/packs"
           className="text-xs font-medium block mx-auto text-center"
           style={{ color: "var(--yunque-accent)" }}
         >
-          先去工作负载页，按场景选能力 →
+          {t("onboarding.welcome.browse")}
         </a>
         <button
           onClick={onSkip}
           className="text-xs font-medium block mx-auto"
           style={{ color: "var(--yunque-text-muted)" }}
-          aria-label="跳过引导"
+          aria-label={t("onboarding.close")}
         >
-          跳过，我是老用户
+          {t("onboarding.welcome.skip")}
         </button>
       </div>
     </div>
@@ -57,10 +75,11 @@ function WelcomeStep({ onNext, onSkip }: { onNext: () => void; onSkip: () => voi
 interface CheckItem { label: string; done: boolean; loading: boolean }
 
 function SetupCheckStep({ onNext, onProviderSetup }: { onNext: () => void; onProviderSetup: () => void }) {
+  const { t } = useI18n();
   const [checks, setChecks] = useState<CheckItem[]>([
-    { label: "服务连接", done: false, loading: true },
-    { label: "模型配置", done: false, loading: false },
-    { label: "对话引擎", done: false, loading: false },
+    { label: t("onboarding.check.server"), done: false, loading: true },
+    { label: t("onboarding.check.model"), done: false, loading: false },
+    { label: t("onboarding.check.engine"), done: false, loading: false },
   ]);
 
   useEffect(() => {
@@ -117,19 +136,20 @@ function SetupCheckStep({ onNext, onProviderSetup }: { onNext: () => void; onPro
 
   return (
     <div className="px-8 pt-10 pb-8 animate-fade-in-up">
-      <h2 className="text-lg font-bold text-center" style={{ color: "var(--yunque-text)" }}>正在检查你的环境…</h2>
-      <div className="mt-6 space-y-1">
+      <h2 className="text-lg font-bold text-center" style={{ color: "var(--yunque-text)" }}>{t("onboarding.check.title")}</h2>
+      <p className="text-xs text-center mt-1" style={{ color: "var(--yunque-text-muted)" }}>{t("onboarding.check.subtitle")}</p>
+      <div className="mt-6 space-y-2">
         {checks.map((c, i) => (
           <div key={i} className="onboard-check-item" data-done={c.done || undefined} style={{ animationDelay: `${i * 100}ms` }}>
             {c.loading ? (
               <Loader2 size={16} className="animate-spin" style={{ color: "var(--yunque-accent)" }} />
             ) : c.done ? (
-              <CheckCircle2 size={16} style={{ color: "var(--yunque-success)" }} />
+              <CheckCircle2 size={16} style={{ color: "var(--yunque-accent)" }} />
             ) : (
               <Circle size={16} style={{ color: "var(--yunque-text-disabled)" }} />
             )}
             <span>{c.label}</span>
-            {c.done && <span className="ml-auto text-xs" style={{ color: "var(--yunque-success)" }}>✓</span>}
+            {c.done && <CheckCircle2 size={13} className="ml-auto" style={{ color: "var(--yunque-accent)" }} />}
           </div>
         ))}
       </div>
@@ -140,6 +160,7 @@ function SetupCheckStep({ onNext, onProviderSetup }: { onNext: () => void; onPro
 interface PresetInfo { id: string; name: string; base_url: string; type: string }
 
 function ProviderSetupStep({ onNext, onSkip }: { onNext: () => void; onSkip: () => void }) {
+  const { t } = useI18n();
   const [presets, setPresets] = useState<PresetInfo[]>([]);
   const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
   const [apiKey, setApiKey] = useState("");
@@ -163,7 +184,7 @@ function ProviderSetupStep({ onNext, onSkip }: { onNext: () => void; onSkip: () 
   const fallbackProviders = [
     { id: "openai", name: "OpenAI" },
     { id: "anthropic", name: "Claude" },
-    { id: "other", name: "其他" },
+    { id: "other", name: t("onboarding.provider.other") },
   ];
   const displayList = presets.length > 0
     ? presets.slice(0, 4).map((p) => ({ id: p.id, name: p.name }))
@@ -195,18 +216,18 @@ function ProviderSetupStep({ onNext, onSkip }: { onNext: () => void; onSkip: () 
         onNext();
       } else {
         const data = await res.json().catch(() => ({}));
-        setError(formatErrorMessage(data?.error, "连接失败，请检查 API Key"));
+        setError(formatErrorMessage(data?.error, t("onboarding.provider.errFail")));
       }
     } catch {
-      setError("网络错误，请检查服务是否在线");
+      setError(t("onboarding.provider.errNetwork"));
     }
     setTesting(false);
   }, [apiKey, selectedPreset, onNext]);
 
   return (
     <div className="px-8 pt-8 pb-8 animate-fade-in-up">
-      <h2 className="text-lg font-bold text-center" style={{ color: "var(--yunque-text)" }}>还差一步就能开始</h2>
-      <p className="text-xs text-center mt-1" style={{ color: "var(--yunque-text-muted)" }}>选择你的 AI 模型提供商</p>
+      <h2 className="text-lg font-bold text-center" style={{ color: "var(--yunque-text)" }}>{t("onboarding.provider.title")}</h2>
+      <p className="text-xs text-center mt-1" style={{ color: "var(--yunque-text-muted)" }}>{t("onboarding.provider.subtitle")}</p>
 
       <div className="mt-5 flex gap-3 justify-center flex-wrap">
         {displayList.map((p, i) => (
@@ -217,18 +238,18 @@ function ProviderSetupStep({ onNext, onSkip }: { onNext: () => void; onSkip: () 
             onClick={() => setSelectedPreset(p.id)}
           >
             <span className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>{p.name}</span>
-            {i === 0 && <span className="text-[10px]" style={{ color: "var(--yunque-accent)" }}>⭐ 推荐</span>}
+            {i === 0 && <span className="text-[10px]" style={{ color: "var(--yunque-accent)" }}>{t("onboarding.provider.recommended")}</span>}
           </button>
         ))}
       </div>
 
       <div className="mt-5">
-        <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--yunque-text-secondary)" }}>API Key</label>
+        <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--yunque-text-secondary)" }}>{t("onboarding.provider.apiKey")}</label>
         <input
           type="password"
           value={apiKey}
           onChange={(e) => { setApiKey(e.target.value); autoDetect(e.target.value); }}
-          placeholder="粘贴你的 API Key…"
+          placeholder={t("onboarding.provider.apiKeyPlaceholder")}
           className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
           style={{
             background: "var(--yunque-surface-2)",
@@ -239,22 +260,22 @@ function ProviderSetupStep({ onNext, onSkip }: { onNext: () => void; onSkip: () 
         />
         {error && <p className="text-xs mt-1.5" style={{ color: "var(--yunque-danger)" }}>{error}</p>}
         <p className="text-[10px] mt-1.5" style={{ color: "var(--yunque-text-disabled)" }}>
-          💡 直接粘贴 Key，我会自动识别提供商类型
+          {t("onboarding.provider.hint")}
         </p>
       </div>
 
       <div className="mt-5 flex items-center justify-between">
-        <button onClick={onSkip} className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>稍后配置</button>
+        <button onClick={onSkip} className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>{t("onboarding.provider.later")}</button>
         <Button
           size="sm"
           className="rounded-xl px-6"
           style={{ background: "var(--neutral-strong-bg)", color: "var(--neutral-strong-fg)" }}
           onPress={testConnection}
           isDisabled={!apiKey.trim() || testing}
-          aria-label="测试连接"
+          aria-label={t("onboarding.provider.test")}
         >
           {testing ? <Loader2 size={14} className="animate-spin mr-1" /> : null}
-          {testing ? "测试中…" : "测试连接"}
+          {testing ? t("onboarding.provider.testing") : t("onboarding.provider.test")}
         </Button>
       </div>
     </div>
@@ -262,12 +283,13 @@ function ProviderSetupStep({ onNext, onSkip }: { onNext: () => void; onSkip: () 
 }
 
 function InteractiveDemoStep({ onNext }: { onNext: () => void }) {
+  const { t } = useI18n();
   const [sent, setSent] = useState(false);
 
   const handleSend = useCallback((text: string) => {
     setSent(true);
+    void markOnboardingComplete();
     setTimeout(() => {
-      localStorage.setItem("yunque_onboarding_done", "1");
       window.location.href = scenarioChatHref(text);
     }, 300);
   }, []);
@@ -275,9 +297,9 @@ function InteractiveDemoStep({ onNext }: { onNext: () => void }) {
   return (
     <div className="px-8 pt-8 pb-8 animate-fade-in-up">
       <h2 className="text-lg font-bold text-center" style={{ color: "var(--yunque-text)" }}>
-        试试对我说点什么 <Sparkles size={16} className="inline" style={{ color: "var(--yunque-accent)" }} />
+        {t("onboarding.demo.title")} <Sparkles size={16} className="inline" style={{ color: "var(--yunque-accent)" }} />
       </h2>
-      <p className="text-xs text-center mt-1" style={{ color: "var(--yunque-text-muted)" }}>点击下方卡片，或输入自定义需求</p>
+      <p className="text-xs text-center mt-1" style={{ color: "var(--yunque-text-muted)" }}>{t("onboarding.demo.subtitle")}</p>
 
       <div className="mt-5 space-y-2.5">
         {ONBOARDING_SCENARIOS.map((d) => (
@@ -301,7 +323,7 @@ function InteractiveDemoStep({ onNext }: { onNext: () => void }) {
 
       <div className="mt-4 flex items-center gap-2">
         <button onClick={onNext} className="text-xs mx-auto" style={{ color: "var(--yunque-text-muted)" }}>
-          跳过演示，直接选择模式 →
+          {t("onboarding.demo.skip")}
         </button>
       </div>
     </div>
@@ -309,31 +331,32 @@ function InteractiveDemoStep({ onNext }: { onNext: () => void }) {
 }
 
 function ModeSelectStep({ onFinish }: { onFinish: (mode: "easy" | "full") => void }) {
+  const { t } = useI18n();
   const [selected, setSelected] = useState<"easy" | "full">("easy");
 
   const modes = [
     {
       id: "easy" as const,
       icon: <Sparkles size={20} />,
-      title: "轻松模式",
-      desc: "围绕一条任务闭环，只保留默认主路径",
-      items: ["工作台", "对话", "任务中心", "记忆", "能力包", "设置"],
+      title: t("onboarding.mode.easy"),
+      desc: t("onboarding.mode.easyDesc"),
+      items: t("onboarding.mode.easyItems").split(","),
       recommended: true,
     },
     {
       id: "full" as const,
       icon: <Layers size={20} />,
-      title: "完整模式",
-      desc: "展开实验室和控制面，适合专业调试与运维",
-      items: ["所有轻松模式", "工作流编排", "知识库/图谱", "角色定制", "审计监控", "更多…"],
+      title: t("onboarding.mode.full"),
+      desc: t("onboarding.mode.fullDesc"),
+      items: t("onboarding.mode.fullItems").split(","),
       recommended: false,
     },
   ];
 
   return (
     <div className="px-8 pt-8 pb-8 animate-fade-in-up">
-      <h2 className="text-lg font-bold text-center" style={{ color: "var(--yunque-text)" }}>选择适合你的模式</h2>
-      <p className="text-xs text-center mt-1" style={{ color: "var(--yunque-text-muted)" }}>随时可在侧栏底部切换</p>
+      <h2 className="text-lg font-bold text-center" style={{ color: "var(--yunque-text)" }}>{t("onboarding.mode.title")}</h2>
+      <p className="text-xs text-center mt-1" style={{ color: "var(--yunque-text-muted)" }}>{t("onboarding.mode.subtitle")}</p>
 
       <div className="mt-5 flex gap-3">
         {modes.map((m) => (
@@ -358,7 +381,7 @@ function ModeSelectStep({ onFinish }: { onFinish: (mode: "easy" | "full") => voi
             {m.recommended && (
               <div className="mt-3 text-[10px] font-medium px-2 py-0.5 rounded-full inline-block"
                 style={{ background: "var(--yunque-accent-muted)", color: "var(--yunque-accent)" }}>
-                推荐
+                {t("onboarding.mode.recommended")}
               </div>
             )}
           </button>
@@ -370,9 +393,9 @@ function ModeSelectStep({ onFinish }: { onFinish: (mode: "easy" | "full") => voi
           className="w-full rounded-xl"
           style={{ background: "var(--neutral-strong-bg)", color: "var(--neutral-strong-fg)", fontWeight: 600 }}
           onPress={() => onFinish(selected)}
-          aria-label={`选择${selected === "easy" ? "轻松" : "完整"}模式并开始`}
+          aria-label={t("onboarding.mode.start")}
         >
-          开始使用 <ArrowRight size={14} className="ml-1" />
+          {t("onboarding.mode.start")} <ArrowRight size={14} className="ml-1" />
         </Button>
       </div>
     </div>
@@ -380,6 +403,7 @@ function ModeSelectStep({ onFinish }: { onFinish: (mode: "easy" | "full") => voi
 }
 
 export function OnboardingGuide() {
+  const { t } = useI18n();
   const { phase, setPhase, visible, finish } = useOnboarding();
 
   const handleModeSelect = useCallback((mode: "easy" | "full") => {
@@ -400,13 +424,13 @@ export function OnboardingGuide() {
   const totalSteps = 5;
 
   return (
-    <div className="onboard-backdrop" role="dialog" aria-modal="true" aria-label="新手引导">
+    <div className="onboard-backdrop" role="dialog" aria-modal="true" aria-label={t("onboarding.aria")}>
       <div className="onboard-card">
         <button
           onClick={finish}
           className="absolute top-4 right-4 p-1.5 rounded-lg z-10"
           style={{ color: "var(--yunque-text-muted)" }}
-          aria-label="关闭引导"
+          aria-label={t("onboarding.close")}
         >
           <X size={16} />
         </button>

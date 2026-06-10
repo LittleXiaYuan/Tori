@@ -62,6 +62,7 @@ func (g *Gateway) ExecuteChatPipeline(ctx context.Context, req *ChatRequest) (*C
 		observe.EndSpan(traceSpan, err)
 		return nil, err
 	}
+	req.WorkspacePaths = inferWorkspacePathsFromMessages(req.WorkspacePaths, req.Messages)
 
 	// ── 1. Quota check ──
 	if !g.usage.CheckQuota(req.TenantID) {

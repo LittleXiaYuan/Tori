@@ -6,7 +6,7 @@ import { Spinner } from "@heroui/react";
 import { useI18n } from "@/lib/i18n";
 import { getAuthHeaders } from "@/lib/api-core";
 
-const PUBLIC_PATHS = ["/login", "/setup"];
+const PUBLIC_PATHS = ["/login", "/setup", "/selection-popup"];
 const AUTH_TIMEOUT_MS = 8000;
 // Re-hit /v1/auth/status at most once every 5 minutes. This trades off
 // "server-side token revocation is visible within 5 min" against "don't

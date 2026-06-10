@@ -2,6 +2,7 @@ package planner
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"yunque-agent/internal/agentcore/llm"
@@ -36,8 +37,47 @@ func (p *Planner) BuildMessages(ctx context.Context, req PlanRequest) ([]llm.Mes
 			EmotionHint: req.EmotionHint,
 		}, NewPromptBuilder(p))
 	}
+	if workspaceContext := buildWorkspaceContextMessage(req.WorkspacePaths); workspaceContext != "" {
+		msgs = append(msgs, llm.Message{Role: "system", Content: workspaceContext})
+		includedLayers = append(includedLayers, "workspace")
+	}
 
 	msgs = append(msgs, promptRuntime.PrepareConversationMessages(req.Messages, time.Now())...)
 	msgs = contextWindowRuntime.FitMessagesForRequest(ctx, msgs, modelRuntime.ClientForRequest(req))
 	return msgs, includedLayers
+}
+
+func buildWorkspaceContextMessage(paths []string) string {
+	if len(paths) == 0 {
+		return ""
+	}
+	const maxPaths = 8
+	var b strings.Builder
+	b.WriteString("[当前工作区]\n")
+	b.WriteString("以下是用户在桌面端登记/打开的本地项目目录。处理读写文件、搜索代码、生成或修改工程文件时，优先在这些目录内定位目标；可使用 file_search 读取，使用 file_create 创建或更新文件。\n")
+	written := 0
+	seen := map[string]bool{}
+	for _, raw := range paths {
+		path := strings.TrimSpace(raw)
+		if path == "" {
+			continue
+		}
+		key := strings.ToLower(strings.TrimRight(path, `\/`))
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		if written >= maxPaths {
+			b.WriteString("- ...\n")
+			break
+		}
+		b.WriteString("- ")
+		b.WriteString(path)
+		b.WriteString("\n")
+		written++
+	}
+	if written == 0 {
+		return ""
+	}
+	return b.String()
 }

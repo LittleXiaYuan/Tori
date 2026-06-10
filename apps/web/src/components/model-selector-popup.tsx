@@ -13,6 +13,7 @@ import {
   ToggleButtonGroup,
 } from "@heroui/react";
 import { Cpu, ChevronDown, Check, Zap, Sparkles, Heart, MessageCircle, Settings } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
 
 export interface ModelOption {
   id: string;
@@ -51,10 +52,10 @@ const MODE_DEFS: { key: ChatMode; label: string; icon: typeof Sparkles }[] = [
 // - 触发按钮 / Mode Switcher / 搜索框 / 列表 / Footer 链接全部使用 HeroUI 原生组件。
 // - ListBox 内置键盘导航 + ARIA + 受控选择，根除手写 click outside 监听
 //   与 React 合成事件竞态导致"点击没反应"的问题。
-const EFFORT_LABELS: Record<ThinkingLevel, string> = {
-  none: "快速",
-  auto: "自动",
-  deep: "深度思考",
+const EFFORT_KEYS: Record<ThinkingLevel, string> = {
+  none: "model.think.none",
+  auto: "model.think.auto",
+  deep: "model.think.deep",
 };
 
 export function ModelSelectorPopup({
@@ -62,6 +63,7 @@ export function ModelSelectorPopup({
   chatMode, onModeChange, airiAvailable,
   thinkingLevel = "auto", onThinkingChange,
 }: Props) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
 
@@ -80,7 +82,7 @@ export function ModelSelectorPopup({
   if (enabledModels.length === 0) {
     return (
       <Chip size="sm" variant="soft" className="text-xs font-mono">
-        {currentModelLabel || "未配置模型"}
+        {currentModelLabel || t("model.unconfigured")}
       </Chip>
     );
   }
@@ -97,11 +99,11 @@ export function ModelSelectorPopup({
         <Button
           variant="ghost"
           size="sm"
-          aria-label="切换模型"
+          aria-label={t("model.switch")}
           className="model-selector-trigger gap-1.5 rounded-full px-2.5 h-8 text-[11px] font-mono"
         >
           <Cpu size={12} />
-          <span className="max-w-[180px] truncate">{currentModelLabel} · {EFFORT_LABELS[thinkingLevel]}</span>
+          <span className="max-w-[180px] truncate">{currentModelLabel} · {t(EFFORT_KEYS[thinkingLevel])}</span>
           <ChevronDown
             size={10}
             style={{
@@ -150,7 +152,7 @@ export function ModelSelectorPopup({
                   const next = Array.from(keys)[0] as ChatMode | undefined;
                   if (next) onModeChange(next);
                 }}
-                aria-label="对话模式"
+                aria-label={t("model.modeAria")}
               >
                 {MODE_DEFS.map((md) => {
                   const isAiri = md.key === "chat" && airiAvailable;
@@ -189,11 +191,11 @@ export function ModelSelectorPopup({
                 value={search}
                 onChange={setSearch}
                 fullWidth
-                aria-label="搜索模型"
+                aria-label={t("model.searchAria")}
               >
                 <SearchField.Group>
                   <SearchField.SearchIcon />
-                  <SearchField.Input placeholder="搜索模型…" autoFocus />
+                  <SearchField.Input placeholder={t("model.searchPlaceholder")} autoFocus />
                   <SearchField.ClearButton />
                 </SearchField.Group>
               </SearchField>
@@ -206,11 +208,11 @@ export function ModelSelectorPopup({
           >
             {filtered.length === 0 ? (
               <div className="text-center py-6 text-xs text-muted">
-                没有找到匹配的模型
+                {t("model.noMatch")}
               </div>
             ) : (
               <ListBox
-                aria-label="模型列表"
+                aria-label={t("model.listAria")}
                 selectionMode="single"
                 selectedKeys={new Set([currentModelId])}
                 onSelectionChange={(keys) => {
@@ -254,9 +256,9 @@ export function ModelSelectorPopup({
               }}
             >
               <div className="flex items-center justify-between mb-2">
-                <span className="text-[10px] font-medium uppercase tracking-wider" style={{ color: "var(--yunque-text-muted)" }}>思维深度</span>
+                <span className="text-[10px] font-medium uppercase tracking-wider" style={{ color: "var(--yunque-text-muted)" }}>{t("model.thinkDepth")}</span>
                 <span className="text-[9px] tabular-nums" style={{ color: "var(--yunque-text-muted)", opacity: 0.6 }}>
-                  {thinkingLevel === "none" ? "低成本" : thinkingLevel === "deep" ? "高成本" : "平衡"}
+                  {thinkingLevel === "none" ? t("model.cost.low") : thinkingLevel === "deep" ? t("model.cost.high") : t("model.cost.balanced")}
                 </span>
               </div>
               <div className="flex items-center gap-1 rounded-[10px] p-1" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
@@ -276,7 +278,7 @@ export function ModelSelectorPopup({
                       {lvl === "none" && <Zap size={11} />}
                       {lvl === "auto" && <Sparkles size={11} />}
                       {lvl === "deep" && <Cpu size={11} />}
-                      {EFFORT_LABELS[lvl]}
+                      {t(EFFORT_KEYS[lvl])}
                     </button>
                   );
                 })}
@@ -295,7 +297,7 @@ export function ModelSelectorPopup({
             }}
           >
             <Settings size={10} />
-            设置
+            {t("model.settings")}
           </Link>
         </Popover.Dialog>
       </Popover.Content>

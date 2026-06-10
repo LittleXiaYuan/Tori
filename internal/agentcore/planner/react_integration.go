@@ -127,7 +127,15 @@ func (p *Planner) runReAct(ctx context.Context, req PlanRequest) (*PlanResult, e
 					fmt.Sprintf("[%s] 未执行：不在本次允许工具内", skillName))
 				trEvt.Meta.Skill = skillName
 				trEvt.Meta.TenantID = req.TenantID
-				trEvt.Detail = observe.ToolResultDetail{Skill: skillName, Error: errMsg}
+				diagnostic := buildToolFailureDiagnostic("allowed tool surface: " + errMsg)
+				trEvt.Detail = observe.ToolResultDetail{
+					Skill:       skillName,
+					Error:       errMsg,
+					ErrorCode:   diagnostic.ErrorCode,
+					Cause:       diagnostic.Cause,
+					Recoverable: diagnostic.Recoverable,
+					NextStep:    diagnostic.NextStep,
+				}
 				req.StepCallback(trEvt)
 			}
 			return &ldg.ToolResult{Error: errMsg}, nil
@@ -170,7 +178,15 @@ func (p *Planner) runReAct(ctx context.Context, req PlanRequest) (*PlanResult, e
 			detail := observe.ToolResultDetail{Skill: skillName, Result: truncate(exec.Output, 2000)}
 			if exec.Err != nil {
 				summary = fmt.Sprintf("[%s] 暂停：%s", skillName, plannerFriendlyFailureText(exec.Err.Error()))
-				detail = observe.ToolResultDetail{Skill: skillName, Error: plannerFriendlyFailureText(exec.Err.Error())}
+				diagnostic := buildToolFailureDiagnostic(exec.Err.Error())
+				detail = observe.ToolResultDetail{
+					Skill:       skillName,
+					Error:       plannerFriendlyFailureText(exec.Err.Error()),
+					ErrorCode:   diagnostic.ErrorCode,
+					Cause:       diagnostic.Cause,
+					Recoverable: diagnostic.Recoverable,
+					NextStep:    diagnostic.NextStep,
+				}
 			}
 			trEvt := observe.NewEvent(req.TraceID, observe.DomainPlanner, observe.EventToolResult, summary)
 			trEvt.Meta.Skill = skillName

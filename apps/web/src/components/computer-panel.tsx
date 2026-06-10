@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useI18n } from "@/lib/i18n";
 import {
   Brain,
-  ChevronRight,
   CheckCircle2,
   Circle,
   FileCode,
@@ -16,6 +15,53 @@ import {
   X,
 } from "lucide-react";
 import type { AgentEvent } from "@/components/execution-trace";
+import MarkdownRenderer from "@/components/markdown-renderer";
+
+// The computer panel is always dark; force light-on-dark tokens so the
+// token-based MarkdownRenderer stays readable even under the light app theme.
+const PANEL_DARK_TOKENS = {
+  ["--yunque-text"]: "#e2e8f0",
+  ["--yunque-text-secondary"]: "#cbd5e1",
+  ["--yunque-text-muted"]: "#94a3b8",
+  ["--yunque-border"]: "rgba(255,255,255,0.08)",
+  ["--yunque-accent"]: "#7dd3fc",
+} as CSSProperties;
+
+function isImagePath(p: string): boolean {
+  return /\.(png|jpe?g|gif|webp|svg|bmp|ico)$/i.test(p);
+}
+
+/** Rich file preview: markdown render for .md, syntax-highlighted code block for
+ *  source files, image for image paths. Falls back to plain <pre>. */
+function FilePreview({ file }: { file: EditorFile }) {
+  const content = file.content || "";
+  const path = file.path || "";
+  if (!content && !isImagePath(path)) {
+    return <div className="p-4 text-[12px]" style={{ color: "#94a3b8" }}>暂无预览内容。</div>;
+  }
+  if (isImagePath(path) && /^(https?:|data:image\/)/i.test(content.trim())) {
+    return (
+      <div className="p-4">
+        <img src={content.trim()} alt={path} className="max-w-full rounded-xl border" style={{ borderColor: "rgba(255,255,255,0.08)" }} />
+      </div>
+    );
+  }
+  const isMd = /\.(md|markdown|mdx)$/i.test(path);
+  const lang = file.language && file.language !== "text" ? file.language : "";
+  let md = "";
+  if (isMd) md = content;
+  else if (!content.includes("```")) md = `\`\`\`${lang}\n${content}\n\`\`\``;
+
+  return (
+    <div className="h-full overflow-y-auto p-4" style={PANEL_DARK_TOKENS}>
+      {md ? (
+        <MarkdownRenderer content={md} />
+      ) : (
+        <pre className="whitespace-pre-wrap break-words font-mono text-[12px] leading-6" style={{ color: "#dbe4f0" }}>{content}</pre>
+      )}
+    </div>
+  );
+}
 
 type ComputerTab = "timeline" | "terminal" | "browser" | "editor" | "thinking";
 
@@ -456,6 +502,21 @@ function TerminalView({ lines }: { lines: TerminalLine[] }) {
   );
 }
 
+/** Render extracted/search content richly: JSON → code block, otherwise
+ *  markdown (so result links auto-render as clickable items, GFM autolinks
+ *  bare URLs, lists/tables format) — approaching Qwen's result cards. */
+function RichContent({ text }: { text: string }) {
+  const trimmed = (text || "").trim();
+  if (!trimmed) return null;
+  const isJson = /^[[{]/.test(trimmed) && /[}\]]$/.test(trimmed);
+  const md = isJson ? `\`\`\`json\n${trimmed}\n\`\`\`` : trimmed;
+  return (
+    <div style={PANEL_DARK_TOKENS}>
+      <MarkdownRenderer content={md} />
+    </div>
+  );
+}
+
 function BrowserView({ frames, sseImage, sseUrl }: { frames: BrowserFrame[]; sseImage: string; sseUrl: string }) {
   const latest = frames[frames.length - 1];
   const url = sseUrl || latest?.url || "";
@@ -479,8 +540,14 @@ function BrowserView({ frames, sseImage, sseUrl }: { frames: BrowserFrame[]; sse
           <img src={image} alt="browser frame" className="w-full rounded-[20px] border object-cover" style={{ borderColor: "var(--yunque-border)" }} />
         ) : (
           <div className="rounded-[24px] border p-4" style={{ background: "rgba(255,255,255,0.025)", borderColor: "var(--yunque-border)" }}>
-            <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>{latest?.action ? `Action: ${latest.action}` : "Browser session"}</div>
-            <div className="mt-2 text-xs leading-6" style={{ color: "var(--yunque-text-secondary)" }}>{content || "Waiting for screenshot frames or extracted browser content."}</div>
+            <div className="mb-1 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
+              {latest?.action === "search" ? "搜索结果" : latest?.action ? `Action: ${latest.action}` : "Browser session"}
+            </div>
+            {content ? (
+              <RichContent text={content} />
+            ) : (
+              <div className="mt-2 text-xs leading-6" style={{ color: "var(--yunque-text-secondary)" }}>等待截图帧或抓取到的网页内容…</div>
+            )}
           </div>
         )}
       </div>
@@ -516,12 +583,14 @@ function EditorView({ files }: { files: EditorFile[] }) {
           </button>
         ))}
       </div>
-      <div className="min-w-0 flex-1 overflow-hidden">
-        <div className="border-b px-4 py-3" style={{ borderColor: "var(--yunque-border)" }}>
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden" style={{ background: "rgba(4,7,16,0.88)" }}>
+        <div className="shrink-0 border-b px-4 py-3" style={{ borderColor: "var(--yunque-border)" }}>
           <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>{file.path || "Untitled file"}</div>
-          <div className="mt-1 text-xs" style={{ color: "var(--yunque-text-muted)" }}>{file.language} ? {file.operation}</div>
+          <div className="mt-1 text-xs" style={{ color: "var(--yunque-text-muted)" }}>{[file.language, file.operation].filter(Boolean).join(" · ")}</div>
         </div>
-        <pre className="h-full overflow-y-auto p-4 text-[12px] leading-6" style={{ background: "rgba(4,7,16,0.88)", color: "#dbe4f0" }}>{file.content || "No preview available."}</pre>
+        <div className="min-h-0 flex-1 overflow-hidden">
+          <FilePreview file={file} />
+        </div>
       </div>
     </div>
   );
@@ -608,7 +677,10 @@ export function ComputerPanel({ steps, traceEvents, taskStatus, taskName, isLive
   }, [steps, traceEvents]);
 
   useEffect(() => {
-    let cancelled = false;
+    // Abortable SSE — without this the connection leaked on every panel
+    // mount/unmount and starved the browser's per-origin connection pool.
+    const controller = new AbortController();
+    let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
     const headers: Record<string, string> = {};
     const token = typeof window !== "undefined" ? localStorage.getItem("yunque_token") || "" : "";
     const key = typeof window !== "undefined" ? localStorage.getItem("yunque_api_key") || "" : "";
@@ -617,16 +689,16 @@ export function ComputerPanel({ steps, traceEvents, taskStatus, taskName, isLive
 
     (async () => {
       try {
-        const res = await fetch("/v1/events/stream", { headers });
+        const res = await fetch("/v1/events/stream", { headers, signal: controller.signal });
         if (!res.ok || !res.body) return;
-        const reader = res.body.getReader();
+        reader = res.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
-        while (!cancelled) {
+        while (true) {
           const { done, value } = await reader.read();
           if (done) break;
           buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\\n");
+          const lines = buffer.split("\n");
           buffer = lines.pop() || "";
           for (const line of lines) {
             if (!line.startsWith("data: ")) continue;
@@ -643,7 +715,10 @@ export function ComputerPanel({ steps, traceEvents, taskStatus, taskName, isLive
       } catch {}
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      controller.abort();
+      reader?.cancel().catch(() => {});
+    };
   }, []);
 
   const tabs = [
@@ -663,15 +738,16 @@ export function ComputerPanel({ steps, traceEvents, taskStatus, taskName, isLive
 
   return (
     <div className={`flex h-full flex-col overflow-hidden ${className || ""}`} style={{ background: "linear-gradient(180deg, rgba(12,18,30,0.98), rgba(8,10,18,0.98))" }}>
-      <div className="border-b px-4 py-4" style={{ borderColor: "rgba(255,255,255,0.07)" }}>
+      <div className="border-b px-4 py-3" style={{ borderColor: "rgba(255,255,255,0.07)" }}>
         <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="mb-2 inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px]" style={{ background: "rgba(59,130,246,0.12)", color: "#93c5fd" }}>
-              <Monitor size={12} />
-              <span>Computer workspace</span>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px]" style={{ background: "rgba(59,130,246,0.12)", color: "#93c5fd" }}>
+                <Monitor size={11} /> {taskName || "工作现场"}
+              </span>
+              {activeSummary && <span className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ background: "#60a5fa" }} />}
             </div>
-            <div className="text-sm font-semibold" style={{ color: "#f8fafc" }}>{taskName || "工作现场"}</div>
-            <div className="mt-1 text-xs leading-5" style={{ color: "#94a3b8" }}>{activeSummary ? `当前：${activeLabel}` : "查看 Agent 刚刚使用过的终端、浏览器、文件和思考证据。"}</div>
+            <div className="mt-1.5 truncate text-xs leading-5" style={{ color: "#94a3b8" }}>{activeSummary ? activeLabel : "查看 Agent 刚刚使用过的终端、浏览器、文件和思考证据。"}</div>
           </div>
           {onClose && (
             <button onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-2xl transition-colors" style={{ background: "rgba(255,255,255,0.05)", color: "#94a3b8" }}>
@@ -681,27 +757,15 @@ export function ComputerPanel({ steps, traceEvents, taskStatus, taskName, isLive
         </div>
       </div>
 
-      {(progressTotal > 1 || activeSummary) && (
-        <div className="border-b px-4 py-3" style={{ borderColor: "rgba(255,255,255,0.06)", background: "rgba(255,255,255,0.02)" }}>
-          {progressTotal > 1 && (
-            <>
-              <div className="mb-2 flex items-center justify-between text-[11px]" style={{ color: "#94a3b8" }}>
-                <span>{progressDone}/{progressTotal} steps complete</span>
-                <span>{progressPct}%</span>
-              </div>
-              <div className="h-1.5 overflow-hidden rounded-full" style={{ background: "rgba(255,255,255,0.07)" }}>
-                <div className="h-full rounded-full transition-all duration-500" style={{ width: `${progressPct}%`, background: progressPct >= 100 ? "#22c55e" : "#3b82f6" }} />
-              </div>
-            </>
-          )}
-          {activeSummary && (
-            <div className={`${progressTotal > 1 ? "mt-3" : ""} flex items-center gap-2 text-[11px]`} style={{ color: "#cbd5e1" }}>
-              <span className="flex h-5 w-5 items-center justify-center rounded-full" style={{ background: "rgba(59,130,246,0.14)", color: "#60a5fa" }}><Sparkles size={11} /></span>
-              <span>{tabs.find((tab) => tab.key === activeTab)?.label || "Timeline"} is active</span>
-              <ChevronRight size={12} style={{ color: "#3b82f6" }} />
-              <span className="min-w-0 truncate" style={{ color: "#94a3b8" }}>{taskStatus || (isLive ? "running" : "ready")}</span>
-            </div>
-          )}
+      {progressTotal > 1 && (
+        <div className="border-b px-4 py-2.5" style={{ borderColor: "rgba(255,255,255,0.06)", background: "rgba(255,255,255,0.02)" }}>
+          <div className="mb-1.5 flex items-center justify-between text-[11px]" style={{ color: "#94a3b8" }}>
+            <span>{progressDone}/{progressTotal} steps</span>
+            <span>{progressPct}%</span>
+          </div>
+          <div className="h-1.5 overflow-hidden rounded-full" style={{ background: "rgba(255,255,255,0.07)" }}>
+            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${progressPct}%`, background: progressPct >= 100 ? "#22c55e" : "#3b82f6" }} />
+          </div>
         </div>
       )}
 

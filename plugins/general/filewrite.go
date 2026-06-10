@@ -69,7 +69,7 @@ func (s *FileWriteSkill) Execute(ctx context.Context, args map[string]any, env *
 	}
 
 	// Security: verify the path is under an allowed directory
-	if !s.isAllowed(absPath) {
+	if !s.isAllowed(absPath, env) {
 		return "", fmt.Errorf("access denied: %s is not under an allowed output directory", absPath)
 	}
 
@@ -122,8 +122,8 @@ func (s *FileWriteSkill) Execute(ctx context.Context, args map[string]any, env *
 	return fmt.Sprintf("已写入 %s（%d 字节，模式：%s）", absPath, size, mode), nil
 }
 
-func (s *FileWriteSkill) isAllowed(absPath string) bool {
-	for _, dir := range s.allowedDirs {
+func (s *FileWriteSkill) isAllowed(absPath string, env *skills.Environment) bool {
+	for _, dir := range mergeWorkspacePaths(s.allowedDirs, env) {
 		absDir, err := filepath.Abs(dir)
 		if err != nil {
 			continue

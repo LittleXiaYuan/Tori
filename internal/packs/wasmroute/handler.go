@@ -44,7 +44,7 @@ type ResponseEnvelope struct {
 // module bytes are read and integrity-checked from installedDir on each
 // request (compiled-module caching is a later optimization). entrypoint
 // defaults to "_start".
-func BuildRouteHandler(installedDir string, rt packruntime.BackendRuntime, spec packruntime.BackendRouteSpec, sb *sandbox.WasmSandbox) http.HandlerFunc {
+func BuildRouteHandler(installedDir string, rt packruntime.BackendRuntime, spec packruntime.BackendRouteSpec, sb *sandbox.WasmSandbox, hostFuncs ...sandbox.ModuleHostFunc) http.HandlerFunc {
 	modulePath := filepath.Join(installedDir, filepath.FromSlash(rt.Module))
 	entrypoint := strings.TrimSpace(spec.Entrypoint)
 	if entrypoint == "" {
@@ -85,7 +85,7 @@ func BuildRouteHandler(installedDir string, rt packruntime.BackendRuntime, spec 
 			return
 		}
 
-		result, err := sb.Execute(r.Context(), wasmBytes, string(stdin), entrypoint)
+		result, err := sb.ExecuteWithHostFuncs(r.Context(), wasmBytes, string(stdin), entrypoint, hostFuncs)
 		if err != nil {
 			writeErr(w, http.StatusInternalServerError, fmt.Sprintf("wasm execution error: %v", err))
 			return
