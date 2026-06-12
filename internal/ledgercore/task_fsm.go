@@ -112,7 +112,10 @@ var transitionEventKind = map[[2]TaskStatus]EventKind{
 	{TaskWaitingInput, TaskCancelled}: EventTaskCancelled,
 	{TaskBlocked, TaskReady}:         EventTaskResumed,
 	{TaskBlocked, TaskCancelled}:     EventTaskCancelled,
-	{TaskRetrying, TaskRunning}:      EventTaskResumed,
+	// retrying → running re-enters execution, so it must replay to `running`
+	// (task.resumed projects to `ready`, which would diverge from the
+	// materialized view).
+	{TaskRetrying, TaskRunning}:      EventTaskStarted,
 	{TaskRetrying, TaskFailed}:       EventTaskFailed,
 	{TaskFailed, TaskReady}:          EventTaskResumed,
 	{TaskCancelled, TaskReady}:       EventTaskResumed,

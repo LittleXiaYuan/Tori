@@ -12,8 +12,8 @@ func TestLoRAPackRoutesDeclareManifestSurface(t *testing.T) {
 		t.Fatalf("unexpected pack id: %s", handler.PackID())
 	}
 	routes := handler.Routes()
-	if len(routes) != 8 {
-		t.Fatalf("expected 8 LoRA routes, got %d", len(routes))
+	if len(routes) != 9 {
+		t.Fatalf("expected 9 LoRA routes, got %d", len(routes))
 	}
 	byPath := map[string][]string{}
 	for _, route := range routes {
@@ -49,5 +49,8 @@ func TestLoRAPackRoutesDeclareManifestSurface(t *testing.T) {
 	}
 	if strings.Join(byPath["/v1/lora/config"], ",") != "GET,PUT,PATCH" {
 		t.Fatalf("expected config to expose GET,PUT,PATCH, got %#v", byPath["/v1/lora/config"])
+	}
+	if strings.Join(byPath["/v1/lora/distill"], ",") != "GET,POST" {
+		t.Fatalf("expected distill to expose GET,POST, got %#v", byPath["/v1/lora/distill"])
 	}
 }

@@ -318,6 +318,15 @@ func formatTimePtr(t *time.Time) *string {
 	s := t.Format(timeFormat)
 	return &s
 }
+// escapeLike escapes SQL LIKE wildcards so user-supplied query text matches
+// literally ('%' and '_' would otherwise act as wildcards).
+func escapeLike(s string) string {
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	s = strings.ReplaceAll(s, `%`, `\%`)
+	s = strings.ReplaceAll(s, `_`, `\_`)
+	return s
+}
+
 func parseTime(s string) time.Time {
 	t, _ := time.Parse(timeFormat, s)
 	return t
@@ -529,6 +538,50 @@ func (b *Backend) ListTasks(ctx context.Context, f ledger.TaskFilter) ([]*ledger
 	return tasks, rows.Err()
 }
 
+// DeleteTask permanently removes a task and every row that references it
+// (dependencies, checkpoints, artifacts, events) in one transaction.
+func (b *Backend) DeleteTask(ctx context.Context, id string) error {
+	tx, err := b.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx,
+		`DELETE FROM task_dependencies WHERE from_task_id = ? OR to_task_id = ?`, id, id); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	for _, stmt := range []string{
+		`DELETE FROM checkpoints WHERE task_id = ?`,
+		`DELETE FROM artifacts WHERE task_id = ?`,
+		`DELETE FROM events WHERE task_id = ?`,
+	} {
+		if _, err := tx.ExecContext(ctx, stmt, id); err != nil {
+			_ = tx.Rollback()
+			return err
+		}
+	}
+	res, err := tx.ExecContext(ctx, `DELETE FROM tasks WHERE id = ?`, id)
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+
+	// Drop the cached event seq so a future task reusing this ID starts clean.
+	b.mu.Lock()
+	delete(b.seqs, id)
+	delete(b.seqsLoaded, id)
+	b.mu.Unlock()
+
+	if n == 0 {
+		return ledger.ErrTaskNotFound
+	}
+	return nil
+}
+
 type scanner interface {
 	Scan(dest ...interface{}) error
 }
@@ -605,7 +658,18 @@ func (b *Backend) appendEventTx(ctx context.Context, tx *sql.Tx, e *ledger.Event
 
 func (b *Backend) appendEventExec(ctx context.Context, execer eventExecer, e *ledger.Event) error {
 	if e.Seq != 0 {
-		return insertEvent(ctx, execer, e)
+		if err := insertEvent(ctx, execer, e); err != nil {
+			return err
+		}
+		// Keep the in-process seq cache ahead of explicitly-numbered inserts
+		// (e.g. events applied by sync). Otherwise the next auto-seq append
+		// reuses the same seq and fails the UNIQUE(task_id, seq) constraint.
+		b.mu.Lock()
+		if b.seqsLoaded[e.TaskID] && e.Seq > b.seqs[e.TaskID] {
+			b.seqs[e.TaskID] = e.Seq
+		}
+		b.mu.Unlock()
+		return nil
 	}
 
 	b.mu.Lock()
@@ -736,8 +800,15 @@ func (b *Backend) QueryEvents(ctx context.Context, q ledger.EventQuery) ([]*ledg
 		where = " WHERE " + strings.Join(clauses, " AND ")
 	}
 
+	// Within a single task, seq is the canonical event order (replay and sync
+	// depend on it); created_at can be skewed for synced or caller-stamped
+	// events. Across tasks there is no global seq, so fall back to timestamps.
+	order := ` ORDER BY created_at ASC, seq ASC`
+	if q.TaskID != "" {
+		order = ` ORDER BY seq ASC`
+	}
 	query := `SELECT id, task_id, kind, seq, actor, payload, parent_id, duration_ms, created_at
-		FROM events` + where + ` ORDER BY created_at ASC, seq ASC`
+		FROM events` + where + order
 
 	if q.Limit > 0 {
 		query += fmt.Sprintf(" LIMIT %d", q.Limit)
@@ -843,11 +914,27 @@ func (b *Backend) DeleteCheckpointsBefore(ctx context.Context, taskID string, be
 // ── Memory ──
 
 func (b *Backend) PutMemory(ctx context.Context, m *ledger.MemoryEntry) error {
+	// True upsert: INSERT OR REPLACE would delete-then-insert on conflict,
+	// and the delete cascades into the embeddings table (ON DELETE CASCADE),
+	// silently dropping the vector on every memory update.
 	_, err := b.db.ExecContext(ctx,
-		`INSERT OR REPLACE INTO memories
+		`INSERT INTO memories
 			(id, tenant_id, task_id, kind, key, content, source, confidence,
 			 access_count, last_access, expires_at, metadata, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(id) DO UPDATE SET
+			tenant_id = excluded.tenant_id,
+			task_id = excluded.task_id,
+			kind = excluded.kind,
+			key = excluded.key,
+			content = excluded.content,
+			source = excluded.source,
+			confidence = excluded.confidence,
+			access_count = excluded.access_count,
+			last_access = excluded.last_access,
+			expires_at = excluded.expires_at,
+			metadata = excluded.metadata,
+			updated_at = excluded.updated_at`,
 		m.ID, m.TenantID, m.TaskID, m.Kind, m.Key, m.Content, m.Source,
 		m.Confidence, m.AccessCount,
 		formatTimePtr(m.LastAccess), formatTimePtr(m.ExpiresAt),
@@ -896,8 +983,8 @@ func (b *Backend) SearchMemories(ctx context.Context, q ledger.MemoryQuery) ([]*
 		args = append(args, *q.TaskID)
 	}
 	if q.Query != "" {
-		clauses = append(clauses, "(content LIKE ? OR key LIKE ?)")
-		pattern := "%" + q.Query + "%"
+		clauses = append(clauses, `(content LIKE ? ESCAPE '\' OR key LIKE ? ESCAPE '\')`)
+		pattern := "%" + escapeLike(q.Query) + "%"
 		args = append(args, pattern, pattern)
 	}
 	if q.Key != "" {
@@ -923,6 +1010,10 @@ func (b *Backend) SearchMemories(ctx context.Context, q ledger.MemoryQuery) ([]*
 		FROM memories WHERE ` + strings.Join(clauses, " AND ") +
 		` ORDER BY updated_at DESC LIMIT ?`
 	args = append(args, limit)
+	if q.Offset > 0 {
+		query += " OFFSET ?"
+		args = append(args, q.Offset)
+	}
 
 	rows, err := b.db.QueryContext(ctx, query, args...)
 	if err != nil {

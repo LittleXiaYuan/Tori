@@ -50,7 +50,8 @@ type EventStream struct {
 	remoteSeqs   map[string]map[string]int64 // instanceID ???taskID ???lastSeq
 	remoteSeqsMu sync.RWMutex
 
-	stopCh chan struct{}
+	stopCh   chan struct{}
+	stopOnce sync.Once
 }
 
 // EventStreamConfig configures the distributed event stream.
@@ -160,12 +161,14 @@ func (es *EventStream) SubscribeRemote(ctx context.Context, filter EventFilter) 
 		if es.isDuplicate(envelope.EventID) {
 			return
 		}
-		es.markSeen(envelope.EventID)
 
-		// Check sequence ordering
+		// Check sequence ordering. Mark seen only after the event is
+		// accepted: marking a rejected out-of-order event would make any
+		// later re-delivery look like a duplicate and drop it permanently.
 		if !es.checkAndUpdateSeq(envelope.InstanceID, envelope.TaskID, envelope.Seq) {
 			return // out-of-order, skip (or could buffer)
 		}
+		es.markSeen(envelope.EventID)
 
 		// Inject into local bus
 		if envelope.Event != nil && matchesFilter(envelope.Event, &filter) {
@@ -177,8 +180,15 @@ func (es *EventStream) SubscribeRemote(ctx context.Context, filter EventFilter) 
 	}
 
 	es.mu.Lock()
+	old, exists := es.externalSubs[topic]
 	es.externalSubs[topic] = subID
 	es.mu.Unlock()
+
+	// Drop the superseded transport subscription, otherwise its handler keeps
+	// firing alongside the new one (duplicate delivery + leak).
+	if exists && old != subID {
+		_ = es.transport.Unsubscribe(ctx, old)
+	}
 
 	return nil
 }
@@ -196,13 +206,15 @@ func (es *EventStream) UnsubscribeAll(ctx context.Context) {
 	}
 }
 
-// Close shuts down the event stream.
+// Close shuts down the event stream. Safe to call multiple times.
 func (es *EventStream) Close() {
-	close(es.stopCh)
-	es.UnsubscribeAll(context.Background())
-	if es.transport != nil {
-		es.transport.Close()
-	}
+	es.stopOnce.Do(func() {
+		close(es.stopCh)
+		es.UnsubscribeAll(context.Background())
+		if es.transport != nil {
+			es.transport.Close()
+		}
+	})
 }
 
 // InstanceID returns this stream's instance identifier.
@@ -238,13 +250,25 @@ func (es *EventStream) markSeen(eventID string) {
 	defer es.seenMu.Unlock()
 	es.seen[eventID] = time.Now()
 
-	// Evict if too large
+	// Evict if too large: TTL pass first, then hard-cap by evicting the
+	// oldest entries so the cache stays bounded even when everything is
+	// within the TTL window.
 	if len(es.seen) > es.maxSeen {
 		cutoff := time.Now().Add(-es.seenTTL)
 		for id, ts := range es.seen {
 			if ts.Before(cutoff) {
 				delete(es.seen, id)
 			}
+		}
+		for len(es.seen) > es.maxSeen {
+			var oldestID string
+			var oldestTS time.Time
+			for id, ts := range es.seen {
+				if oldestID == "" || ts.Before(oldestTS) {
+					oldestID, oldestTS = id, ts
+				}
+			}
+			delete(es.seen, oldestID)
 		}
 	}
 }

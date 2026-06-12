@@ -4,6 +4,7 @@ import (
 	"context"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -17,11 +18,29 @@ import (
 //	Stage 4: Multi-signal rerank (keyword + semantic + graph + goal + confidence + recency)
 type RecallEngine struct {
 	backend  Backend
-	weights  ScoreWeights
 	vector   *VectorIndex
 	graph    *ContextGraph
 	graphRAG *GraphRAG
 	bm25     *BM25Index
+
+	// weights is read by every Recall and rewritten by AdaptiveRecall;
+	// guard it so weight adaptation cannot tear a concurrent scoring pass.
+	weightsMu sync.RWMutex
+	weights   ScoreWeights
+}
+
+// snapshotWeights returns a consistent copy of the scoring weights.
+func (re *RecallEngine) snapshotWeights() ScoreWeights {
+	re.weightsMu.RLock()
+	defer re.weightsMu.RUnlock()
+	return re.weights
+}
+
+// setWeights atomically replaces the scoring weights.
+func (re *RecallEngine) setWeights(w ScoreWeights) {
+	re.weightsMu.Lock()
+	re.weights = w
+	re.weightsMu.Unlock()
 }
 
 // SetGraph attaches the context graph for Stage 2 traversal.
@@ -105,12 +124,14 @@ func (re *RecallEngine) Recall(ctx context.Context, q RecallQuery) (*RecallResul
 	}
 
 	// ── Stage 2: Graph traversal (optional) ──
+	// Graph and BM25 indexes span tenants, so every candidate fetched by ID
+	// must pass the tenant/kind/recency/expiry gate before joining the pool.
 	if re.graph != nil && q.TaskID != "" {
 		relatedIDs, _ := re.graph.FindRelatedMemoriesForTenant(ctx, q.TenantID, NodeTask, q.TaskID, q.Limit*2)
 		for _, rid := range relatedIDs {
 			if _, exists := candidateMap[rid]; !exists {
 				m, err := re.backend.GetMemory(ctx, rid)
-				if err == nil && m != nil {
+				if err == nil && recallMemoryAllowed(m, &q, now) {
 					candidateMap[m.ID] = m
 				}
 			}
@@ -125,7 +146,7 @@ func (re *RecallEngine) Recall(ctx context.Context, q RecallQuery) (*RecallResul
 		for _, hit := range bm25Hits {
 			if _, exists := candidateMap[hit.DocID]; !exists {
 				m, err := re.backend.GetMemory(ctx, hit.DocID)
-				if err == nil && m != nil {
+				if err == nil && recallMemoryAllowed(m, &q, now) {
 					candidateMap[m.ID] = m
 				}
 			}
@@ -167,6 +188,10 @@ func (re *RecallEngine) Recall(ctx context.Context, q RecallQuery) (*RecallResul
 	}
 
 	// ── Stage 3: Semantic retrieval (optional) ──
+	// Cosine scores are kept in a side map: entries strip their embeddings
+	// (and GetMemory never loads them), so Stage 4 cannot recompute
+	// similarity from the entry itself.
+	semanticScores := make(map[string]float64)
 	if re.vector != nil && re.vector.Enabled() && len(queryEmbed) > 0 {
 		vecResults, err := re.vector.Search(ctx, VectorQuery{
 			TenantID:  q.TenantID,
@@ -177,6 +202,7 @@ func (re *RecallEngine) Recall(ctx context.Context, q RecallQuery) (*RecallResul
 		})
 		if err == nil {
 			for _, sr := range vecResults {
+				semanticScores[sr.Entry.ID] = sr.Score
 				if _, exists := candidateMap[sr.Entry.ID]; !exists {
 					entryCopy := sr.Entry
 					entryCopy.Embedding = nil // don't carry embeddings in results
@@ -206,18 +232,18 @@ func (re *RecallEngine) Recall(ctx context.Context, q RecallQuery) (*RecallResul
 		bm25ScoreMap[hit.DocID] = hit.Score
 	}
 
+	weights := re.snapshotWeights()
 	var scored []ScoredEntry
 	for _, m := range candidateMap {
-		baseScore, reason := scoreEntry(m, &q, re.weights)
+		baseScore, reason := scoreEntry(m, &q, weights)
 
-		hasSemantic := len(queryEmbed) > 0 && len(m.Embedding) > 0
+		semanticSim, hasSemantic := semanticScores[m.ID]
+		if !hasSemantic && len(queryEmbed) > 0 && len(m.Embedding) > 0 {
+			semanticSim = CosineSimilarity(queryEmbed, m.Embedding)
+			hasSemantic = true
+		}
 		_, hasBM25 := bm25ScoreMap[m.ID]
 		_, hasCommunity := communityHitMap[m.ID]
-
-		var semanticSim float64
-		if hasSemantic {
-			semanticSim = CosineSimilarity(queryEmbed, m.Embedding)
-		}
 
 		var normalizedBM25 float64
 		if hasBM25 {

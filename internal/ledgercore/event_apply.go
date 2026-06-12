@@ -16,6 +16,13 @@ func ApplyEvent(t *Task, e *Event) {
 	case EventTaskCreated:
 		t.ID = e.TaskID
 		t.Status = TaskCreated
+		// Mirror CreateTask defaults so replay matches the materialized row
+		// even for events that predate richer payloads.
+		t.AgentID = "default"
+		t.Input = JSON("{}")
+		t.Output = JSON("{}")
+		t.Metadata = JSON("{}")
+		t.MaxRetries = 2
 		if p.Goal != "" {
 			t.Goal = p.Goal
 		}
@@ -34,6 +41,19 @@ func ApplyEvent(t *Task, e *Event) {
 		if len(p.Input) > 0 {
 			t.Input = JSON(p.Input)
 		}
+		if len(p.Metadata) > 0 {
+			t.Metadata = JSON(p.Metadata)
+		}
+		if p.Priority != nil {
+			t.Priority = *p.Priority
+		}
+		if p.MaxRetries != nil {
+			t.MaxRetries = *p.MaxRetries
+		}
+		if p.ParentTaskID != "" {
+			pid := p.ParentTaskID
+			t.ParentTaskID = &pid
+		}
 		t.CreatedAt = e.CreatedAt
 
 	case EventTaskReady:
@@ -41,7 +61,11 @@ func ApplyEvent(t *Task, e *Event) {
 
 	case EventTaskStarted:
 		t.Status = TaskRunning
-		t.StartedAt = &e.CreatedAt
+		// First start wins, matching the materialized-view update in
+		// TaskManager.Transition (retry restarts re-emit task.started).
+		if t.StartedAt == nil {
+			t.StartedAt = &e.CreatedAt
+		}
 
 	case EventTaskCompleted:
 		t.Status = TaskCompleted
@@ -87,11 +111,20 @@ func ApplyEvent(t *Task, e *Event) {
 		if p.CheckpointID != "" {
 			t.CheckpointRef = &p.CheckpointID
 		}
+
+	default:
+		// Step/reasoning/infra events never touch the materialized task row,
+		// so they must not advance its version or timestamp during replay.
+		return
 	}
 
-	// Always update the version and timestamp
 	t.UpdatedAt = e.CreatedAt
-	t.Version++
+	// task.created corresponds to the INSERT (version 0); every other
+	// projected kind corresponds to exactly one UpdateTask (+1). Keeping the
+	// counts aligned lets replayed tasks participate in optimistic locking.
+	if e.Kind != EventTaskCreated {
+		t.Version++
+	}
 }
 
 // eventPayload is the union of all possible payload fields.
@@ -124,6 +157,12 @@ type eventPayload struct {
 	PlanSteps   []string `json:"plan_steps,omitempty"`    // Steps in a generated plan
 	Depth       *int     `json:"depth,omitempty"`         // Reasoning depth (for nested thought trees)
 	ParentStep  *int     `json:"parent_step,omitempty"`   // Links to parent reasoning step
+
+	// Creation fields (task.created)
+	Metadata     json.RawMessage `json:"metadata,omitempty"`
+	Priority     *int            `json:"priority,omitempty"`
+	MaxRetries   *int            `json:"max_retries,omitempty"`
+	ParentTaskID string          `json:"parent_task_id,omitempty"`
 
 	// Infrastructure
 	CheckpointID string `json:"checkpoint_id,omitempty"`

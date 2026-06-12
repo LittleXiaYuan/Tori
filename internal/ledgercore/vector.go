@@ -210,25 +210,41 @@ func (vi *VectorIndex) searchIVF(ctx context.Context, q VectorQuery) ([]ScoredEn
 		minScore = 0.3
 	}
 
-	// IVF search returns memory IDs with scores
-	ivfResults := vi.ivf.Search(q.Embedding, limit*2, minScore)
+	// The IVF index spans all tenants, so over-fetch and apply the same
+	// tenant/kind filters as searchHNSW; skipping them would leak another
+	// tenant's memories into the results.
+	ivfResults := vi.ivf.Search(q.Embedding, limit*10, minScore)
 
 	// Load full memory entries from backend
 	var results []ScoredEntry
 	for _, ir := range ivfResults {
 		m, err := vi.backend.GetMemory(ctx, ir.MemoryID)
-		if err != nil {
+		if err != nil || m == nil {
 			continue
+		}
+		if q.TenantID != "" && m.TenantID != q.TenantID {
+			continue
+		}
+		if len(q.Kinds) > 0 {
+			ok := false
+			for _, kind := range q.Kinds {
+				if m.Kind == kind {
+					ok = true
+					break
+				}
+			}
+			if !ok {
+				continue
+			}
 		}
 		results = append(results, ScoredEntry{
 			Entry:  *m,
 			Score:  ir.Score,
 			Reason: "semantic (ivf)",
 		})
-	}
-
-	if len(results) > limit {
-		results = results[:limit]
+		if len(results) >= limit {
+			break
+		}
 	}
 	return results, nil
 }

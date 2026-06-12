@@ -45,16 +45,30 @@ func (m *KVMigrator) MigrateFile(namespace, key, filePath string) error {
 	}
 
 	ctx := context.Background()
+
+	// If the key already exists, an earlier migration ran but the rename
+	// below failed. Re-writing would clobber KV data that may have been
+	// updated since; just retry retiring the source file.
+	if existing, err := m.ldg.KV.GetRaw(ctx, namespace, key); err == nil && existing != nil {
+		if err := os.Rename(filePath, filePath+".migrated"); err != nil {
+			return fmt.Errorf("kv migrate: %s/%s already in Ledger but source rename failed: %w", namespace, key, err)
+		}
+		slog.Info("kv migrate: retired stale source file", "file", filepath.Base(filePath), "namespace", namespace, "key", key)
+		return nil
+	}
+
 	if err := m.ldg.KV.PutRaw(ctx, namespace, key, data); err != nil {
 		return fmt.Errorf("kv migrate put %s/%s: %w", namespace, key, err)
 	}
 
 	migratedPath := filePath + ".migrated"
 	if err := os.Rename(filePath, migratedPath); err != nil {
-		slog.Warn("kv migrate: rename failed (data already in Ledger)", "file", filePath, "err", err)
-	} else {
-		slog.Info("kv migrated", "file", filepath.Base(filePath), "namespace", namespace, "key", key)
+		// Surface the failure: leaving the source in place would re-trigger
+		// the overwrite-protection path above on next start, but operators
+		// should know the migration is in a half-finished state.
+		return fmt.Errorf("kv migrate: stored %s/%s but failed to retire source file %s: %w", namespace, key, filePath, err)
 	}
+	slog.Info("kv migrated", "file", filepath.Base(filePath), "namespace", namespace, "key", key)
 	return nil
 }
 

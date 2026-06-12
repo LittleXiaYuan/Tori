@@ -63,9 +63,12 @@ func (mb *MemoryBridge) storeExperience(taskID string, success bool, detail stri
 		confidence = 0.7
 	}
 
-	// Store as experience memory in Ledger
+	// Store as experience memory in Ledger. The ID is derived from the task
+	// so duplicate terminal events (or re-runs) upsert one row instead of
+	// accumulating copies with the same logical key.
 	taskIDRef := taskID
 	err := mb.ldg.Memory.Put(ctx, &ledger.MemoryEntry{
+		ID:         fmt.Sprintf("task-exp-%s", taskID),
 		TenantID:   tenantID,
 		TaskID:     &taskIDRef,
 		Kind:       ledger.MemoryExperience,

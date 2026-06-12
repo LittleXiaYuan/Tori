@@ -17,16 +17,30 @@ type CheckpointManager struct {
 // Save creates a checkpoint for the given task at the current event position.
 // It captures the full task state and optional working memory snapshot.
 func (cm *CheckpointManager) Save(ctx context.Context, taskID string, stepIndex int, workingMem JSON, reason string) (*Checkpoint, error) {
-	// Get current task state
-	task, err := cm.backend.GetTask(ctx, taskID)
-	if err != nil {
-		return nil, err
-	}
-
-	// Get the latest event seq efficiently (single query, no full scan)
-	eventSeq, err := cm.backend.LatestEventSeq(ctx, taskID)
-	if err != nil {
-		return nil, err
+	// Optimistic snapshot: the task row and the event cursor must describe
+	// the same moment, otherwise Resume replays from a cursor that is ahead
+	// of the stored state and returns stale data. If the seq moved while we
+	// read the task, retry; equal seqs before and after the read mean no
+	// event landed in between.
+	var task *Task
+	var eventSeq int64
+	for attempt := 0; ; attempt++ {
+		s1, err := cm.backend.LatestEventSeq(ctx, taskID)
+		if err != nil {
+			return nil, err
+		}
+		task, err = cm.backend.GetTask(ctx, taskID)
+		if err != nil {
+			return nil, err
+		}
+		s2, err := cm.backend.LatestEventSeq(ctx, taskID)
+		if err != nil {
+			return nil, err
+		}
+		eventSeq = s2
+		if s1 == s2 || attempt >= 3 {
+			break
+		}
 	}
 
 	// Serialize task state
@@ -102,6 +116,11 @@ func (cm *CheckpointManager) Cleanup(ctx context.Context, taskID string, keepCou
 
 	if len(cps) <= keepCount {
 		return nil // nothing to clean
+	}
+
+	// keepCount <= 0 means delete everything (guard against cps[-1] panic).
+	if keepCount <= 0 {
+		return cm.backend.DeleteCheckpointsBefore(ctx, taskID, cps[0].EventSeq+1)
 	}
 
 	// cps is sorted DESC by created_at, keep first keepCount

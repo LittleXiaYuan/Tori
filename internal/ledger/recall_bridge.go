@@ -114,17 +114,29 @@ func (rb *RecallBridge) recall(ctx context.Context, tenantID, query string) *led
 		TaskType: ledger.TaskTypeGoal,
 		Limit:    5,
 		MinScore: 0.2,
-		// Only surface user-facing memory kinds. Exclude experience (raw
-		// training-data conversation pairs collected for nightly export) and
-		// artifact refs — they would pollute recall and waste prompt tokens.
+		// Include experience so MemoryBridge's task success/failure lessons
+		// reach the planner (the documented learning loop). Raw training-data
+		// pairs share the experience kind but are tagged source=training_data
+		// and are filtered below — they would pollute recall and waste
+		// prompt tokens.
 		MemoryKinds: []ledger.MemoryKind{
 			ledger.MemoryFact, ledger.MemoryRule,
 			ledger.MemorySummary, ledger.MemoryPreference,
+			ledger.MemoryExperience,
 		},
 	})
 	if err != nil {
 		return nil
 	}
+	filtered := result.Entries[:0]
+	for _, e := range result.Entries {
+		if e.Entry.Kind == ledger.MemoryExperience && e.Entry.Source == "training_data" {
+			continue
+		}
+		filtered = append(filtered, e)
+	}
+	result.Entries = filtered
+	result.TotalFound = len(filtered)
 	return result
 }
 

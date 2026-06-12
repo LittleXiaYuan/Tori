@@ -47,7 +47,7 @@ func (ar *AdaptiveRecall) RecordFeedback(ctx context.Context, fb RecallFeedback,
 	ar.feedback = append(ar.feedback, recallFeedbackEntry{
 		feedback: fb,
 		query:    query,
-		weights:  ar.engine.weights,
+		weights:  ar.engine.snapshotWeights(),
 		at:       time.Now(),
 	})
 	ar.mu.Unlock()
@@ -81,11 +81,11 @@ func (ar *AdaptiveRecall) AdaptWeights(ctx context.Context, minSamples int) (Sco
 	ar.mu.Unlock()
 
 	if len(entries) < minSamples {
-		return ar.engine.weights, 0
+		return ar.engine.snapshotWeights(), 0
 	}
 
 	// Analyze which weight dimensions correlate with helpfulness
-	w := ar.engine.weights
+	w := ar.engine.snapshotWeights()
 	lr := 0.05 // learning rate
 
 	var helpfulScores, unhelpfulScores [7]float64
@@ -160,14 +160,14 @@ func (ar *AdaptiveRecall) AdaptWeights(ctx context.Context, minSamples int) (Sco
 	}
 
 	// Apply new weights
-	ar.engine.weights = w
+	ar.engine.setWeights(w)
 
 	return w, len(entries)
 }
 
 // PersistWeights saves the current weights to Memory for cross-session persistence.
 func (ar *AdaptiveRecall) PersistWeights(ctx context.Context, tenantID string) error {
-	data, _ := json.Marshal(ar.engine.weights)
+	data, _ := json.Marshal(ar.engine.snapshotWeights())
 	return ar.memory.Put(ctx, &MemoryEntry{
 		TenantID:   tenantID,
 		Kind:       MemoryRule,
@@ -193,7 +193,7 @@ func (ar *AdaptiveRecall) LoadWeights(ctx context.Context, tenantID string) erro
 		if m.Key == "recall.weights" {
 			var w ScoreWeights
 			if json.Unmarshal([]byte(m.Content), &w) == nil {
-				ar.engine.weights = w
+				ar.engine.setWeights(w)
 				return nil
 			}
 		}
@@ -203,7 +203,7 @@ func (ar *AdaptiveRecall) LoadWeights(ctx context.Context, tenantID string) erro
 
 // CurrentWeights returns the current scoring weights.
 func (ar *AdaptiveRecall) CurrentWeights() ScoreWeights {
-	return ar.engine.weights
+	return ar.engine.snapshotWeights()
 }
 
 // FeedbackCount returns the number of accumulated feedback entries.

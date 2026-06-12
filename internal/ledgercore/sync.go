@@ -3,6 +3,7 @@ package ledger
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -132,10 +133,22 @@ type SyncEngine struct {
 	stopCh   chan struct{}
 	stopOnce sync.Once
 
-	// In-memory set of seen event IDs for efficient dedup during sync.
-	seenMu sync.RWMutex
-	seenIDs map[string]struct{}
+	// seenIDs is a bounded dedupe cache over recently applied/created event
+	// IDs, with seenFIFO tracking insertion order for eviction. Eviction is
+	// safe: a re-delivered event that slipped out of the cache hits the
+	// storage primary-key constraint in AppendEvent and is not re-published.
+	seenMu   sync.Mutex
+	seenIDs  map[string]struct{}
+	seenFIFO []string
+	seenCap  int
 }
+
+// syncSeenCap bounds the dedupe cache; ~8k ULIDs ≈ a few hundred KB.
+const syncSeenCap = 8192
+
+// syncPullBatchSize caps how many events one pull response carries; lagging
+// peers catch up across successive sync rounds.
+const syncPullBatchSize = 100
 
 // SyncConflictPolicy determines how to resolve concurrent events on the same task.
 type SyncConflictPolicy int
@@ -172,6 +185,7 @@ func NewSyncEngine(cfg SyncEngineConfig) *SyncEngine {
 		conflictPolicy: cfg.ConflictPolicy,
 		stopCh:         make(chan struct{}),
 		seenIDs:        make(map[string]struct{}),
+		seenCap:        syncSeenCap,
 	}
 
 	// Register sync message handler
@@ -217,14 +231,44 @@ func (se *SyncEngine) OnLocalEvent(ctx context.Context, e *Event) {
 	se.vector = se.vector.Increment(se.instanceID)
 	se.mu.Unlock()
 
-	se.seenMu.Lock()
-	se.seenIDs[e.ID] = struct{}{}
-	se.seenMu.Unlock()
+	se.markSeen(e.ID)
 
 	// Opportunistic push to all peers
 	if se.transport != nil {
 		se.pushEventToPeers(ctx, e)
 	}
+}
+
+// markSeen records an event ID in the bounded dedupe cache, evicting the
+// oldest entries once the cap is reached (FIFO).
+func (se *SyncEngine) markSeen(id string) {
+	se.seenMu.Lock()
+	defer se.seenMu.Unlock()
+	if _, ok := se.seenIDs[id]; ok {
+		return
+	}
+	se.seenIDs[id] = struct{}{}
+	se.seenFIFO = append(se.seenFIFO, id)
+	for len(se.seenFIFO) > se.seenCap {
+		oldest := se.seenFIFO[0]
+		se.seenFIFO = se.seenFIFO[1:]
+		delete(se.seenIDs, oldest)
+	}
+}
+
+func (se *SyncEngine) hasSeen(id string) bool {
+	se.seenMu.Lock()
+	defer se.seenMu.Unlock()
+	_, ok := se.seenIDs[id]
+	return ok
+}
+
+// SeenCount reports the current size of the dedupe cache (bounded by the
+// engine's cap). Exposed for tests and operational monitoring.
+func (se *SyncEngine) SeenCount() int {
+	se.seenMu.Lock()
+	defer se.seenMu.Unlock()
+	return len(se.seenIDs)
 }
 
 // GetVersionVector returns the current version vector.
@@ -320,20 +364,17 @@ func (se *SyncEngine) handleMessage(msg *SyncMessage) {
 }
 
 func (se *SyncEngine) handlePull(ctx context.Context, msg *SyncMessage) {
-	// Query local events after the requested sequence
+	// Push AfterSeq (and the optional task scope) down into the query so the
+	// oldest missing events come back first. Fetching an arbitrary window and
+	// filtering in memory could return zero overlap with what a lagging peer
+	// was missing and starve it permanently.
 	events, err := se.backend.QueryEvents(ctx, EventQuery{
-		Limit: 100,
+		TaskID:   msg.TaskID,
+		AfterSeq: msg.AfterSeq,
+		Limit:    syncPullBatchSize,
 	})
 	if err != nil {
 		return
-	}
-
-	// Filter to events after afterSeq
-	var filtered []*Event
-	for _, e := range events {
-		if e.Seq > msg.AfterSeq {
-			filtered = append(filtered, e)
-		}
 	}
 
 	response := &SyncMessage{
@@ -341,7 +382,7 @@ func (se *SyncEngine) handlePull(ctx context.Context, msg *SyncMessage) {
 		InstanceID: se.instanceID,
 		RequestID:  msg.RequestID,
 		Vector:     se.GetVersionVector(),
-		Events:     filtered,
+		Events:     events,
 		Timestamp:  time.Now().UnixMilli(),
 	}
 
@@ -360,21 +401,21 @@ func (se *SyncEngine) handlePush(ctx context.Context, msg *SyncMessage) {
 	}
 	se.peerMu.Unlock()
 
-	// Merge incoming events (O(1) dedup via in-memory seen set).
+	// Merge incoming events (O(1) dedup via the bounded seen cache).
 	for _, e := range msg.Events {
-		se.seenMu.RLock()
-		_, seen := se.seenIDs[e.ID]
-		se.seenMu.RUnlock()
-		if seen {
+		if se.hasSeen(e.ID) {
 			continue
 		}
 
 		if se.shouldApply(ctx, e) {
+			// AppendEvent fails on a duplicate ID (storage PK), so an event
+			// evicted from the bounded cache and re-delivered is still not
+			// re-applied or re-published.
 			if err := se.backend.AppendEvent(ctx, e); err == nil {
-				se.seenMu.Lock()
-				se.seenIDs[e.ID] = struct{}{}
-				se.seenMu.Unlock()
+				se.markSeen(e.ID)
 				se.bus.Publish(e)
+			} else if err != ErrEventSeqConflict {
+				slog.Warn("sync: apply remote event failed", "event", e.ID, "task", e.TaskID, "err", err)
 			}
 		}
 	}

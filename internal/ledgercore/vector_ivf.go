@@ -21,7 +21,8 @@ import (
 type IVFConfig struct {
 	// NumClusters is the number of Voronoi cells (K). Default: sqrt(N), min 8.
 	NumClusters int
-	// NumProbe is the number of clusters to search at query time. Default: max(1, K/10).
+	// NumProbe is the number of clusters to search at query time.
+	// Default: max(ceil(sqrt(K)), K/10).
 	NumProbe int
 	// MaxIterations for K-means training. Default: 20.
 	MaxIterations int
@@ -115,7 +116,12 @@ func (idx *IVFIndex) Train(vectors map[string][]float32) {
 
 	nprobe := idx.config.NumProbe
 	if nprobe == 0 {
-		nprobe = max(1, K/10)
+		// The sqrt(K) floor keeps recall stable at small scale, where K-means
+		// splits the few natural clusters across many cells and K/10 probes
+		// too few of them (measured: K=31, nprobe=3 → recall dips to 50%;
+		// nprobe=6 → 100% over 100 builds). At scale K/10 dominates,
+		// preserving the documented ~10x speedup for 10K+ vectors.
+		nprobe = max(int(math.Ceil(math.Sqrt(float64(K)))), K/10)
 	}
 
 	idx.dims = len(entries[0].embedding)

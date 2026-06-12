@@ -211,7 +211,7 @@ func TestStatusConversions(t *testing.T) {
 		{ledger.TaskFailed, agtask.StatusFailed},
 		{ledger.TaskCancelled, agtask.StatusCancelled},
 		{ledger.TaskWaitingInput, agtask.StatusPaused},
-		{ledger.TaskBlocked, agtask.StatusPaused},
+		{ledger.TaskBlocked, agtask.StatusInterrupted},
 		{ledger.TaskRetrying, agtask.StatusRunning},
 	}
 	for _, tt := range ledgerTests {

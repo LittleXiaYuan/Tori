@@ -258,7 +258,10 @@ func (s *LedgerStore) Update(t *agtask.Task) error {
 		}
 	}
 
-	lt, _ = s.ldg.Tasks.GetTask(ctx, t.ID)
+	lt, err = s.ldg.Tasks.GetTask(ctx, t.ID)
+	if err != nil {
+		return err
+	}
 	lt.Goal = t.Description
 	lt.UpdatedAt = time.Now()
 
@@ -271,6 +274,8 @@ func (s *LedgerStore) Update(t *agtask.Task) error {
 
 	if t.Error != "" {
 		lt.Error = &t.Error
+	} else {
+		lt.Error = nil // clear a stale error from a previous failed run
 	}
 	lt.StartedAt = t.StartedAt
 	lt.FinishedAt = t.FinishedAt
@@ -369,7 +374,7 @@ func ledgerTransitionPath(from, to ledger.TaskStatus) ([]ledger.TaskStatus, bool
 	return nil, false
 }
 
-// Delete removes a task.
+// Delete removes a task permanently (row, events, checkpoints, artifacts).
 func (s *LedgerStore) Delete(id string) bool {
 	ctx := context.Background()
 	lt, err := s.ldg.Tasks.GetTask(ctx, id)
@@ -378,6 +383,10 @@ func (s *LedgerStore) Delete(id string) bool {
 	}
 	if !lt.Status.IsTerminal() {
 		s.ldg.Tasks.Cancel(ctx, id, "deleted by user")
+	}
+
+	if err := s.ldg.Backend().DeleteTask(ctx, id); err != nil {
+		return false
 	}
 
 	if s.baseDir != "" {
@@ -395,7 +404,9 @@ func (s *LedgerStore) ArtifactDir(taskID string) (string, error) {
 	return dir, nil
 }
 
-// RecoverInterrupted marks any running tasks as failed on startup.
+// RecoverInterrupted marks any running tasks as interrupted on startup.
+// They map back to agtask.StatusInterrupted, which keeps them dispatchable
+// (marking them failed would strand dependency-driven tasks permanently).
 func (s *LedgerStore) RecoverInterrupted() int {
 	ctx := context.Background()
 	running, err := s.ldg.Tasks.ListTasks(ctx, ledger.TaskFilter{
@@ -406,8 +417,9 @@ func (s *LedgerStore) RecoverInterrupted() int {
 	}
 
 	count := 0
+	payload := mustJSON(map[string]string{"reason": "process restarted while task was executing"})
 	for _, lt := range running {
-		if err := s.ldg.Tasks.Fail(ctx, lt.ID, "process restarted while task was executing"); err == nil {
+		if err := s.ldg.Tasks.Transition(ctx, lt.ID, ledger.TaskBlocked, "runtime", payload); err == nil {
 			count++
 		}
 	}
@@ -476,7 +488,9 @@ func ledgerStatusToAgent(s ledger.TaskStatus) agtask.Status {
 	case ledger.TaskWaitingInput:
 		return agtask.StatusPaused
 	case ledger.TaskBlocked:
-		return agtask.StatusPaused
+		// Blocked round-trips with StatusInterrupted (dependency-waiting,
+		// recoverable); mapping it to Paused would strip dispatchability.
+		return agtask.StatusInterrupted
 	case ledger.TaskRetrying:
 		return agtask.StatusRunning
 	case ledger.TaskCompleted:
@@ -507,7 +521,8 @@ func agentStatusToLedger(s agtask.Status) ledger.TaskStatus {
 	case agtask.StatusCancelled:
 		return ledger.TaskCancelled
 	case agtask.StatusInterrupted:
-		return ledger.TaskFailed
+		// Non-terminal: interrupted tasks must stay resumable/dispatchable.
+		return ledger.TaskBlocked
 	default:
 		return ledger.TaskCreated
 	}

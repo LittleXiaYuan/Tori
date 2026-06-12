@@ -14,6 +14,9 @@ type Backend interface {
 	GetTask(ctx context.Context, id string) (*Task, error)
 	UpdateTask(ctx context.Context, t *Task) error
 	ListTasks(ctx context.Context, f TaskFilter) ([]*Task, error)
+	// DeleteTask permanently removes a task together with its events,
+	// checkpoints, artifacts, and dependency links.
+	DeleteTask(ctx context.Context, id string) error
 
 	// ── Event (append-only) ──
 

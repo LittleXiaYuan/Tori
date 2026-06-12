@@ -88,10 +88,11 @@ func (l *Ledger) CompactEvents(ctx context.Context, tenantID string, cfg Compact
 	for _, k := range cfg.KeepKinds {
 		keepSet[k] = true
 	}
-	// Always keep task lifecycle events
+	// Always keep task lifecycle + checkpoint events
 	for _, k := range []EventKind{
 		EventTaskCreated, EventTaskStarted, EventTaskCompleted,
 		EventTaskFailed, EventTaskCancelled, EventCompacted,
+		EventCheckpointCreated,
 	} {
 		keepSet[k] = true
 	}
@@ -124,12 +125,24 @@ func (l *Ledger) CompactEvents(ctx context.Context, tenantID string, cfg Compact
 			summary.LastEvent = events[len(events)-1].CreatedAt
 		}
 
+		// Resume replays events with seq > checkpoint.EventSeq on top of the
+		// checkpoint state (failed tasks are resumable), so the window after
+		// the last checkpoint must survive compaction.
+		var cpSeq int64 = -1
+		if cp, err := l.backend.LatestCheckpoint(ctx, t.ID); err == nil && cp != nil {
+			cpSeq = cp.EventSeq
+		}
+
 		var toRemove []string
 		for _, e := range events {
 			summary.EventKindCounts[string(e.Kind)]++
-			if !keepSet[e.Kind] {
-				toRemove = append(toRemove, e.ID)
+			if keepSet[e.Kind] {
+				continue
 			}
+			if cpSeq >= 0 && e.Seq > cpSeq {
+				continue
+			}
+			toRemove = append(toRemove, e.ID)
 		}
 
 		summary.RemovedEvents = len(toRemove)

@@ -104,9 +104,14 @@ func (cg *ContextGraph) FindRelatedMemoriesForTenant(ctx context.Context, tenant
 	}
 	var memoryIDs []string
 	for _, n := range nodes {
-		if n.Kind == NodeMemory && len(memoryIDs) < limit {
-			memoryIDs = append(memoryIDs, n.RefID)
+		if n.Kind != NodeMemory || len(memoryIDs) >= limit {
+			continue
 		}
+		// Edges may cross tenants; never hand back another tenant's memory.
+		if tenantID != "" && n.TenantID != "" && n.TenantID != tenantID {
+			continue
+		}
+		memoryIDs = append(memoryIDs, n.RefID)
 	}
 	return memoryIDs, nil
 }

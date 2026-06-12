@@ -201,6 +201,7 @@ func (p *LedgerPersister) flush() {
 	ctx := context.Background()
 	total := 0
 	temporalTotal := 0
+	failed := 0
 	flushedAt := p.now().UTC()
 
 	// Export and persist Mid-term items
@@ -210,6 +211,7 @@ func (p *LedgerPersister) flush() {
 			entry := itemToLedgerEntry(tenantID, item, ledger.MemoryFact)
 			if err := p.ldg.Memory.Put(ctx, entry); err != nil {
 				slog.Warn("ledger persister: mid flush error", "key", item.Key, "err", err)
+				failed++
 			} else {
 				total++
 				if err := p.writeTemporalMemory(ctx, "mid", tenantID, item, flushedAt); err != nil {
@@ -232,6 +234,7 @@ func (p *LedgerPersister) flush() {
 			entry := itemToLedgerEntry(tenantID, item, kind)
 			if err := p.ldg.Memory.Put(ctx, entry); err != nil {
 				slog.Warn("ledger persister: long flush error", "key", item.Key, "err", err)
+				failed++
 			} else {
 				total++
 				if err := p.writeTemporalMemory(ctx, "long", tenantID, item, flushedAt); err != nil {
@@ -241,6 +244,14 @@ func (p *LedgerPersister) flush() {
 				}
 			}
 		}
+	}
+
+	// Re-mark dirty when any write failed so the next flush retries instead
+	// of letting in-memory state silently diverge from the ledger.
+	if failed > 0 {
+		p.mu.Lock()
+		p.dirty = true
+		p.mu.Unlock()
 	}
 
 	slog.Debug("ledger persister: flushed to Ledger", "items", total, "temporal_items", temporalTotal)

@@ -42,12 +42,31 @@ func (tm *TaskManager) CreateTask(ctx context.Context, goal string, taskType Tas
 		opt(t)
 	}
 
-	payload, err := json.Marshal(map[string]interface{}{
-		"goal":      t.Goal,
-		"type":      t.Type,
-		"tenant_id": t.TenantID,
-		"agent_id":  t.AgentID,
-	})
+	// The created event must carry every initial field so Replay reconstructs
+	// the same state as the materialized row (INV-1).
+	createdPayload := map[string]interface{}{
+		"goal":        t.Goal,
+		"type":        t.Type,
+		"tenant_id":   t.TenantID,
+		"agent_id":    t.AgentID,
+		"max_retries": t.MaxRetries,
+	}
+	if t.UserID != "" {
+		createdPayload["user_id"] = t.UserID
+	}
+	if len(t.Input) > 0 {
+		createdPayload["input"] = json.RawMessage(t.Input)
+	}
+	if len(t.Metadata) > 0 {
+		createdPayload["metadata"] = json.RawMessage(t.Metadata)
+	}
+	if t.Priority != 0 {
+		createdPayload["priority"] = t.Priority
+	}
+	if t.ParentTaskID != nil {
+		createdPayload["parent_task_id"] = *t.ParentTaskID
+	}
+	payload, err := json.Marshal(createdPayload)
 	if err != nil {
 		return nil, err
 	}

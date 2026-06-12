@@ -119,6 +119,12 @@ func (t *HTTPStreamTransport) Publish(ctx context.Context, topic string, data []
 		}
 		io.Copy(io.Discard, resp.Body)
 		resp.Body.Close()
+		if resp.StatusCode >= 300 {
+			slog.Warn("stream publish: peer rejected event", "peer", peerID, "status", resp.StatusCode)
+			if firstErr == nil {
+				firstErr = fmt.Errorf("peer %s returned status %d", peerID, resp.StatusCode)
+			}
+		}
 	}
 
 	return firstErr
@@ -190,18 +196,23 @@ func (t *HTTPStreamTransport) handleIncoming(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	// Collect matching handlers under the lock, invoke them after releasing
+	// it: a handler that calls Subscribe/Unsubscribe would otherwise deadlock
+	// trying to upgrade the read lock we are still holding.
 	t.mu.RLock()
-	defer t.mu.RUnlock()
-
-	matched := 0
+	var handlers []func(data []byte)
 	for _, sub := range t.subs {
 		if topicMatches(sub.topic, envelope.Topic) {
-			sub.handler(envelope.Data)
-			matched++
+			handlers = append(handlers, sub.handler)
 		}
 	}
+	t.mu.RUnlock()
 
-	if matched == 0 {
+	for _, h := range handlers {
+		h(envelope.Data)
+	}
+
+	if len(handlers) == 0 {
 		slog.Debug("stream transport: no matching subscribers", "topic", envelope.Topic)
 	}
 

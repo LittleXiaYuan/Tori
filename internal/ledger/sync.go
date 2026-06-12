@@ -23,16 +23,17 @@ func NewLedgerSync(ldg *ledger.Ledger, ts agtask.Store) *LedgerSync {
 
 // runnerEventToLedger maps Runner event strings to Ledger EventKinds.
 var runnerEventToLedger = map[string]ledger.EventKind{
-	"task_started":   ledger.EventTaskStarted,
-	"task_completed": ledger.EventTaskCompleted,
-	"task_failed":    ledger.EventTaskFailed,
-	"task_paused":    ledger.EventTaskWaitingInput,
-	"task_resumed":   ledger.EventTaskResumed,
-	"task_restarted": ledger.EventTaskResumed,
-	"task_cancelled": ledger.EventTaskCancelled,
-	"step_completed": ledger.EventStepCompleted,
-	"step_started":   ledger.EventStepStarted,
-	"step_failed":    ledger.EventStepFailed,
+	"task_started":     ledger.EventTaskStarted,
+	"task_completed":   ledger.EventTaskCompleted,
+	"task_failed":      ledger.EventTaskFailed,
+	"task_paused":      ledger.EventTaskWaitingInput,
+	"task_resumed":     ledger.EventTaskResumed,
+	"task_restarted":   ledger.EventTaskResumed,
+	"task_cancelled":   ledger.EventTaskCancelled,
+	"task_interrupted": ledger.EventTaskBlocked, // dependency-wait, recoverable
+	"step_completed":   ledger.EventStepCompleted,
+	"step_started":     ledger.EventStepStarted,
+	"step_failed":      ledger.EventStepFailed,
 }
 
 // OnEvent handles a task event and records it in the Ledger.
