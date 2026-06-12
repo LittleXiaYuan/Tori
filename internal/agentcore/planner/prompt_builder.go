@@ -179,7 +179,14 @@ func (pb *PromptBuilder) BuildDynamicContext(ctx context.Context, req DynamicCon
 	}
 	results := make(chan layerResult, 3)
 	pending := 0
-	skipRetrieval := len([]rune(req.LastMessage)) < 6
+	msgRunes := len([]rune(req.LastMessage))
+	skipRetrieval := msgRunes < 6
+	// LocalBrain already classified this turn (System 1, no extra cost).
+	// Casual chat turns keep the memory layer (preferences matter) but skip
+	// graph/ledger recall and code retrieval: both carry network hops
+	// (query embedding, rerank) with near-zero relevance for small talk.
+	// Longer chat messages may reference history, so only short ones skip.
+	casualChat := req.IntentHint == "chat" && msgRunes < 24
 
 	// Bound the whole retrieval fan-out. The child context cancels in-flight
 	// embedding/rerank HTTP calls once the budget is spent; the buffered
@@ -201,7 +208,7 @@ func (pb *PromptBuilder) BuildDynamicContext(ctx context.Context, req DynamicCon
 			}
 		})
 	}
-	if injectGraphEnabled && pb.contextAssembly != nil && pb.contextAssembly.HasGraphContext() && !skipRetrieval {
+	if injectGraphEnabled && pb.contextAssembly != nil && pb.contextAssembly.HasGraphContext() && !skipRetrieval && !casualChat {
 		pending++
 		safego.Go("prompt-graph-context", func() {
 			if graphCtx := pb.contextAssembly.GraphContextForRequest(retrCtx, req.TenantID, req.LastMessage); graphCtx != "" {
@@ -211,7 +218,7 @@ func (pb *PromptBuilder) BuildDynamicContext(ctx context.Context, req DynamicCon
 			}
 		})
 	}
-	if pb.contextAssembly != nil && pb.contextAssembly.codeContext != nil && !skipRetrieval {
+	if pb.contextAssembly != nil && pb.contextAssembly.codeContext != nil && !skipRetrieval && !casualChat {
 		pending++
 		safego.Go("prompt-code-context", func() {
 			if codeCtx := pb.contextAssembly.codeContext(req.LastMessage); codeCtx != "" {
