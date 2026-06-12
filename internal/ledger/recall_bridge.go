@@ -58,6 +58,12 @@ func (rb *RecallBridge) QueryForTenant(tenantID string) func(string) string {
 // This is the tenant-aware entry point wired into the planner graph context,
 // fixing the prior mismatch where writes used the active tenant but recall was
 // pinned to "system".
+// rerankMinQueryRunes gates the cross-encoder reranker: short conversational
+// queries ("在吗", "今天如何") carry too little signal for reranking to beat
+// the engine's multi-signal order, and the extra network hop is exactly the
+// kind of latency users feel on casual chat turns.
+const rerankMinQueryRunes = 12
+
 func (rb *RecallBridge) QueryTenant(ctx context.Context, tenantID, query string) string {
 	if ctx == nil {
 		ctx = context.Background()
@@ -66,14 +72,29 @@ func (rb *RecallBridge) QueryTenant(ctx context.Context, tenantID, query string)
 		tenantID = rb.tenantID
 	}
 
-	merged := rb.recall(ctx, tenantID, query)
-	if tenantID != systemTenant {
-		merged = mergeRecall(merged, rb.recall(ctx, systemTenant, query))
-	}
+	// The tenant and shared-system recalls are independent pipelines (each
+	// with its own query-embedding call); running them in parallel halves
+	// the wall-clock cost of the chat path.
+	merged := func() *ledger.RecallResult {
+		if tenantID == systemTenant {
+			return rb.recall(ctx, tenantID, query)
+		}
+		var sysRes *ledger.RecallResult
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			sysRes = rb.recall(ctx, systemTenant, query)
+		}()
+		userRes := rb.recall(ctx, tenantID, query)
+		<-done
+		return mergeRecall(userRes, sysRes)
+	}()
 	if merged == nil || len(merged.Entries) == 0 {
 		return ""
 	}
-	rb.applyRerank(ctx, query, merged)
+	if len([]rune(query)) >= rerankMinQueryRunes {
+		rb.applyRerank(ctx, query, merged)
+	}
 	return formatRecallEntries(merged)
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -81,6 +82,21 @@ func layerInjectionEnabled(env string) bool {
 		return true
 	}
 }
+
+// retrievalTimeout caps how long BuildDynamicContext waits for the parallel
+// retrieval layers (memory / ledger recall / code). Recall involves network
+// hops (query embedding, optional cross-encoder rerank), and an unbounded
+// wait lets one slow provider stall every chat turn — the reported
+// "greetings feel laggy" failure mode. Late layers are dropped for this turn;
+// the next turn retries. Tune via CONTEXT_RETRIEVAL_TIMEOUT_MS (0 disables).
+var retrievalTimeout = func() time.Duration {
+	if v := strings.TrimSpace(os.Getenv("CONTEXT_RETRIEVAL_TIMEOUT_MS")); v != "" {
+		if ms, err := strconv.Atoi(v); err == nil && ms >= 0 {
+			return time.Duration(ms) * time.Millisecond
+		}
+	}
+	return 1500 * time.Millisecond
+}()
 
 // Per-layer injection gates, cached at package init (require restart to change).
 // All default ON; set the corresponding env to false/0/off to isolate a source.
@@ -165,10 +181,20 @@ func (pb *PromptBuilder) BuildDynamicContext(ctx context.Context, req DynamicCon
 	pending := 0
 	skipRetrieval := len([]rune(req.LastMessage)) < 6
 
+	// Bound the whole retrieval fan-out. The child context cancels in-flight
+	// embedding/rerank HTTP calls once the budget is spent; the buffered
+	// channel lets late goroutines finish without leaking.
+	retrCtx := ctx
+	var cancelRetr context.CancelFunc
+	if retrievalTimeout > 0 && !skipRetrieval {
+		retrCtx, cancelRetr = context.WithTimeout(ctx, retrievalTimeout)
+		defer cancelRetr()
+	}
+
 	if injectMemoryEnabled && pb.contextAssembly != nil && pb.contextAssembly.memory != nil && !skipRetrieval {
 		pending++
 		safego.Go("prompt-memory-recall", func() {
-			if memCtx := pb.contextAssembly.Memory(ctx, req.TenantID, req.LastMessage); memCtx != "" {
+			if memCtx := pb.contextAssembly.Memory(retrCtx, req.TenantID, req.LastMessage); memCtx != "" {
 				results <- layerResult{"memory", ctxwindow.LayerPriorityMemory, "## 记忆上下文\n", memCtx}
 			} else {
 				results <- layerResult{}
@@ -178,7 +204,7 @@ func (pb *PromptBuilder) BuildDynamicContext(ctx context.Context, req DynamicCon
 	if injectGraphEnabled && pb.contextAssembly != nil && pb.contextAssembly.HasGraphContext() && !skipRetrieval {
 		pending++
 		safego.Go("prompt-graph-context", func() {
-			if graphCtx := pb.contextAssembly.GraphContextForRequest(ctx, req.TenantID, req.LastMessage); graphCtx != "" {
+			if graphCtx := pb.contextAssembly.GraphContextForRequest(retrCtx, req.TenantID, req.LastMessage); graphCtx != "" {
 				results <- layerResult{"graph", ctxwindow.LayerPriorityRetrieval, "## 知识图谱\n", graphCtx}
 			} else {
 				results <- layerResult{}
@@ -196,12 +222,25 @@ func (pb *PromptBuilder) BuildDynamicContext(ctx context.Context, req DynamicCon
 		})
 	}
 
-	// Collect parallel results
+	// Collect parallel results, dropping layers that miss the time budget.
 	var rawRetrieval []layerResult
+	var retrDeadline <-chan time.Time
+	if retrievalTimeout > 0 && pending > 0 {
+		timer := time.NewTimer(retrievalTimeout + 100*time.Millisecond)
+		defer timer.Stop()
+		retrDeadline = timer.C
+	}
+collect:
 	for i := 0; i < pending; i++ {
-		r := <-results
-		if r.content != "" {
-			rawRetrieval = append(rawRetrieval, r)
+		select {
+		case r := <-results:
+			if r.content != "" {
+				rawRetrieval = append(rawRetrieval, r)
+			}
+		case <-retrDeadline:
+			slog.Warn("prompt_builder: retrieval budget exceeded, continuing with partial context",
+				"collected", len(rawRetrieval), "dropped", pending-i, "budget", retrievalTimeout)
+			break collect
 		}
 	}
 
