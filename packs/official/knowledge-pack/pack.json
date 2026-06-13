@@ -1,0 +1,49 @@
+{
+  "id": "yunque.pack.knowledge",
+  "name": "Knowledge (知识库)",
+  "version": "0.1.0",
+  "description": "知识库面：来源管理、导入、检索（RAG）。默认预装的核心能力，可在能力包中心关闭。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": [
+      "knowledge.search",
+      "knowledge.ingest"
+    ],
+    "routes": [
+      "/v1/knowledge/search",
+      "/v1/knowledge/sources",
+      "/v1/knowledge/stats",
+      "/v1/knowledge/upload",
+      "/v1/knowledge/ingest",
+      "/v1/knowledge/import-url",
+      "/v1/knowledge/import-repo",
+      "/v1/knowledge/source",
+      "/v1/knowledge/source/update"
+    ],
+    "permissions": [
+      "knowledge:read",
+      "knowledge:write"
+    ]
+  },
+  "frontend": {
+    "menus": [
+      { "key": "knowledge", "label": "知识库", "path": "/knowledge", "icon": "package", "order": 61 }
+    ],
+    "assets": {
+      "type": "builtin"
+    }
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "group": "intelligence",
+    "phase": "A2",
+    "preload": "true",
+    "note": "Default-preloaded pack: in the pack model (can be disabled) but enabled out-of-box. Frontend nav stays static for now; pack-gating lands with profile removal."
+  },
+  "status": "beta"
+}

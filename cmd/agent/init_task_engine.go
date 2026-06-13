@@ -41,6 +41,7 @@ import (
 	"yunque-agent/internal/observe"
 	experiencepack "yunque-agent/internal/packs/experience"
 	innerlifepack "yunque-agent/internal/packs/innerlife"
+	knowledgepack "yunque-agent/internal/packs/knowledge"
 	microagentpack "yunque-agent/internal/packs/microagent"
 	nightschoolpack "yunque-agent/internal/packs/nightschool"
 	worldmodelpack "yunque-agent/internal/packs/worldmodel"
@@ -127,6 +128,11 @@ func initTaskEngine(
 		typedLdg:       typedLdg,
 		skillLifecycle: skillLifecycleRaw.(*selfheal.Lifecycle),
 	})
+
+	// Knowledge (RAG) pack — bridge migration: the pack owns the /v1/knowledge/*
+	// route registration + enablement gate; handler implementations still live on
+	// the gateway (HandleKnowledgePack) during this phase.
+	gw.RegisterBackendPack(knowledgepack.NewHandler(gw))
 
 	// Inner Life pack — exposes the soul-layer outputs (curiosity / reflection /
 	// dreaming) over a read-only HTTP surface. Registered here because the
