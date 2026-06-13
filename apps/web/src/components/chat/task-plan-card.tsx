@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Sparkles, Check, X, ChevronDown, ListChecks, Code2 } from "lucide-react";
 import type { AgentEvent } from "@/components/execution-trace";
+import { useI18n } from "@/lib/i18n";
 
 type StepStatus = "done" | "running" | "pending" | "failed";
 
@@ -94,6 +95,7 @@ function StatusDot({ status }: { status: StepStatus }) {
 }
 
 export function TaskPlanCard({ events, isLive }: { events: AgentEvent[]; isLive: boolean }) {
+  const { t } = useI18n();
   const steps = useMemo(
     () => structuredSteps(events) ?? toolSteps(events, isLive),
     [events, isLive],
@@ -180,7 +182,7 @@ export function TaskPlanCard({ events, isLive }: { events: AgentEvent[]; isLive:
         <span className="task-plan-card__meta">
           <span className="task-plan-card__count">{doneCount}/{steps.length}</span>
           <span className="task-plan-card__time">已用时 {elapsed}</span>
-          <button type="button" className="task-plan-card__collapse" onClick={() => setOpen(false)} aria-label="收起">
+          <button type="button" className="task-plan-card__collapse" onClick={() => setOpen(false)} aria-label={t("common.collapse")}>
             <ChevronDown size={14} className="task-plan-card__chev" style={{ transform: "rotate(180deg)" }} />
           </button>
         </span>

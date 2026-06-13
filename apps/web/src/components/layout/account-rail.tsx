@@ -18,6 +18,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Avatar, Button, Tooltip } from "@heroui/react";
 import {
   Brain,
+  Languages,
   LayoutGrid,
   LogOut,
   MessageCircle,
@@ -230,6 +231,10 @@ export default function AccountRail() {
     patchAndApply({ presetTheme: next });
   }, []);
 
+  const toggleLocale = useCallback(() => {
+    setLocale(locale === "zh" ? "en" : "zh");
+  }, [locale, setLocale]);
+
   const openCommandPalette = useCallback(() => {
     closeFlyoutNow();
     document.dispatchEvent(new CustomEvent("yunque:open-command-palette"));
@@ -406,6 +411,22 @@ export default function AccountRail() {
           <Tooltip.Content placement="right">
             {themeMode === "light" ? ui.themeDark : ui.themeLight}
           </Tooltip.Content>
+        </Tooltip>
+
+        <Tooltip delay={0}>
+          <Tooltip.Trigger>
+            <Button
+              size="sm"
+              variant="ghost"
+              isIconOnly
+              className="account-rail-btn"
+              onPress={toggleLocale}
+              aria-label={ui.locale}
+            >
+              <Languages size={16} />
+            </Button>
+          </Tooltip.Trigger>
+          <Tooltip.Content placement="right">{ui.locale}</Tooltip.Content>
         </Tooltip>
 
         <Tooltip delay={0}>

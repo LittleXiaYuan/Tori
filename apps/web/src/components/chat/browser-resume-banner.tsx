@@ -1,5 +1,6 @@
 import { Button } from "@heroui/react";
 import { Plug } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
 
 export interface BrowserResumeBannerProps {
   /** The last user prompt that blocked on the browser connector. */
@@ -46,6 +47,7 @@ export function BrowserResumeBanner({
   onResume,
   onRefresh,
 }: BrowserResumeBannerProps) {
+  const { t } = useI18n();
   return (
     <div className="px-4 pt-3 xl:px-5 shrink-0">
       <div
@@ -65,16 +67,16 @@ export function BrowserResumeBanner({
             >
               <Plug size={15} style={{ color: bridgeConnected ? "#86efac" : "#fbbf24" }} />
               {bridgeConnected
-                ? "Browser task ready to resume"
-                : "Browser connector blocked this task"}
+                ? t("browser.resume.titleReady")
+                : t("browser.resume.titleBlocked")}
             </div>
             <div
               className="mt-1 text-xs leading-6"
               style={{ color: "var(--yunque-text-muted)" }}
             >
               {bridgeConnected
-                ? "The browser runtime is connected again. Continue the blocked task with one click."
-                : "This task needs the live browser connector. Connect it first, then resume from where the flow paused."}
+                ? t("browser.resume.descReady")
+                : t("browser.resume.descBlocked")}
             </div>
             <div
               className="mt-2 truncate rounded-xl px-2.5 py-2 text-[11px]"
@@ -92,7 +94,7 @@ export function BrowserResumeBanner({
               isPending={resumePending}
               onPress={onResume}
             >
-              Continue task
+              {t("browser.resume.continue")}
             </Button>
             <Button
               size="sm"
@@ -100,7 +102,7 @@ export function BrowserResumeBanner({
               className="rounded-full px-3"
               onPress={() => window.open("/packs/browser", "_blank", "noopener,noreferrer")}
             >
-              Open browser setup
+              {t("browser.resume.setup")}
             </Button>
             <Button
               size="sm"
@@ -108,7 +110,7 @@ export function BrowserResumeBanner({
               className="rounded-full px-3"
               onPress={onRefresh}
             >
-              Refresh status
+              {t("browser.resume.refresh")}
             </Button>
           </div>
         </div>

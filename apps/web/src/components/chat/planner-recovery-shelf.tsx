@@ -6,6 +6,7 @@ import { ArchiveRestore, ExternalLink, RefreshCw, RotateCcw } from "lucide-react
 import { api } from "@/lib/api";
 import type { PlannerCheckpointRecoverResponse, PlannerCheckpointRecoveryAction, PlannerCheckpointRecoveryPlan, PlannerCheckpointResumePlanJob, PlannerCheckpointResumePlanJobResponse, PlannerCheckpointResumePlanResponse, PlannerCheckpointResumeTaskResponse, PlannerCheckpointSummary, TaskInfo } from "@/lib/api-types";
 import { formatErrorMessage } from "@/lib/error-utils";
+import { useI18n } from "@/lib/i18n";
 
 interface PlannerRecoveryShelfProps {
   onSend: (text: string) => void;
@@ -225,6 +226,7 @@ export function PlannerRecoveryShelf({
     return (res.checkpoints || []).find((cp) => cp.plan_id === planId);
   },
 }: PlannerRecoveryShelfProps) {
+  const { t } = useI18n();
   const [items, setItems] = useState<PlannerCheckpointSummary[]>(initialCheckpoints);
   const [loading, setLoading] = useState(fetchOnMount);
   const [recoveringKey, setRecoveringKey] = useState<string | null>(null);
@@ -453,7 +455,7 @@ export function PlannerRecoveryShelf({
             <div className="text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>连接中断或步骤失败后，可以从这里继续。</div>
           </div>
         </div>
-        <Button isIconOnly variant="ghost" size="sm" onPress={() => void load()} isDisabled={loading || disabled} aria-label="刷新可恢复任务">
+        <Button isIconOnly variant="ghost" size="sm" onPress={() => void load()} isDisabled={loading || disabled} aria-label={t("planner.refreshRecoverable")}>
           {loading ? <Spinner size="sm" /> : <RefreshCw size={13} />}
         </Button>
       </div>

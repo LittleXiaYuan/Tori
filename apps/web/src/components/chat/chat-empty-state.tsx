@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { AlertTriangle } from "lucide-react";
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
@@ -21,16 +21,15 @@ interface ChatEmptyStateProps {
   composer: ReactNode;
 }
 
-const FALLBACK_CHIPS: StarterChip[] = PRODUCT_SCENARIOS.slice(0, 4).map((s) => ({
-  label: s.label,
-  prompt: s.prompt,
-}));
+/** Scenario ids used as offline/fallback starter chips. Labels and prompts are
+ *  localized at render via i18n so English users don't see Chinese chips. */
+const FALLBACK_SCENARIO_IDS = PRODUCT_SCENARIOS.slice(0, 4).map((s) => s.id);
 
 /** Aurora (northern-lights) brand mark — flat monoline curtains in a single
  *  accent color (no gradient), so it reads as a calm, friendly glyph. */
 function AuroraMark() {
   return (
-    <svg viewBox="0 0 48 48" width="26" height="26" fill="none" aria-hidden>
+    <svg viewBox="0 0 48 48" width="30" height="30" fill="none" aria-hidden>
       <g stroke="currentColor" strokeLinecap="round" fill="none">
         <path d="M14 38 C 11 28, 19 23, 15 10" strokeWidth="2.4" opacity="0.95" />
         <path d="M24 40 C 21 27, 30 21, 25 9" strokeWidth="2.4" opacity="0.7" />
@@ -40,13 +39,17 @@ function AuroraMark() {
   );
 }
 
-/** Returns the time-of-day bucket key; the caller localizes it via i18n. */
+/** Maps the current hour to a time-of-day bucket key. */
+function greetingKeyForNow(): string {
+  const h = new Date().getHours();
+  return h < 5 ? "late" : h < 11 ? "morning" : h < 13 ? "noon" : h < 18 ? "afternoon" : "evening";
+}
+
+/** Returns the time-of-day bucket key; the caller localizes it via i18n.
+ *  Computed once on the first render (lazy init) so the empty state paints the
+ *  correct greeting immediately instead of flashing from a "hello" default. */
 function useGreetingKey(): string {
-  const [key, setKey] = useState("hello");
-  useEffect(() => {
-    const h = new Date().getHours();
-    setKey(h < 5 ? "late" : h < 11 ? "morning" : h < 13 ? "noon" : h < 18 ? "afternoon" : "evening");
-  }, []);
+  const [key] = useState(greetingKeyForNow);
   return key;
 }
 
@@ -56,26 +59,36 @@ export function ChatEmptyState({ setupNeeded, chatD, inputRef, composer }: ChatE
   const [chips, setChips] = useState<StarterChip[] | null>(null);
   const greetingKey = useGreetingKey();
   const greeting = t(`chat.empty.greet.${greetingKey}`);
+  // Localized offline/fallback chips (t is memoized on locale, so this only
+  // recomputes when the language changes).
+  const fallbackChips = useMemo<StarterChip[]>(
+    () =>
+      FALLBACK_SCENARIO_IDS.map((id) => ({
+        label: t(`scenario.${id}.label`),
+        prompt: t(`scenario.${id}.prompt`),
+      })),
+    [t],
+  );
 
   useEffect(() => {
     let alive = true;
     if (setupNeeded) {
-      setChips(FALLBACK_CHIPS);
+      setChips(fallbackChips);
       return;
     }
     api
       .starterSuggestions()
       .then((res) => {
         if (!alive) return;
-        setChips(res.suggestions?.length ? res.suggestions : FALLBACK_CHIPS);
+        setChips(res.suggestions?.length ? res.suggestions : fallbackChips);
       })
       .catch(() => {
-        if (alive) setChips(FALLBACK_CHIPS);
+        if (alive) setChips(fallbackChips);
       });
     return () => {
       alive = false;
     };
-  }, [setupNeeded]);
+  }, [setupNeeded, fallbackChips]);
 
   const pickChip = (prompt: string) => {
     chatD({ type: "SET_INPUT", value: prompt });
@@ -99,14 +112,13 @@ export function ChatEmptyState({ setupNeeded, chatD, inputRef, composer }: ChatE
           <span className="chat-empty__mark" aria-hidden>
             <AuroraMark />
           </span>
-          <h1 className="chat-empty__greeting">{t("chat.empty.greetTpl").replace("{g}", greeting)}</h1>
+          <h1 className="chat-empty__greeting" suppressHydrationWarning>{t("chat.empty.greetTpl").replace("{g}", greeting)}</h1>
         </div>
       </div>
 
       <div className="chat-empty__composer">{composer}</div>
 
       <div className="chat-empty__chips" aria-label={t("chat.empty.suggestions")}>
-        <span className="chat-empty__chips-label">{t("chat.empty.try")}</span>
         {chips === null
           ? Array.from({ length: 4 }).map((_, i) => (
               <span key={i} className="chat-empty__chip chat-empty__chip--skeleton" aria-hidden />

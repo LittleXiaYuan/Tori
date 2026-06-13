@@ -198,7 +198,7 @@ export default function ChatPage() {
     if (!bridgeState?.connected || !resumePromptForBrowser) return;
     setBridgeNotice({
       tone: "success",
-      text: "Browser connector is ready. You can continue the blocked task now.",
+      text: t("chat.bridge.readyResume"),
     });
   }, [bridgeState?.connected, resumePromptForBrowser, setBridgeNotice]);
 
@@ -247,7 +247,7 @@ export default function ChatPage() {
       } else {
         convD({ type: "CANCEL_RENAME" });
       }
-    } catch (e) { showToast(formatErrorMessage(e, "更新对话失败。"), "error"); }
+    } catch (e) { showToast(formatErrorMessage(e, t("chat.toast.updateFailed")), "error"); }
   }, []);
 
   
@@ -264,8 +264,8 @@ export default function ChatPage() {
       await api.deleteConversation(convId);
       convD({ type: "REMOVE", id: convId });
       if (conv.activeId === convId) { convD({ type: "SET_ACTIVE", id: "default" }); chatD({ type: "SET_MESSAGES", messages: [] }); chatD({ type: "CLEAR_LIVE_TRACE" }); }
-      showToast("对话已删除。", "success");
-    } catch (e) { showToast(formatErrorMessage(e, "删除对话失败。"), "error"); }
+      showToast(t("chat.toast.deleted"), "success");
+    } catch (e) { showToast(formatErrorMessage(e, t("chat.toast.deleteFailed")), "error"); }
   }, [conv.activeId]);
 
   
@@ -285,7 +285,7 @@ export default function ChatPage() {
     if (msgIdx < 0) return;
     const toRemove = chat.messages.slice(msgIdx + 1).map((m) => m.id);
     toRemove.forEach((id) => chatD({ type: "REMOVE_MSG", id }));
-    showToast("已回滚到该消息", "success");
+    showToast(t("chat.toast.rolledBack"), "success");
   }, [chat.messages]);
 
   const pendingRetryRef = useRef<string | null>(null);
@@ -318,12 +318,12 @@ export default function ChatPage() {
     const hasPendingFileContext = pendingFiles.some(f => f.parsedText || f.workspacePath || f.base64);
     if ((!text && !hasPendingFileContext) || chat.loading) return;
     if (pendingFiles.some(f => f.status === "uploading")) {
-      showToast("附件还在添加，请稍等一下再发送。", "warning");
+      showToast(t("chat.toast.attachWait"), "warning");
       return;
     }
-    const displayText = text || "请读取并处理附件";
+    const displayText = text || t("chat.defaultAttachPrompt");
     if (setupNeeded) {
-      showToast("请先在设置中配置模型提供商 API Key", "warning");
+      showToast(t("chat.toast.setupKey"), "warning");
       router.push("/settings/providers");
       return;
     }
@@ -461,7 +461,7 @@ export default function ChatPage() {
         window.clearTimeout(initialResponseTimer);
       }
       if (!resp.ok) throw new Error(await chatHttpErrorMessage(resp));
-      if (!resp.body) throw new Error("连接暂时中断，现场已保留；如果任务已经推进，可以从最近可恢复任务继续。");
+      if (!resp.body) throw new Error(t("chat.error.streamInterrupted"));
 
       // Subagents (esp. file_exec generating whole PPT/Word docs) run a single
       // long LLM turn that emits no intermediate SSE events. The backend handoff
@@ -585,7 +585,7 @@ export default function ChatPage() {
       }
     } catch (e: unknown) {
       if ((e as Error).name === "AbortError") {
-        chatD({ type: "APPEND_LAST", delta: "\n\n[已停止生成]" });
+        chatD({ type: "APPEND_LAST", delta: `\n\n${t("chat.aborted")}` });
       } else if (e instanceof ChatStreamTimeoutError) {
         chatD({ type: "ERROR_LAST", error: friendlyError(e.message) });
         refreshPlannerRecovery();
@@ -629,7 +629,7 @@ export default function ChatPage() {
     try {
       await sendMessage(nextPrompt);
       setResumePromptForBrowser(null);
-      setBridgeNotice({ tone: "success", text: "Resumed the browser task." });
+      setBridgeNotice({ tone: "success", text: t("chat.bridge.resumed") });
     } finally {
       setBrowserResumePending(false);
     }
@@ -700,7 +700,7 @@ export default function ChatPage() {
       });
       showToast(result.share?.code ? `已同步到 ${result.channel?.name || channel.name}，协作码 ${result.share.code}` : `已同步到 ${result.channel?.name || channel.name}`, "success");
     } catch (e) {
-      const error = formatErrorMessage(e, "同步失败");
+      const error = formatErrorMessage(e, t("chat.toast.syncFailed"));
       chatD({
         type: "ADD_SHARE_RECEIPT",
         messageId,
@@ -820,9 +820,9 @@ export default function ChatPage() {
   }, [searchParams, conv.activeId, switchConversation]);
 
   const thinkingOptions = [
-    { key: "none" as const, label: "快速", icon: <Zap size={12} /> },
-    { key: "auto" as const, label: "自动", icon: <Gauge size={12} /> },
-    { key: "deep" as const, label: "深度", icon: <Brain size={12} /> },
+    { key: "none" as const, label: t("model.think.none"), icon: <Zap size={12} /> },
+    { key: "auto" as const, label: t("model.think.auto"), icon: <Gauge size={12} /> },
+    { key: "deep" as const, label: t("model.think.deep"), icon: <Brain size={12} /> },
   ] as const;
 
   // The composer is rendered in one of two places depending on whether a
@@ -844,7 +844,7 @@ export default function ChatPage() {
       showConnectors={showConnectors}
       bridgeConnected={Boolean(bridgeState?.connected)}
       availableModels={availableModels}
-      currentModel={currentModel || "选择模型"}
+      currentModel={currentModel || t("composer.selectModel")}
       currentModelId={currentModelId}
       airiAvailable={airiAvailable}
       thinkingLevel={thinkingLevel}
@@ -873,7 +873,7 @@ export default function ChatPage() {
             await api.providerSessionOverride(m.id, conv.activeId).catch(() => {});
           }
         } catch (e) {
-          showToast(formatErrorMessage(e, "切换执行层模型失败。"), "error");
+          showToast(formatErrorMessage(e, t("chat.toast.modelSwitchFailed")), "error");
         }
       }}
       onModeChange={(mode) => {
@@ -968,7 +968,7 @@ export default function ChatPage() {
                   <Dropdown.Menu onAction={(key) => handleSwitchPreset(key as string)}>
                     {presets.map((p) => (
                       <Dropdown.Item key={p.id} id={p.id} textValue={p.name}>
-                        <Label>{p.name}{p.id === activePreset ? "（当前）" : ""}</Label>
+                        <Label>{p.name}{p.id === activePreset ? t("chat.presetCurrent") : ""}</Label>
                       </Dropdown.Item>
                     ))}
                   </Dropdown.Menu>
@@ -978,7 +978,7 @@ export default function ChatPage() {
 
             {chat.streaming && (
               <Chip className="animate-pulse-dot hidden lg:inline-flex" size="sm" style={{ background: "rgba(0,111,238,0.1)", color: "var(--yunque-accent)" }}>
-                <Sparkles size={11} className="mr-1" /> 流式生成中
+                <Sparkles size={11} className="mr-1" /> {t("chat.streaming")}
               </Chip>
             )}
 
@@ -991,7 +991,7 @@ export default function ChatPage() {
                 >
                   <Monitor size={15} />
                 </Button>
-                <Tooltip.Content>{showComputer ? "隐藏计算机面板" : "显示计算机面板"}</Tooltip.Content>
+                <Tooltip.Content>{showComputer ? t("chat.computer.hide") : t("chat.computer.show")}</Tooltip.Content>
               </Tooltip>
             )}
 
@@ -1003,7 +1003,7 @@ export default function ChatPage() {
               >
                 <Maximize2 size={14} />
               </Button>
-              <Tooltip.Content>禅模式 (Ctrl+\)</Tooltip.Content>
+              <Tooltip.Content>{t("chat.zen")} (Ctrl+\)</Tooltip.Content>
             </Tooltip>
 
           </div>
@@ -1023,14 +1023,14 @@ export default function ChatPage() {
                   setBridgeNotice({
                     tone: status.connected ? "success" : "info",
                     text: status.connected
-                      ? "Browser connector is ready."
-                      : "Browser connector is still offline.",
+                      ? t("chat.bridge.ready")
+                      : t("chat.bridge.offline"),
                   });
                 })
                 .catch(() =>
                   setBridgeNotice({
                     tone: "error",
-                    text: "Unable to refresh browser connector status.",
+                    text: t("chat.bridge.refreshFailed"),
                   }),
                 );
             }}
@@ -1070,8 +1070,8 @@ export default function ChatPage() {
                 onBrowserRefresh={() => {
                   syncBridgeState();
                   browserIntentClient.extensionStatus()
-                    .then((status) => setBridgeNotice({ tone: status.connected ? "success" : "info", text: status.connected ? "Browser connector is ready." : "Browser connector is still offline." }))
-                    .catch(() => setBridgeNotice({ tone: "error", text: "Unable to refresh browser connector status." }));
+                    .then((status) => setBridgeNotice({ tone: status.connected ? "success" : "info", text: status.connected ? t("chat.bridge.ready") : t("chat.bridge.offline") }))
+                    .catch(() => setBridgeNotice({ tone: "error", text: t("chat.bridge.refreshFailed") }));
                 }}
                 onBrowserContinue={(prompt) => {
                   setResumePromptForBrowser(prompt);

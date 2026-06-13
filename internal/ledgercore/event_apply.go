@@ -62,7 +62,8 @@ func ApplyEvent(t *Task, e *Event) {
 	case EventTaskStarted:
 		t.Status = TaskRunning
 		// First start wins, matching the materialized-view update in
-		// TaskManager.Transition (retry restarts re-emit task.started).
+		// TaskManager.Transition (retry re-entry emits task.retry_succeeded,
+		// which keeps this original StartedAt).
 		if t.StartedAt == nil {
 			t.StartedAt = &e.CreatedAt
 		}
@@ -104,6 +105,12 @@ func ApplyEvent(t *Task, e *Event) {
 		// Clear terminal fields
 		t.Error = nil
 		t.FinishedAt = nil
+
+	case EventTaskRetrySucceeded:
+		// A retry re-entered execution. StartedAt is preserved (first start
+		// wins, set on the original task.started); only clear any stale error.
+		t.Status = TaskRunning
+		t.Error = nil
 
 	// ── Checkpoint ──
 
@@ -148,15 +155,15 @@ type eventPayload struct {
 	Retryable *bool  `json:"retryable,omitempty"`
 
 	// Reasoning trace fields
-	Thought     string   `json:"thought,omitempty"`      // The reasoning text
-	Observation string   `json:"observation,omitempty"`   // What was observed
-	Decision    string   `json:"decision,omitempty"`      // What was decided
-	Alternative string   `json:"alternative,omitempty"`   // Alternative considered / backtrack target
-	Reason      string   `json:"reason,omitempty"`        // Why (for decisions, backtracks)
-	Confidence  *float64 `json:"confidence,omitempty"`    // Confidence level [0,1]
-	PlanSteps   []string `json:"plan_steps,omitempty"`    // Steps in a generated plan
-	Depth       *int     `json:"depth,omitempty"`         // Reasoning depth (for nested thought trees)
-	ParentStep  *int     `json:"parent_step,omitempty"`   // Links to parent reasoning step
+	Thought     string   `json:"thought,omitempty"`     // The reasoning text
+	Observation string   `json:"observation,omitempty"` // What was observed
+	Decision    string   `json:"decision,omitempty"`    // What was decided
+	Alternative string   `json:"alternative,omitempty"` // Alternative considered / backtrack target
+	Reason      string   `json:"reason,omitempty"`      // Why (for decisions, backtracks)
+	Confidence  *float64 `json:"confidence,omitempty"`  // Confidence level [0,1]
+	PlanSteps   []string `json:"plan_steps,omitempty"`  // Steps in a generated plan
+	Depth       *int     `json:"depth,omitempty"`       // Reasoning depth (for nested thought trees)
+	ParentStep  *int     `json:"parent_step,omitempty"` // Links to parent reasoning step
 
 	// Creation fields (task.created)
 	Metadata     json.RawMessage `json:"metadata,omitempty"`

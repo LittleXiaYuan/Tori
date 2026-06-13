@@ -117,6 +117,15 @@ export function ChatInputArea(props: ChatInputAreaProps) {
 
   const emptyComposer = !hasMessages;
 
+  // Mirror the send guard in chat/page.tsx: a message can be sent when there is
+  // text OR at least one attachment carrying content (parsed text, a workspace
+  // path, or inline base64). Without this the send button stayed dead when the
+  // user only attached a file.
+  const hasPendingFileContext = pendingFiles.some(
+    (f) => f.parsedText || f.workspacePath || f.base64,
+  );
+  const canSend = input.trim().length > 0 || hasPendingFileContext;
+
   return (
     <div
       className={`shrink-0 ${emptyComposer ? "chat-composer-shell--empty px-0 py-0" : "px-5 py-2 xl:px-6"}`}
@@ -254,6 +263,7 @@ export function ChatInputArea(props: ChatInputAreaProps) {
                     </div>
                     <button
                       onClick={() => onRemoveFile(f.id, f.preview)}
+                      aria-label={`${t("composer.removeFile")}: ${f.name}`}
                       className="ml-1 w-4 h-4 rounded-full flex items-center justify-center text-[10px] opacity-0 group-hover/file:opacity-100 transition-opacity shrink-0"
                       style={{
                         background: "rgba(239,68,68,0.9)",
@@ -286,7 +296,7 @@ export function ChatInputArea(props: ChatInputAreaProps) {
                 }}
               >
                 <span>
-                  {showSlashMenu ? "Command menu" : "Slash command"}
+                  {showSlashMenu ? t("composer.commandMenu") : t("composer.slashCommand")}
                 </span>
                 {activeSlashCommand && (
                   <span
@@ -334,6 +344,7 @@ export function ChatInputArea(props: ChatInputAreaProps) {
                   variant="ghost"
                   size="sm"
                   className="chat-tool-btn compact-tool"
+                  aria-label={t("composer.addFile")}
                   onPress={() => fileInputRef.current?.click()}
                 >
                   <Paperclip size={14} />
@@ -346,6 +357,7 @@ export function ChatInputArea(props: ChatInputAreaProps) {
                   variant="ghost"
                   size="sm"
                   className="chat-tool-btn compact-tool"
+                  aria-label={t("composer.addImage")}
                   onPress={onOpenImagePicker}
                 >
                   <ImageIcon size={14} />
@@ -358,6 +370,7 @@ export function ChatInputArea(props: ChatInputAreaProps) {
                   variant="ghost"
                   size="sm"
                   className="chat-tool-btn compact-tool"
+                  aria-label={isRecording ? t("composer.stopRec") : t("composer.voice")}
                   onPress={isRecording ? onStopRecording : onStartRecording}
                   style={isRecording ? { color: "#ef4444" } : {}}
                 >
@@ -379,6 +392,7 @@ export function ChatInputArea(props: ChatInputAreaProps) {
                     size="sm"
                     className="chat-tool-btn compact-tool"
                     data-active={showConnectors ? "true" : undefined}
+                    aria-label={t("composer.connector")}
                     onPress={() => onConnectorsToggle(!showConnectors)}
                   >
                     <Plug size={14} />
@@ -429,14 +443,14 @@ export function ChatInputArea(props: ChatInputAreaProps) {
                 isIconOnly
                 aria-label={t("composer.send")}
                 size="sm"
-                className={`chat-send-btn h-10 w-10 rounded-[18px] ${input.trim() ? "chat-send-active" : ""}`}
-                data-active={input.trim() ? "true" : "false"}
-                isDisabled={!input.trim()}
+                className={`chat-send-btn h-10 w-10 rounded-[18px] ${canSend ? "chat-send-active" : ""}`}
+                data-active={canSend ? "true" : "false"}
+                isDisabled={!canSend}
                 style={{
-                  background: input.trim()
+                  background: canSend
                     ? "var(--yunque-accent)"
                     : "var(--yunque-bg-muted)",
-                  color: input.trim() ? "#fff" : "var(--yunque-text-muted)",
+                  color: canSend ? "#fff" : "var(--yunque-text-muted)",
                 }}
                 onPress={onSend}
               >

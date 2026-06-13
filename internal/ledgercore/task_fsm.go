@@ -68,26 +68,26 @@ const (
 // transitionActors maps (from, to) → required actor.
 var transitionActors = map[[2]TaskStatus]TransitionActor{
 	// Runtime-driven
-	{TaskCreated, TaskReady}:         ActorRuntime,
-	{TaskReady, TaskRunning}:         ActorRuntime,
-	{TaskRunning, TaskCompleted}:     ActorRuntime,
-	{TaskRunning, TaskFailed}:        ActorRuntime,
-	{TaskRunning, TaskWaitingInput}:  ActorRuntime,
-	{TaskRunning, TaskBlocked}:       ActorRuntime,
-	{TaskRunning, TaskRetrying}:      ActorRuntime,
-	{TaskBlocked, TaskReady}:         ActorRuntime,
-	{TaskRetrying, TaskRunning}:      ActorRuntime,
-	{TaskRetrying, TaskFailed}:       ActorRuntime,
+	{TaskCreated, TaskReady}:        ActorRuntime,
+	{TaskReady, TaskRunning}:        ActorRuntime,
+	{TaskRunning, TaskCompleted}:    ActorRuntime,
+	{TaskRunning, TaskFailed}:       ActorRuntime,
+	{TaskRunning, TaskWaitingInput}: ActorRuntime,
+	{TaskRunning, TaskBlocked}:      ActorRuntime,
+	{TaskRunning, TaskRetrying}:     ActorRuntime,
+	{TaskBlocked, TaskReady}:        ActorRuntime,
+	{TaskRetrying, TaskRunning}:     ActorRuntime,
+	{TaskRetrying, TaskFailed}:      ActorRuntime,
 
 	// User-driven
-	{TaskCreated, TaskCancelled}:     ActorUser,
-	{TaskReady, TaskCancelled}:       ActorUser,
-	{TaskRunning, TaskCancelled}:     ActorUser,
-	{TaskWaitingInput, TaskRunning}:  ActorUser, // input received
+	{TaskCreated, TaskCancelled}:      ActorUser,
+	{TaskReady, TaskCancelled}:        ActorUser,
+	{TaskRunning, TaskCancelled}:      ActorUser,
+	{TaskWaitingInput, TaskRunning}:   ActorUser, // input received
 	{TaskWaitingInput, TaskCancelled}: ActorUser,
-	{TaskBlocked, TaskCancelled}:     ActorUser,
-	{TaskFailed, TaskReady}:          ActorUser, // restart
-	{TaskCancelled, TaskReady}:       ActorUser, // reopen
+	{TaskBlocked, TaskCancelled}:      ActorUser,
+	{TaskFailed, TaskReady}:           ActorUser, // restart
+	{TaskCancelled, TaskReady}:        ActorUser, // reopen
 }
 
 // TransitionActorFor returns the expected actor for a given transition.
@@ -100,27 +100,27 @@ func TransitionActorFor(from, to TaskStatus) TransitionActor {
 
 // transitionEventKind maps transitions to their corresponding event kinds.
 var transitionEventKind = map[[2]TaskStatus]EventKind{
-	{TaskCreated, TaskReady}:         EventTaskReady,
-	{TaskReady, TaskRunning}:         EventTaskStarted,
-	{TaskRunning, TaskCompleted}:     EventTaskCompleted,
-	{TaskRunning, TaskFailed}:        EventTaskFailed,
-	{TaskRunning, TaskCancelled}:     EventTaskCancelled,
-	{TaskRunning, TaskWaitingInput}:  EventTaskWaitingInput,
-	{TaskRunning, TaskBlocked}:       EventTaskBlocked,
-	{TaskRunning, TaskRetrying}:      EventTaskRetrying,
-	{TaskWaitingInput, TaskRunning}:  EventTaskInputReceived,
+	{TaskCreated, TaskReady}:          EventTaskReady,
+	{TaskReady, TaskRunning}:          EventTaskStarted,
+	{TaskRunning, TaskCompleted}:      EventTaskCompleted,
+	{TaskRunning, TaskFailed}:         EventTaskFailed,
+	{TaskRunning, TaskCancelled}:      EventTaskCancelled,
+	{TaskRunning, TaskWaitingInput}:   EventTaskWaitingInput,
+	{TaskRunning, TaskBlocked}:        EventTaskBlocked,
+	{TaskRunning, TaskRetrying}:       EventTaskRetrying,
+	{TaskWaitingInput, TaskRunning}:   EventTaskInputReceived,
 	{TaskWaitingInput, TaskCancelled}: EventTaskCancelled,
-	{TaskBlocked, TaskReady}:         EventTaskResumed,
-	{TaskBlocked, TaskCancelled}:     EventTaskCancelled,
-	// retrying → running re-enters execution, so it must replay to `running`
-	// (task.resumed projects to `ready`, which would diverge from the
-	// materialized view).
-	{TaskRetrying, TaskRunning}:      EventTaskStarted,
-	{TaskRetrying, TaskFailed}:       EventTaskFailed,
-	{TaskFailed, TaskReady}:          EventTaskResumed,
-	{TaskCancelled, TaskReady}:       EventTaskResumed,
-	{TaskCreated, TaskCancelled}:     EventTaskCancelled,
-	{TaskReady, TaskCancelled}:       EventTaskCancelled,
+	{TaskBlocked, TaskReady}:          EventTaskResumed,
+	{TaskBlocked, TaskCancelled}:      EventTaskCancelled,
+	// retrying → running re-enters execution via a dedicated event so it
+	// replays to `running` (task.resumed would diverge to `ready`) while
+	// staying distinguishable from a first start for observability.
+	{TaskRetrying, TaskRunning}:  EventTaskRetrySucceeded,
+	{TaskRetrying, TaskFailed}:   EventTaskFailed,
+	{TaskFailed, TaskReady}:      EventTaskResumed,
+	{TaskCancelled, TaskReady}:   EventTaskResumed,
+	{TaskCreated, TaskCancelled}: EventTaskCancelled,
+	{TaskReady, TaskCancelled}:   EventTaskCancelled,
 }
 
 // EventKindForTransition returns the event kind that should be emitted

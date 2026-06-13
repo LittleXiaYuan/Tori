@@ -11,17 +11,18 @@ type EventKind string
 
 // Task lifecycle events.
 const (
-	EventTaskCreated       EventKind = "task.created"
-	EventTaskReady         EventKind = "task.ready"
-	EventTaskStarted       EventKind = "task.started"
-	EventTaskCompleted     EventKind = "task.completed"
-	EventTaskFailed        EventKind = "task.failed"
-	EventTaskCancelled     EventKind = "task.cancelled"
-	EventTaskRetrying      EventKind = "task.retrying"
-	EventTaskBlocked       EventKind = "task.blocked"
-	EventTaskWaitingInput  EventKind = "task.waiting_input"
-	EventTaskInputReceived EventKind = "task.input_received"
-	EventTaskResumed       EventKind = "task.resumed"
+	EventTaskCreated        EventKind = "task.created"
+	EventTaskReady          EventKind = "task.ready"
+	EventTaskStarted        EventKind = "task.started"
+	EventTaskCompleted      EventKind = "task.completed"
+	EventTaskFailed         EventKind = "task.failed"
+	EventTaskCancelled      EventKind = "task.cancelled"
+	EventTaskRetrying       EventKind = "task.retrying"
+	EventTaskBlocked        EventKind = "task.blocked"
+	EventTaskWaitingInput   EventKind = "task.waiting_input"
+	EventTaskInputReceived  EventKind = "task.input_received"
+	EventTaskResumed        EventKind = "task.resumed"
+	EventTaskRetrySucceeded EventKind = "task.retry_succeeded"
 )
 
 // Step execution events.

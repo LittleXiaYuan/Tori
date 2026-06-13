@@ -22,6 +22,7 @@
   --yunque-elevated:    #2a2a35;
   --yunque-bg-surface:  #14141a;
   --yunque-bg-muted:    rgba(255,255,255,0.04);
+  --yunque-bg-hover:    rgba(255,255,255,0.06);
 
   /* ── Borders ────────────────────────────── */
   --yunque-border:        rgba(255,255,255,0.07);
@@ -152,6 +153,7 @@
   --yunque-elevated:    #ffffff;
   --yunque-bg-surface:  #f9fafb;
   --yunque-bg-muted:    rgba(15, 23, 42, 0.04);
+  --yunque-bg-hover:    rgba(15, 23, 42, 0.06);
   --yunque-border:        rgba(15, 23, 42, 0.08);
   --yunque-border-strong: rgba(15, 23, 42, 0.12);
   --yunque-text:           #1f2937;
@@ -271,11 +273,24 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* In a plain browser there is no native Mica/vibrancy material beneath the
+ * transparent <body>, so the dark overlay must paint its own solid base —
+ * otherwise dark mode renders on a white WebView backdrop and looks washed
+ * out. The Tauri shell (data-shell="tauri") drops the base layer so the
+ * system material keeps showing through. */
 #bg-overlay {
   position: fixed;
   inset: 0;
   z-index: -1;
   pointer-events: none;
+  transition: background 0.3s ease;
+  background:
+    radial-gradient(900px 600px at 12% 10%, var(--yunque-accent-glow, rgba(59, 130, 246, 0.10)), transparent 60%),
+    radial-gradient(800px 500px at 88% 80%, rgba(168, 85, 247, 0.08), transparent 60%),
+    radial-gradient(700px 600px at 50% 50%, rgba(45, 212, 191, 0.05), transparent 65%),
+    linear-gradient(180deg, #0b0b0f, #0a0a0c);
+}
+[data-shell="tauri"] #bg-overlay {
   background:
     radial-gradient(900px 600px at 12% 10%, var(--yunque-accent-glow, rgba(59, 130, 246, 0.10)), transparent 60%),
     radial-gradient(800px 500px at 88% 80%, rgba(168, 85, 247, 0.08), transparent 60%),
@@ -1429,15 +1444,9 @@ button, [role="button"] { border-radius: var(--radius-md); }
   outline-offset: 2px;
 }
 
-/* Background overlay for background images */
-#bg-overlay {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  background: var(--yunque-bg-overlay, transparent);
-  transition: background 0.3s ease;
-}
+/* Wallpaper scrim is applied inline by theme-engine.ts on #bg-overlay only when
+ * a user background image is set (so the ambient gradient base above stays the
+ * default in plain browsers — see the #bg-overlay rule earlier in this file). */
 
 /* Skip to content link (accessibility) */
 .skip-link {
@@ -1485,8 +1494,11 @@ button, [role="button"] { border-radius: var(--radius-md); }
   transform: translateY(-1px);
 }
 .chat-input-wrap:focus-within {
-  border-color: rgba(59,130,246,0.32) !important;
-  box-shadow: 0 10px 28px rgba(0,0,0,0.18), 0 0 0 1px rgba(59,130,246,0.16);
+  border-color: color-mix(in srgb, var(--yunque-accent) 36%, transparent) !important;
+  box-shadow:
+    0 10px 28px rgba(0,0,0,0.18),
+    0 0 0 1px color-mix(in srgb, var(--yunque-accent) 18%, transparent),
+    0 0 36px color-mix(in srgb, var(--yunque-accent) 10%, transparent);
 }
 .chat-input-wrap[data-busy="true"] {
   animation: composerPulse 2.1s ease-in-out infinite;
@@ -1723,6 +1735,16 @@ button, [role="button"] { border-radius: var(--radius-md); }
   opacity: 1;
   transform: translateY(0);
   pointer-events: auto;
+}
+
+/* Touch / no-hover devices can't reveal tools via hover and tapping a bubble
+ * doesn't always move focus into it — keep the actions permanently visible. */
+@media (hover: none) {
+  .chat-message-tools {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+  }
 }
 
 /* Inbox category nav link */
@@ -2081,6 +2103,7 @@ button, [role="button"] { border-radius: var(--radius-md); }
   background: transparent;
 }
 .chat-empty {
+  position: relative;
   min-height: 100%;
   display: flex;
   flex-direction: column;
@@ -2092,6 +2115,34 @@ button, [role="button"] { border-radius: var(--radius-md); }
   margin: 0 auto;
   padding-bottom: 4vh;
   animation: fadeInUp 0.4s ease-out both;
+}
+/* Gemini-style ambient nebula behind the hero: a soft accent-tinted radial
+ * glow that gives the otherwise flat canvas depth. Follows the dynamic
+ * accent color via color-mix, so custom brand palettes glow correctly. */
+.chat-empty::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 44%;
+  transform: translate(-50%, -50%);
+  width: min(860px, 110%);
+  height: min(520px, 78%);
+  background:
+    radial-gradient(ellipse 60% 55% at 50% 46%,
+      color-mix(in srgb, var(--yunque-accent) 13%, transparent) 0%,
+      color-mix(in srgb, var(--yunque-accent) 5%, transparent) 45%,
+      transparent 72%);
+  filter: blur(32px);
+  pointer-events: none;
+  z-index: 0;
+}
+.chat-empty > * {
+  position: relative;
+  z-index: 1;
+}
+[data-theme="light"] .chat-empty::before,
+.light .chat-empty::before {
+  opacity: 0.45;
 }
 .chat-empty__illustration {
   position: relative;
@@ -2204,8 +2255,18 @@ button, [role="button"] { border-radius: var(--radius-md); }
   margin-right: 2px;
 }
 .chat-composer--empty .chat-composer-textarea {
-  min-height: 44px !important;
+  min-height: 52px !important;
   font-size: 15px !important;
+}
+/* On the hero screen the secondary tool icons stay quiet until the user
+ * engages the composer, keeping a single Gemini-like focal point. */
+.chat-composer--empty .chat-tool-btn {
+  opacity: 0.62;
+  transition: opacity var(--duration-base) ease;
+}
+.chat-composer--empty:hover .chat-tool-btn,
+.chat-composer--empty:focus-within .chat-tool-btn {
+  opacity: 1;
 }
 .chat-status-bar {
   display: flex;
@@ -2379,14 +2440,16 @@ button, [role="button"] { border-radius: var(--radius-md); }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
   color: var(--yunque-accent);
+  filter: drop-shadow(0 0 12px var(--yunque-accent-glow));
 }
 .chat-empty__greeting {
-  font-size: 26px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  font-size: clamp(28px, 3.4vw, 34px);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
   color: var(--yunque-text);
 }
 .chat-empty__sub {
@@ -2408,10 +2471,10 @@ button, [role="button"] { border-radius: var(--radius-md); }
   width: 100%;
 }
 .chat-empty__chip {
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   font-weight: 500;
   color: var(--yunque-text-secondary);
-  padding: 6px 14px;
+  padding: 7px 16px;
   border-radius: 999px;
   border: 1px solid var(--glass-edge, var(--yunque-border));
   background: var(--glass-card, var(--yunque-card));
@@ -2426,7 +2489,8 @@ button, [role="button"] { border-radius: var(--radius-md); }
 }
 .chat-empty__chip:hover {
   color: var(--yunque-text);
-  border-color: var(--yunque-border-strong);
+  border-color: color-mix(in srgb, var(--yunque-accent) 38%, transparent);
+  background: color-mix(in srgb, var(--yunque-accent) 7%, transparent);
   transform: translateY(-1px);
 }
 .chat-empty__chip--skeleton {
@@ -2520,6 +2584,33 @@ button, [role="button"] { border-radius: var(--radius-md); }
 /* Markdown code highlight overrides */
 .markdown-body pre code.hljs { background: transparent; padding: 0; }
 .markdown-body .hljs { background: transparent; }
+
+/* The global hljs theme (github-dark-dimmed) is tuned for dark backgrounds;
+ * its mid-tone token colors wash out on light code blocks. Re-map the common
+ * token groups to a GitHub-light palette when the light theme is active. */
+[data-theme="light"] .hljs,
+.light .hljs { color: #24292f; }
+[data-theme="light"] .hljs-comment, .light .hljs-comment,
+[data-theme="light"] .hljs-quote, .light .hljs-quote { color: #6e7781; font-style: italic; }
+[data-theme="light"] .hljs-keyword, .light .hljs-keyword,
+[data-theme="light"] .hljs-selector-tag, .light .hljs-selector-tag,
+[data-theme="light"] .hljs-literal, .light .hljs-literal,
+[data-theme="light"] .hljs-type, .light .hljs-type,
+[data-theme="light"] .hljs-built_in, .light .hljs-built_in,
+[data-theme="light"] .hljs-name, .light .hljs-name { color: #cf222e; }
+[data-theme="light"] .hljs-string, .light .hljs-string,
+[data-theme="light"] .hljs-attr, .light .hljs-attr,
+[data-theme="light"] .hljs-meta .hljs-string, .light .hljs-meta .hljs-string { color: #0a3069; }
+[data-theme="light"] .hljs-number, .light .hljs-number,
+[data-theme="light"] .hljs-symbol, .light .hljs-symbol,
+[data-theme="light"] .hljs-bullet, .light .hljs-bullet,
+[data-theme="light"] .hljs-link, .light .hljs-link { color: #0550ae; }
+[data-theme="light"] .hljs-title, .light .hljs-title,
+[data-theme="light"] .hljs-section, .light .hljs-section,
+[data-theme="light"] .hljs-title.function_, .light .hljs-title.function_ { color: #8250df; }
+[data-theme="light"] .hljs-variable, .light .hljs-variable,
+[data-theme="light"] .hljs-template-variable, .light .hljs-template-variable,
+[data-theme="light"] .hljs-attribute, .light .hljs-attribute { color: #953800; }
 
 /* ═══════════════════════════════════════════════
    Command Palette (⌘K)

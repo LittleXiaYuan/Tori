@@ -40,7 +40,7 @@ export interface ThemeConfig {
 }
 
 export const DEFAULT_THEME: ThemeConfig = {
-  presetTheme: "light",
+  presetTheme: "dark",
   colorTheme: "deep_sea",
   customColor: "#0284c7",
   radius: "default",
@@ -252,12 +252,21 @@ export function applyTheme(cfg: ThemeConfig): void {
     const baseColor = isLight ? "255,255,255" : "10,10,12";
     s.setProperty("--yunque-bg", `rgba(${baseColor},${(1 - bgAlpha * 0.6).toFixed(2)})`);
     const overlayEl = document.getElementById("bg-overlay");
-    if (overlayEl) overlayEl.style.backdropFilter = cfg.interfaceBgBlur > 0 ? `blur(${cfg.interfaceBgBlur}px)` : "";
+    if (overlayEl) {
+      overlayEl.style.backdropFilter = cfg.interfaceBgBlur > 0 ? `blur(${cfg.interfaceBgBlur}px)` : "";
+      // Replace the ambient gradient with a translucent scrim so the body
+      // wallpaper shows through, dimmed for text readability.
+      overlayEl.style.background = "var(--yunque-bg-overlay)";
+    }
   } else {
     // Clear previously-applied bg so switching away removes it.
     document.body.style.backgroundImage = "";
     const overlayEl = document.getElementById("bg-overlay");
-    if (overlayEl) overlayEl.style.backdropFilter = "";
+    if (overlayEl) {
+      overlayEl.style.backdropFilter = "";
+      // Restore the CSS-defined ambient gradient base (no inline override).
+      overlayEl.style.background = "";
+    }
     s.setProperty("--yunque-bg-overlay", "transparent");
     s.removeProperty("--yunque-bg");
   }
