@@ -38,11 +38,16 @@ import (
 	"yunque-agent/internal/agentcore/skillgrowth/adapter"
 	"yunque-agent/internal/cognikernel"
 	reflectpkg "yunque-agent/internal/experimental/reflect"
+	"yunque-agent/pkg/packruntime"
 
 	"yunque-agent/internal/ledgercore"
 
 	iledger "yunque-agent/internal/ledger"
 )
+
+// cognitiveLayerPackID is the pack whose enabled-state drives the planner's
+// master cognitive-layer switch (hot-toggle from the 能力包中心).
+const cognitiveLayerPackID = "yunque.pack.cognitive-layer"
 
 // soulDeps bundles dependencies needed by the soul-layer initializer.
 type soulDeps struct {
@@ -554,6 +559,40 @@ func initSoulLayer(deps soulDeps) {
 		app.Set("react_runner", reactRunner)
 		slog.Info("react: runner initialized")
 	}
+
+	// 15. Cognitive-layer pack binding — toggling yunque.pack.cognitive-layer in
+	// the 能力包中心 hot-flips the whole cognitive layer (no restart).
+	wireCognitiveLayerPack(app)
+}
+
+// wireCognitiveLayerPack binds the cognitive-layer pack's enabled-state to the
+// planner's master switch (planner.SetCognitiveLayerEnabled), so enabling or
+// disabling the pack at runtime hot-toggles memory/reflection/dreaming/evolution
+// without a restart — the same hot-plug model the cogni-kernel pack uses. When
+// the pack runtime is unavailable, the env-derived default stays in effect.
+func wireCognitiveLayerPack(app *agentrt.App) {
+	raw, ok := app.Get(agentrt.CompPackRuntimeRegistry)
+	if !ok {
+		return
+	}
+	reg, ok := raw.(*packruntime.Registry)
+	if !ok || reg == nil {
+		return
+	}
+	// Initial state from the installed pack (if discovered before this runs).
+	if pack, found := reg.Get(cognitiveLayerPackID); found {
+		planner.SetCognitiveLayerEnabled(pack.Status == packruntime.PackStatusEnabled)
+	}
+	// Keep synced on every future enable/disable/install of this pack.
+	reg.OnChange(func(event packruntime.ChangeEvent) {
+		if event.Pack.Manifest.ID != cognitiveLayerPackID {
+			return
+		}
+		enabled := event.Pack.Status == packruntime.PackStatusEnabled
+		planner.SetCognitiveLayerEnabled(enabled)
+		slog.Info("cognitive layer: pack toggle applied", "enabled", enabled)
+	})
+	slog.Info("cognitive layer: bound to pack", "pack", cognitiveLayerPackID)
 }
 
 // buildFailureLog assembles the recent failure lessons from the shared
