@@ -4,15 +4,22 @@ import (
 	"context"
 	"log/slog"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
 	"yunque-agent/internal/agentcore/llm"
+	"yunque-agent/internal/agentcore/offline"
 	agentrt "yunque-agent/internal/agentcore/runtime"
 	"yunque-agent/internal/agentcore/runtime/circuit"
 	"yunque-agent/internal/appdir"
 	iledger "yunque-agent/internal/ledger"
 )
+
+// offlineEngineKey is the app-registry key under which the stateful 小羽
+// (RWKV-7) dream driver is stored. The CogniKernel ignition (init_soul.go)
+// pulls it from here to drive the background self-evolution loop.
+const offlineEngineKey = "offline_engine"
 
 // initLLM initializes the LLM client pool, provider registry, local model
 // auto-detection, and circuit breaker.
@@ -53,6 +60,36 @@ func initLLM(app *agentrt.App) error {
 		slog.Info("llm pool: expert tier configured", "model", cfg.LLMExpertModel)
 	}
 	slog.Info("llm pool initialized", "tiers", app.LLMPool.Keys())
+
+	// Offline background engine — 小羽 (RWKV-7) on Ascend. This is the "slow
+	// brain": a local, O(1)-memory model that drives the CogniKernel dreaming /
+	// self-evolution loops at zero API cost. It is a BACKGROUND tier and is never
+	// routed to by the front-stage interactive path (the gateway chat routes hard
+	// block any request that targets role/tier "offline").
+	if offlineURL := strings.TrimSpace(os.Getenv("OFFLINE_LLM_BASE_URL")); offlineURL != "" {
+		offlineModel := os.Getenv("OFFLINE_LLM_MODEL")
+		if offlineModel == "" {
+			offlineModel = "xiaoyu-rwkv7"
+		}
+		offlineKey := os.Getenv("OFFLINE_LLM_KEY")
+		if offlineKey == "" {
+			offlineKey = cfg.LLMAPIKey
+		}
+		// (1) Register an OpenAI-compatible client under the "offline" role so
+		// background loops can pull stateless offline inference via the pool
+		// (app.LLMPool.Get("offline")). The Pool is typed to *llm.Client, so the
+		// richer stateful driver below cannot be a pool member directly.
+		app.LLMPool.Register("offline", llm.NewClient(offlineURL, offlineKey, offlineModel))
+		// (2) Stateful reverie/dream driver (RWKV-7 O(1) state continuity). The
+		// dream endpoint may live behind a different URL than the OpenAI-compat
+		// surface; OFFLINE_LLM_DREAM_URL overrides it, else reuse the base.
+		dreamURL := strings.TrimSpace(os.Getenv("OFFLINE_LLM_DREAM_URL"))
+		if dreamURL == "" {
+			dreamURL = offlineURL
+		}
+		app.Set(offlineEngineKey, offline.NewXiaoyuClient(dreamURL, offlineKey, offlineModel))
+		slog.Info("llm pool: offline (background) engine configured", "model", offlineModel, "base", offlineURL)
+	}
 
 	// Provider registry
 	app.Providers = llm.NewProviderRegistry(app.LLMPool)

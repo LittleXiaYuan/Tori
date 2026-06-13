@@ -312,6 +312,71 @@ func (m *cogniModule) Init(ctx context.Context, app *agentrt.App) error {
 		}
 	}
 
+	// Self-evolution apply/revert — the missing link that lets the engine
+	// actually mutate a Cogni declaration. SAFE BY DEFAULT: gated OFF unless
+	// COGNI_EVOLUTION_APPLY_ENABLED=true. Even when enabled, mutations only run
+	// via the manual evolve endpoint, are snapshot-reverted on regression by the
+	// engine's own gate, are re-validated before landing, and never touch the
+	// Cogni's identity. Effects are in-memory (registry) so a restart falls back
+	// to the on-disk baseline — a deliberate safety floor for self-modification.
+	if strings.EqualFold(strings.TrimSpace(os.Getenv("COGNI_EVOLUTION_APPLY_ENABLED")), "true") {
+		var evoMu sync.Mutex
+		evoBackups := make(map[string][]byte) // cogniID → pre-round declaration JSON
+		evolutionEngine.SetApplyFunc(func(cogniID string, mutations []cogni.SkillMutation) error {
+			decl, ok := m.registry.Get(cogniID)
+			if !ok {
+				return fmt.Errorf("cogni %q not found", cogniID)
+			}
+			original, err := json.Marshal(decl)
+			if err != nil {
+				return fmt.Errorf("snapshot marshal: %w", err)
+			}
+			// Deep-copy via JSON so we never mutate the live declaration in place.
+			var next cogni.Declaration
+			if err := json.Unmarshal(original, &next); err != nil {
+				return fmt.Errorf("snapshot unmarshal: %w", err)
+			}
+			for _, mut := range mutations {
+				applyMutationToDecl(&next, mut)
+			}
+			next.ID = cogniID // identity is immutable
+			if err := next.Validate(); err != nil {
+				return fmt.Errorf("mutated declaration invalid: %w", err)
+			}
+			// Snapshot the pre-round state each apply so a later revert restores
+			// THIS round only (keeping any prior kept rounds).
+			evoMu.Lock()
+			evoBackups[cogniID] = original
+			evoMu.Unlock()
+			if err := m.registry.Add(&next, "evolution"); err != nil {
+				return fmt.Errorf("registry update: %w", err)
+			}
+			slog.Info("cogni: evolution applied mutations", "cogni", cogniID, "count", len(mutations))
+			return nil
+		})
+		evolutionEngine.SetRevertFunc(func(cogniID string, mutations []cogni.SkillMutation) error {
+			evoMu.Lock()
+			original, ok := evoBackups[cogniID]
+			evoMu.Unlock()
+			if !ok {
+				return nil
+			}
+			var prev cogni.Declaration
+			if err := json.Unmarshal(original, &prev); err != nil {
+				return fmt.Errorf("revert unmarshal: %w", err)
+			}
+			prev.ID = cogniID
+			if err := m.registry.Add(&prev, "evolution-revert"); err != nil {
+				return fmt.Errorf("registry revert: %w", err)
+			}
+			slog.Info("cogni: evolution reverted to baseline", "cogni", cogniID)
+			return nil
+		})
+		slog.Info("cogni: evolution apply+revert wired (snapshot-based, gate ON)")
+	} else {
+		slog.Info("cogni: evolution apply disabled (set COGNI_EVOLUTION_APPLY_ENABLED=true to allow self-modification)")
+	}
+
 	// Federation
 	selfID := "local"
 	selfURL := "http://localhost" + app.Config.Addr
@@ -951,4 +1016,124 @@ func (m *cogniModule) Status() agentrt.ModuleStatus {
 		Enabled:     enabled,
 		Running:     enabled && m.cogniRuntimeActive(),
 	}
+}
+
+// applyMutationToDecl applies one evolution mutation onto a (deep-copied)
+// declaration using typed, guaranteed-valid field writes. It deliberately only
+// touches the two safe, behavior-relevant surfaces — the injected prompt text
+// (Context.Static) and activation sensitivity (Activation.*) — so a malformed
+// LLM mutation can never produce an invalid declaration. Unknown shapes are
+// no-ops; the engine's bench gate then reverts the empty change.
+func applyMutationToDecl(d *cogni.Declaration, mut cogni.SkillMutation) {
+	switch mut.MutationType {
+	case "prompt":
+		txt := afterString(mut.After, "static", "prompt", "text", "context", "instruction")
+		if txt == "" {
+			txt = strings.TrimSpace(mut.Rationale)
+			if txt != "" {
+				txt = "[evolution] " + txt
+			}
+		}
+		if txt == "" {
+			return
+		}
+		if strings.TrimSpace(d.Context.Static) != "" {
+			d.Context.Static += "\n\n" + txt
+		} else {
+			d.Context.Static = txt
+		}
+	case "parameter":
+		if v, ok := afterFloat(mut.After, "min_score"); ok {
+			d.Activation.MinScore = clamp01(v)
+		}
+		if v, ok := afterFloat(mut.After, "keyword_weight"); ok {
+			d.Activation.KeywordWeight = clamp01(v)
+		}
+		if v, ok := afterFloat(mut.After, "regex_weight"); ok {
+			d.Activation.RegexWeight = clamp01(v)
+		}
+		for _, kw := range afterStrings(mut.After, "keywords") {
+			if !containsString(d.Activation.Keywords, kw) {
+				d.Activation.Keywords = append(d.Activation.Keywords, kw)
+			}
+		}
+	default:
+		// "timeout" / "new_skill" and any unknown type are intentionally not
+		// auto-applied (resource-budget and capability-surface changes are out
+		// of scope for safe auto-evolution).
+	}
+}
+
+func afterString(m map[string]any, keys ...string) string {
+	for _, k := range keys {
+		if v, ok := m[k]; ok {
+			if s, ok := v.(string); ok && strings.TrimSpace(s) != "" {
+				return strings.TrimSpace(s)
+			}
+		}
+	}
+	return ""
+}
+
+func afterFloat(m map[string]any, key string) (float64, bool) {
+	v, ok := m[key]
+	if !ok {
+		return 0, false
+	}
+	switch n := v.(type) {
+	case float64:
+		return n, true
+	case int:
+		return float64(n), true
+	case json.Number:
+		f, err := n.Float64()
+		return f, err == nil
+	case string:
+		f, err := strconv.ParseFloat(strings.TrimSpace(n), 64)
+		return f, err == nil
+	}
+	return 0, false
+}
+
+func afterStrings(m map[string]any, key string) []string {
+	v, ok := m[key]
+	if !ok {
+		return nil
+	}
+	switch arr := v.(type) {
+	case []string:
+		return arr
+	case []any:
+		out := make([]string, 0, len(arr))
+		for _, it := range arr {
+			if s, ok := it.(string); ok && strings.TrimSpace(s) != "" {
+				out = append(out, strings.TrimSpace(s))
+			}
+		}
+		return out
+	case string:
+		if strings.TrimSpace(arr) != "" {
+			return []string{strings.TrimSpace(arr)}
+		}
+	}
+	return nil
+}
+
+func clamp01(v float64) float64 {
+	if v < 0 {
+		return 0
+	}
+	if v > 1 {
+		return 1
+	}
+	return v
+}
+
+func containsString(list []string, s string) bool {
+	for _, it := range list {
+		if it == s {
+			return true
+		}
+	}
+	return false
 }

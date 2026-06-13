@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"yunque-agent/internal/agentcore/planner"
 	"yunque-agent/pkg/packruntime"
 )
 
@@ -42,6 +43,9 @@ func (g *Gateway) evolutionEnabled() bool {
 // → prompt-injection loop. Gated by evolutionEnabled so the evolution pack can
 // turn it off.
 func (g *Gateway) fireReflection(tenantID, sessionID, intent, reply string, skillsUsed []string, modelTier string) {
+	if !planner.CognitiveLayerEnabled() {
+		return // cognitive layer off → no post-turn learning
+	}
 	if g.reflectiveLoop == nil || strings.TrimSpace(reply) == "" || strings.TrimSpace(intent) == "" {
 		return
 	}

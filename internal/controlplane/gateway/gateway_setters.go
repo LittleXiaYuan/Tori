@@ -615,6 +615,10 @@ func (g *Gateway) SetCogniGenesis(gen *cogni.Genesis) { g.cogniGenesis = gen }
 // SetCogniEvolution attaches the evolution engine for /v1/cognis/{id}/evolve.
 func (g *Gateway) SetCogniEvolution(ee *cogni.EvolutionEngine) { g.cogniEvolution = ee }
 
+// SetCogniKernel attaches the CogniKernel so the offline dream loop can be
+// surfaced read-only via /v1/reverie/dream/status.
+func (g *Gateway) SetCogniKernel(k *cognikernel.CogniKernel) { g.cogniKernel = k }
+
 // SetCogniFederation attaches the federation manager.
 func (g *Gateway) SetCogniFederation(cf *cogni.CogniFederation) { g.cogniFederation = cf }
 

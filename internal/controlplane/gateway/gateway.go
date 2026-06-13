@@ -368,6 +368,7 @@ type Gateway struct {
 	cogniFederation         *cogni.CogniFederation
 	cogniCostTracker        *cogni.CostTracker
 	cogniBus                *cogni.CogniBus
+	cogniKernel             *cognikernel.CogniKernel // offline dream loop, for status surface
 
 	// NL Config — natural-language → structured-config translator
 	nlConfigTranslator *cogni.NLConfigTranslator

@@ -344,6 +344,9 @@ func clipConversationSummary(reply string) string {
 // runPostChatHooks triggers async post-processing: memory pipeline, learning loop,
 // adaptive loop, skill growth, and skill suggestions.
 func (g *Gateway) runPostChatHooks(ctx context.Context, req *ChatRequest, result *planner.PlanResult, emotionHint *emotion.Result) {
+	if !planner.CognitiveLayerEnabled() {
+		return // cognitive layer off → no memory ingest / learning / adaptive / skill-growth
+	}
 	if g.orchestrator != nil && result.Reply != "" {
 		_ = g.orchestrator.Ingest(ctx, req.TenantID, result.Reply, "conversation", "assistant_reply")
 		g.metrics.Cognitive().MemoryIngest.Add(1)

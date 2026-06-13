@@ -216,8 +216,8 @@ func buildChannelHandler(
 
 		convStore.Append(sessionID, userMsg)
 
-		// Memory ingestion
-		if orchestrator != nil {
+		// Memory ingestion (cognitive layer)
+		if planner.CognitiveLayerEnabled() && orchestrator != nil {
 			memContent := fmt.Sprintf("[%s]: %s", displayName, msg.Content)
 			if err := orchestrator.Ingest(channelCtx, tenantID, memContent, "conversation", "channel_input"); err != nil {
 				slog.Warn("memory ingest failed", "err", err)
@@ -279,35 +279,40 @@ func buildChannelHandler(
 			})
 		}
 
-		// CognitivePlugin routing: highest ShouldHandle score >= 0.7 claims the message.
+		// CognitivePlugin routing: highest ShouldHandle score >= 0.7 claims the
+		// message. This is part of the cognitive layer, so it is skipped entirely
+		// when the layer is off — the message then always goes to the clean
+		// planner+tools path.
 		var result *planner.PlanResult
 		var err error
-		cogPlugin, cogScore := app.PluginReg.RouteMessage(channelCtx, msg.Content)
-		if cogPlugin != nil {
-			slog.Info("cognitive plugin claiming message",
-				"plugin", cogPlugin.Name(), "score", cogScore, "channel", msg.ChannelType)
-			cogEnv := &pluginpkg.CognitiveEnv{
-				LLMCall: app.LLMBreaker.Call,
-				MemorySearch: func(ctx context.Context, query string) string {
-					return app.Orchestrator.CompileContext(ctx, tenantID, query)
-				},
-				TenantID:    tenantID,
-				UserID:      msg.UserID,
-				ChannelType: msg.ChannelType,
-				SessionID:   sessionID,
-			}
-			reply, handleErr := cogPlugin.Handle(channelCtx, msg.Content, cogEnv)
-			if handleErr != nil {
-				slog.Warn("cognitive plugin handle failed, falling back to Planner",
-					"plugin", cogPlugin.Name(), "err", handleErr)
-				cogPlugin = nil // fall through to normal Planner
-			} else {
-				result = &planner.PlanResult{Reply: reply}
-				err = nil
+		cognitivePluginHandled := false
+		if planner.CognitiveLayerEnabled() {
+			if cogPlugin, cogScore := app.PluginReg.RouteMessage(channelCtx, msg.Content); cogPlugin != nil {
+				slog.Info("cognitive plugin claiming message",
+					"plugin", cogPlugin.Name(), "score", cogScore, "channel", msg.ChannelType)
+				cogEnv := &pluginpkg.CognitiveEnv{
+					LLMCall: app.LLMBreaker.Call,
+					MemorySearch: func(ctx context.Context, query string) string {
+						return app.Orchestrator.CompileContext(ctx, tenantID, query)
+					},
+					TenantID:    tenantID,
+					UserID:      msg.UserID,
+					ChannelType: msg.ChannelType,
+					SessionID:   sessionID,
+				}
+				reply, handleErr := cogPlugin.Handle(channelCtx, msg.Content, cogEnv)
+				if handleErr != nil {
+					slog.Warn("cognitive plugin handle failed, falling back to Planner",
+						"plugin", cogPlugin.Name(), "err", handleErr)
+				} else {
+					result = &planner.PlanResult{Reply: reply}
+					err = nil
+					cognitivePluginHandled = true
+				}
 			}
 		}
 
-		if cogPlugin == nil {
+		if !cognitivePluginHandled {
 			result, err = p.Run(channelCtx, planner.PlanRequest{
 				Messages: msgs, TenantID: tenantID, EmotionHint: channelEmotionHint,
 				IsGroup: isGroup, ChannelType: msg.ChannelType, ChatType: chatType,
@@ -338,6 +343,9 @@ func buildChannelHandler(
 
 		// Learning loop + experience
 		safego.Go("LearningLoop", func() {
+			if !planner.CognitiveLayerEnabled() {
+				return // cognitive layer off → no channel learning/experience
+			}
 			learnCtx, learnCancel := context.WithTimeout(context.Background(), LearningLoopTimeout)
 			defer learnCancel()
 			quality := 7

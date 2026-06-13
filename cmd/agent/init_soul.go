@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"os"
 	"strings"
 	"time"
 
@@ -17,7 +18,9 @@ import (
 	"yunque-agent/internal/agentcore/llm/distill"
 	"yunque-agent/internal/agentcore/memory"
 	"yunque-agent/internal/agentcore/multiagent"
+	"yunque-agent/internal/agentcore/offline"
 	"yunque-agent/internal/agentcore/planner"
+	"yunque-agent/internal/controlplane/gateway"
 	"yunque-agent/internal/agentcore/review"
 	agentrt "yunque-agent/internal/agentcore/runtime"
 	"yunque-agent/internal/agentcore/selfheal"
@@ -34,6 +37,7 @@ import (
 	"yunque-agent/internal/agentcore/selfheal/iterate"
 	"yunque-agent/internal/agentcore/skillgrowth/adapter"
 	"yunque-agent/internal/cognikernel"
+	reflectpkg "yunque-agent/internal/experimental/reflect"
 
 	"yunque-agent/internal/ledgercore"
 
@@ -188,6 +192,139 @@ func initSoulLayer(deps soulDeps) {
 		})
 		app.Set("dreaming_loop", dreamingLoop)
 		slog.Info("dreaming_loop: ready (curiosity → memory + reverie wired)")
+	}
+
+	// 3.2 CogniKernel ignition — wire the dreaming loop to the offline engine
+	// (小羽 / RWKV-7) and formally start the loop at boot. The kernel drives a
+	// fixed-interval dream cycle that pulls the offline engine, distills
+	// experiences, and sinks them into the SAME experience store the planner
+	// reads (anti-fragmentation: one truth source). Only runs when an offline
+	// engine is configured (OFFLINE_LLM_BASE_URL).
+	if rawEngine, ok := app.Get(offlineEngineKey); ok && planner.CognitiveLayerEnabled() {
+		if xiaoyu, ok := rawEngine.(*offline.XiaoyuClient); ok {
+			kernel := cognikernel.New(cognikernel.DefaultKernelConfig())
+			if dl, ok := app.Get("dreaming_loop"); ok {
+				if dreamingLoop, ok := dl.(*cognikernel.DreamingLoop); ok {
+					kernel.SetDreamingLoop(dreamingLoop)
+				}
+			}
+
+			// Distill closure: build yesterday's failure log from the experience
+			// store, run 小羽's stateful dream (carrying the RWKV state handle),
+			// then map the results back into kernel-neutral records.
+			kernel.SetDreamDistill(func(ctx context.Context, prevSessionID string) (string, []cognikernel.DreamExperience, error) {
+				sessionID := prevSessionID
+				if sessionID == "" {
+					sessionID = "dream-default"
+				}
+				if !xiaoyu.Healthy(ctx) {
+					return prevSessionID, nil, fmt.Errorf("offline engine unavailable (NPU busy or service down)")
+				}
+				resp, err := xiaoyu.Dream(ctx, offline.DreamRequest{
+					SessionID: sessionID,
+					TenantID:  "default",
+					LogEvent:  buildFailureLog(app),
+				})
+				if err != nil {
+					return prevSessionID, nil, err
+				}
+				out := make([]cognikernel.DreamExperience, 0, len(resp.Experiences))
+				for _, e := range resp.Experiences {
+					out = append(out, cognikernel.DreamExperience{
+						Category: e.Category,
+						Outcome:  e.Outcome,
+						Lesson:   e.Lesson,
+						Context:  e.Context,
+						Tags:     e.Tags,
+					})
+				}
+				return resp.SessionID, out, nil
+			})
+
+			// Sink closure: persist distilled experiences into the SAME store the
+			// planner reads (resolved lazily so init ordering is irrelevant).
+			kernel.SetExperienceSink(func(ctx context.Context, exp cognikernel.DreamExperience) error {
+				raw, ok := app.Get(agentrt.CompExperienceStore)
+				if !ok {
+					return nil
+				}
+				store, ok := raw.(*reflectpkg.ExperienceStore)
+				if !ok {
+					return nil
+				}
+				store.Add(reflectpkg.Experience{
+					Source:   "reverie",
+					SourceID: "xiaoyu-dream",
+					Category: orDefault(exp.Category, "strategy"),
+					Outcome:  orDefault(exp.Outcome, "partial"),
+					Lesson:   exp.Lesson,
+					Context:  exp.Context,
+					Tags:     exp.Tags,
+				})
+				return nil
+			})
+
+			// Durable RWKV state-handle continuity: persist session_id to Ledger
+			// KV so O(1) state survives restarts (next-restart resumes instead of
+			// starting a fresh "dream-default" state).
+			if typedLdg != nil {
+				kvStore := iledger.NewKVConfigStore(typedLdg, "reverie_state")
+				kernel.SetSessionStore(
+					func(ctx context.Context) string {
+						var handle string
+						found, err := kvStore.Get(ctx, "dream_session", &handle)
+						if err != nil || !found {
+							return ""
+						}
+						return handle
+					},
+					func(ctx context.Context, sessionID string) {
+						if sessionID == "" {
+							return
+						}
+						if err := kvStore.Put(ctx, "dream_session", sessionID); err != nil {
+							slog.Warn("cognikernel: dream session persist failed", "err", err)
+						}
+					},
+				)
+			}
+
+			// Observability: emit a durable digest event after each dream cycle so
+			// the offline loop is visible on the Inner-life timeline (mirrors the
+			// DreamingLoop's dreaming.completed event).
+			if typedLdg != nil && typedLdg.Events != nil {
+				kernel.SetDreamEventEmit(func(ctx context.Context, kind string, payload map[string]any) {
+					tenantID, _ := payload["tenant_id"].(string)
+					_ = typedLdg.Events.Append(ctx, &ledger.Event{
+						TaskID:    "tenant:" + tenantID,
+						Kind:      ledger.EventKind(kind),
+						Actor:     "cogni_kernel",
+						Payload:   ledger.MakePayload(payload),
+						CreatedAt: time.Now(),
+					})
+				})
+			}
+
+			// Honor live hot-toggle of the cognitive layer in the dream loop too.
+			kernel.SetEnabledCheck(planner.CognitiveLayerEnabled)
+
+			kernel.Start(context.Background())
+			interval := 30 * time.Minute
+			if v := strings.TrimSpace(os.Getenv("DREAM_INTERVAL")); v != "" {
+				if d, err := time.ParseDuration(v); err == nil && d > 0 {
+					interval = d
+				}
+			}
+			kernel.StartDreamingScheduler(context.Background(), interval, "default")
+			app.Set("cogni_kernel", kernel)
+			// Expose the kernel read-only for the /v1/reverie/dream/status panel.
+			if gwRaw, ok := app.Get(agentrt.CompGateway); ok {
+				if gw, ok := gwRaw.(*gateway.Gateway); ok {
+					gw.SetCogniKernel(kernel)
+				}
+			}
+			slog.Info("cognikernel: ignited with 小羽 offline engine", "interval", interval, "model", xiaoyu.Model())
+		}
 	}
 
 	// 3.5 World Model → track external environment state
@@ -419,6 +556,41 @@ func initSoulLayer(deps soulDeps) {
 	}
 }
 
+// buildFailureLog assembles the recent failure lessons from the shared
+// experience store into a compact log for the offline engine to chew on. Empty
+// when the store is absent or holds no failures.
+func buildFailureLog(app *agentrt.App) string {
+	raw, ok := app.Get(agentrt.CompExperienceStore)
+	if !ok {
+		return ""
+	}
+	store, ok := raw.(*reflectpkg.ExperienceStore)
+	if !ok {
+		return ""
+	}
+	var sb strings.Builder
+	for _, e := range store.All() { // newest first
+		if e.Outcome != "failure" {
+			continue
+		}
+		sb.WriteString("- ")
+		sb.WriteString(e.Lesson)
+		sb.WriteByte('\n')
+		if sb.Len() > 4000 {
+			break
+		}
+	}
+	return sb.String()
+}
+
+// orDefault returns v, or fallback when v is blank.
+func orDefault(v, fallback string) string {
+	if strings.TrimSpace(v) == "" {
+		return fallback
+	}
+	return v
+}
+
 // runNighttimeScheduler runs iterate, curiosity, eval, causal, lifecycle, and
 // compaction during low-traffic hours (2:00-5:00 AM).
 func runNighttimeScheduler(app *agentrt.App, iterEngine *iterate.Engine, typedLdg *ledger.Ledger) {
@@ -430,8 +602,13 @@ func runNighttimeScheduler(app *agentrt.App, iterEngine *iterate.Engine, typedLd
 			continue
 		}
 
+		// Cognitive-layer master switch: when off, skip the cognitive night jobs
+		// (iterate / dreaming / eval / causal) but keep base maintenance
+		// (memory lifecycle + event compaction) running.
+		cog := planner.CognitiveLayerEnabled()
+
 		// Run iterate cycle
-		if iterEngine.Enabled() {
+		if cog && iterEngine.Enabled() {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 			cycleLog, err := iterEngine.RunCycle(ctx)
 			cancel()
@@ -448,7 +625,7 @@ func runNighttimeScheduler(app *agentrt.App, iterEngine *iterate.Engine, typedLd
 
 		// Run dreaming cycle (curiosity + future reverie/skill-grow) — emits
 		// dreaming.completed ledger event for Inner-life Pack timeline.
-		if dl, ok := app.Get("dreaming_loop"); ok {
+		if dl, ok := app.Get("dreaming_loop"); ok && cog {
 			if dreamingLoop, ok := dl.(*cognikernel.DreamingLoop); ok {
 				if cm, ok := app.Get("curiosity"); ok {
 					if curiosityMod, ok := cm.(*curiosity.Module); ok && curiosityMod.ShouldExplore(context.Background(), "default") {
@@ -471,7 +648,7 @@ func runNighttimeScheduler(app *agentrt.App, iterEngine *iterate.Engine, typedLd
 		}
 
 		// Run eval + distill batch
-		if ev, ok := app.Get("evaluator"); ok {
+		if ev, ok := app.Get("evaluator"); ok && cog {
 			if evaluator, ok := ev.(*eval.Evaluator); ok {
 				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 				results, err := evaluator.EvaluateBatch(ctx, "default", 10)
@@ -485,7 +662,7 @@ func runNighttimeScheduler(app *agentrt.App, iterEngine *iterate.Engine, typedLd
 		}
 
 		// Run causal failure pattern analysis
-		if ce, ok := app.Get("causal_engine"); ok {
+		if ce, ok := app.Get("causal_engine"); ok && cog {
 			if causalEngine, ok := ce.(*causal.CausalEngine); ok {
 				ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 				patterns, err := causalEngine.AnalyzeFailurePatterns(ctx, "default", 20)

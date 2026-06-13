@@ -4,8 +4,10 @@ import (
 	"context"
 	"log/slog"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	ctxwindow "yunque-agent/internal/agentcore/context"
@@ -117,6 +119,31 @@ var (
 	injectBeliefEnabled   = layerInjectionEnabled("INJECT_BELIEF")
 )
 
+// cognitiveLayerEnabled is the MASTER switch for the whole cognitive layer
+// (memory, graph/recall, cogni, belief, strategy, reverie, emotion, state,
+// cognitive plugins, skill hints, reflection/learning, dreaming, evolution).
+// Default ON — when off the agent runs as a clean "planner + tools" shell.
+//
+// It is RUNTIME-MUTABLE (atomic) so it can be hot-toggled without a restart —
+// the same hot-plug model the Pack runtime / Cogni registry already use. The
+// initial value comes from COGNITIVE_LAYER_ENABLED (default on); a pack or API
+// toggle can flip it live via SetCognitiveLayerEnabled.
+var cognitiveLayerEnabled = func() *atomic.Bool {
+	b := new(atomic.Bool)
+	b.Store(layerInjectionEnabled("COGNITIVE_LAYER_ENABLED"))
+	return b
+}()
+
+// CognitiveLayerEnabled reports whether the master cognitive layer is on. Boot
+// wiring, gateway post-hooks, and background schedulers all gate on this so the
+// whole stack flips together. Safe for concurrent reads.
+func CognitiveLayerEnabled() bool { return cognitiveLayerEnabled.Load() }
+
+// SetCognitiveLayerEnabled hot-toggles the cognitive layer at runtime (no
+// restart). Intended to be driven by a pack/API toggle so the entire cognitive
+// stack can be enabled/disabled live, WASM-pack style.
+func SetCognitiveLayerEnabled(on bool) { cognitiveLayerEnabled.Store(on) }
+
 // AllocateBudget returns per-layer budget proportions based on the user's
 // intent classification. When intent is empty or adaptive budget is disabled,
 // returns uniform allocation.
@@ -155,6 +182,19 @@ func (pb *PromptBuilder) BuildDynamicContext(ctx context.Context, req DynamicCon
 	defer func() {
 		slog.Debug("prompt_builder: dynamic context built", "elapsed_ms", time.Since(t0).Milliseconds(), "layers", len(pb.LastIncludedLayers))
 	}()
+
+	// Master cognitive-layer gate. When OFF, the agent is a clean planner+tools
+	// shell: skip ALL cognitive context layers, keeping only the active task's
+	// working memory (task execution, not the cognitive companion stack).
+	if !cognitiveLayerEnabled.Load() {
+		if strings.TrimSpace(req.TaskContext) != "" {
+			pb.LastIncludedLayers = []string{"task"}
+			return req.TaskContext
+		}
+		pb.LastIncludedLayers = nil
+		return ""
+	}
+
 	var layers []ctxwindow.Layer
 
 	// P1: Task working memory (highest dynamic priority)
@@ -176,9 +216,11 @@ func (pb *PromptBuilder) BuildDynamicContext(ctx context.Context, req DynamicCon
 		priority ctxwindow.LayerPriority
 		prefix   string
 		content  string
+		elapsed  time.Duration
 	}
 	results := make(chan layerResult, 3)
 	pending := 0
+	pendingNames := make(map[string]struct{}, 3)
 	msgRunes := len([]rune(req.LastMessage))
 	skipRetrieval := msgRunes < 6
 	// LocalBrain already classified this turn (System 1, no extra cost).
@@ -200,32 +242,29 @@ func (pb *PromptBuilder) BuildDynamicContext(ctx context.Context, req DynamicCon
 
 	if injectMemoryEnabled && pb.contextAssembly != nil && pb.contextAssembly.memory != nil && !skipRetrieval {
 		pending++
+		pendingNames["memory"] = struct{}{}
 		safego.Go("prompt-memory-recall", func() {
-			if memCtx := pb.contextAssembly.Memory(retrCtx, req.TenantID, req.LastMessage); memCtx != "" {
-				results <- layerResult{"memory", ctxwindow.LayerPriorityMemory, "## 记忆上下文\n", memCtx}
-			} else {
-				results <- layerResult{}
-			}
+			start := time.Now()
+			memCtx := pb.contextAssembly.Memory(retrCtx, req.TenantID, req.LastMessage)
+			results <- layerResult{"memory", ctxwindow.LayerPriorityMemory, "## 记忆上下文\n", memCtx, time.Since(start)}
 		})
 	}
 	if injectGraphEnabled && pb.contextAssembly != nil && pb.contextAssembly.HasGraphContext() && !skipRetrieval && !casualChat {
 		pending++
+		pendingNames["graph"] = struct{}{}
 		safego.Go("prompt-graph-context", func() {
-			if graphCtx := pb.contextAssembly.GraphContextForRequest(retrCtx, req.TenantID, req.LastMessage); graphCtx != "" {
-				results <- layerResult{"graph", ctxwindow.LayerPriorityRetrieval, "## 知识图谱\n", graphCtx}
-			} else {
-				results <- layerResult{}
-			}
+			start := time.Now()
+			graphCtx := pb.contextAssembly.GraphContextForRequest(retrCtx, req.TenantID, req.LastMessage)
+			results <- layerResult{"graph", ctxwindow.LayerPriorityRetrieval, "## 知识图谱\n", graphCtx, time.Since(start)}
 		})
 	}
 	if pb.contextAssembly != nil && pb.contextAssembly.codeContext != nil && !skipRetrieval && !casualChat {
 		pending++
+		pendingNames["code"] = struct{}{}
 		safego.Go("prompt-code-context", func() {
-			if codeCtx := pb.contextAssembly.codeContext(req.LastMessage); codeCtx != "" {
-				results <- layerResult{"code", ctxwindow.LayerPriorityRetrieval, "", codeCtx}
-			} else {
-				results <- layerResult{}
-			}
+			start := time.Now()
+			codeCtx := pb.contextAssembly.codeContext(req.LastMessage)
+			results <- layerResult{"code", ctxwindow.LayerPriorityRetrieval, "", codeCtx, time.Since(start)}
 		})
 	}
 
@@ -241,12 +280,22 @@ collect:
 	for i := 0; i < pending; i++ {
 		select {
 		case r := <-results:
+			delete(pendingNames, r.name)
+			slog.Debug("prompt_builder: retrieval layer done",
+				"layer", r.name, "elapsed_ms", r.elapsed.Milliseconds(), "empty", r.content == "")
 			if r.content != "" {
 				rawRetrieval = append(rawRetrieval, r)
 			}
 		case <-retrDeadline:
+			// Name the offenders so production logs point straight at the slow
+			// retrieval source instead of just counting drops.
+			slow := make([]string, 0, len(pendingNames))
+			for name := range pendingNames {
+				slow = append(slow, name)
+			}
+			sort.Strings(slow)
 			slog.Warn("prompt_builder: retrieval budget exceeded, continuing with partial context",
-				"collected", len(rawRetrieval), "dropped", pending-i, "budget", retrievalTimeout)
+				"collected", len(rawRetrieval), "dropped", strings.Join(slow, ","), "budget", retrievalTimeout)
 			break collect
 		}
 	}

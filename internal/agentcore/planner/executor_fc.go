@@ -41,7 +41,7 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 	// or an explicit user tool whitelist (AllowedSkills). cogniInvokers routes a
 	// matching tool call back through the cogni's MCPManager during dispatch.
 	var cogniInvokers map[string]CogniTool
-	if !req.DisableDelegation && len(req.AllowedSkills) == 0 {
+	if cognitiveLayerEnabled.Load() && !req.DisableDelegation && len(req.AllowedSkills) == 0 {
 		tools, cogniInvokers = mergeCogniTools(tools, contextAssembly.CogniTools(ctx, userMsg, req.TenantID, req.ChannelType))
 	}
 

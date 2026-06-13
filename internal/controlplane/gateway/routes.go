@@ -27,10 +27,12 @@ package gateway
 // ──────────────────────────────────────────────
 
 func (g *Gateway) registerChatRoutes() {
-	// Core chat
-	g.mux.HandleFunc("/v1/chat", g.requireAuth(g.limiter.Middleware(g.handleChat)))
-	g.mux.HandleFunc("/v1/chat/stream", g.requireAuth(g.limiter.Middleware(g.handleStreamChat)))
-	g.mux.HandleFunc("/v1/chat/agentic", g.requireAuth(g.limiter.Middleware(g.handleAgenticChat)))
+	// Core chat. guardNoOfflineRole hard-blocks (403) any front-stage request
+	// that tries to target the offline background engine (小羽 / RWKV-7), so its
+	// latency never leaks into the user-facing path.
+	g.mux.HandleFunc("/v1/chat", g.requireAuth(g.limiter.Middleware(g.guardNoOfflineRole(g.handleChat))))
+	g.mux.HandleFunc("/v1/chat/stream", g.requireAuth(g.limiter.Middleware(g.guardNoOfflineRole(g.handleStreamChat))))
+	g.mux.HandleFunc("/v1/chat/agentic", g.requireAuth(g.limiter.Middleware(g.guardNoOfflineRole(g.handleAgenticChat))))
 	g.mux.HandleFunc("/v1/chat/starter-suggestions", g.requireAuth(g.handleStarterSuggestions))
 	g.mux.HandleFunc("/v1/ws", g.requireAuth(g.handleWebSocket))
 	g.mux.HandleFunc("/v1/token", g.handleTokenGenerate)
@@ -288,6 +290,11 @@ func (g *Gateway) registerReverieRoutes() {
 	g.mux.HandleFunc("/v1/reverie/thought", g.requireAuth(g.handleReverieDeleteThought))
 	g.mux.HandleFunc("/v1/reverie/targets", g.requireAuth(g.handleReverieTargets))
 	g.mux.HandleFunc("/v1/reverie/actions", g.requireAuth(g.handleReverieActions))
+	// Offline dream loop + self-evolution status (read-only observability).
+	g.mux.HandleFunc("/v1/reverie/dream/status", g.requireAuth(g.handleDreamStatus))
+	// Cognitive-layer master switch — runtime hot-toggle (admin-only). GET reads
+	// state; POST {"enabled":bool} flips the whole cognitive stack without restart.
+	g.mux.HandleFunc("/v1/cognitive-layer", g.requireAuth(g.requireAdmin(g.handleCognitiveLayer)))
 }
 
 // ──────────────────────────────────────────────

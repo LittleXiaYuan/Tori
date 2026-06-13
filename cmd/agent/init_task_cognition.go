@@ -95,6 +95,10 @@ func initCognitionWiring(
 	experienceStore := reflectpkg.NewExperienceStore(cfg.DataPath("experience.json"))
 	taskReflector := reflectpkg.NewTaskReflector(app.LLMClient, experienceStore)
 	gw.SetExperienceStore(experienceStore)
+	// Expose the single experience store app-wide so the CogniKernel offline
+	// dream loop sinks into the SAME store the planner reads for strategy
+	// injection (anti-fragmentation rule — one truth source, not a new one).
+	app.Set(agentrt.CompExperienceStore, experienceStore)
 	p.SetStrategyContext(func() string {
 		return experienceStore.CompileStrategies(10)
 	})
