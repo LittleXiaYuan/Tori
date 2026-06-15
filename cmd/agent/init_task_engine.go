@@ -156,14 +156,16 @@ func initTaskEngine(
 	// (de-shelled from the gateway). add (short/mid/long) + compact are wired here.
 	_ = gw.RegisterModule(memorypack.NewWired(gw.MemoryManager(), gw.MemoryPipeline(), gw.MemoryOrchestrator, gw.TenantOf))
 
-	// Skills pack — the listing surface (/v1/skills) is filled in (served natively
-	// via the registry + metrics); scan/dynamic/approve/reject stay on the gateway
-	// bridge (HandleSkillsPack). SkillHub / market keep their own gateway routes.
-	skillsPack := skillspack.NewHandlerWithService(gw, gw.SkillsRegistry(), gw.Metrics())
+	// Skills pack — fully de-shelled: listing / scan / dynamic / approve / reject
+	// all served natively via the registry + metrics + file scanner. SkillHub /
+	// market keep their own gateway routes.
+	skillsPack := skillspack.NewHandlerWithService(gw.SkillsRegistry(), gw.Metrics())
 	// De-shelled approve/reject persist via the same path the gateway used.
 	skillsPack.SetDynamicSave(func() error {
 		return task.SaveDynamicSkills(gw.SkillsRegistry(), "data/dynamic_skills.json")
 	})
+	// De-shelled /v1/skills/scan rescans data/skills via the gateway file loader.
+	skillsPack.SetScan(gw.ScanSkills)
 	_ = gw.RegisterModule(skillsPack)
 
 	// Work pack — bridge migration (group 4): owns the task (/v1/tasks/*) +

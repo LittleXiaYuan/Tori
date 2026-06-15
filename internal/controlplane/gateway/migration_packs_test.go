@@ -124,7 +124,7 @@ func newMigrationPackRegistry() *packruntime.Registry {
 func registerMigrationPacks(gw *Gateway) {
 	gw.RegisterBackendPack(knowledgepack.NewHandlerWithStore(gw, gw.KnowledgeStore()))
 	gw.RegisterBackendPack(memorypack.NewWired(gw.MemoryManager(), gw.MemoryPipeline(), gw.MemoryOrchestrator, gw.TenantOf))
-	gw.RegisterBackendPack(skillspack.NewHandlerWithService(gw, gw.SkillsRegistry(), gw.Metrics()))
+	gw.RegisterBackendPack(skillspack.NewHandlerWithService(gw.SkillsRegistry(), gw.Metrics()))
 	gw.RegisterBackendPack(workpack.NewHandler(gw))
 	gw.RegisterBackendPack(controlplanepack.NewHandler(gw))
 	// Native monolith-extracted packs (mirror cmd/agent/init_task_engine.go).
@@ -178,7 +178,7 @@ func newTestGatewayWithMigrationPack(t *testing.T, packID string, status packrun
 	case memorypack.PackID:
 		gw.RegisterBackendPack(memorypack.NewWired(gw.MemoryManager(), gw.MemoryPipeline(), gw.MemoryOrchestrator, gw.TenantOf))
 	case skillspack.PackID:
-		gw.RegisterBackendPack(skillspack.NewHandlerWithService(gw, gw.SkillsRegistry(), gw.Metrics()))
+		gw.RegisterBackendPack(skillspack.NewHandlerWithService(gw.SkillsRegistry(), gw.Metrics()))
 	case workpack.PackID:
 		gw.RegisterBackendPack(workpack.NewHandler(gw))
 	case controlplanepack.PackID:

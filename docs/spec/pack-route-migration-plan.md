@@ -4,7 +4,7 @@
 > Pack Runtime 下（先桥接、后填肉），消除空壳包，最终让能力面都能在能力包中心
 > 热启停。本计划是工程化执行蓝图，按组推进、每组可回滚、每步带测试。
 
-状态：草案 / 待执行（执行前需先有干净基线，见 §1）。
+状态：执行中（基线已收敛）。截至 2026-06-15：干净基线已提交，v2 微内核 + 5 个 surface 包已迁移上生产，`go test` 与前端 pack 测试全绿；逐组真实进度见 §6。
 
 ---
 
@@ -110,15 +110,33 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 
 ---
 
-## 6. 进度跟踪
+## 6. 进度跟踪（2026-06-15 基线收敛 checkpoint）
 
-- 第 0 步：干净基线（提交在途 pack 工作）—— 由仓库负责人完成
-- 第 1 组：knowledge（样板，确立可复用模式）
-- 第 2 组：memory
-- 第 3 组：skills
-- 第 4 组：work
-- 第 5 组：cogni-console（多为菜单指向）
-- 第 6 组：control-plane（评估是否常开 core pack）
-- 第 7 组：workspace（评估是否需后端）
-- 填肉阶段：各组实现从网关搬入 pack 模块
+> 图例：✅ 已全原生（实现在 pack 内）｜🟡 部分原生（核心已迁，少量仍桥接到网关）｜⬜ 空壳 / 菜单（暂无后端或仅导航）
+
+| 组   | 包              | 状态  | 说明                                                                                     |
+| --- | -------------- | --- | -------------------------------------------------------------------------------------- |
+| 0   | 干净基线           | ✅   | 提交 `0a1496d0`（147 文件）：v2 微内核 + 核心/单体路由原生化                                                |
+| 1   | knowledge      | 🟡  | search/sources/stats/ingest/source 增删改 已原生；upload/import-url/import-repo 仍桥接（upload 与 admin 共用 MinerU 解析） |
+| 2   | memory         | ✅   | 全原生（提交 `6d24735b`：recall-debug/persona/update 填肉，删桥接）                                     |
+| 3   | skills         | ✅   | `/v1/skills` 全原生：列表、scan、dynamic、approve、reject（无网关桥接；scan 经 `Gateway.ScanSkills()` 注入）   |
+| 4   | work           | ✅   | tasks / projects / workflows 全原生（workflow 由 `WorkflowHandler().RouteSpecs()` 合并挂载）       |
+| 5   | cogni-console  | ⬜   | 多为菜单指向已有 `/v1/cognis/*`（cogni-kernel 后端已原生）                                              |
+| 6   | control-plane  | 🟡  | governance 切片（audit/trust/iterate/review/skillgrow/usage 等）已迁（桥接）；更广 ops 面（tenants/metrics/plugins/models/inbox/tools/bots/providers/approvals）待迁 |
+| 7   | workspace      | ⬜   | 纯 dashboard 导航，暂无后端路由                                                                    |
+
+计划外额外完成（已上生产、全原生）：v2 微内核生命周期（enable/disable → Start/Stop）；单体抽离包 modes / reverie / ide / cron / triggers / documents / missions / files / instructions / emotion / graph。
+
+### 验证门禁（2026-06-15 基线收敛）
+
+- `go test ./pkg/packruntime ./internal/controlplane/gateway ./internal/packs/... ./cmd/agent -count=1` → 全 **ok**（4 个包暂无单测：controlplane / knowledge / memory / state，路由行为由网关迁移测试 `migration_packs_test.go` 覆盖）。
+- `apps/web` → `npm test -- pack`：**18 文件 / 103 测试全过** + SDK 边界检查 ok。
+- manifest `backend.routes` ↔ `handler.Routes()`：五个迁移包（knowledge/memory/skills/work/control-plane）均一致；网关已无被迁路径的直连注册（无 `http.ServeMux` 重复注册风险）。
+
+### 仍待“填肉”的 bridge 路由
+
+- knowledge：`upload` / `import-url` / `import-repo`（upload 需先把 MinerU 解析抽成 admin 与 pack 共享的包）。
+- control-plane：更广 ops 面（见上表第 6 组）。
+
+> 2026-06-15 增量：skills `/v1/skills/scan` 已去壳进 `internal/packs/skills`（删除 `handlers_skills_pack.go` 桥接与网关 `handleSkillsScan`，新增 `Gateway.ScanSkills()` 注入），skills 组转为 ✅ 全原生。
 

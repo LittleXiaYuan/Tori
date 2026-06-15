@@ -1,11 +1,12 @@
 // Package skillspack mounts the skill-management HTTP surface (/v1/skills/*) as a
 // Pack Runtime backend module.
 //
-// Migration status: the pack owns route registration + the enable/disable gate.
-// The skill listing read surface (/v1/skills) has been "filled in" — it is served
-// natively here from the skill registry + metrics. The scan/dynamic/approve/reject
-// routes stay on the gateway bridge for now. SkillHub / market keep their own
-// gateway routes.
+// Migration status: fully de-shelled. The pack owns route registration, the
+// enable/disable gate AND every handler implementation — listing (/v1/skills),
+// scan, dynamic, approve and reject all run natively here, talking to the skill
+// registry / metrics / file-scanner through narrow injected deps. No gateway
+// bridge remains. SkillHub (/api/skillhub/*) and the skill market (/v1/market/*)
+// keep their own gateway routes (ownership TBD per the migration plan).
 package skillspack
 
 import (
@@ -22,11 +23,6 @@ import (
 )
 
 const PackID = "yunque.pack.skills"
-
-// SkillsGateway is the narrow gateway surface the still-bridged skills routes need.
-type SkillsGateway interface {
-	HandleSkillsPack(w http.ResponseWriter, r *http.Request)
-}
 
 // SkillsRegistry is the narrow registry surface the native handlers need
 // (listing + dynamic skill review). *skills.Registry satisfies it.
@@ -46,12 +42,12 @@ type MetricsSource interface {
 // Handler is the skills pack's backend module. registry/metrics may be nil (e.g.
 // in tests that only exercise the route gates).
 type Handler struct {
-	gateway     SkillsGateway
 	registry    SkillsRegistry
 	metrics     MetricsSource
 	host        packruntime.Host
 	started     atomic.Bool
-	saveDynamic func() error // persists dynamic-skill changes (injected by host)
+	saveDynamic func() error       // persists dynamic-skill changes (injected by host)
+	scan        func() (int, bool) // rescans data/skills; returns (loaded, configured)
 }
 
 // SetDynamicSave injects the persistence hook for dynamic-skill approve/reject.
@@ -59,13 +55,20 @@ type Handler struct {
 // without importing the concrete registry persistence path.
 func (h *Handler) SetDynamicSave(fn func() error) { h.saveDynamic = fn }
 
-// NewHandler builds the skills pack backed only by the gateway bridge.
-func NewHandler(gateway SkillsGateway) *Handler { return &Handler{gateway: gateway} }
+// SetScan injects the filesystem rescan hook used by the native /v1/skills/scan
+// handler. The closure returns (skills loaded, loader configured); the host wires
+// it to the gateway's skill file loader so the pack owns the handler without
+// importing the concrete loader.
+func (h *Handler) SetScan(fn func() (int, bool)) { h.scan = fn }
+
+// NewHandler builds a bare skills pack (no native services wired). Used by tests
+// that exercise route gating / the registry-less degraded paths.
+func NewHandler() *Handler { return &Handler{} }
 
 // NewHandlerWithService builds the skills pack with the registry + metrics wired,
 // so the /v1/skills listing is served natively by this package.
-func NewHandlerWithService(gateway SkillsGateway, registry SkillsRegistry, metrics MetricsSource) *Handler {
-	return &Handler{gateway: gateway, registry: registry, metrics: metrics}
+func NewHandlerWithService(registry SkillsRegistry, metrics MetricsSource) *Handler {
+	return &Handler{registry: registry, metrics: metrics}
 }
 
 // PackID returns the stable manifest id.
@@ -95,25 +98,51 @@ func (h *Handler) Stop(ctx context.Context) error {
 	return nil
 }
 
-// Routes mounts the core /v1/skills/* surface. /v1/skills is served natively; the
-// scan/dynamic/approve/reject routes are dispatched to the gateway bridge.
+// Routes mounts the core /v1/skills/* surface, all served natively by this pack.
 func (h *Handler) Routes() []packruntime.BackendRoute {
-	bridge := h.gateway.HandleSkillsPack
 	methods := []string{
 		http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodPatch,
 	}
 	mk := func(path string, handler http.HandlerFunc) packruntime.BackendRoute {
 		return packruntime.BackendRoute{Methods: methods, Path: path, Handler: handler}
 	}
+	// Every /v1/skills/* route is served natively by this pack (no gateway bridge).
 	return []packruntime.BackendRoute{
 		mk("/v1/skills", h.handleSkills),
-		mk("/v1/skills/scan", bridge),
-		// dynamic / approve / reject are de-shelled — served natively here
-		// (logic moved out of the gateway). Only scan remains bridged.
+		mk("/v1/skills/scan", h.handleScan),
 		mk("/v1/skills/dynamic", h.handleDynamicGet),
 		mk("/v1/skills/approve", h.handleApprove),
 		mk("/v1/skills/reject", h.handleReject),
 	}
+}
+
+// handleScan triggers a filesystem rescan of data/skills via the injected scan
+// hook (de-shelled from the gateway) and reports how many were loaded plus the
+// current total. Returns 500 when no scanner is wired (loader not configured).
+func (h *Handler) handleScan(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "POST only")
+		return
+	}
+	if h.scan == nil {
+		apperror.WriteCode(w, apperror.CodeInternal, "skill file loader not configured")
+		return
+	}
+	count, ok := h.scan()
+	if !ok {
+		apperror.WriteCode(w, apperror.CodeInternal, "skill file loader not configured")
+		return
+	}
+	total := 0
+	if h.registry != nil {
+		total = len(h.registry.All())
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"status":        "scanned",
+		"skills_loaded": count,
+		"total_skills":  total,
+	})
 }
 
 // handleApprove approves a pending dynamic skill (de-shelled from the gateway):

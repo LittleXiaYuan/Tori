@@ -291,21 +291,6 @@ func (g *Gateway) rebuildSkillsFromPlugins() {
 	g.planner.SetDomainPrompt(g.pluginReg.CombinedPrompt())
 }
 
-func (g *Gateway) handleSkillsScan(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "POST only")
-		return
-	}
-	if g.skillFileLoader == nil {
-		apperror.WriteCode(w, apperror.CodeInternal, "skill file loader not configured")
-		return
-	}
-	count := g.skillFileLoader.LoadAll()
-	slog.Info("skills scanned via API", "count", count)
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{
-		"status":        "scanned",
-		"skills_loaded": count,
-		"total_skills":  len(g.registry.All()),
-	})
-}
+// handleSkillsScan was de-shelled into the skills pack (internal/packs/skills);
+// the scan handler now lives there and rescans via the Gateway.ScanSkills()
+// accessor (see handlers_admin_skills.go).
