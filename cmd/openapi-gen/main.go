@@ -27,6 +27,14 @@ import (
 
 var routePattern = regexp.MustCompile(`mux\.HandleFunc\(\s*"([^"]+)"`)
 
+// routeSpecPattern matches pack-ified route declarations exposed as
+// `[]Route{ {Path: "/v1/..."} }` specs and mounted later via
+// `mux.HandleFunc(rt.Path, ...)`. After pack-ification the literal path lives
+// only on the struct field (e.g. the work pack's workflow surface at
+// /v1/workflows*), so scanning for `mux.HandleFunc("...")` alone would miss it.
+// Combined with shouldInclude, this only picks up real /v1·/api·/webhook routes.
+var routeSpecPattern = regexp.MustCompile(`\bPath\s*:\s*"([^"]+)"`)
+
 type openAPISpec struct {
 	OpenAPI    string                          `yaml:"openapi"`
 	Info       openAPIInfo                     `yaml:"info"`
@@ -164,17 +172,25 @@ func extractPaths(dir string) ([]string, error) {
 		if err != nil {
 			return err
 		}
-		for _, m := range routePattern.FindAllStringSubmatch(string(data), -1) {
-			p := m[1]
-			if !shouldInclude(p) {
-				continue
+		text := string(data)
+		// Two route-declaration styles are scanned so pack-ified surfaces are
+		// covered as well as classic gateway registrations:
+		//   1. routePattern     — literal mux.HandleFunc("/path", ...) calls.
+		//   2. routeSpecPattern — []Route{ {Path: "/path"} } specs that packs
+		//      mount via mux.HandleFunc(rt.Path, ...) (path lives on the field).
+		for _, re := range []*regexp.Regexp{routePattern, routeSpecPattern} {
+			for _, m := range re.FindAllStringSubmatch(text, -1) {
+				p := m[1]
+				if !shouldInclude(p) {
+					continue
+				}
+				// Trailing-slash routes in net/http mux are subtree handlers — they
+				// match `/prefix/<anything>`. Convert to an OpenAPI path parameter.
+				if strings.HasSuffix(p, "/") && p != "/" {
+					p = p + "{id}"
+				}
+				seen[p] = true
 			}
-			// Trailing-slash routes in net/http mux are subtree handlers — they
-			// match `/prefix/<anything>`. Convert to an OpenAPI path parameter.
-			if strings.HasSuffix(p, "/") && p != "/" {
-				p = p + "{id}"
-			}
-			seen[p] = true
 		}
 		return nil
 	})
