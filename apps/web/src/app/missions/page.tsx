@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { api, type TaskInfo, type CronJob, type TriggerDef, type TaskTemplate } from "@/lib/api";
 import { Card, Button, Spinner, Tabs, Chip, Tooltip } from "@heroui/react";
 import {
-  Zap, Plus, Trash2, Play, Clock, CheckCircle2, ListTodo,
+  Zap, Plus, Trash2, Play, Clock, CheckCircle2, ListTodo, MessageCircle,
   GitBranch, RefreshCw, Send, X, AlertTriangle, Pause,
   RotateCcw, Timer, Radio, FileText, Sparkles, ChevronDown,
   ChevronRight, Calendar, Power, PowerOff, Copy, Eye,
@@ -223,8 +223,15 @@ export default function MissionsPage() {
     <div className="page-root space-y-5 animate-fade-in-up" style={{ color: "var(--yunque-text)" }}>
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="page-title flex items-center gap-2"><Zap size={20} /> 任务中心</h1>
+        <div>
+          <h1 className="page-title flex items-center gap-2"><Zap size={20} /> 任务中心</h1>
+          <p className="text-xs mt-1" style={{ color: "var(--yunque-text-muted)" }}>汇集对话里发起的任务，可查看进度、产物与结果；也可在对话里说「帮我做…」发起。</p>
+        </div>
         <div className="flex gap-2">
+          <Tooltip delay={0}>
+            <Button variant="ghost" size="sm" onPress={() => router.push("/chat")}><MessageCircle size={14} /> 去对话</Button>
+            <Tooltip.Content>回到对话发起任务</Tooltip.Content>
+          </Tooltip>
           <Tooltip delay={0}>
             <Button variant="ghost" size="sm" onPress={loadAll}><RefreshCw size={14} /></Button>
             <Tooltip.Content>刷新</Tooltip.Content>
@@ -408,7 +415,7 @@ export default function MissionsPage() {
             ))}
             {filtered.length === 0 && (
               <div className="col-span-full">
-                <EmptyState icon={<Zap size={24} style={{ color: "var(--yunque-accent)" }} />} title="暂无任务" description="点击「智能创建」开始" />
+                <EmptyState icon={<Zap size={24} style={{ color: "var(--yunque-accent)" }} />} title="暂无任务" description="点击「智能创建」，或回到对话里说「帮我做…」即可发起任务" />
               </div>
             )}
           </div>

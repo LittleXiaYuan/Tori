@@ -396,6 +396,14 @@ export function ChatMessageList({
               </button>
               <button
                 type="button"
+                onClick={() => onSend("把这次对话里值得长期记住的偏好或事实，整理后存进我的记忆。")}
+                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs"
+                style={{ color: "var(--yunque-text)", background: "transparent" }}
+              >
+                <Brain size={12} /> {t("chat.saveToMemory")}
+              </button>
+              <button
+                type="button"
                 onClick={() => onSend(`/report Generate a structured report from the above conversation.`)}
                 className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs"
                 style={{ color: "var(--yunque-text)", background: "transparent" }}
@@ -614,7 +622,8 @@ export function ChatMessageList({
               if (files.length === 0) return null;
               return (
                 <div className="chat-inline-panel mt-2 rounded-xl border p-2" style={{ background: "var(--yunque-bg-muted)", borderColor: "var(--yunque-border)" }}>
-                  <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: "var(--yunque-text-muted)" }}>{t("chat.generatedFiles")}</div>
+                  <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: "var(--yunque-text-muted)" }}>{t("chat.generatedFiles")}</div>
+                  <div className="mb-2 text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>{t("chat.generatedFilesHint")}</div>
                   <div className="space-y-2">
                     {files.map((f, i) => {
                       const ext = (f.name || f.path).split(".").pop()?.toLowerCase() || "";
