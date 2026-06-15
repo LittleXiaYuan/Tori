@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { BookOpen, ClipboardList, Cpu, FileText, Search } from "lucide-react";
+import { BookOpen, Brain, ClipboardList, Cpu, FileText, MessageCircle, Search } from "lucide-react";
 
 export interface ProductScenario {
   id: string;
@@ -45,10 +45,27 @@ export const PRODUCT_SCENARIOS: ProductScenario[] = [
     prompt: "帮我把下面这段资料整理成知识库条目，并给出摘要和标签。",
     icon: <BookOpen size={14} />,
   },
+  {
+    id: "ask-explain",
+    label: "解释概念",
+    description: "用通俗的话解释一个概念并举例。",
+    prompt: "用通俗的话解释「向量数据库」是什么，并举一个生活中的例子。",
+    icon: <MessageCircle size={14} />,
+  },
+  {
+    id: "remember-pref",
+    label: "记住偏好",
+    description: "把你的习惯写进长期记忆。",
+    prompt: "记住我的工作偏好：回复先给结论、尽量简洁。以后对话都按这个来。",
+    icon: <Brain size={14} />,
+  },
 ];
 
 export const ONBOARDING_SCENARIOS = PRODUCT_SCENARIOS.slice(0, 3);
-export const CHAT_EMPTY_SCENARIOS = PRODUCT_SCENARIOS.slice(0, 4);
+// Chat 空态起手势：固定覆盖三条主路径——问答/创作、加知识或记忆、建任务/行动。
+export const CHAT_EMPTY_SCENARIOS = ["ask-explain", "knowledge-brief", "remember-pref", "weekly-report"]
+  .map((id) => PRODUCT_SCENARIOS.find((s) => s.id === id))
+  .filter((s): s is ProductScenario => Boolean(s));
 export const DASHBOARD_SCENARIOS = PRODUCT_SCENARIOS.slice(0, 3);
 
 export function scenarioChatHref(prompt: string): string {

@@ -5,7 +5,7 @@ import { AlertTriangle } from "lucide-react";
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import type { ChatDispatch } from "@/lib/chat-state";
-import { PRODUCT_SCENARIOS } from "@/lib/product-scenarios";
+import { CHAT_EMPTY_SCENARIOS } from "@/lib/product-scenarios";
 
 interface StarterChip {
   label: string;
@@ -23,7 +23,7 @@ interface ChatEmptyStateProps {
 
 /** Scenario ids used as offline/fallback starter chips. Labels and prompts are
  *  localized at render via i18n so English users don't see Chinese chips. */
-const FALLBACK_SCENARIO_IDS = PRODUCT_SCENARIOS.slice(0, 4).map((s) => s.id);
+const FALLBACK_SCENARIO_IDS = CHAT_EMPTY_SCENARIOS.map((s) => s.id);
 
 /** Aurora (northern-lights) brand mark — flat monoline curtains in a single
  *  accent color (no gradient), so it reads as a calm, friendly glyph. */
@@ -114,6 +114,9 @@ export function ChatEmptyState({ setupNeeded, chatD, inputRef, composer }: ChatE
           </span>
           <h1 className="chat-empty__greeting" suppressHydrationWarning>{t("chat.empty.greetTpl").replace("{g}", greeting)}</h1>
         </div>
+        <p style={{ marginTop: 8, fontSize: 13, lineHeight: 1.5, color: "var(--yunque-text-muted)", textAlign: "center", maxWidth: 460 }}>
+          {t("chat.empty.subtitle")}
+        </p>
       </div>
 
       <div className="chat-empty__composer">{composer}</div>

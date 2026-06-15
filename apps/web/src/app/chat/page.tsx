@@ -998,6 +998,17 @@ export default function ChatPage() {
             <Tooltip delay={0}>
               <Button
                 isIconOnly variant="ghost" size="sm" className="chat-tool-btn h-8 w-8 rounded-full"
+                onPress={() => router.push("/missions")}
+                style={{ color: "var(--yunque-text-muted)" }}
+              >
+                <Zap size={15} />
+              </Button>
+              <Tooltip.Content>{t("chat.toTasks")}</Tooltip.Content>
+            </Tooltip>
+
+            <Tooltip delay={0}>
+              <Button
+                isIconOnly variant="ghost" size="sm" className="chat-tool-btn h-8 w-8 rounded-full"
                 onPress={() => shortcutHandlers.zen_mode()}
                 style={{ color: "var(--yunque-text-muted)" }}
               >
