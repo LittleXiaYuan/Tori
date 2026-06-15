@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"sort"
+	"time"
 )
 
 // CanonicalPackBundle validates and returns a deterministic copy of a bundle
@@ -14,6 +15,11 @@ func CanonicalPackBundle(bundle PackBundle) (PackBundle, error) {
 		return PackBundle{}, err
 	}
 	canonical := bundle
+	// CreatedAt is wall-clock metadata, not bundle content. Two bundles built
+	// from identical packs moments apart would otherwise hash differently
+	// (flaky, e.g. TestDigestPackBundleIsStableAcrossPackOrder) and the digest
+	// would not be reproducible. Zero it so the digest depends only on content.
+	canonical.CreatedAt = time.Time{}
 	canonical.Packs = append([]PackManifest(nil), bundle.Packs...)
 	sort.Slice(canonical.Packs, func(i, j int) bool { return canonical.Packs[i].ID < canonical.Packs[j].ID })
 	canonical.EnabledPacks = append([]string(nil), bundle.EnabledPacks...)
