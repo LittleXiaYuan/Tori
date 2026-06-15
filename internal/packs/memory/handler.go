@@ -1,19 +1,22 @@
 // Package memorypack mounts the memory HTTP surface (/v1/memory/*) as a Pack
 // Runtime backend module.
 //
-// Migration status: the pack owns route registration + the enable/disable gate.
-// The simple read surface (stats / search) has been "filled in" — its handler
-// implementations now live here and talk to the memory manager directly
-// (decoupled from the gateway), with tenant resolution injected via tenantOf.
-// The remaining routes (recall/debug, add, compact, persona, update) depend on
-// the orchestrator / pipeline and stay on the gateway bridge for now.
+// Migration status: fully de-shelled. The pack owns route registration, the
+// enable/disable gate AND every handler implementation. The read surface
+// (stats/search), the write surface (add/compact) and the orchestrator-backed
+// surface (recall/debug, persona, update) all run natively here, talking to the
+// memory manager / pipeline / orchestrator through narrow injected deps — no
+// gateway bridge remains.
 package memorypack
 
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"strconv"
 	"sync/atomic"
+	"time"
 
 	"yunque-agent/internal/agentcore/memory"
 	"yunque-agent/internal/apperror"
@@ -22,26 +25,23 @@ import (
 
 const PackID = "yunque.pack.memory"
 
-// MemoryGateway is the narrow gateway surface the still-bridged memory routes need.
-type MemoryGateway interface {
-	HandleMemoryPack(w http.ResponseWriter, r *http.Request)
-}
-
-// MemoryReader is the narrow read surface the native handlers need.
+// MemoryReader is the narrow read surface the native stats/search handlers need.
 type MemoryReader interface {
 	Stats(tenantID string) map[string]int
 	SearchAll(ctx context.Context, tenantID, query string, limit int) ([]memory.Item, error)
 }
 
-// Handler is the memory pack's backend module. reader/tenantOf may be nil (e.g.
-// in tests that only exercise the route gates); the native handlers degrade to a
-// "not configured" response in that case.
+// Handler is the memory pack's backend module. Any injected dep may be nil (e.g.
+// in tests that only exercise the route gates); the native handlers then degrade
+// to a "not configured" response in that case.
 type Handler struct {
-	gateway  MemoryGateway
 	reader   MemoryReader
 	tenantOf func(context.Context) string
 	host     packruntime.Host
 	started  atomic.Bool
+	// orchOf resolves the memory orchestrator lazily (late-bound) so the wiring
+	// order between the gateway and this pack does not matter.
+	orchOf func() *memory.Orchestrator
 	// compact persists/compacts memory via the host pipeline (injected so the
 	// pack owns the handler without importing the concrete pipeline).
 	compact func(ctx context.Context, tenantID string, targetCount, decayDays int) (any, error)
@@ -62,22 +62,14 @@ func (h *Handler) SetAdd(fn func(ctx context.Context, tenantID string, item memo
 	h.add = fn
 }
 
-// NewHandler builds the memory pack backed only by the gateway bridge.
-func NewHandler(gateway MemoryGateway) *Handler { return &Handler{gateway: gateway} }
-
-// NewHandlerWithService builds the memory pack with the read service wired, so
-// the stats/search surface is served natively by this package.
-func NewHandlerWithService(gateway MemoryGateway, reader MemoryReader, tenantOf func(context.Context) string) *Handler {
-	return &Handler{gateway: gateway, reader: reader, tenantOf: tenantOf}
-}
-
-// NewWired builds a fully-wired memory pack: native stats/search/add/compact
-// (de-shelled from the gateway). It is the single wiring path shared by the host
-// bootstrap and tests, so the native handlers behave identically in both. mgr
-// backs read + add (short/mid/long routing); pipe backs compact; either may be
-// nil (the corresponding native handler then reports "not configured").
-func NewWired(gateway MemoryGateway, mgr *memory.Manager, pipe *memory.Pipeline, tenantOf func(context.Context) string) *Handler {
-	h := &Handler{gateway: gateway, tenantOf: tenantOf}
+// NewWired builds a fully-wired memory pack with every route served natively.
+// mgr backs read + add (short/mid/long routing); pipe backs compact; orchOf
+// resolves the orchestrator for recall/debug + persona; any may be nil (the
+// corresponding native handler then reports "not configured"). It is the single
+// wiring path shared by the host bootstrap and tests, so the native handlers
+// behave identically in both.
+func NewWired(mgr *memory.Manager, pipe *memory.Pipeline, orchOf func() *memory.Orchestrator, tenantOf func(context.Context) string) *Handler {
+	h := &Handler{tenantOf: tenantOf, orchOf: orchOf}
 	if mgr != nil {
 		h.reader = mgr
 		h.add = func(ctx context.Context, tenantID string, item memory.Item, layer string) error {
@@ -126,10 +118,8 @@ func (h *Handler) Stop(ctx context.Context) error {
 	return nil
 }
 
-// Routes mounts /v1/memory/*. stats/search are served natively; the rest are
-// dispatched to the gateway bridge during this migration phase.
+// Routes mounts /v1/memory/* — every route is served natively by this pack.
 func (h *Handler) Routes() []packruntime.BackendRoute {
-	bridge := h.gateway.HandleMemoryPack
 	methods := []string{
 		http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodPatch,
 	}
@@ -137,17 +127,22 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 		return packruntime.BackendRoute{Methods: methods, Path: path, Handler: handler}
 	}
 	return []packruntime.BackendRoute{
-		// Native (filled-in) read surface.
 		mk("/v1/memory/stats", h.handleStats),
 		mk("/v1/memory/search", h.handleSearch),
-		// compact + add are de-shelled — served natively here via injected hooks.
 		mk("/v1/memory/compact", h.handleCompact),
 		mk("/v1/memory/add", h.handleAdd),
-		// Still bridged to the gateway (orchestrator / editable-memory dependent).
-		mk("/v1/memory/recall/debug", bridge),
-		mk("/v1/memory/persona", bridge),
-		mk("/v1/memory/update", bridge),
+		mk("/v1/memory/recall/debug", h.handleRecallDebug),
+		mk("/v1/memory/persona", h.handlePersonaGet),
+		mk("/v1/memory/update", h.handlePersonaUpdate),
 	}
+}
+
+// orchestrator resolves the late-bound memory orchestrator (may be nil).
+func (h *Handler) orchestrator() *memory.Orchestrator {
+	if h.orchOf == nil {
+		return nil
+	}
+	return h.orchOf()
 }
 
 // handleAdd writes a memory item natively (de-shelled from the gateway): it
@@ -237,4 +232,146 @@ func (h *Handler) handleSearch(w http.ResponseWriter, r *http.Request) {
 	}
 	items, _ := h.reader.SearchAll(r.Context(), h.tenant(r), req.Query, req.Limit)
 	_ = json.NewEncoder(w).Encode(map[string]any{"results": items, "count": len(items)})
+}
+
+// handleRecallDebug exposes what the orchestrator recalls for a query (native,
+// de-shelled from the gateway), scoped to the caller's tenant: per-item score
+// breakdown (layer, raw/final score, access count, age) plus the final compiled
+// context string that would be injected into the planner.
+func (h *Handler) handleRecallDebug(w http.ResponseWriter, r *http.Request) {
+	orch := h.orchestrator()
+	if orch == nil {
+		apperror.WriteCode(w, apperror.CodeInternal, "memory orchestrator not configured")
+		return
+	}
+	tid := h.tenant(r)
+	query := r.URL.Query().Get("q")
+	limit := 10
+	if r.Method == http.MethodPost {
+		var req struct {
+			Query string `json:"query"`
+			Limit int    `json:"limit"`
+		}
+		json.NewDecoder(r.Body).Decode(&req)
+		if req.Query != "" {
+			query = req.Query
+		}
+		if req.Limit > 0 {
+			limit = req.Limit
+		}
+	}
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if n, err := strconv.Atoi(l); err == nil && n > 0 {
+			limit = n
+		}
+	}
+	if query == "" {
+		apperror.WriteCode(w, apperror.CodeMissingField, "query is required (q= or body.query)")
+		return
+	}
+
+	items := orch.Recall(r.Context(), tid, query, limit)
+	type debugItem struct {
+		Content     string  `json:"content"`
+		Source      string  `json:"source"`
+		Category    string  `json:"category,omitempty"`
+		Score       float64 `json:"score"`
+		RawScore    float64 `json:"raw_score"`
+		AccessCount int     `json:"access_count"`
+		AgeSeconds  float64 `json:"age_seconds"`
+	}
+	out := make([]debugItem, 0, len(items))
+	for _, it := range items {
+		out = append(out, debugItem{
+			Content:     it.Content,
+			Source:      it.Source,
+			Category:    it.Category,
+			Score:       it.Score,
+			RawScore:    it.RawScore,
+			AccessCount: it.AccessCount,
+			AgeSeconds:  it.Age.Seconds(),
+		})
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"tenant":           tid,
+		"query":            query,
+		"items":            out,
+		"count":            len(out),
+		"compiled_context": orch.CompileContext(r.Context(), tid, query),
+	})
+}
+
+func (h *Handler) handlePersonaGet(w http.ResponseWriter, r *http.Request) {
+	orch := h.orchestrator()
+	if orch == nil || orch.Editable() == nil {
+		apperror.WriteCode(w, apperror.CodeInternal, "memory orchestrator not configured")
+		return
+	}
+	blocks := orch.Editable().AllBlocks()
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{"blocks": blocks})
+}
+
+func (h *Handler) handlePersonaUpdate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "POST only")
+		return
+	}
+	orch := h.orchestrator()
+	if orch == nil || orch.Editable() == nil {
+		apperror.WriteCode(w, apperror.CodeInternal, "memory orchestrator not configured")
+		return
+	}
+	var req struct {
+		ID      string `json:"id"`
+		Label   string `json:"label"`
+		Content string `json:"content"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		apperror.WriteCode(w, apperror.CodeInvalidField, "invalid request")
+		return
+	}
+
+	editable := orch.Editable()
+	if req.ID == "" {
+		if req.Content == "" {
+			apperror.WriteCode(w, apperror.CodeInvalidField, "content cannot be empty for new block")
+			return
+		}
+		label := fmt.Sprintf("%s-%d", req.Label, time.Now().UnixNano())
+		editable.AddBlock(label, req.Content, 0)
+	} else {
+		targetLabel := req.Label
+		if targetLabel == "" {
+			for _, b := range editable.AllBlocks() {
+				if b.ID == req.ID {
+					targetLabel = b.Label
+					break
+				}
+			}
+		}
+
+		if targetLabel == "" {
+			apperror.WriteCode(w, apperror.CodeNotFound, "memory block not found")
+			return
+		}
+
+		if req.Content == "" {
+			editable.RemoveBlock(targetLabel)
+		} else {
+			res := editable.Edit(memory.EditRequest{
+				BlockLabel: targetLabel,
+				Op:         memory.OpRethink,
+				NewText:    req.Content,
+			})
+			if !res.Success {
+				apperror.WriteCode(w, apperror.CodeInternal, res.Error)
+				return
+			}
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }

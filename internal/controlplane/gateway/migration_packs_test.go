@@ -123,7 +123,7 @@ func newMigrationPackRegistry() *packruntime.Registry {
 // tasks,projects} routes exist and are auth-gated in tests.
 func registerMigrationPacks(gw *Gateway) {
 	gw.RegisterBackendPack(knowledgepack.NewHandlerWithStore(gw, gw.KnowledgeStore()))
-	gw.RegisterBackendPack(memorypack.NewWired(gw, gw.MemoryManager(), gw.MemoryPipeline(), gw.TenantOf))
+	gw.RegisterBackendPack(memorypack.NewWired(gw.MemoryManager(), gw.MemoryPipeline(), gw.MemoryOrchestrator, gw.TenantOf))
 	gw.RegisterBackendPack(skillspack.NewHandlerWithService(gw, gw.SkillsRegistry(), gw.Metrics()))
 	gw.RegisterBackendPack(workpack.NewHandler(gw))
 	gw.RegisterBackendPack(controlplanepack.NewHandler(gw))
@@ -176,7 +176,7 @@ func newTestGatewayWithMigrationPack(t *testing.T, packID string, status packrun
 	case knowledgepack.PackID:
 		gw.RegisterBackendPack(knowledgepack.NewHandlerWithStore(gw, gw.KnowledgeStore()))
 	case memorypack.PackID:
-		gw.RegisterBackendPack(memorypack.NewWired(gw, gw.MemoryManager(), gw.MemoryPipeline(), gw.TenantOf))
+		gw.RegisterBackendPack(memorypack.NewWired(gw.MemoryManager(), gw.MemoryPipeline(), gw.MemoryOrchestrator, gw.TenantOf))
 	case skillspack.PackID:
 		gw.RegisterBackendPack(skillspack.NewHandlerWithService(gw, gw.SkillsRegistry(), gw.Metrics()))
 	case workpack.PackID:

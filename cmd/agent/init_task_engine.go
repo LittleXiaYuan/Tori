@@ -154,7 +154,7 @@ func initTaskEngine(
 	// gateway bridge (HandleMemoryPack) for now.
 	// Memory pack: native stats/search/add/compact via the shared NewWired path
 	// (de-shelled from the gateway). add (short/mid/long) + compact are wired here.
-	_ = gw.RegisterModule(memorypack.NewWired(gw, gw.MemoryManager(), gw.MemoryPipeline(), gw.TenantOf))
+	_ = gw.RegisterModule(memorypack.NewWired(gw.MemoryManager(), gw.MemoryPipeline(), gw.MemoryOrchestrator, gw.TenantOf))
 
 	// Skills pack — the listing surface (/v1/skills) is filled in (served natively
 	// via the registry + metrics); scan/dynamic/approve/reject stay on the gateway
