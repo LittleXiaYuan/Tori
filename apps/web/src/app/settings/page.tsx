@@ -226,9 +226,11 @@ export default function SettingsPage() {
         {setupNeeded && (
           <SettingsCard
             tone="warning"
+            href="/setup"
             icon={<Rocket size={18} style={{ color: "var(--yunque-warning)" }} />}
             title="首次设置"
-            desc="请先进入「模型与提供商配置」选择模型并填写密钥，完成后即可开始使用。"
+            desc="用一分钟向导配好模型，完成后自动进入对话。"
+            action={<span className="kpi-sub">去配置 →</span>}
           />
         )}
 

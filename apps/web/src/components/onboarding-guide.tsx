@@ -51,13 +51,6 @@ function WelcomeStep({ onNext, onSkip }: { onNext: () => void; onSkip: () => voi
         >
           {t("onboarding.welcome.start")} <ArrowRight size={14} className="ml-1" />
         </Button>
-        <a
-          href="/packs"
-          className="text-xs font-medium block mx-auto text-center"
-          style={{ color: "var(--yunque-accent)" }}
-        >
-          {t("onboarding.welcome.browse")}
-        </a>
         <button
           onClick={onSkip}
           className="text-xs font-medium block mx-auto"

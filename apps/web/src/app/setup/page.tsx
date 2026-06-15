@@ -233,13 +233,13 @@ export default function SetupPage() {
       if (result.ok && result.provider.available) {
         setTestResult({
           ok: true,
-          msg: result.provider.latency ? `Connection OK · ${result.provider.latency}` : "Connection OK",
+          msg: result.provider.latency ? `连接成功 · ${result.provider.latency}` : "连接成功",
         });
       } else {
-        setTestResult({ ok: false, msg: formatErrorMessage(result.provider.error, "Connection failed") });
+        setTestResult({ ok: false, msg: formatErrorMessage(result.provider.error, "连接失败：请检查 Base URL（需以 http/https 开头）、API Key 和模型名是否正确") });
       }
     } catch (error) {
-      setTestResult({ ok: false, msg: formatErrorMessage(error, "Connection failed") });
+      setTestResult({ ok: false, msg: formatErrorMessage(error, "连接失败：请检查 Base URL（需以 http/https 开头）、API Key 和模型名是否正确") });
     } finally {
       setTesting(false);
     }

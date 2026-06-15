@@ -324,7 +324,7 @@ export default function ChatPage() {
     const displayText = text || t("chat.defaultAttachPrompt");
     if (setupNeeded) {
       showToast(t("chat.toast.setupKey"), "warning");
-      router.push("/settings/providers");
+      router.push("/setup");
       return;
     }
     // Browser-intent flows (slash `/browser …` and social-publish) live in

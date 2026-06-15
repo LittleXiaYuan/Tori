@@ -241,10 +241,7 @@ export default function DashboardPage() {
             </p>
             <div style={{ display: "flex", gap: "var(--sp-3)", marginTop: "var(--sp-3)" }}>
               <Button size="sm" onPress={() => router.push("/setup")} style={{ background: "var(--yunque-warning)", color: "#000", fontWeight: 600 }}>
-                <Rocket size={13} /> 设置向导
-              </Button>
-              <Button size="sm" variant="ghost" onPress={() => router.push("/settings")}>
-                <Settings size={13} /> 手动配置
+                <Rocket size={13} /> 去配置模型
               </Button>
             </div>
           </div>

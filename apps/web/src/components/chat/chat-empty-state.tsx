@@ -103,7 +103,7 @@ export function ChatEmptyState({ setupNeeded, chatD, inputRef, composer }: ChatE
             <AlertTriangle size={15} style={{ color: "#f59e0b" }} /> {t("chat.empty.setupTitle")}
           </div>
           <p className="chat-empty__setup-desc">{t("chat.empty.setupDesc")}</p>
-          <a href="/settings/providers" className="chat-empty__setup-link">{t("chat.empty.setupLink")}</a>
+          <a href="/setup" className="chat-empty__setup-link">{t("chat.empty.setupLink")}</a>
         </div>
       )}
 
