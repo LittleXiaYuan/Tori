@@ -62,7 +62,7 @@ export default function SkillAnomalyPackPage() {
       if (!skillSlug && profilesRes.profiles?.[0]?.skill_slug) setSkillSlug(profilesRes.profiles[0].skill_slug);
     } catch (e) {
       const msg = formatErrorMessage(e, "加载 Skill Anomaly Pack 失败");
-      setError(msg.includes("pack route is not enabled") ? "Skill Anomaly Pack 当前未启用。请到「增量包」控制台启用 yunque.pack.skill-anomaly 后再使用。" : msg);
+      setError(msg.includes("pack route is not enabled") ? "Skill Anomaly Pack 当前未启用。请到「能力包」控制台启用 yunque.pack.skill-anomaly 后再使用。" : msg);
     } finally {
       setLoading(false);
     }

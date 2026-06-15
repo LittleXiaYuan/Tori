@@ -53,7 +53,7 @@ export default function SBOMDriftPackPage() {
       if (!baseId && snapshotsRes.snapshots?.[0]?.id) setBaseId(snapshotsRes.snapshots[0].id);
     } catch (e) {
       const msg = formatErrorMessage(e, "加载 SBOM Drift Pack 失败");
-      setError(msg.includes("pack route is not enabled") ? "SBOM Drift Pack 当前未启用。请到「增量包」控制台启用 yunque.pack.sbom-drift 后再使用。" : msg);
+      setError(msg.includes("pack route is not enabled") ? "SBOM Drift Pack 当前未启用。请到「能力包」控制台启用 yunque.pack.sbom-drift 后再使用。" : msg);
     } finally {
       setLoading(false);
     }

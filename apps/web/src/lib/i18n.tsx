@@ -383,7 +383,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "nav.item.memory": "记忆",
     "nav.item.packs": "能力包",
     "nav.item.cognis": "Cogni",
-    "nav.item.skills": "技能库",
+    "nav.item.skills": "技能",
     "nav.item.plugins": "插件宿主",
     "nav.item.settings": "设置",
     "nav.item.inbox": "收件箱",

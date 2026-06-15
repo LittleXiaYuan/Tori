@@ -54,7 +54,7 @@ interface QuickLink {
  */
 const QUICK_LINKS: QuickLink[] = [
   { href: "/chat",      icon: <MessageCircle size={16} />, zh: "对话",   en: "Chat" },
-  { href: "/missions",  icon: <Zap size={16} />,           zh: "任务",   en: "Missions" },
+  { href: "/missions",  icon: <Zap size={16} />,           zh: "任务中心", en: "Missions" },
   { href: "/memory",    icon: <Brain size={16} />,         zh: "记忆",   en: "Memory" },
 ];
 

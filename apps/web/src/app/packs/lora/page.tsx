@@ -88,7 +88,7 @@ export default function LoRAPackPage() {
       setStatus(null);
       const msg = stR.reason instanceof Error ? stR.reason.message : String(stR.reason);
       if (msg.includes("pack route is not enabled")) {
-        setDisabledReason("LoRA Pack 当前未启用。请到「增量包」控制台启用 yunque.pack.lora 后再使用。");
+        setDisabledReason("LoRA Pack 当前未启用。请到「能力包」控制台启用 yunque.pack.lora 后再使用。");
       } else if (msg.includes("LoRA scheduler not configured") || msg.includes("not configured")) {
         setDisabledReason("当前进程未启用 LoRA / 进化组件（需 LocalBrain 与 Ledger，参见 init_intelligence）。");
       } else {

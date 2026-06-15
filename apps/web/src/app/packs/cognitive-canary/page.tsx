@@ -83,7 +83,7 @@ export default function CognitiveCanaryPackPage() {
       setReports(reportsRes.reports || []);
     } catch (e) {
       const msg = formatErrorMessage(e, "加载 Cognitive Canary Pack 失败");
-      setError(msg.includes("pack route is not enabled") ? "Cognitive Canary Pack 当前未启用。请到「增量包」控制台启用 yunque.pack.cognitive-canary 后再使用。" : msg);
+      setError(msg.includes("pack route is not enabled") ? "Cognitive Canary Pack 当前未启用。请到「能力包」控制台启用 yunque.pack.cognitive-canary 后再使用。" : msg);
     } finally {
       setLoading(false);
     }

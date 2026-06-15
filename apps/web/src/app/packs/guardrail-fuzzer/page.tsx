@@ -66,7 +66,7 @@ export default function GuardrailFuzzerPackPage() {
       setReports(reportsRes.reports || []);
     } catch (e) {
       const msg = formatErrorMessage(e, "加载 Guardrail Fuzzer Pack 失败");
-      setError(msg.includes("pack route is not enabled") ? "Guardrail Fuzzer Pack 当前未启用。请到「增量包」控制台启用 yunque.pack.guardrail-fuzzer 后再使用。" : msg);
+      setError(msg.includes("pack route is not enabled") ? "Guardrail Fuzzer Pack 当前未启用。请到「能力包」控制台启用 yunque.pack.guardrail-fuzzer 后再使用。" : msg);
     } finally {
       setLoading(false);
     }

@@ -26,7 +26,7 @@ function defaultSnapshotId() {
 
 function sampleValues() {
   return JSON.stringify({
-    goal: "继续推进 Pack Runtime 轻内核 + 可选增量包",
+    goal: "继续推进 Pack Runtime 轻内核 + 可选能力包",
     persona: "谨慎、可回滚、验证后提交",
     memory_layer: "long",
   }, null, 2);
@@ -80,7 +80,7 @@ export default function MemoryTimeTravelPackPage() {
       if (!targetId && snapshotsRes.snapshots?.[1]?.id) setTargetId(snapshotsRes.snapshots[1].id);
     } catch (e) {
       const msg = formatErrorMessage(e, "加载 Memory Time Travel Pack 失败");
-      setError(msg.includes("pack route is not enabled") ? "Memory Time Travel Pack 当前未启用。请到「增量包」控制台启用 yunque.pack.memory-time-travel 后再使用。" : msg);
+      setError(msg.includes("pack route is not enabled") ? "Memory Time Travel Pack 当前未启用。请到「能力包」控制台启用 yunque.pack.memory-time-travel 后再使用。" : msg);
     } finally {
       setLoading(false);
     }

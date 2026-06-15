@@ -8,7 +8,6 @@ export type OnboardingPhase =
   | "setup-check"
   | "provider-setup"
   | "interactive-demo"
-  | "mode-select"
   | "done";
 
 interface SetupStatus {

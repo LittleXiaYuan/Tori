@@ -70,8 +70,8 @@ export async function fetchEnabledPacks(): Promise<InstalledPack[]> {
 }
 
 /** Thin-shell introspection packs whose underlying subsystems always run; they
- *  are surfaced as core nav items (group 智能) instead of toggleable Packs, so
- *  they no longer clutter the Pack menu or read as optional add-ons. */
+ *  are surfaced via the static NAV_ITEMS catalog (group 扩展) instead of being
+ *  re-emitted here, so enabling them never double-lists every surface. */
 const CORE_PROMOTED_PACK_IDS = new Set<string>([
   "yunque.pack.inner-life",
   "yunque.pack.night-school",
@@ -109,7 +109,7 @@ export function buildPackNavItems(packs: InstalledPack[]): PackNavItem[] {
         packId: manifest.id,
         packName: manifest.name,
         order: menu.order ?? 999,
-        keywords: `${manifest.id} ${manifest.name} ${manifest.description || ""} ${menu.key} ${menu.label} pack 增量包`,
+        keywords: `${manifest.id} ${manifest.name} ${manifest.description || ""} ${menu.key} ${menu.label} pack 能力包`,
       }));
     })
     .sort((a, b) => a.order - b.order || a.label.localeCompare(b.label));

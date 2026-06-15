@@ -356,7 +356,7 @@ export default function CognisPage() {
     <div className="page-root flex flex-col gap-5 animate-fade-in-up">
       <PageHeader
         icon={<Sparkles size={20} aria-hidden="true" />}
-        title="我的 Cogni"
+        title="Cogni"
         description="用大白话描述你想要的 Cogni，云雀自动配好技能、触发方式和人设。"
         onRefresh={load}
         actions={

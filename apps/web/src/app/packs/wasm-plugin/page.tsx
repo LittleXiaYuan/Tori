@@ -408,7 +408,7 @@ export default function WASMPluginPackPage() {
       const msg = formatErrorMessage(e, "加载 WASM Plugin Pack 失败");
       setError(
         msg.includes("pack route is not enabled")
-          ? "WASM Plugin Pack 当前未启用。请到「增量包」控制台启用 yunque.pack.wasm-plugin 后再使用。"
+          ? "WASM Plugin Pack 当前未启用。请到「能力包」控制台启用 yunque.pack.wasm-plugin 后再使用。"
           : msg,
       );
     } finally {

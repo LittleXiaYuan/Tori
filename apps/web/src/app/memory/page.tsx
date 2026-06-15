@@ -101,7 +101,7 @@ export default function MemoryPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Brain size={20} style={{ color: "var(--yunque-accent)" }} />
-          <h1 className="page-title">{"记忆与情感"}</h1>
+          <h1 className="page-title">{"记忆"}</h1>
         </div>
         <div className="flex gap-2">
           <Tooltip delay={0}>

@@ -13,7 +13,7 @@ export default function PacksCognisRedirect() {
   }, [router]);
   return (
     <div className="p-10 text-center text-sm" style={{ color: "var(--yunque-text-muted)" }}>
-      正在前往「我的 Cogni」…
+      正在前往「Cogni」…
     </div>
   );
 }

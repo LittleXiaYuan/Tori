@@ -129,7 +129,7 @@ export default function ChaosProbePackPage() {
       const msg = formatErrorMessage(e, "加载 Chaos Probe Pack 失败");
       setError(
         msg.includes("pack route is not enabled")
-          ? "Chaos Probe Pack 当前未启用。请到「增量包」控制台启用 yunque.pack.chaos-probe 后再使用。"
+          ? "Chaos Probe Pack 当前未启用。请到「能力包」控制台启用 yunque.pack.chaos-probe 后再使用。"
           : msg,
       );
     } finally {

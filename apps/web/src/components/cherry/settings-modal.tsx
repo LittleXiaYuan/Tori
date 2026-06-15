@@ -624,7 +624,7 @@ function DataSection() {
           <div>
             <div className="cherry-settings-row-label">备份恢复 Pack</div>
             <div className="cherry-settings-row-desc">
-              备份能力属于可选增量包。主设置只显示状态和入口，导入、导出、回滚由 Pack Runtime 页面承载。
+              备份能力属于可选能力包。主设置只显示状态和入口，导入、导出、回滚由 Pack Runtime 页面承载。
               <div style={{ marginTop: 4, color: backupPackStatus === "enabled" ? "var(--yunque-accent)" : "var(--yunque-text-muted)" }}>
                 当前状态：{backupPackStatus === "loading" ? "检查中…" : backupPackStatus === "enabled" ? "已启用" : backupPackStatus === "disabled" ? "已安装但未启用" : "未安装"}
               </div>

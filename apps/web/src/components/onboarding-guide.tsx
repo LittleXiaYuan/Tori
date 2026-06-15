@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Button } from "@heroui/react";
 import {
   Sparkles, ArrowRight, X, CheckCircle2, Circle, Loader2,
-  Zap, Layers,
+  Zap,
 } from "lucide-react";
 import { useOnboarding, markOnboardingComplete, type OnboardingPhase } from "@/hooks/use-onboarding";
 import { useI18n } from "@/lib/i18n";
@@ -329,98 +329,20 @@ function InteractiveDemoStep({ onNext }: { onNext: () => void }) {
   );
 }
 
-function ModeSelectStep({ onFinish }: { onFinish: (mode: "easy" | "full") => void }) {
-  const { t } = useI18n();
-  const [selected, setSelected] = useState<"easy" | "full">("easy");
-
-  const modes = [
-    {
-      id: "easy" as const,
-      icon: <Sparkles size={20} />,
-      title: t("onboarding.mode.easy"),
-      desc: t("onboarding.mode.easyDesc"),
-      items: t("onboarding.mode.easyItems").split(","),
-      recommended: true,
-    },
-    {
-      id: "full" as const,
-      icon: <Layers size={20} />,
-      title: t("onboarding.mode.full"),
-      desc: t("onboarding.mode.fullDesc"),
-      items: t("onboarding.mode.fullItems").split(","),
-      recommended: false,
-    },
-  ];
-
-  return (
-    <div className="px-8 pt-8 pb-8 animate-fade-in-up">
-      <h2 className="text-lg font-bold text-center" style={{ color: "var(--yunque-text)" }}>{t("onboarding.mode.title")}</h2>
-      <p className="text-xs text-center mt-1" style={{ color: "var(--yunque-text-muted)" }}>{t("onboarding.mode.subtitle")}</p>
-
-      <div className="mt-5 flex gap-3">
-        {modes.map((m) => (
-          <button
-            key={m.id}
-            className="onboard-mode-card"
-            data-selected={selected === m.id || undefined}
-            onClick={() => setSelected(m.id)}
-          >
-            <div className="flex justify-center mb-3" style={{ color: selected === m.id ? "var(--yunque-accent)" : "var(--yunque-text-muted)" }}>
-              {m.icon}
-            </div>
-            <div className="text-sm font-bold" style={{ color: "var(--yunque-text)" }}>{m.title}</div>
-            <div className="text-[10px] mt-1" style={{ color: "var(--yunque-text-muted)" }}>{m.desc}</div>
-            <div className="mt-3 space-y-1 text-left">
-              {m.items.map((item) => (
-                <div key={item} className="text-[10px] flex items-center gap-1.5" style={{ color: "var(--yunque-text-secondary)" }}>
-                  <span style={{ color: "var(--yunque-success)", fontSize: 8 }}>●</span> {item}
-                </div>
-              ))}
-            </div>
-            {m.recommended && (
-              <div className="mt-3 text-[10px] font-medium px-2 py-0.5 rounded-full inline-block"
-                style={{ background: "var(--yunque-accent-muted)", color: "var(--yunque-accent)" }}>
-                {t("onboarding.mode.recommended")}
-              </div>
-            )}
-          </button>
-        ))}
-      </div>
-
-      <div className="mt-6">
-        <Button
-          className="w-full rounded-xl"
-          style={{ background: "var(--neutral-strong-bg)", color: "var(--neutral-strong-fg)", fontWeight: 600 }}
-          onPress={() => onFinish(selected)}
-          aria-label={t("onboarding.mode.start")}
-        >
-          {t("onboarding.mode.start")} <ArrowRight size={14} className="ml-1" />
-        </Button>
-      </div>
-    </div>
-  );
-}
-
 export function OnboardingGuide() {
   const { t } = useI18n();
   const { phase, setPhase, visible, finish } = useOnboarding();
 
-  const handleModeSelect = useCallback((mode: "easy" | "full") => {
-    writeProfileMode(mode);
-    finish();
-  }, [finish]);
-
   const handleSkipToDemo = useCallback(() => setPhase("interactive-demo"), [setPhase]);
-  const handleSkipToMode = useCallback(() => setPhase("mode-select"), [setPhase]);
 
   if (!visible) return null;
 
   const phaseIndex: Record<OnboardingPhase, number> = {
     "welcome": 0, "setup-check": 1, "provider-setup": 2,
-    "interactive-demo": 3, "mode-select": 4, "done": 5,
+    "interactive-demo": 3, "done": 4,
   };
   const currentIdx = phaseIndex[phase] || 0;
-  const totalSteps = 5;
+  const totalSteps = 4;
 
   return (
     <div className="onboard-backdrop" role="dialog" aria-modal="true" aria-label={t("onboarding.aria")}>
@@ -464,16 +386,12 @@ export function OnboardingGuide() {
         {phase === "provider-setup" && (
           <ProviderSetupStep
             onNext={handleSkipToDemo}
-            onSkip={handleSkipToMode}
+            onSkip={finish}
           />
         )}
 
         {phase === "interactive-demo" && (
-          <InteractiveDemoStep onNext={handleSkipToMode} />
-        )}
-
-        {phase === "mode-select" && (
-          <ModeSelectStep onFinish={handleModeSelect} />
+          <InteractiveDemoStep onNext={finish} />
         )}
       </div>
     </div>

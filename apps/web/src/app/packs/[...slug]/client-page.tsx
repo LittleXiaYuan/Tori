@@ -62,7 +62,7 @@ export default function PackRuntimeRouteClientPage() {
           <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>
             当前路径 <code>{pathname}</code> 需要先安装并启用对应 pack。前端不会为未启用包暴露页面入口，避免继续把可选能力写死进主系统。
           </div>
-          <Link href="/packs" className="btn-accent inline-flex w-fit items-center rounded-xl px-4 py-2 text-sm">返回增量包运行时</Link>
+          <Link href="/packs" className="btn-accent inline-flex w-fit items-center rounded-xl px-4 py-2 text-sm">返回能力包运行时</Link>
         </Card>
       </div>
     );
@@ -83,7 +83,7 @@ export default function PackRuntimeRouteClientPage() {
         description={isIframeBundle
           ? "该 Pack 提供独立前端包，已在沙箱 iframe 中动态加载（DLC）。"
           : "这是由后端 enabled pack registry 同步出来的通用 Pack 页面。专属页面尚未随前端包加载时，先展示 manifest、资源入口和 SDK 调用面。"}
-        actions={<Link href="/packs" className="inline-flex items-center rounded-xl px-4 py-2 text-sm" style={{ border: "1px solid var(--yunque-border)", color: "var(--yunque-text)" }}>管理增量包</Link>}
+        actions={<Link href="/packs" className="inline-flex items-center rounded-xl px-4 py-2 text-sm" style={{ border: "1px solid var(--yunque-border)", color: "var(--yunque-text)" }}>管理能力包</Link>}
       />
 
       {isIframeBundle && (
@@ -130,13 +130,13 @@ export default function PackRuntimeRouteClientPage() {
 
         <Card className="section-card p-5 space-y-3">
           <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
-            <ExternalLink size={15} /> UI 资源与增量包
+            <ExternalLink size={15} /> UI 资源与能力包
           </div>
           <div className="text-xs space-y-2" style={{ color: "var(--yunque-text-muted)" }}>
             <div>资源类型：<code>{assets?.type || "builtin"}</code></div>
             <div>资源入口：<code>{assets?.entry || distribution?.frontendUrl || "-"}</code></div>
             <div>远程前端：<code>{distribution?.frontendUrl || "-"}</code></div>
-            <div>增量包：<code>{distribution?.packageUrl || "-"}</code></div>
+            <div>能力包：<code>{distribution?.packageUrl || "-"}</code></div>
             <div>SHA-256：<code>{distribution?.sha256 || pack.artifacts?.sha256 || "-"}</code></div>
           </div>
         </Card>

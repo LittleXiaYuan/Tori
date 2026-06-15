@@ -84,11 +84,11 @@ export default function PacksPageOptimized() {
     available: releaseCatalog.count || releaseCatalog.entries.length,
   }), [packs, releaseCatalog]);
 
-  const run = async (label: string, op: () => Promise<unknown>) => {
+  const run = async (label: string, op: () => Promise<unknown>, successMsg = "操作成功") => {
     setBusy(label);
     try {
       await op();
-      showToast("操作成功", "success");
+      showToast(successMsg, "success");
       await refreshAll();
       window.dispatchEvent(new CustomEvent("yunque:packs-changed"));
     } catch (e) {
@@ -108,7 +108,7 @@ export default function PacksPageOptimized() {
     sha256: entry.sha256,
     source: entry.release_url,
   }));
-  const enable = (id: string) => run(`enable:${id}`, () => packsClient.enable(id));
+  const enable = (id: string) => run(`enable:${id}`, () => packsClient.enable(id), "已启用 ✓ 可在 ⌘K 搜索或「全部功能 › 扩展」中打开，或在本页用「固定侧栏」放到侧边栏");
   const disable = (id: string) => run(`disable:${id}`, () => packsClient.disable(id));
   const rollback = (id: string) => run(`rollback:${id}`, () => packsClient.rollback(id));
 

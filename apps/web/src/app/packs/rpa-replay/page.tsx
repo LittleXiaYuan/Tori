@@ -60,7 +60,7 @@ export default function RPAReplayPackPage() {
       const msg = formatErrorMessage(e, "加载 RPA Replay Pack 失败");
       setError(msg);
       if (msg.includes("pack route is not enabled")) {
-        setError("RPA Replay Pack 当前未启用。请到「增量包」控制台启用 yunque.pack.rpa-replay 后再使用。");
+        setError("RPA Replay Pack 当前未启用。请到「能力包」控制台启用 yunque.pack.rpa-replay 后再使用。");
       }
     } finally {
       setLoading(false);

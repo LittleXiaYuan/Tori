@@ -97,24 +97,24 @@ export const NAV_ITEMS: NavItem[] = [
   { id: "nav-workflows", href: "/workflows", label: "工作流", group: "工作", layer: "lab", packId: WORK_PACK_ID, icon: <Blocks size={16} />, keywords: "workflow 工作流 流程 lab 实验" },
   { id: "nav-workers", href: "/workers", label: "Worker", group: "工作", layer: "control-plane", packId: CONTROL_PLANE_PACK_ID, icon: <Cpu size={16} />, keywords: "workers worker 进程 运维" },
 
-  // 智能 - 核心功能
+  // 智能 - 核心功能（核心「智能」只保留 知识库 / 记忆，不再被内省 Pack 挤占）
   { id: "nav-knowledge", href: "/knowledge", label: "知识库", group: "智能", layer: "core", defaultVisible: true, packId: KNOWLEDGE_PACK_ID, icon: <BookOpen size={16} />, keywords: "knowledge 知识 RAG" },
   { id: "nav-memory", href: "/memory", label: "记忆", group: "智能", layer: "core", defaultVisible: true, packId: MEMORY_PACK_ID, icon: <Brain size={16} />, keywords: "memory 记忆 反馈 沉淀" },
 
-  // 智能 - 内省视图（原为薄壳 Pack，底层子系统始终运行，这里并入核心导航）
-  { id: "nav-inner-life", href: "/packs/inner-life", label: "内在生活", group: "智能", layer: "core", packId: "yunque.pack.inner-life", icon: <HeartPulse size={16} />, keywords: "inner life 内在生活 反思 好奇 dreaming 自省 内省" },
-  { id: "nav-night-school", href: "/packs/night-school", label: "夜校", group: "智能", layer: "core", packId: "yunque.pack.night-school", icon: <Lightbulb size={16} />, keywords: "night school 夜校 蒸馏 特质 学习 内省" },
-  { id: "nav-experience", href: "/packs/experience", label: "经验", group: "智能", layer: "core", packId: "yunque.pack.experience", icon: <SmilePlus size={16} />, keywords: "experience 经验 推荐 评估 沉淀 内省" },
-  { id: "nav-world-model", href: "/packs/world-model", label: "世界模型", group: "智能", layer: "core", packId: "yunque.pack.world-model", icon: <Globe size={16} />, keywords: "world model 世界模型 因果 causal 内省" },
-  { id: "nav-micro-agent", href: "/packs/micro-agent", label: "微代理", group: "智能", layer: "core", packId: "yunque.pack.micro-agent", icon: <Bot size={16} />, keywords: "micro agent 微代理 react 子代理 内省" },
-
   // 扩展 - 核心功能
-  { id: "nav-packs", href: "/packs", label: "能力包", group: "扩展", layer: "pack", defaultVisible: true, icon: <Boxes size={16} />, keywords: "packs pack runtime 增量包 能力包 热插拔 可选能力 默认入口" },
+  { id: "nav-packs", href: "/packs", label: "能力包", group: "扩展", layer: "pack", defaultVisible: true, icon: <Boxes size={16} />, keywords: "packs pack runtime 能力包 热插拔 可选能力 默认入口" },
   { id: "nav-cognis", href: "/cognis", label: "Cogni", group: "扩展", layer: "core", defaultVisible: true, packId: COGNI_CONSOLE_PACK_ID, icon: <BrainCircuit size={16} />, keywords: "Cogni cognis 助手 assistant 智体 认知内核 我的 Cogni" },
 
   // 扩展 - 开发工具（full 模式）
-  { id: "nav-skills", href: "/skills", label: "技能库", group: "扩展", layer: "lab", packId: SKILLS_PACK_ID, icon: <Package size={16} />, keywords: "skills 技能 运行时技能 高级入口 legacy pack 的原子能力来源" },
+  { id: "nav-skills", href: "/skills", label: "技能", group: "扩展", layer: "lab", packId: SKILLS_PACK_ID, icon: <Package size={16} />, keywords: "skills 技能 技能库 运行时技能 高级入口 legacy pack 的原子能力来源" },
   { id: "nav-plugins", href: "/plugins", label: "插件宿主", group: "扩展", layer: "control-plane", packId: CONTROL_PLANE_PACK_ID, icon: <Puzzle size={16} />, keywords: "plugins 插件 宿主 运行时 高级入口 legacy pack 的代码载体" },
+
+  // 扩展 - 内省能力包（由对应 Pack 启用后出现，归入「扩展」而非核心「智能」，避免每个 Pack 都挤占主导航）
+  { id: "nav-inner-life", href: "/packs/inner-life", label: "内在生活", group: "扩展", layer: "pack", packId: "yunque.pack.inner-life", icon: <HeartPulse size={16} />, keywords: "inner life 内在生活 反思 好奇 dreaming 自省 内省" },
+  { id: "nav-night-school", href: "/packs/night-school", label: "夜校", group: "扩展", layer: "pack", packId: "yunque.pack.night-school", icon: <Lightbulb size={16} />, keywords: "night school 夜校 蒸馏 特质 学习 内省" },
+  { id: "nav-experience", href: "/packs/experience", label: "经验", group: "扩展", layer: "pack", packId: "yunque.pack.experience", icon: <SmilePlus size={16} />, keywords: "experience 经验 推荐 评估 沉淀 内省" },
+  { id: "nav-world-model", href: "/packs/world-model", label: "世界模型", group: "扩展", layer: "pack", packId: "yunque.pack.world-model", icon: <Globe size={16} />, keywords: "world model 世界模型 因果 causal 内省" },
+  { id: "nav-micro-agent", href: "/packs/micro-agent", label: "微代理", group: "扩展", layer: "pack", packId: "yunque.pack.micro-agent", icon: <Bot size={16} />, keywords: "micro agent 微代理 react 子代理 内省" },
 
   // 系统 - 核心功能
   { id: "nav-settings", href: "/settings", label: "设置", group: "系统", layer: "core", defaultVisible: true, icon: <Settings size={16} />, keywords: "settings 偏好 设置" },
