@@ -108,6 +108,10 @@ func initCognitionWiring(
 		}
 		return experienceStore.CompileStrategies(10)
 	})
+	// Tier 0 microkernel: let ENABLED capability packs inject context into the
+	// prompt, so a Pack's enablement actually flows into the agent's reasoning
+	// (not just its HTTP routes). Packs opt in by implementing ContextProvider.
+	p.SetPackContext(gw.PackContext)
 
 	if typedLdg != nil {
 		migrator := iledger.NewKVMigrator(typedLdg)

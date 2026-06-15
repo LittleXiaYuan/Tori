@@ -32,9 +32,45 @@ export interface NavItem {
   layer: CapabilityLayer;
   /** Visible in the default "easy" surface. Everything else is progressive discovery. */
   defaultVisible?: boolean;
+  /**
+   * If set, this surface is owned by a capability pack and is only shown when
+   * that pack is enabled in the registry (Phase A3 — nav driven by enabled
+   * packs). Untagged items are always eligible (subject to profile filtering).
+   */
+  packId?: string;
   icon: React.ReactNode;
   keywords?: string;
 }
+
+/** Pack that owns the control-plane / Pro 运维 surfaces (Phase A2 manifest). */
+export const CONTROL_PLANE_PACK_ID = "yunque.pack.control-plane";
+/** Pack that owns the task/work surfaces (任务中心 stays core; the rest are gated). */
+export const WORK_PACK_ID = "yunque.pack.work";
+/** Pack that owns the skill-management surfaces. */
+export const SKILLS_PACK_ID = "yunque.pack.skills";
+/** Default-preloaded packs (enabled out-of-box, can be disabled). */
+export const MEMORY_PACK_ID = "yunque.pack.memory";
+export const KNOWLEDGE_PACK_ID = "yunque.pack.knowledge";
+export const COGNI_CONSOLE_PACK_ID = "yunque.pack.cogni-console";
+export const WORKSPACE_PACK_ID = "yunque.pack.workspace";
+
+/**
+ * Packs that ship enabled by default. The nav seeds its "enabled" set with
+ * these so default-preloaded surfaces render immediately (no flash) before the
+ * live pack status returns; the live status then reconciles (e.g. hides one the
+ * user has disabled).
+ */
+export const DEFAULT_ENABLED_PACK_IDS = new Set<string>([
+  MEMORY_PACK_ID,
+  KNOWLEDGE_PACK_ID,
+  COGNI_CONSOLE_PACK_ID,
+  WORKSPACE_PACK_ID,
+  "yunque.pack.inner-life",
+  "yunque.pack.night-school",
+  "yunque.pack.experience",
+  "yunque.pack.world-model",
+  "yunque.pack.micro-agent",
+]);
 
 export const DEFAULT_NAV_ITEM_IDS = new Set<string>([
   "nav-dashboard",
@@ -49,51 +85,51 @@ export const DEFAULT_NAV_ITEM_IDS = new Set<string>([
 
 export const NAV_ITEMS: NavItem[] = [
   // 概览 - 核心功能（easy 模式可见）
-  { id: "nav-dashboard", href: "/dashboard", label: "工作台", group: "概览", layer: "core", defaultVisible: true, icon: <LayoutDashboard size={16} />, keywords: "dashboard home 主页 仪表盘 overview workspace 工作台 场景" },
+  { id: "nav-dashboard", href: "/dashboard", label: "工作台", group: "概览", layer: "core", defaultVisible: true, packId: WORKSPACE_PACK_ID, icon: <LayoutDashboard size={16} />, keywords: "dashboard home 主页 仪表盘 overview workspace 工作台 场景" },
   { id: "nav-chat", href: "/chat", label: "对话", group: "概览", layer: "core", defaultVisible: true, icon: <MessageCircle size={16} />, keywords: "chat 聊天 会话 行动 产物" },
 
   // 工作 - 核心功能
   { id: "nav-missions", href: "/missions", label: "任务中心", group: "工作", layer: "core", defaultVisible: true, icon: <Zap size={16} />, keywords: "missions tasks 任务 反馈 验收" },
 
   // 工作 - 辅助功能（full 模式）
-  { id: "nav-task-run", href: "/task-run", label: "执行视图", group: "工作", layer: "core", icon: <Terminal size={16} />, keywords: "task run 执行 运行" },
-  { id: "nav-projects", href: "/projects", label: "项目", group: "工作", layer: "core", icon: <FolderGit2 size={16} />, keywords: "projects 项目 repo workspace" },
-  { id: "nav-workflows", href: "/workflows", label: "工作流", group: "工作", layer: "lab", icon: <Blocks size={16} />, keywords: "workflow 工作流 流程 lab 实验" },
-  { id: "nav-workers", href: "/workers", label: "Worker", group: "工作", layer: "control-plane", icon: <Cpu size={16} />, keywords: "workers worker 进程 运维" },
+  { id: "nav-task-run", href: "/task-run", label: "执行视图", group: "工作", layer: "core", packId: WORK_PACK_ID, icon: <Terminal size={16} />, keywords: "task run 执行 运行" },
+  { id: "nav-projects", href: "/projects", label: "项目", group: "工作", layer: "core", packId: WORK_PACK_ID, icon: <FolderGit2 size={16} />, keywords: "projects 项目 repo workspace" },
+  { id: "nav-workflows", href: "/workflows", label: "工作流", group: "工作", layer: "lab", packId: WORK_PACK_ID, icon: <Blocks size={16} />, keywords: "workflow 工作流 流程 lab 实验" },
+  { id: "nav-workers", href: "/workers", label: "Worker", group: "工作", layer: "control-plane", packId: CONTROL_PLANE_PACK_ID, icon: <Cpu size={16} />, keywords: "workers worker 进程 运维" },
 
   // 智能 - 核心功能
-  { id: "nav-knowledge", href: "/knowledge", label: "知识库", group: "智能", layer: "core", defaultVisible: true, icon: <BookOpen size={16} />, keywords: "knowledge 知识 RAG" },
-  { id: "nav-memory", href: "/memory", label: "记忆", group: "智能", layer: "core", defaultVisible: true, icon: <Brain size={16} />, keywords: "memory 记忆 反馈 沉淀" },
+  { id: "nav-knowledge", href: "/knowledge", label: "知识库", group: "智能", layer: "core", defaultVisible: true, packId: KNOWLEDGE_PACK_ID, icon: <BookOpen size={16} />, keywords: "knowledge 知识 RAG" },
+  { id: "nav-memory", href: "/memory", label: "记忆", group: "智能", layer: "core", defaultVisible: true, packId: MEMORY_PACK_ID, icon: <Brain size={16} />, keywords: "memory 记忆 反馈 沉淀" },
 
   // 智能 - 内省视图（原为薄壳 Pack，底层子系统始终运行，这里并入核心导航）
-  { id: "nav-inner-life", href: "/packs/inner-life", label: "内在生活", group: "智能", layer: "core", icon: <HeartPulse size={16} />, keywords: "inner life 内在生活 反思 好奇 dreaming 自省 内省" },
-  { id: "nav-night-school", href: "/packs/night-school", label: "夜校", group: "智能", layer: "core", icon: <Lightbulb size={16} />, keywords: "night school 夜校 蒸馏 特质 学习 内省" },
-  { id: "nav-experience", href: "/packs/experience", label: "经验", group: "智能", layer: "core", icon: <SmilePlus size={16} />, keywords: "experience 经验 推荐 评估 沉淀 内省" },
-  { id: "nav-world-model", href: "/packs/world-model", label: "世界模型", group: "智能", layer: "core", icon: <Globe size={16} />, keywords: "world model 世界模型 因果 causal 内省" },
-  { id: "nav-micro-agent", href: "/packs/micro-agent", label: "微代理", group: "智能", layer: "core", icon: <Bot size={16} />, keywords: "micro agent 微代理 react 子代理 内省" },
+  { id: "nav-inner-life", href: "/packs/inner-life", label: "内在生活", group: "智能", layer: "core", packId: "yunque.pack.inner-life", icon: <HeartPulse size={16} />, keywords: "inner life 内在生活 反思 好奇 dreaming 自省 内省" },
+  { id: "nav-night-school", href: "/packs/night-school", label: "夜校", group: "智能", layer: "core", packId: "yunque.pack.night-school", icon: <Lightbulb size={16} />, keywords: "night school 夜校 蒸馏 特质 学习 内省" },
+  { id: "nav-experience", href: "/packs/experience", label: "经验", group: "智能", layer: "core", packId: "yunque.pack.experience", icon: <SmilePlus size={16} />, keywords: "experience 经验 推荐 评估 沉淀 内省" },
+  { id: "nav-world-model", href: "/packs/world-model", label: "世界模型", group: "智能", layer: "core", packId: "yunque.pack.world-model", icon: <Globe size={16} />, keywords: "world model 世界模型 因果 causal 内省" },
+  { id: "nav-micro-agent", href: "/packs/micro-agent", label: "微代理", group: "智能", layer: "core", packId: "yunque.pack.micro-agent", icon: <Bot size={16} />, keywords: "micro agent 微代理 react 子代理 内省" },
 
   // 扩展 - 核心功能
   { id: "nav-packs", href: "/packs", label: "能力包", group: "扩展", layer: "pack", defaultVisible: true, icon: <Boxes size={16} />, keywords: "packs pack runtime 增量包 能力包 热插拔 可选能力 默认入口" },
-  { id: "nav-cognis", href: "/cognis", label: "Cogni", group: "扩展", layer: "core", defaultVisible: true, icon: <BrainCircuit size={16} />, keywords: "Cogni cognis 助手 assistant 智体 认知内核 我的 Cogni" },
+  { id: "nav-cognis", href: "/cognis", label: "Cogni", group: "扩展", layer: "core", defaultVisible: true, packId: COGNI_CONSOLE_PACK_ID, icon: <BrainCircuit size={16} />, keywords: "Cogni cognis 助手 assistant 智体 认知内核 我的 Cogni" },
 
   // 扩展 - 开发工具（full 模式）
-  { id: "nav-skills", href: "/skills", label: "技能库", group: "扩展", layer: "lab", icon: <Package size={16} />, keywords: "skills 技能 运行时技能 高级入口 legacy pack 的原子能力来源" },
-  { id: "nav-plugins", href: "/plugins", label: "插件宿主", group: "扩展", layer: "control-plane", icon: <Puzzle size={16} />, keywords: "plugins 插件 宿主 运行时 高级入口 legacy pack 的代码载体" },
+  { id: "nav-skills", href: "/skills", label: "技能库", group: "扩展", layer: "lab", packId: SKILLS_PACK_ID, icon: <Package size={16} />, keywords: "skills 技能 运行时技能 高级入口 legacy pack 的原子能力来源" },
+  { id: "nav-plugins", href: "/plugins", label: "插件宿主", group: "扩展", layer: "control-plane", packId: CONTROL_PLANE_PACK_ID, icon: <Puzzle size={16} />, keywords: "plugins 插件 宿主 运行时 高级入口 legacy pack 的代码载体" },
 
   // 系统 - 核心功能
   { id: "nav-settings", href: "/settings", label: "设置", group: "系统", layer: "core", defaultVisible: true, icon: <Settings size={16} />, keywords: "settings 偏好 设置" },
 
-  // 系统 - 控制面（full 模式）
-  { id: "nav-inbox", href: "/inbox", label: "收件箱", group: "系统", layer: "control-plane", icon: <MailWarning size={16} />, keywords: "inbox 消息 通知 渠道 控制面" },
-  { id: "nav-tools", href: "/tools", label: "终端", group: "系统", layer: "control-plane", icon: <Wrench size={16} />, keywords: "tools terminal shell 工具 运维" },
-  { id: "nav-models", href: "/models", label: "模型", group: "系统", layer: "control-plane", icon: <Cpu size={16} />, keywords: "models 模型 LLM 控制面" },
-  { id: "nav-providers", href: "/settings/providers", label: "提供商", group: "系统", layer: "control-plane", icon: <Globe size={16} />, keywords: "providers 提供商 api key 控制面" },
-  { id: "nav-metrics", href: "/metrics", label: "指标", group: "系统", layer: "control-plane", icon: <BarChart3 size={16} />, keywords: "metrics 统计 指标 控制面" },
-  { id: "nav-approvals", href: "/approvals", label: "审批", group: "系统", layer: "control-plane", icon: <ShieldCheck size={16} />, keywords: "approvals 审批 控制面" },
-  { id: "nav-audit", href: "/audit", label: "审计", group: "系统", layer: "control-plane", icon: <Shield size={16} />, keywords: "audit 日志 审计 控制面" },
-  { id: "nav-trust", href: "/trust", label: "信任", group: "系统", layer: "control-plane", icon: <ShieldCheck size={16} />, keywords: "trust 安全 信任 控制面" },
-  { id: "nav-tenants", href: "/tenants", label: "租户", group: "系统", layer: "control-plane", icon: <Users size={16} />, keywords: "tenants 租户 团队 控制面" },
-  { id: "nav-bots", href: "/bots", label: "Bot", group: "系统", layer: "control-plane", icon: <Bot size={16} />, keywords: "bots bot 机器人 渠道 控制面" },
+  // 系统 - 控制面（由 control-plane Pro 包驱动，启用后才出现）
+  { id: "nav-inbox", href: "/inbox", label: "收件箱", group: "系统", layer: "control-plane", packId: CONTROL_PLANE_PACK_ID, icon: <MailWarning size={16} />, keywords: "inbox 消息 通知 渠道 控制面" },
+  { id: "nav-tools", href: "/tools", label: "终端", group: "系统", layer: "control-plane", packId: CONTROL_PLANE_PACK_ID, icon: <Wrench size={16} />, keywords: "tools terminal shell 工具 运维" },
+  { id: "nav-models", href: "/models", label: "模型", group: "系统", layer: "control-plane", packId: CONTROL_PLANE_PACK_ID, icon: <Cpu size={16} />, keywords: "models 模型 LLM 控制面" },
+  { id: "nav-providers", href: "/settings/providers", label: "提供商", group: "系统", layer: "control-plane", packId: CONTROL_PLANE_PACK_ID, icon: <Globe size={16} />, keywords: "providers 提供商 api key 控制面" },
+  { id: "nav-metrics", href: "/metrics", label: "指标", group: "系统", layer: "control-plane", packId: CONTROL_PLANE_PACK_ID, icon: <BarChart3 size={16} />, keywords: "metrics 统计 指标 控制面" },
+  { id: "nav-approvals", href: "/approvals", label: "审批", group: "系统", layer: "control-plane", packId: CONTROL_PLANE_PACK_ID, icon: <ShieldCheck size={16} />, keywords: "approvals 审批 控制面" },
+  { id: "nav-audit", href: "/audit", label: "审计", group: "系统", layer: "control-plane", packId: CONTROL_PLANE_PACK_ID, icon: <Shield size={16} />, keywords: "audit 日志 审计 控制面" },
+  { id: "nav-trust", href: "/trust", label: "信任", group: "系统", layer: "control-plane", packId: CONTROL_PLANE_PACK_ID, icon: <ShieldCheck size={16} />, keywords: "trust 安全 信任 控制面" },
+  { id: "nav-tenants", href: "/tenants", label: "租户", group: "系统", layer: "control-plane", packId: CONTROL_PLANE_PACK_ID, icon: <Users size={16} />, keywords: "tenants 租户 团队 控制面" },
+  { id: "nav-bots", href: "/bots", label: "Bot", group: "系统", layer: "control-plane", packId: CONTROL_PLANE_PACK_ID, icon: <Bot size={16} />, keywords: "bots bot 机器人 渠道 控制面" },
 ];
 
 export const NAV_GROUP_ORDER: NavGroup[] = ["概览", "工作", "智能", "系统", "扩展"];
@@ -122,6 +158,16 @@ export function navItemLabel(item: { id: string; label: string }, t: (key: strin
 export function filterNavItemsByProfile(items: NavItem[], mode: ProfileMode): NavItem[] {
   if (mode === "full") return items;
   return items.filter((item) => item.defaultVisible === true);
+}
+
+/**
+ * Phase A3 — nav driven by enabled packs. Drops any pack-owned nav item
+ * (`packId` set) whose owning pack is not currently enabled, so surfaces like
+ * the control-plane cluster disappear by default and reappear only when the
+ * user enables their pack. Untagged items pass through unchanged.
+ */
+export function filterNavItemsByEnabledPacks(items: NavItem[], enabledPackIds: Set<string>): NavItem[] {
+  return items.filter((item) => !item.packId || enabledPackIds.has(item.packId));
 }
 
 export function groupNavItems(items: NavItem[]): Record<NavGroup, NavItem[]> {

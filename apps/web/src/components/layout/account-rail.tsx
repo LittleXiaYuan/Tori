@@ -35,7 +35,7 @@ import { loadTheme, patchAndApply } from "@/lib/theme-engine";
 import AccountRailFlyout from "@/components/layout/account-rail-flyout";
 import { WindowControls } from "@/components/title-bar";
 import { buildPackNavItems, fetchEnabledPacks } from "@/lib/pack-sync";
-import type { NavItem } from "@/lib/nav-items";
+import { DEFAULT_ENABLED_PACK_IDS, type NavItem } from "@/lib/nav-items";
 import { useNavigationPreferences } from "@/hooks/use-user-preferences";
 
 const FLY_ENTER_DELAY_MS = 300;
@@ -69,6 +69,7 @@ export default function AccountRail() {
   const [flyoutOpen, setFlyoutOpen] = useState(false);
   const [extItems, setExtItems] = useState<NavItem[]>([]);
   const [packItems, setPackItems] = useState<NavItem[]>([]);
+  const [enabledPackIds, setEnabledPackIds] = useState<Set<string>>(() => new Set(DEFAULT_ENABLED_PACK_IDS));
   const [anchorTop, setAnchorTop] = useState(0);
   const enterTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -98,6 +99,7 @@ export default function AccountRail() {
   useEffect(() => {
     fetchEnabledPacks()
       .then((packs) => {
+        setEnabledPackIds(new Set(packs.map((p) => p.manifest.id)));
         setPackItems(
           buildPackNavItems(packs).map((item) => ({
             id: `pack-${item.packId}-${item.href}`,
@@ -111,7 +113,10 @@ export default function AccountRail() {
           })),
         );
       })
-      .catch(() => setPackItems([]));
+      .catch(() => {
+        setEnabledPackIds(new Set());
+        setPackItems([]);
+      });
   }, []);
 
   // hover 进入/离开延时控制
@@ -467,6 +472,7 @@ export default function AccountRail() {
     <AccountRailFlyout
       open={flyoutOpen}
       extItems={[...packItems, ...extItems]}
+      enabledPackIds={enabledPackIds}
       anchorTop={anchorTop}
       onMouseEnter={cancelCloseFlyout}
       onMouseLeave={scheduleCloseFlyout}

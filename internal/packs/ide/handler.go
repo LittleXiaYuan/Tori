@@ -1,32 +1,92 @@
-package gateway
+// Package idepack mounts the IDE-supervisor HTTP surface (/v1/ide/review,
+// /v1/ide/status) as a v2 capability pack (Tier 0 microkernel). Native pack:
+// handler logic lives here and reaches the host only through a narrow accessor
+// (code review via the planner, skill count + uptime for status) — the gateway
+// no longer hosts these routes.
+package idepack
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"time"
 
-	"yunque-agent/internal/agentcore/llm"
-	"yunque-agent/internal/agentcore/planner"
+	"yunque-agent/pkg/packruntime"
 )
 
-// ── IDE Supervisor 专用接口 ──────────────────────────────────
+// PackID is the stable manifest id.
+const PackID = "yunque.pack.ide"
 
 const fence = "```"
 
-// handleIDEReviewCode 为 IDE 插件提供结构化代码审查
-// POST /v1/ide/review
-func (g *Gateway) handleIDEReviewCode(w http.ResponseWriter, r *http.Request) {
+// Gateway is the narrow host surface the IDE pack needs.
+type Gateway interface {
+	// ReviewPlan runs a code-review prompt through the host LLM pipeline.
+	ReviewPlan(ctx context.Context, tenantID, prompt string) (string, error)
+	// TenantOf resolves the request tenant.
+	TenantOf(ctx context.Context) string
+	// SkillCount reports the number of registered skills (for status).
+	SkillCount() int
+	// Uptime reports server uptime (for status).
+	Uptime() time.Duration
+}
+
+// Handler is the IDE pack backend module.
+type Handler struct {
+	gw      Gateway
+	host    packruntime.Host
+	started atomic.Bool
+}
+
+// New builds the IDE pack backed by the host accessors.
+func New(gw Gateway) *Handler { return &Handler{gw: gw} }
+
+var _ packruntime.Module = (*Handler)(nil)
+
+func (h *Handler) PackID() string { return PackID }
+
+func (h *Handler) Init(host packruntime.Host) error {
+	h.host = host
+	return nil
+}
+
+func (h *Handler) Start(ctx context.Context) error {
+	h.started.Store(true)
+	if h.host != nil {
+		h.host.Logger().Info("ide pack started", "pack", PackID)
+	}
+	return nil
+}
+
+func (h *Handler) Stop(ctx context.Context) error {
+	h.started.Store(false)
+	return nil
+}
+
+// Routes mounts the IDE-supervisor surface natively.
+func (h *Handler) Routes() []packruntime.BackendRoute {
+	m := []string{http.MethodGet, http.MethodPost}
+	return []packruntime.BackendRoute{
+		{Methods: m, Path: "/v1/ide/review", Handler: h.handleReview},
+		{Methods: m, Path: "/v1/ide/status", Handler: h.handleStatus},
+	}
+}
+
+// handleReview provides structured code review for the IDE plugin (POST).
+func (h *Handler) handleReview(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	if h.gw == nil {
+		http.Error(w, "ide pack not wired", http.StatusServiceUnavailable)
+		return
+	}
 
-	tid := tenantFromCtx(r.Context())
-
-	// Limit request body size (max 512KB)
+	tid := h.gw.TenantOf(r.Context())
 	r.Body = http.MaxBytesReader(w, r.Body, 512*1024)
 
 	var req struct {
@@ -34,19 +94,16 @@ func (g *Gateway) handleIDEReviewCode(w http.ResponseWriter, r *http.Request) {
 		Content  string `json:"content"`
 		Diff     string `json:"diff"`
 		Language string `json:"language"`
-		Mode     string `json:"mode"` // "full" | "diff" | "quick"
+		Mode     string `json:"mode"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
-
 	if req.Content == "" && req.Diff == "" {
 		http.Error(w, "content or diff required", http.StatusBadRequest)
 		return
 	}
-
-	// Input validation
 	if len(req.FilePath) > 512 {
 		http.Error(w, "file_path too long", http.StatusBadRequest)
 		return
@@ -63,11 +120,9 @@ func (g *Gateway) handleIDEReviewCode(w http.ResponseWriter, r *http.Request) {
 		req.Language = req.Language[:50]
 	}
 
-	// Whitelist mode
 	mode := req.Mode
 	switch mode {
 	case "full", "diff", "quick":
-		// valid
 	default:
 		if req.Diff != "" {
 			mode = "diff"
@@ -76,11 +131,9 @@ func (g *Gateway) handleIDEReviewCode(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Sanitize file path for prompt (prevent path traversal in display)
 	safePath := sanitizeForPrompt(req.FilePath)
 	safeLang := sanitizeForPrompt(req.Language)
 
-	// 构造 review 提示
 	var prompt string
 	jsonFmt := `{"summary":"一句话总结","issues":[{"line":N,"severity":"error|warning|info","message":"问题描述","suggestion":"建议修复"}],"score":1-10,"improvements":["改进建议"]}`
 
@@ -91,7 +144,6 @@ func (g *Gateway) handleIDEReviewCode(w http.ResponseWriter, r *http.Request) {
 				"文件: %s\n语言: %s\n\n"+fence+"diff\n%s\n"+fence+"\n\n"+
 				"请以 JSON 格式返回审查结果: %s\n只返回 JSON，不要其他内容。",
 			safePath, safeLang, req.Diff, jsonFmt)
-
 	case "quick":
 		content := req.Content
 		if len(content) > 2000 {
@@ -102,8 +154,7 @@ func (g *Gateway) handleIDEReviewCode(w http.ResponseWriter, r *http.Request) {
 				"文件: %s\n"+fence+"\n%s\n"+fence+"\n\n"+
 				"JSON 格式返回: %s\n只返回 JSON。",
 			safePath, content, jsonFmt)
-
-	default: // "full"
+	default:
 		prompt = fmt.Sprintf(
 			"你是一位资深代码审查专家。请对以下代码进行全面审查。\n\n"+
 				"文件: %s\n语言: %s\n\n"+fence+"\n%s\n"+fence+"\n\n"+
@@ -111,59 +162,47 @@ func (g *Gateway) handleIDEReviewCode(w http.ResponseWriter, r *http.Request) {
 			safePath, safeLang, req.Content, jsonFmt)
 	}
 
-	// 调用 Planner（复用现有 LLM 管线）
-	result, err := g.planner.Run(r.Context(), planner.PlanRequest{
-		Messages: []llm.Message{{Role: "user", Content: prompt}},
-		TenantID: tid,
-	})
+	reply, err := h.gw.ReviewPlan(r.Context(), tid, prompt)
 	if err != nil {
-		slog.Error("ide review failed", "error", err, "file", req.FilePath)
 		http.Error(w, "review failed: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// 尝试解析 LLM 返回的 JSON
-	parsed := parseReviewJSON(result.Reply)
-
+	parsed := parseReviewJSON(reply)
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(parsed)
+	_ = json.NewEncoder(w).Encode(parsed)
 }
 
-// handleIDEStatus 返回 IDE 连接可用的服务端能力
-// GET /v1/ide/status
-func (g *Gateway) handleIDEStatus(w http.ResponseWriter, r *http.Request) {
+// handleStatus returns server-side capabilities available to the IDE plugin (GET).
+func (h *Handler) handleStatus(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-
 	skillCount := 0
-	if g.registry != nil {
-		skillCount = len(g.registry.All())
+	uptime := time.Duration(0)
+	if h.gw != nil {
+		skillCount = h.gw.SkillCount()
+		uptime = h.gw.Uptime()
 	}
-
 	status := map[string]any{
 		"version":      "0.1.0",
 		"connected":    true,
 		"capabilities": []string{"review", "tasks", "missions", "approvals", "workflows", "sse"},
 		"skills_count": skillCount,
 		"server_time":  time.Now().Format(time.RFC3339),
-		"uptime_sec":   int(time.Since(g.startTime).Seconds()),
+		"uptime_sec":   int(uptime.Seconds()),
 	}
-
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(status)
+	_ = json.NewEncoder(w).Encode(status)
 }
 
-// parseReviewJSON 从 LLM 回复中提取结构化 review 结果
+// parseReviewJSON extracts a structured review result from an LLM reply.
 func parseReviewJSON(reply string) map[string]any {
-	// 尝试直接解析
 	var result map[string]any
 	if err := json.Unmarshal([]byte(reply), &result); err == nil {
 		return result
 	}
-
-	// 尝试从 ```json ... ``` 中提取
 	jsonTag := fence + "json"
 	if idx := strings.Index(reply, jsonTag); idx >= 0 {
 		start := idx + len(jsonTag)
@@ -174,8 +213,6 @@ func parseReviewJSON(reply string) map[string]any {
 			}
 		}
 	}
-
-	// 尝试从 { ... } 中提取
 	if idx := strings.Index(reply, "{"); idx >= 0 {
 		if end := strings.LastIndex(reply, "}"); end > idx {
 			jsonStr := reply[idx : end+1]
@@ -184,8 +221,6 @@ func parseReviewJSON(reply string) map[string]any {
 			}
 		}
 	}
-
-	// 无法解析，返回文本形式
 	return map[string]any{
 		"summary": reply,
 		"issues":  []any{},
@@ -195,12 +230,9 @@ func parseReviewJSON(reply string) map[string]any {
 
 // sanitizeForPrompt removes characters that could break prompt structure.
 func sanitizeForPrompt(s string) string {
-	// Remove backticks (could break code fences)
 	s = strings.ReplaceAll(s, "`", "'")
-	// Remove common prompt injection markers
 	s = strings.ReplaceAll(s, "///system:", "")
 	s = strings.ReplaceAll(s, "###system", "")
-	// Limit length
 	r := []rune(s)
 	if len(r) > 256 {
 		return string(r[:256])

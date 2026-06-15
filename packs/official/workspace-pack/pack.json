@@ -1,0 +1,37 @@
+{
+  "id": "yunque.pack.workspace",
+  "name": "Workspace (工作台)",
+  "version": "0.1.0",
+  "description": "工作台仪表盘：场景入口、系统健康、指标概览。默认预装但已从首页降级（首页现为对话），可在能力包中心关闭。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": [
+      "workspace.dashboard"
+    ],
+    "routes": [],
+    "permissions": [
+      "workspace:read"
+    ]
+  },
+  "frontend": {
+    "menus": [
+      { "key": "dashboard", "label": "工作台", "path": "/dashboard", "icon": "package", "order": 10 }
+    ],
+    "assets": {
+      "type": "builtin"
+    }
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "group": "overview",
+    "phase": "A5",
+    "preload": "true",
+    "note": "Dashboard demoted from landing (home is now /chat). Default-preloaded so it stays reachable; frontend nav stays static until profile removal handles initial-state gating."
+  },
+  "status": "beta"
+}

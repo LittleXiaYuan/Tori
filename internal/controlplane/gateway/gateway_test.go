@@ -104,7 +104,9 @@ func TestRequestID(t *testing.T) {
 }
 
 func TestAuthRequired(t *testing.T) {
-	gw, _ := newTestGateway()
+	// /v1/skills is a (migrated) skills-pack route; use a gateway with the
+	// migration packs enabled so the auth gate — not the SPA catch-all — owns it.
+	gw, _ := newTestGatewayMigrationEnabled()
 	req := httptest.NewRequest("GET", "/v1/skills", nil)
 	w := httptest.NewRecorder()
 	gw.ServeHTTP(w, req)
@@ -114,7 +116,7 @@ func TestAuthRequired(t *testing.T) {
 }
 
 func TestAuthWithAPIKey(t *testing.T) {
-	gw, tm := newTestGateway()
+	gw, tm := newTestGatewayMigrationEnabled()
 	t1 := tm.Register("test-org")
 	req := httptest.NewRequest("GET", "/v1/skills", nil)
 	req.Header.Set("X-API-Key", t1.APIKey)
@@ -167,7 +169,7 @@ func TestSearchEndpointsGracefullyHandleNoProviders(t *testing.T) {
 }
 
 func TestAuthRejectsAPIKeyInQuery(t *testing.T) {
-	gw, tm := newTestGateway()
+	gw, tm := newTestGatewayMigrationEnabled()
 	t1 := tm.Register("test-org")
 	req := httptest.NewRequest("GET", "/v1/skills?api_key="+t1.APIKey, nil)
 	w := httptest.NewRecorder()

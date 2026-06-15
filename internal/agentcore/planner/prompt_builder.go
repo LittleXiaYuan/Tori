@@ -432,6 +432,18 @@ collect:
 			})
 		}
 	}
+	// Pack context — enabled capability packs (Tier 0 microkernel) that implement
+	// ContextProvider inject here, so enabling a Pack actually shows up in the
+	// agent's reasoning flow. Empty when no enabled pack contributes context.
+	if pb.contextAssembly != nil && pb.contextAssembly.packContext != nil {
+		if packCtx := pb.contextAssembly.packContext(ctx, req.TenantID, req.LastMessage); packCtx != "" {
+			layers = append(layers, ctxwindow.Layer{
+				Name:     "pack",
+				Priority: ctxwindow.LayerPriorityCognition,
+				Content:  packCtx,
+			})
+		}
+	}
 	// Reverie: inject only high-relevance inner thoughts with natural delivery guidance
 	if injectReverieEnabled && pb.proactiveCog != nil {
 		if jctx := pb.proactiveCog.JournalContext(2, req.LastMessage); jctx != "" {

@@ -12,10 +12,11 @@ import { api } from "@/lib/api";
 // and running the probe server-side would add a hop that fails whenever the
 // Go sidecar isn't up yet.
 //
-// Branches:
-//   1. LLM fully configured         → /dashboard (scenario-first workspace)
+// Branches (Phase A5 — conversation-first home; the dashboard is demoted to an
+// optional "工作台" surface instead of the landing):
+//   1. LLM fully configured         → /chat (conversation is the home)
 //   2. First run, nothing bound yet → /setup (choose Tori vs API key)
-//   3. Probe failed (backend down)  → /dashboard (let the shell show the error)
+//   3. Probe failed (backend down)  → /chat (let the shell show the error)
 export default function Home() {
   const router = useRouter();
 
@@ -31,9 +32,9 @@ export default function Home() {
         if (cancelled) return;
 
         const needsSetup = Boolean(env?.first_run) && !tori?.bound;
-        router.replace(needsSetup ? "/setup" : "/dashboard");
+        router.replace(needsSetup ? "/setup" : "/chat");
       } catch {
-        if (!cancelled) router.replace("/dashboard");
+        if (!cancelled) router.replace("/chat");
       }
     })();
     return () => {

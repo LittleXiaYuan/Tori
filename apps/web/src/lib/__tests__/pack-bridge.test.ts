@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   BRIDGE_VERSION,
+  BackendCallMaxBodyChars,
+  BridgeViolationError,
+  createBridgeRateLimiter,
   createSSEParser,
   dispatchBridgeRequest,
   eventPathsFromPermissions,
@@ -13,15 +16,17 @@ import {
   type AllowedRoute,
   type BridgeEnvelope,
   type BridgeContext,
+  type BridgeViolation,
   type PackSSEEvent,
 } from "../pack-bridge";
 
-function makeCtx(handlers: BridgeContext["handlers"]) {
+function makeCtx(handlers: BridgeContext["handlers"], extra?: Partial<BridgeContext>) {
   const posted: BridgeEnvelope[] = [];
   const ctx: BridgeContext = {
     packId: "yunque.pack.demo",
     post: (m) => posted.push(m),
     handlers,
+    ...extra,
   };
   return { ctx, posted };
 }
@@ -80,6 +85,57 @@ describe("pack-bridge/dispatchBridgeRequest", () => {
     await dispatchBridgeRequest(ctx, { kind: "req", id: "c4", method: "ui.toast", payload: { message: "hi" } });
     expect(posted[0]).toEqual({ v: BRIDGE_VERSION, id: "c4", kind: "res", payload: null });
   });
+
+  it("keeps typed violation codes and notifies onViolation", async () => {
+    const violations: BridgeViolation[] = [];
+    const { ctx, posted } = makeCtx(
+      { "nav.push": () => { throw new BridgeViolationError("forbidden", "path not declared"); } },
+      { onViolation: (v) => violations.push(v) },
+    );
+
+    await dispatchBridgeRequest(ctx, { kind: "req", id: "v1", method: "nav.push", payload: { path: "/settings" } });
+    await dispatchBridgeRequest(ctx, { kind: "req", id: "v2", method: "no.such.method" });
+
+    expect(posted[0].error?.code).toBe("forbidden");
+    expect(violations).toEqual([
+      { method: "nav.push", code: "forbidden", message: "path not declared" },
+      { method: "no.such.method", code: "forbidden", message: "unknown or unpermitted method: no.such.method" },
+    ]);
+  });
+
+  it("does not treat operational handler errors as violations", async () => {
+    const violations: BridgeViolation[] = [];
+    const { ctx, posted } = makeCtx(
+      { "backend.call": () => { throw new Error("network down"); } },
+      { onViolation: (v) => violations.push(v) },
+    );
+    await dispatchBridgeRequest(ctx, { kind: "req", id: "e1", method: "backend.call" });
+    expect(posted[0].error?.code).toBe("error");
+    expect(violations).toHaveLength(0);
+  });
+
+  it("rate-limits inbound requests and reports the breach", async () => {
+    let t = 0;
+    const violations: BridgeViolation[] = [];
+    const { ctx, posted } = makeCtx(
+      { "ui.resize": () => ({ ok: true }) },
+      {
+        rateLimit: createBridgeRateLimiter({ capacity: 2, refillPerSecond: 1, now: () => t }),
+        onViolation: (v) => violations.push(v),
+      },
+    );
+
+    await dispatchBridgeRequest(ctx, { kind: "req", id: "r1", method: "ui.resize" });
+    await dispatchBridgeRequest(ctx, { kind: "req", id: "r2", method: "ui.resize" });
+    await dispatchBridgeRequest(ctx, { kind: "req", id: "r3", method: "ui.resize" });
+    expect(posted[2].error?.code).toBe("rate_limited");
+    expect(violations).toHaveLength(1);
+
+    // Tokens refill with time, so a well-behaved pack recovers.
+    t += 2000;
+    await dispatchBridgeRequest(ctx, { kind: "req", id: "r4", method: "ui.resize" });
+    expect(posted[3].error).toBeUndefined();
+  });
 });
 
 describe("pack-bridge/isRouteAllowed", () => {
@@ -130,8 +186,49 @@ describe("pack-bridge/makeBackendCallHandler", () => {
       authHeaders: () => ({}),
       fetchImpl: fetchImpl as unknown as typeof fetch,
     });
-    await expect(handler({ method: "POST", path: "/v1/admin/wipe" }, { packId: "p" })).rejects.toThrow(/not permitted/);
+    await expect(handler({ method: "POST", path: "/v1/admin/wipe" }, { packId: "p" })).rejects.toThrow(BridgeViolationError);
     expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("rejects oversized request bodies before fetching", async () => {
+    const fetchImpl = vi.fn();
+    const handler = makeBackendCallHandler({
+      routes: [{ method: "POST", path: "/v1/hello/ping" }],
+      authHeaders: () => ({}),
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+    const huge = "x".repeat(BackendCallMaxBodyChars + 1);
+    await expect(handler({ method: "POST", path: "/v1/hello/ping", body: huge }, { packId: "p" }))
+      .rejects.toThrow(/body too large/);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("aborts a hung backend call after the host-side timeout", async () => {
+    vi.useFakeTimers();
+    try {
+      const fetchImpl = vi.fn(
+        (_url: string, init?: RequestInit) =>
+          new Promise<Response>((_resolve, reject) => {
+            init?.signal?.addEventListener("abort", () => {
+              const err = new Error("aborted");
+              err.name = "AbortError";
+              reject(err);
+            });
+          }),
+      );
+      const handler = makeBackendCallHandler({
+        routes: [{ method: "GET", path: "/v1/hello/state" }],
+        authHeaders: () => ({}),
+        fetchImpl: fetchImpl as unknown as typeof fetch,
+        timeoutMs: 5000,
+      });
+      const pending = handler({ method: "GET", path: "/v1/hello/state" }, { packId: "p" }) as Promise<unknown>;
+      const assertion = expect(pending).rejects.toThrow(/timeout after 5000ms/);
+      await vi.advanceTimersByTimeAsync(5001);
+      await assertion;
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
@@ -274,16 +371,61 @@ describe("pack-bridge/PackEventSubscriptions", () => {
 });
 
 describe("pack-bridge/makeStorageHandlers", () => {
-  it("namespaces keys per pack", () => {
+  function mapStore() {
     const mem = new Map<string, string>();
-    const store = {
-      getItem: (k: string) => (mem.has(k) ? mem.get(k)! : null),
-      setItem: (k: string, v: string) => void mem.set(k, v),
+    return {
+      mem,
+      store: {
+        getItem: (k: string) => (mem.has(k) ? mem.get(k)! : null),
+        setItem: (k: string, v: string) => void mem.set(k, v),
+        get length() { return mem.size; },
+        key: (i: number) => [...mem.keys()][i] ?? null,
+      },
     };
+  }
+
+  it("namespaces keys per pack", () => {
+    const { mem, store } = mapStore();
     const h = makeStorageHandlers("yunque.pack.demo", store);
     h["storage.set"]({ key: "theme", value: "dark" }, { packId: "yunque.pack.demo" });
     expect(mem.get("pack:yunque.pack.demo:theme")).toBe("dark");
     expect(h["storage.get"]({ key: "theme" }, { packId: "yunque.pack.demo" })).toEqual({ value: "dark" });
     expect(h["storage.get"]({ key: "missing" }, { packId: "yunque.pack.demo" })).toEqual({ value: null });
+  });
+
+  it("enforces value-size and key-count quotas", () => {
+    const { mem, store } = mapStore();
+    // Foreign keys (host or other packs) must not count against this pack.
+    mem.set("yunque_token", "host-secret");
+    mem.set("pack:other.pack:x", "1");
+
+    const h = makeStorageHandlers("yunque.pack.demo", store, { maxValueChars: 8, maxKeys: 2 });
+    const ctx = { packId: "yunque.pack.demo" };
+
+    expect(() => h["storage.set"]({ key: "big", value: "123456789" }, ctx)).toThrow(/value too large/);
+    h["storage.set"]({ key: "a", value: "1" }, ctx);
+    h["storage.set"]({ key: "b", value: "2" }, ctx);
+    expect(() => h["storage.set"]({ key: "c", value: "3" }, ctx)).toThrow(/too many keys/);
+    // Overwriting an existing key stays allowed at the cap.
+    h["storage.set"]({ key: "a", value: "9" }, ctx);
+    expect(mem.get("pack:yunque.pack.demo:a")).toBe("9");
+  });
+
+  it("rejects oversized keys", () => {
+    const { store } = mapStore();
+    const h = makeStorageHandlers("yunque.pack.demo", store, { maxKeyChars: 4 });
+    expect(() => h["storage.set"]({ key: "abcde", value: "1" }, { packId: "yunque.pack.demo" }))
+      .toThrow(/key too long/);
+  });
+});
+
+describe("pack-bridge/createBridgeRateLimiter", () => {
+  it("allows bursts up to capacity and refills over time", () => {
+    let t = 0;
+    const rl = createBridgeRateLimiter({ capacity: 3, refillPerSecond: 2, now: () => t });
+    expect([rl.allow(), rl.allow(), rl.allow(), rl.allow()]).toEqual([true, true, true, false]);
+    t += 500; // +1 token
+    expect(rl.allow()).toBe(true);
+    expect(rl.allow()).toBe(false);
   });
 });

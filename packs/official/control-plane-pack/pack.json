@@ -1,0 +1,107 @@
+{
+  "id": "yunque.pack.control-plane",
+  "name": "Control Plane (Pro 运维)",
+  "version": "0.1.0",
+  "description": "进阶运维与治理面：信任、审计、迭代、审查、技能成长、用量等治理 API 收成一个常开核心包。默认启用，确保审计/信任等治理面开箱可用；如需最简主路径可在能力包中心关闭。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": [
+      "control_plane.governance",
+      "control_plane.ops"
+    ],
+    "routes": [
+      "/v1/audit/tail",
+      "/v1/audit/verify",
+      "/v1/audit/stats",
+      "/api/audit/trail",
+      "/api/trust/scores",
+      "/api/trust/reset",
+      "/api/trust/grant",
+      "/api/iterate/proposals",
+      "/api/iterate/approve",
+      "/api/iterate/reject",
+      "/api/iterate/trigger",
+      "/api/iterate/status",
+      "/api/review/status",
+      "/api/skillgrow/patterns",
+      "/v1/usage",
+      "/v1/quota",
+      "/v1/approvals",
+      "/v1/approvals/approve",
+      "/v1/approvals/deny",
+      "/v1/approvals/decide",
+      "/v1/approvals/rules",
+      "/v1/inbox",
+      "/v1/inbox/read",
+      "/v1/tools/exec",
+      "/v1/tools/list",
+      "/v1/tools/poll",
+      "/v1/tools/kill",
+      "/v1/bots",
+      "/v1/bots/detail",
+      "/v1/plugins",
+      "/v1/plugins/toggle",
+      "/v1/plugins/create",
+      "/v1/plugins/delete",
+      "/v1/plugins/files",
+      "/v1/plugins/ui",
+      "/v1/plugins/reload",
+      "/v1/plugins/open-folder",
+      "/v1/system/info",
+      "/v1/system/stats",
+      "/v1/metrics",
+      "/v1/metrics/prometheus",
+      "/v1/cache/stats",
+      "/v1/tenants",
+      "/v1/models",
+      "/api/providers",
+      "/api/providers/test",
+      "/api/providers/enable",
+      "/api/providers/disable",
+      "/api/providers/switch-model",
+      "/api/providers/session",
+      "/api/providers/local/discover",
+      "/api/providers/local/register",
+      "/api/providers/delete",
+      "/api/providers/tori/discover",
+      "/v1/router/stats",
+      "/api/breaker/reset",
+      "/api/providers/exec"
+    ],
+    "permissions": [
+      "control_plane:read",
+      "control_plane:write"
+    ]
+  },
+  "frontend": {
+    "menus": [
+      { "key": "trust", "label": "信任", "path": "/trust", "icon": "shield", "order": 210 },
+      { "key": "audit", "label": "审计", "path": "/audit", "icon": "file-search", "order": 211 },
+      { "key": "tenants", "label": "租户", "path": "/tenants", "icon": "users", "order": 212 },
+      { "key": "metrics", "label": "指标", "path": "/metrics", "icon": "activity", "order": 213 },
+      { "key": "workers", "label": "Workers", "path": "/workers", "icon": "cpu", "order": 214 },
+      { "key": "approvals", "label": "审批", "path": "/approvals", "icon": "check-circle", "order": 215 },
+      { "key": "plugins", "label": "插件", "path": "/plugins", "icon": "puzzle", "order": 216 },
+      { "key": "models", "label": "模型", "path": "/models", "icon": "box", "order": 217 },
+      { "key": "inbox", "label": "收件箱", "path": "/inbox", "icon": "inbox", "order": 218 },
+      { "key": "tools", "label": "工具", "path": "/tools", "icon": "wrench", "order": 219 },
+      { "key": "providers", "label": "提供商", "path": "/settings/providers", "icon": "globe", "order": 220 },
+      { "key": "bots", "label": "Bot", "path": "/bots", "icon": "bot", "order": 221 }
+    ],
+    "assets": {
+      "type": "builtin"
+    }
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "group": "control-plane",
+    "phase": "A2",
+    "note": "Always-on core governance pack: default-enabled so audit/trust/usage governance APIs stay available out of the box. Backend route ownership migrated in slices — this slice owns the registerGovernanceRoutes subset (audit/trust/iterate/review/skillgrow/usage); broader ops surfaces (tenants/metrics/plugins/models/inbox/tools/bots/providers/approvals) migrate later."
+  },
+  "status": "beta"
+}

@@ -1,0 +1,47 @@
+{
+  "id": "yunque.pack.memory",
+  "name": "Memory (记忆)",
+  "version": "0.1.0",
+  "description": "记忆面：记忆块、情感历史、心跳日志。默认预装的核心陪伴能力，可在能力包中心关闭。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": [
+      "memory.recall",
+      "memory.manage"
+    ],
+    "routes": [
+      "/v1/memory/stats",
+      "/v1/memory/search",
+      "/v1/memory/recall/debug",
+      "/v1/memory/add",
+      "/v1/memory/compact",
+      "/v1/memory/persona",
+      "/v1/memory/update"
+    ],
+    "permissions": [
+      "memory:read",
+      "memory:write"
+    ]
+  },
+  "frontend": {
+    "menus": [
+      { "key": "memory", "label": "记忆", "path": "/memory", "icon": "brain", "order": 60 }
+    ],
+    "assets": {
+      "type": "builtin"
+    }
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "group": "intelligence",
+    "phase": "A2",
+    "preload": "true",
+    "note": "Default-preloaded pack: in the pack model (can be disabled) but enabled out-of-box. Frontend nav stays static for now; pack-gating with proper initial-state handling lands with profile removal."
+  },
+  "status": "beta"
+}

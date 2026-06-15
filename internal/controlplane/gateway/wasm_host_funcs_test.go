@@ -56,6 +56,15 @@ func TestBuildWasmHostFuncsGating(t *testing.T) {
 	if !names["ledger_get"] || !names["ledger_set"] {
 		t.Fatalf("ledger_* should export with a KV provider, got %v", names)
 	}
+
+	// llm:call (ABI v2) only exports llm_chat when an LLM provider is wired.
+	if names := hostFuncNames(g.buildWasmHostFuncs("p", []string{PermLLMCall})); names["llm_chat"] {
+		t.Fatal("llm_chat must not export without an llm provider")
+	}
+	g.llmCall = func(_ context.Context, _, _ string) (string, error) { return "ok", nil }
+	if names := hostFuncNames(g.buildWasmHostFuncs("p", []string{PermLLMCall})); !names["llm_chat"] {
+		t.Fatal("llm_chat should export with llm:call permission + provider")
+	}
 }
 
 type fakePackKV struct {

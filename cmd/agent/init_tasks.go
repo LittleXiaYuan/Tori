@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -74,6 +76,15 @@ func initTasks(app *agentrt.App) error {
 		return err
 	}
 
+	// wasm-plugin pack: the remote-install executor (blueprint Appendix B) is
+	// off unless an operator sets WASM_REMOTE_INSTALL_ENFORCE=true. Its trusted
+	// installer is injected after the Gateway exists (SetInstallFromCache below).
+	wasmPluginPack := wasmpluginpack.New(wasmpluginpack.Config{
+		PluginDir:            cfg.DataPath("plugins"),
+		DataDir:              cfg.DataPath("wasm-plugin"),
+		RemoteInstallEnforce: strings.EqualFold(strings.TrimSpace(os.Getenv("WASM_REMOTE_INSTALL_ENFORCE")), "true"),
+	})
+
 	// ── Phase 2: Gateway ──
 	gw := gateway.NewFromConfig(gateway.GatewayConfig{
 		Planner:   p,
@@ -104,8 +115,23 @@ func initTasks(app *agentrt.App) error {
 			rpareplaypack.New(rpareplaypack.Config{DataDir: cfg.DataPath("rpa-replay")}),
 			sbomdriftpack.New(sbomdriftpack.Config{RepoRoot: ".", DataDir: cfg.DataPath("sbom-drift")}),
 			skillanomalypack.New(skillanomalypack.Config{DataDir: cfg.DataPath("skill-anomaly")}),
-			wasmpluginpack.New(wasmpluginpack.Config{PluginDir: cfg.DataPath("plugins"), DataDir: cfg.DataPath("wasm-plugin")}),
+			wasmPluginPack,
 		},
+	})
+	// Inject the trusted remote-install installer now that the Gateway exists
+	// (it resolves the pack registry + trust root lazily at request time).
+	// InstallFromYqpack re-verifies SHA-256 + Ed25519 signature and extracts/
+	// registers atomically — fail closed, nothing installed on any failure.
+	wasmPluginPack.SetInstallFromCache(func(_ context.Context, cachePath string) error {
+		reg := gw.PackRegistry()
+		if reg == nil {
+			return fmt.Errorf("pack registry not available")
+		}
+		_, err := reg.InstallFromYqpack(cachePath, packruntime.InstallOptions{
+			TrustRoot: gw.PackTrustRoot(),
+			Source:    "yqpack-remote",
+		})
+		return err
 	})
 	gw.SetPlannerResumeJobStore(cfg.DataPath("planner", "resume_plan_jobs.jsonl"))
 	packRegistry, err := packruntime.NewRegistry(cfg.DataPath("packs"))
@@ -182,8 +208,9 @@ func initTasks(app *agentrt.App) error {
 	gw.SetLoRAScheduler(loraScheduler)
 	gw.SetTrainingMetrics(trainingMetrics)
 	gw.SetEvolutionCoordinator(evolutionCoordinator)
-	gw.RegisterBackendPack(browserintentpack.NewHandler(gw))
-	gw.RegisterBackendPack(lorapack.NewHandler(lorapack.Options{
+	// Browser Intent + LoRA migrated to the v2 Module lifecycle (Tier 0 microkernel).
+	_ = gw.RegisterModule(browserintentpack.NewHandler(gw))
+	_ = gw.RegisterModule(lorapack.NewHandler(lorapack.Options{
 		Scheduler: loraScheduler,
 		Metrics:   trainingMetrics,
 		Evolution: evolutionCoordinator,
@@ -585,7 +612,89 @@ func ensureBuiltinPacks(registry *packruntime.Registry) {
 	if registry == nil {
 		return
 	}
-	for _, manifestPath := range []string{
+	// Pack refactor — Phase A, brick 1: the builtin pack set is now declared by
+	// the on-disk manifests under packs/official/ and discovered dynamically,
+	// instead of a hardcoded path list. This is the first step toward "every
+	// surface is a manifest-declared pack". Discovery falls back to the known
+	// official set if the directory cannot be located (unusual install layout).
+	manifestPaths := discoverBuiltinPackManifestPaths()
+	if len(manifestPaths) == 0 {
+		manifestPaths = fallbackBuiltinPackManifestPaths()
+		slog.Warn("builtin pack discovery found no manifests; using fallback set", "count", len(manifestPaths))
+	}
+	for _, manifestPath := range manifestPaths {
+		manifest, err := loadBuiltinPackManifest(manifestPath)
+		if err != nil {
+			slog.Warn("builtin pack manifest skipped", "path", manifestPath, "err", err)
+			continue
+		}
+		if _, ok := registry.Get(manifest.ID); ok {
+			continue
+		}
+		if _, err := registry.Install(manifest, manifestPath); err != nil {
+			slog.Warn("builtin pack install failed", "id", manifest.ID, "path", manifestPath, "err", err)
+			continue
+		}
+		slog.Info("builtin pack manifest installed", "id", manifest.ID, "state", manifest.DefaultState)
+	}
+}
+
+// builtinPackExcluded lists official pack directories that must NOT be
+// auto-seeded as builtins. dlc-demo-pack ships as a manual-install DLC
+// reference example, so it stays opt-in even though it lives under packs/official.
+var builtinPackExcluded = map[string]bool{
+	"dlc-demo-pack": true,
+}
+
+// discoverBuiltinPackManifestPaths scans packs/official/*/pack.json so the
+// builtin pack set is sourced from on-disk manifests rather than a hardcoded
+// list. Returns repo-relative manifest paths in deterministic order; empty when
+// the directory cannot be located (the caller then uses the fallback set).
+func discoverBuiltinPackManifestPaths() []string {
+	dir := locateBuiltinPackDir()
+	if dir == "" {
+		return nil
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		slog.Warn("builtin pack discovery: read dir failed", "dir", dir, "err", err)
+		return nil
+	}
+	var paths []string
+	for _, entry := range entries {
+		if !entry.IsDir() || builtinPackExcluded[entry.Name()] {
+			continue
+		}
+		if _, statErr := os.Stat(filepath.Join(dir, entry.Name(), "pack.json")); statErr != nil {
+			continue
+		}
+		paths = append(paths, "packs/official/"+entry.Name()+"/pack.json")
+	}
+	sort.Strings(paths)
+	return paths
+}
+
+// locateBuiltinPackDir returns the first existing packs/official directory among
+// the same candidate roots used to resolve individual builtin manifests.
+func locateBuiltinPackDir() string {
+	rel := filepath.Join("packs", "official")
+	candidates := []string{rel, filepath.Join("..", "..", rel)}
+	if _, file, _, ok := runtime.Caller(0); ok {
+		repoRoot := filepath.Clean(filepath.Join(filepath.Dir(file), "..", ".."))
+		candidates = append(candidates, filepath.Join(repoRoot, rel))
+	}
+	for _, c := range candidates {
+		if info, err := os.Stat(c); err == nil && info.IsDir() {
+			return c
+		}
+	}
+	return ""
+}
+
+// fallbackBuiltinPackManifestPaths is the known first-party pack set, used only
+// when on-disk discovery cannot locate packs/official (e.g. a trimmed install).
+func fallbackBuiltinPackManifestPaths() []string {
+	return []string{
 		"packs/official/backup-pack/pack.json",
 		"packs/official/cogni-kernel-pack/pack.json",
 		"packs/official/inner-life-pack/pack.json",
@@ -603,20 +712,6 @@ func ensureBuiltinPacks(registry *packruntime.Registry) {
 		"packs/official/sbom-drift-pack/pack.json",
 		"packs/official/skill-anomaly-pack/pack.json",
 		"packs/official/wasm-plugin-pack/pack.json",
-	} {
-		manifest, err := loadBuiltinPackManifest(manifestPath)
-		if err != nil {
-			slog.Warn("builtin pack manifest skipped", "path", manifestPath, "err", err)
-			continue
-		}
-		if _, ok := registry.Get(manifest.ID); ok {
-			continue
-		}
-		if _, err := registry.Install(manifest, manifestPath); err != nil {
-			slog.Warn("builtin pack install failed", "id", manifest.ID, "path", manifestPath, "err", err)
-			continue
-		}
-		slog.Info("builtin pack manifest installed", "id", manifest.ID, "state", manifest.DefaultState)
 	}
 }
 

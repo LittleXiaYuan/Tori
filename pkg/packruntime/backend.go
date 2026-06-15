@@ -1,8 +1,11 @@
 package packruntime
 
 import (
+	"context"
 	"net/http"
 	"time"
+
+	"yunque-agent/pkg/skills"
 )
 
 // BackendRoute describes one HTTP surface provided by a backend capability
@@ -267,7 +270,68 @@ type BackendRouteAuditReport struct {
 
 // BackendModule is implemented by backend capability packs that can be mounted
 // into the host Gateway without hard-coding their individual routes there.
+//
+// This is the v1 interface (routes only). New packs should implement the v2
+// Module interface below, which adds a lifecycle and depends on the kernel Host
+// contract instead of the concrete Gateway. BackendModule stays for backward
+// compatibility — AsModule adapts it to Module.
 type BackendModule interface {
 	PackID() string
 	Routes() []BackendRoute
 }
+
+// Module is the v2 capability-pack contract (see doc/MICROKERNEL-PACK-BLUEPRINT.md).
+// Unlike BackendModule it has a real lifecycle and receives the kernel Host, so a
+// pack can own a full vertical capability (routes + background workers) while
+// depending only on the kernel contract — never on *gateway.Gateway.
+type Module interface {
+	PackID() string
+	// Init wires the pack against the kernel. Called once before Routes/Start.
+	Init(host Host) error
+	// Routes returns the HTTP surface to mount (may be empty).
+	Routes() []BackendRoute
+	// Start launches background workers (index build, schedulers, …). It must
+	// return promptly; long-running work belongs in a goroutine bound to ctx.
+	Start(ctx context.Context) error
+	// Stop tears down background workers on disable/uninstall.
+	Stop(ctx context.Context) error
+}
+
+// ContextProvider is an optional capability: a Module that contributes dynamic
+// context into the prompt-assembly path.
+type ContextProvider interface {
+	BuildContext(ctx context.Context, message, tenant string) string
+}
+
+// DependencyAware is an optional capability: a Module that declares the pack IDs
+// it must load after, so the runtime can topologically order Init/Start.
+type DependencyAware interface {
+	DependsOn() []string
+}
+
+// SkillProvider is an optional capability: a Module that contributes agent tools
+// (skills) the planner can invoke. When the pack is enabled the host registers
+// these into the skill registry, so a Pack's enablement adds callable capability
+// to the agent (Tier 0 microkernel "tool line"); disabling removes them.
+type SkillProvider interface {
+	Skills() []skills.Skill
+}
+
+// AsModule adapts any BackendModule to the v2 Module interface. A value that
+// already implements Module is returned as-is; a v1 BackendModule is wrapped
+// with no-op Init/Start/Stop so existing packs keep working unchanged.
+func AsModule(m BackendModule) Module {
+	if mod, ok := m.(Module); ok {
+		return mod
+	}
+	return legacyModule{inner: m}
+}
+
+// legacyModule wraps a v1 BackendModule as a v2 Module.
+type legacyModule struct{ inner BackendModule }
+
+func (l legacyModule) PackID() string             { return l.inner.PackID() }
+func (l legacyModule) Init(Host) error            { return nil }
+func (l legacyModule) Routes() []BackendRoute     { return l.inner.Routes() }
+func (l legacyModule) Start(context.Context) error { return nil }
+func (l legacyModule) Stop(context.Context) error  { return nil }

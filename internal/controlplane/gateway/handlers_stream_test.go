@@ -14,6 +14,20 @@ import (
 	"yunque-agent/internal/observe"
 )
 
+// lastNonTitlePrompt returns the last captured LLM request body that is a real
+// chat/planner prompt, skipping the asynchronous conversation-title-generation
+// call which can race in after the chat response and otherwise be picked up as
+// the "last" body. Title prompts are identified by the title-generator system
+// instruction.
+func lastNonTitlePrompt(bodies []string) string {
+	for i := len(bodies) - 1; i >= 0; i-- {
+		if !strings.Contains(bodies[i], "对话标题生成器") {
+			return bodies[i]
+		}
+	}
+	return ""
+}
+
 func TestStreamChat_EmptyBody(t *testing.T) {
 	gw, _ := newTestGateway()
 	req := httptest.NewRequest("POST", "/v1/chat/stream", strings.NewReader(""))
@@ -561,7 +575,7 @@ func TestAgenticChatAttachmentContextCarriesIntoFollowUpPrompt(t *testing.T) {
 	if len(capturedBodies) < 2 {
 		t.Fatalf("expected both turns to reach mock LLM, captured=%d bodies=%v", len(capturedBodies), capturedBodies)
 	}
-	followUpPrompt := capturedBodies[len(capturedBodies)-1]
+	followUpPrompt := lastNonTitlePrompt(capturedBodies)
 	if !strings.Contains(followUpPrompt, "公司名称") || !strings.Contains(followUpPrompt, "云鸢科技") {
 		t.Fatalf("expected hidden attachment context in follow-up prompt, got %s", followUpPrompt)
 	}
@@ -627,7 +641,7 @@ func TestAgenticChatAttachmentMetadataCarriesIntoFollowUpPrompt(t *testing.T) {
 	if len(capturedBodies) < 2 {
 		t.Fatalf("expected both turns to reach mock LLM, captured=%d bodies=%v", len(capturedBodies), capturedBodies)
 	}
-	followUpPrompt := capturedBodies[len(capturedBodies)-1]
+	followUpPrompt := lastNonTitlePrompt(capturedBodies)
 	if !strings.Contains(followUpPrompt, "[Attachment file: 申请表.pdf]") || !strings.Contains(followUpPrompt, "正文未直接展开") {
 		t.Fatalf("expected hidden attachment metadata in follow-up prompt, got %s", followUpPrompt)
 	}

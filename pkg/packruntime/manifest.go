@@ -60,6 +60,19 @@ type BackendManifest struct {
 	RouteSpecs   []BackendRouteSpec `json:"routeSpecs,omitempty"`
 	Permissions  []string           `json:"permissions,omitempty"`
 	Runtime      *BackendRuntime    `json:"runtime,omitempty"`
+	// ToolSpecs declares agent tools (skills) a wasm pack contributes. When the
+	// pack is enabled the host builds a sandboxed WasmSkill per spec and registers
+	// it into the skill registry, so a downloaded pack gives the agent callable
+	// capability (Tier 0 microkernel "tool line"); disabling removes them.
+	ToolSpecs []BackendToolSpec `json:"toolSpecs,omitempty"`
+}
+
+// BackendToolSpec is manifest-owned metadata for one wasm-backed agent tool.
+type BackendToolSpec struct {
+	Name        string         `json:"name"`
+	Description string         `json:"description,omitempty"`
+	Entrypoint  string         `json:"entrypoint,omitempty"`
+	Parameters  map[string]any `json:"parameters,omitempty"`
 }
 
 // BackendRuntime declares how a pack's backend routes are executed. A nil
@@ -71,15 +84,45 @@ type BackendRuntime struct {
 	Type   string `json:"type"`             // "" = in-process (first-party); "wasm" = sandboxed module
 	Module string `json:"module,omitempty"` // pack-relative path to the .wasm, e.g. "module.wasm"
 	SHA256 string `json:"sha256,omitempty"` // hex sha256 of the module bytes, enforced before execution
+	// ABIVersion is the host↔module ABI the pack was built against (see
+	// docs/spec/pack-wasm-abi.md). 0 (unset) means the original v1 ABI. The host
+	// refuses to mount a module whose ABI it cannot support, so a downloaded pack
+	// built for a newer/older ABI fails closed instead of misbehaving.
+	ABIVersion int `json:"abiVersion,omitempty"`
 }
 
 // RuntimeTypeWasm is the BackendRuntime.Type value selecting the WASM
 // delivery path.
 const RuntimeTypeWasm = "wasm"
 
+// WASM host ABI version range supported by this host build. New host functions
+// are added only by bumping CurrentABIVersion (never by changing an existing
+// signature), so older modules keep working; MinABIVersion drops support for a
+// retired ABI after a deprecation window.
+const (
+	// CurrentABIVersion: v2 adds the llm_chat host function (additive, gated by
+	// the llm:call permission). v1 modules keep working since host functions are
+	// only ever added, never changed.
+	CurrentABIVersion = 2
+	MinABIVersion     = 1
+)
+
 // IsWasm reports whether this backend is delivered as a sandboxed WASM module.
 func (b BackendManifest) IsWasm() bool {
 	return b.Runtime != nil && b.Runtime.Type == RuntimeTypeWasm
+}
+
+// ABICompatible reports whether this host build can run the module's declared
+// ABI. An unset (0) ABIVersion is treated as the original v1 ABI.
+func (rt *BackendRuntime) ABICompatible() bool {
+	if rt == nil {
+		return true
+	}
+	v := rt.ABIVersion
+	if v == 0 {
+		v = CurrentABIVersion
+	}
+	return v >= MinABIVersion && v <= CurrentABIVersion
 }
 
 // BackendRouteSpec is manifest-owned backend route metadata. Routes keeps the

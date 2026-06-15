@@ -1,0 +1,37 @@
+{
+  "id": "yunque.pack.cogni-console",
+  "name": "Cogni Console (我的 Cogni)",
+  "version": "0.1.0",
+  "description": "Cogni 管理控制台：查看、创建与演化你的 Cogni。默认预装，可在能力包中心关闭。与底层 cogni-kernel 运行时包分离。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": [
+      "cogni.console"
+    ],
+    "routes": [],
+    "permissions": [
+      "cogni:read"
+    ]
+  },
+  "frontend": {
+    "menus": [
+      { "key": "cognis", "label": "Cogni", "path": "/cognis", "icon": "brain-circuit", "order": 62 }
+    ],
+    "assets": {
+      "type": "builtin"
+    }
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "group": "extensions",
+    "phase": "A2",
+    "preload": "true",
+    "note": "Default-preloaded Cogni management console surface (/cognis). Distinct from yunque.pack.cogni-kernel (backend runtime loops). Frontend nav stays static for now."
+  },
+  "status": "beta"
+}

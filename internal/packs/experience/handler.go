@@ -4,10 +4,12 @@
 package experiencepack
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"sort"
 	"strconv"
+	"sync/atomic"
 	"time"
 
 	"yunque-agent/internal/cognicore/eval"
@@ -32,6 +34,8 @@ type Handler struct {
 	recEngine *recommend.Engine
 	evaluator *eval.Evaluator
 	tenantID  string
+	host      packruntime.Host
+	started   atomic.Bool
 }
 
 // New creates an Experience pack handler.
@@ -50,6 +54,30 @@ func New(cfg Config) *Handler {
 
 // PackID returns the manifest id.
 func (h *Handler) PackID() string { return PackID }
+
+// compile-time assertion: Experience is a v2 capability Module (Tier 0 microkernel).
+var _ packruntime.Module = (*Handler)(nil)
+
+// Init wires the pack against the kernel Host. Dependencies arrive via Config.
+func (h *Handler) Init(host packruntime.Host) error {
+	h.host = host
+	return nil
+}
+
+// Start marks the pack live on enable (no background workers — read-only views).
+func (h *Handler) Start(ctx context.Context) error {
+	h.started.Store(true)
+	if h.host != nil {
+		h.host.Logger().Info("experience pack started", "pack", PackID)
+	}
+	return nil
+}
+
+// Stop marks the pack stopped on disable.
+func (h *Handler) Stop(ctx context.Context) error {
+	h.started.Store(false)
+	return nil
+}
 
 // Routes exposes the read-only experience endpoints.
 func (h *Handler) Routes() []packruntime.BackendRoute {

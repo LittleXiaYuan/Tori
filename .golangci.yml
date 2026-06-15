@@ -1,91 +1,77 @@
-# golangci-lint configuration for yunque-agent
-# Run: golangci-lint run ./...
-
+version: "2"
 run:
-  timeout: 5m
   go: "1.25"
   tests: true
-
 linters:
   enable:
-    # Bug detection
-    - errcheck        # unchecked errors
-    - govet           # go vet on steroids
-    - staticcheck     # advanced static analysis
-    - ineffassign     # useless assignments
-    - unused          # unused code
-
-    # Style & maintainability
-    - gofmt           # formatting
-    - goimports       # import ordering
-    - misspell        # common typos
-
-    # Complexity
-    - gocyclo         # cyclomatic complexity
-    - cyclop          # cyclomatic complexity (alternative)
-
-    # Security
-    - gosec           # security issues
-
-    # Performance
-    - prealloc        # slice preallocation hints
-
+    - cyclop
+    - gocyclo
+    - gosec
+    - misspell
+    - prealloc
   disable:
-    - depguard        # not needed
-    - godox           # allow TODOs during development
-    - lll             # line length — too strict for CJK comments
-
-linters-settings:
-  gocyclo:
-    min-complexity: 30  # start permissive, tighten over time
-
-  cyclop:
-    max-complexity: 30
-
-  gosec:
-    excludes:
-      - G104  # allow unhandled errors in deferred Close()
-      - G304  # allow file path from variable (we validate inputs)
-
-  errcheck:
-    exclude-functions:
-      - (*log/slog.Logger).Info
-      - (*log/slog.Logger).Warn
-      - (*log/slog.Logger).Error
-      - encoding/json.NewEncoder.Encode
-      - io.Copy
-      - (net/http.ResponseWriter).Write
-      - (*os.File).Close
-
-  misspell:
-    locale: US
-
+    - depguard
+    - godox
+    - lll
+  settings:
+    cyclop:
+      max-complexity: 30
+    errcheck:
+      exclude-functions:
+        - (*log/slog.Logger).Info
+        - (*log/slog.Logger).Warn
+        - (*log/slog.Logger).Error
+        - encoding/json.NewEncoder.Encode
+        - io.Copy
+        - (net/http.ResponseWriter).Write
+        - (*os.File).Close
+    gocyclo:
+      min-complexity: 30
+    gosec:
+      excludes:
+        - G104
+        - G304
+    misspell:
+      locale: US
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - linters:
+          - cyclop
+          - errcheck
+          - gocyclo
+          - gosec
+        path: _test\.go
+      - linters:
+          - all
+        path: .*\.gen\.go
+      - linters:
+          - cyclop
+          - gocyclo
+        path: cmd/agent/init_.*\.go
+      - linters:
+          - cyclop
+          - gocyclo
+        path: internal/controlplane/gateway/gateway\.go
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
 issues:
-  exclude-rules:
-    # Test files can be more relaxed
-    - path: _test\.go
-      linters:
-        - errcheck
-        - gosec
-        - gocyclo
-        - cyclop
-
-    # Generated files
-    - path: ".*\\.gen\\.go"
-      linters:
-        - all
-
-    # Allow long init functions
-    - path: "cmd/agent/init_.*\\.go"
-      linters:
-        - gocyclo
-        - cyclop
-
-    # Allow type assertions in gateway (many optional components)
-    - path: "internal/controlplane/gateway/gateway\\.go"
-      linters:
-        - gocyclo
-        - cyclop
-
   max-issues-per-linter: 50
   max-same-issues: 5
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

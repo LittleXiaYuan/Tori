@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
@@ -87,6 +88,10 @@ type WasmConfig struct {
 	MemoryLimitPages uint32        // max memory in 64KB pages (default 256 = 16MB)
 	MaxDuration      time.Duration // execution timeout (default 10s)
 	MaxOutputBytes   int           // max stdout/stderr size (default 64KB)
+	// CompileCacheDir, when set, backs the wazero compilation cache with an
+	// on-disk directory so compiled modules survive process restarts (faster
+	// cold start, less boot CPU for downloaded yqpacks). Empty = in-memory cache.
+	CompileCacheDir string
 }
 
 // DefaultWasmConfig returns sensible defaults for WASM execution.
@@ -115,8 +120,24 @@ func NewWasmSandbox(cfg WasmConfig) *WasmSandbox {
 		maxOutput:    cfg.MaxOutputBytes,
 		hostFuncs:    make(map[string]HostFunc),
 		kvStore:      make(map[string]string),
-		compileCache: wazero.NewCompilationCache(),
+		compileCache: newCompilationCache(cfg.CompileCacheDir),
 	}
+}
+
+// newCompilationCache returns an on-disk compilation cache when dir is set
+// (compiled modules survive restarts), falling back to an in-memory cache on
+// empty dir or any error so the sandbox always has a working cache.
+func newCompilationCache(dir string) wazero.CompilationCache {
+	dir = strings.TrimSpace(dir)
+	if dir != "" {
+		if cache, err := wazero.NewCompilationCacheWithDir(dir); err == nil {
+			slog.Info("wasm sandbox: using on-disk compilation cache", "dir", dir)
+			return cache
+		} else {
+			slog.Warn("wasm sandbox: on-disk compilation cache unavailable, using in-memory", "dir", dir, "err", err)
+		}
+	}
+	return wazero.NewCompilationCache()
 }
 
 // RegisterHostFunc adds a host function that WASM modules can call.

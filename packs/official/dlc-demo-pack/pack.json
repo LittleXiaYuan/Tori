@@ -21,7 +21,7 @@
     "runtime": {
       "type": "wasm",
       "module": "module.wasm",
-      "sha256": "89112006887d4f4d68920a42f12ff6aa2a6886f0c643db73811035acfbd3d2ef"
+      "sha256": "f41bb7275ab8a90b46731882e82249cc864ca937375fb49f2c3f9d3694191c9e"
     }
   },
   "frontend": {

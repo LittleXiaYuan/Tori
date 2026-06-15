@@ -10,15 +10,16 @@
  * 通过 `data-active` 在当前路径上高亮。
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { NAV_ITEMS, NAV_GROUP_ORDER, type NavGroup, type NavItem, filterNavItemsByProfile, groupNavItems, navItemLabel } from "@/lib/nav-items";
+import { NAV_ITEMS, NAV_GROUP_ORDER, type NavGroup, type NavItem, filterNavItemsByEnabledPacks, groupNavItems, navItemLabel } from "@/lib/nav-items";
 import { useI18n } from "@/lib/i18n";
-import { PROFILE_MODE_KEY, readProfileMode } from "@/lib/profile-mode";
 
 interface AccountRailFlyoutProps {
   open: boolean;
   extItems?: NavItem[];
+  /** 当前已启用的能力包 ID 集合，用于隐藏未启用包所拥有的导航项（A3）。 */
+  enabledPackIds?: Set<string>;
   /** 浮卡顶部相对视口的 px 位置（由父组件根据触发器 boundingRect 计算）。 */
   anchorTop?: number;
   onMouseEnter?: () => void;
@@ -34,29 +35,22 @@ const GROUP_LABEL_EN: Record<NavGroup, string> = {
   扩展: "Extensions",
 };
 
-export default function AccountRailFlyout({ open, extItems = [], anchorTop = 0, onMouseEnter, onMouseLeave, onPick }: AccountRailFlyoutProps) {
+export default function AccountRailFlyout({ open, extItems = [], enabledPackIds, anchorTop = 0, onMouseEnter, onMouseLeave, onPick }: AccountRailFlyoutProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { locale, t } = useI18n();
-  const [profileMode, setProfileMode] = useState(readProfileMode);
 
-  useEffect(() => {
-    const handleProfileModeChange = (event: StorageEvent) => {
-      if (event.key === PROFILE_MODE_KEY) setProfileMode(readProfileMode());
-    };
-    window.addEventListener("storage", handleProfileModeChange);
-    return () => window.removeEventListener("storage", handleProfileModeChange);
-  }, []);
-
+  // Nav is fully pack-driven: core items always show; pack-owned items show only
+  // when their pack is enabled. The 轻松/完整 profile toggle has been retired.
   const grouped = useMemo(
-    () => groupNavItems(filterNavItemsByProfile([...NAV_ITEMS, ...extItems], profileMode)),
-    [extItems, profileMode],
+    () => groupNavItems(
+      filterNavItemsByEnabledPacks([...NAV_ITEMS, ...extItems], enabledPackIds ?? new Set<string>()),
+    ),
+    [extItems, enabledPackIds],
   );
   const isZh = locale === "zh";
   const groupLabel = (g: NavGroup) => (isZh ? g : GROUP_LABEL_EN[g]);
-  const title = isZh
-    ? (profileMode === "easy" ? "主路径" : "所有功能")
-    : (profileMode === "easy" ? "Main Path" : "All Features");
+  const title = isZh ? "全部功能" : "All features";
 
   return (
     <aside

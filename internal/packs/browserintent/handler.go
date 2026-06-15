@@ -1,9 +1,11 @@
 package browserintent
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"yunque-agent/pkg/packruntime"
@@ -26,6 +28,8 @@ type BrowserGateway interface {
 // touching the browser WebSocket hub or skill implementation.
 type Handler struct {
 	gateway BrowserGateway
+	host    packruntime.Host
+	started atomic.Bool
 }
 
 func NewHandler(gateway BrowserGateway) *Handler {
@@ -33,6 +37,31 @@ func NewHandler(gateway BrowserGateway) *Handler {
 }
 
 func (h *Handler) PackID() string { return PackID }
+
+// compile-time assertion: Browser Intent is a v2 capability Module (Tier 0 microkernel).
+var _ packruntime.Module = (*Handler)(nil)
+
+// Init wires the pack against the kernel Host. The pack already depends on the
+// narrow BrowserGateway interface, not the concrete Gateway.
+func (h *Handler) Init(host packruntime.Host) error {
+	h.host = host
+	return nil
+}
+
+// Start marks the pack live on enable.
+func (h *Handler) Start(ctx context.Context) error {
+	h.started.Store(true)
+	if h.host != nil {
+		h.host.Logger().Info("browser-intent pack started", "pack", PackID)
+	}
+	return nil
+}
+
+// Stop marks the pack stopped on disable.
+func (h *Handler) Stop(ctx context.Context) error {
+	h.started.Store(false)
+	return nil
+}
 
 func (h *Handler) Routes() []packruntime.BackendRoute {
 	return []packruntime.BackendRoute{

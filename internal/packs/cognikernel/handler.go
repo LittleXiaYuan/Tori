@@ -1,8 +1,10 @@
 package cognikernelpack
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
+	"sync/atomic"
 	"time"
 
 	"yunque-agent/pkg/packruntime"
@@ -56,7 +58,9 @@ type RuntimeStateReport struct {
 // this migration phase, but route dispatch, runtime-state handling, enablement
 // and method gates are owned by this package.
 type Handler struct {
-	router *Router
+	router  *Router
+	host    packruntime.Host
+	started atomic.Bool
 }
 
 func NewHandler(api API) *Handler {
@@ -70,6 +74,31 @@ func NewHandlerWithRuntimeState(api API, reporter RuntimeStateReporter) *Handler
 		}
 	}
 	return &Handler{router: NewRouter(api, reporter)}
+}
+
+// compile-time assertion: Cogni Kernel is a v2 capability Module (Tier 0 microkernel).
+var _ packruntime.Module = (*Handler)(nil)
+
+// Init wires the pack against the kernel Host (deps arrive via the API +
+// RuntimeStateReporter interfaces, not the concrete Gateway).
+func (h *Handler) Init(host packruntime.Host) error {
+	h.host = host
+	return nil
+}
+
+// Start marks the pack live on enable.
+func (h *Handler) Start(ctx context.Context) error {
+	h.started.Store(true)
+	if h.host != nil {
+		h.host.Logger().Info("cogni-kernel pack started", "pack", PackID)
+	}
+	return nil
+}
+
+// Stop marks the pack stopped on disable.
+func (h *Handler) Stop(ctx context.Context) error {
+	h.started.Store(false)
+	return nil
 }
 
 // Router is the pack-owned route dispatcher for Cogni Kernel. It keeps runtime

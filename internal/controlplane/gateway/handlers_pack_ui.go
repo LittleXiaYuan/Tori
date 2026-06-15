@@ -3,6 +3,7 @@ package gateway
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"yunque-agent/internal/agentcore/audit"
 	"yunque-agent/internal/apperror"
 	"yunque-agent/pkg/packruntime"
 )
@@ -116,6 +118,55 @@ func (g *Gateway) setPackUIHeaders(w http.ResponseWriter, r *http.Request, frame
 	}, "; "))
 	h.Set("Cross-Origin-Resource-Policy", "same-origin")
 	h.Set("X-Content-Type-Options", "nosniff")
+}
+
+// handlePackBridgeViolation files one refused DLC-bridge request (unknown
+// method, undeclared route, quota or rate breach) into the tamper-evident
+// audit chain, as required by docs/spec/pack-frontend-dlc.md §7.3. The report
+// comes from the authed host shell — never from the sandboxed bundle itself.
+//
+// Route: POST /v1/packs/{id}/bridge-violation (auth required)
+func (g *Gateway) handlePackBridgeViolation(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "POST only")
+		return
+	}
+	id := strings.TrimSpace(r.PathValue("id"))
+	if g.packRegistry == nil {
+		apperror.WriteCode(w, apperror.CodeNotFound, "pack registry not configured")
+		return
+	}
+	if _, ok := g.packRegistry.Get(id); !ok {
+		apperror.WriteCode(w, apperror.CodeNotFound, "pack not found")
+		return
+	}
+	var req struct {
+		Method  string `json:"method"`
+		Code    string `json:"code"`
+		Message string `json:"message"`
+	}
+	if err := json.NewDecoder(io.LimitReader(r.Body, 8<<10)).Decode(&req); err != nil {
+		apperror.WriteCode(w, apperror.CodeBadRequest, "invalid JSON body")
+		return
+	}
+	clip := func(s string, n int) string {
+		s = strings.TrimSpace(s)
+		if len(s) > n {
+			return s[:n]
+		}
+		return s
+	}
+	code := clip(req.Code, 32)
+	if code == "" {
+		code = "forbidden"
+	}
+	detail := fmt.Sprintf("code=%s method=%s %s", code, clip(req.Method, 64), clip(req.Message, 512))
+	if g.auditChain != nil {
+		g.auditChain.Append(audit.EventAuth, "pack:"+id, "bridge_violation", detail)
+	}
+	slog.Warn("pack bridge violation", "pack", id, "code", code, "method", clip(req.Method, 64))
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]bool{"ok": true})
 }
 
 // packUIShellAncestors is the frame-ancestors source list used by the dedicated

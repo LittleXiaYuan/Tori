@@ -48,7 +48,21 @@ func newE2EGateway(mockURL string) (*Gateway, *tenant.Manager) {
 	cs := session.NewStore(50)
 	pr := plugin.NewRegistry()
 	jwtCfg := &JWTConfig{Secret: "e2e-test-secret", Issuer: "e2e", Expiration: time.Hour}
-	gw := New(p, tm, mm, reg, sched, cs, pr, nil, nil, jwtCfg, nil, nil, nil)
+	// Register the migrated core packs with an enabled registry so the e2e
+	// gateway matches production after the pack-route migration (otherwise
+	// /v1/{skills,memory,tasks,...} fall through to the SPA catch-all).
+	gw := NewFromConfig(GatewayConfig{
+		Planner:   p,
+		Tenants:   tm,
+		Memory:    mm,
+		Skills:    reg,
+		Scheduler: sched,
+		ConvStore: cs,
+		Plugins:   pr,
+		JWTConfig: jwtCfg,
+		Packs:     newMigrationPackRegistry(),
+	})
+	registerMigrationPacks(gw)
 	gw.SetLedgerHealthChecker(fakeHealthChecker{})
 	return gw, tm
 }

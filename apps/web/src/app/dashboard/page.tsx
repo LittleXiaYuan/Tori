@@ -37,31 +37,6 @@ function formatUptime(seconds: number): string {
 
 /* ── Mini charts ────────────────────────────────── */
 
-function Sparkline({ data, color = "var(--yunque-accent)", w = 72, h = 24 }: {
-  data: number[]; color?: string; w?: number; h?: number;
-}) {
-  if (!data.length) return null;
-  const max = Math.max(...data, 1);
-  const min = Math.min(...data, 0);
-  const range = max - min || 1;
-  const pts = data
-    .map((v, i) => `${(i / Math.max(data.length - 1, 1)) * w},${h - ((v - min) / range) * (h - 4) - 2}`)
-    .join(" ");
-  const gradId = `sp-${color.replace(/[^a-z0-9]/gi, "")}`;
-  return (
-    <svg width={w} height={h} className="shrink-0" style={{ opacity: 0.9 }}>
-      <defs>
-        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.2" />
-          <stop offset="100%" stopColor={color} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <polygon points={`0,${h} ${pts} ${w},${h}`} fill={`url(#${gradId})`} />
-      <polyline points={pts} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
-    </svg>
-  );
-}
-
 function BarChart({ data, labels, color = "var(--yunque-accent)", height = 100 }: {
   data: number[]; labels?: string[]; color?: string; height?: number;
 }) {
@@ -104,9 +79,9 @@ function BarChart({ data, labels, color = "var(--yunque-accent)", height = 100 }
 
 /* ── KPI Card ──────────────────────────────────── */
 
-function KPICard({ label, value, icon, accent, change, sub, spark }: {
+function KPICard({ label, value, icon, accent, change, sub }: {
   label: string; value: string | number; icon: React.ReactNode;
-  accent: string; change?: number; sub?: string; spark?: number[];
+  accent: string; change?: number; sub?: string;
 }) {
   return (
     <div
@@ -138,7 +113,6 @@ function KPICard({ label, value, icon, accent, change, sub, spark }: {
             {sub && <span className="kpi-sub">{sub}</span>}
           </div>
         </div>
-        {spark && spark.length > 1 && <Sparkline data={spark} color={accent} />}
       </div>
     </div>
   );
@@ -221,9 +195,6 @@ export default function DashboardPage() {
   const barLabels = useMemo(() => skillMetrics.map(s => s.name?.slice(0, 6) ?? ""), [skillMetrics]);
   const latencyData = useMemo(() => skillMetrics.map(s => s.latency?.avg_ms ?? 0), [skillMetrics]);
 
-  const sparkReq = useMemo(() => [3, 5, 2, 7, 4, 6, 8, 5, 9, 7, reqTotal % 15 || 8, 10], [reqTotal]);
-  const sparkToken = useMemo(() => [100, 200, 150, 300, 250, 400, 350, 500, tokenTotal % 600 || 450, 550], [tokenTotal]);
-
   if (loading) {
     return <DashboardSkeleton />;
   }
@@ -289,7 +260,6 @@ export default function DashboardPage() {
           accent="var(--yunque-accent)"
           change={successRate > 0 ? successRate - 100 : undefined}
           sub={`成功率 ${successRate.toFixed(1)}%`}
-          spark={sparkReq}
         />
         <KPICard
           label="令牌消耗"
@@ -297,7 +267,6 @@ export default function DashboardPage() {
           icon={<Zap size={13} />}
           accent="var(--yunque-warning)"
           sub={`输入 ${tokensIn.toLocaleString()} / 输出 ${tokensOut.toLocaleString()}`}
-          spark={sparkToken}
         />
         <KPICard
           label="延迟"

@@ -309,6 +309,9 @@ func (s *RuntimeStrategyService) ClassifyRequest(ctx context.Context, req PlanRe
 	if decision.Handler != "local" && req.ModelOverride == "" && req.RoutedTier == "" {
 		classifiedReq.ModelOverride = decision.Handler
 	}
+	// Carry the intent downstream: PromptBuilder uses it to skip graph/code
+	// retrieval on casual chat and to weight per-layer context budgets.
+	classifiedReq.IntentHint = decision.IntentCategory()
 	return &RuntimeClassificationResult{
 		Decision:     decision,
 		Request:      classifiedReq,

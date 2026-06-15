@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -13,27 +14,21 @@ import (
 	"yunque-agent/internal/apperror"
 )
 
-// from handlers_memory.go
-func (g *Gateway) handleMemoryStats(w http.ResponseWriter, r *http.Request) {
-	tid := tenantFromCtx(r.Context())
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(g.memory.Stats(tid))
-}
+// MemoryManager exposes the memory manager to backend packs (e.g. the memory
+// pack's native read handlers). May be nil if memory is not configured.
+func (g *Gateway) MemoryManager() *memory.Manager { return g.memory }
 
-func (g *Gateway) handleMemorySearch(w http.ResponseWriter, r *http.Request) {
-	tid := tenantFromCtx(r.Context())
-	var req struct {
-		Query string `json:"query"`
-		Limit int    `json:"limit"`
-	}
-	json.NewDecoder(r.Body).Decode(&req)
-	if req.Limit <= 0 {
-		req.Limit = 10
-	}
-	items, _ := g.memory.SearchAll(r.Context(), tid, req.Query, req.Limit)
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{"results": items, "count": len(items)})
-}
+// MemoryPipeline exposes the memory pipeline to backend packs (e.g. the memory
+// pack's native /v1/memory/compact handler). May be nil if not configured.
+func (g *Gateway) MemoryPipeline() *memory.Pipeline { return g.pipeline }
+
+// TenantOf exposes the gateway's tenant-from-context resolution to backend packs
+// so their native handlers can scope to the caller's tenant.
+func (g *Gateway) TenantOf(ctx context.Context) string { return tenantFromCtx(ctx) }
+
+// Memory read handlers (stats / search) were filled into the memory pack
+// (internal/packs/memory); they now live there and talk to the manager directly.
+// The orchestrator/pipeline-dependent handlers below remain on the gateway.
 
 // handleMemoryRecallDebug exposes what the orchestrator recalls for a query,
 // scoped to the caller's tenant: per-item score breakdown (layer, raw score,
@@ -101,64 +96,6 @@ func (g *Gateway) handleMemoryRecallDebug(w http.ResponseWriter, r *http.Request
 		"count":            len(out),
 		"compiled_context": g.orchestrator.CompileContext(r.Context(), tid, query),
 	})
-}
-
-func (g *Gateway) handleMemoryAdd(w http.ResponseWriter, r *http.Request) {
-	tid := tenantFromCtx(r.Context())
-	var req struct {
-		Key    string `json:"key"`
-		Value  string `json:"value"`
-		Layer  string `json:"layer"` // "short", "mid", "long"
-		Source string `json:"source"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Value == "" {
-		apperror.WriteCode(w, apperror.CodeMissingField, "value is required")
-		return
-	}
-	item := memory.Item{Key: req.Key, Value: req.Value, Source: req.Source}
-	var err error
-	switch req.Layer {
-	case "long":
-		err = g.memory.AddLong(r.Context(), tid, item)
-	case "short":
-		err = g.memory.Short.Put(r.Context(), tid, item)
-	default:
-		err = g.memory.AddMid(r.Context(), tid, item)
-	}
-	if err != nil {
-		apperror.Write(w, apperror.Wrap(apperror.CodeStorageError, "memory add failed", err))
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
-}
-
-func (g *Gateway) handleMemoryCompact(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "POST only")
-		return
-	}
-	tid := tenantFromCtx(r.Context())
-	var req struct {
-		TargetCount int `json:"target_count"`
-		DecayDays   int `json:"decay_days"`
-	}
-	json.NewDecoder(r.Body).Decode(&req)
-	if req.TargetCount <= 0 {
-		req.TargetCount = 0 // auto
-	}
-	if g.pipeline == nil {
-		apperror.WriteCode(w, apperror.CodeInternal, "memory pipeline not configured")
-		return
-	}
-	result, err := g.pipeline.Compact(r.Context(), tid, req.TargetCount, req.DecayDays)
-	if err != nil {
-		apperror.Write(w, apperror.Wrap(apperror.CodeInternal, "compact failed", err))
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(result)
 }
 
 func (g *Gateway) handleMemoryPersonaGet(w http.ResponseWriter, r *http.Request) {
@@ -233,118 +170,10 @@ func (g *Gateway) handleMemoryPersonaUpdate(w http.ResponseWriter, r *http.Reque
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
-//  from handlers_graph.go
-// --- Knowledge Graph API ---
-
-func (g *Gateway) handleGraphEntities(w http.ResponseWriter, r *http.Request) {
-	if g.pipeline == nil || g.pipeline.Graph() == nil {
-		json.NewEncoder(w).Encode(map[string]any{"entities": []any{}})
-		return
-	}
-	graph := g.pipeline.Graph()
-	w.Header().Set("Content-Type", "application/json")
-
-	switch r.Method {
-	case http.MethodGet:
-		query := r.URL.Query().Get("q")
-		if query != "" {
-			results := graph.SearchEntities(query, 50)
-			json.NewEncoder(w).Encode(map[string]any{"entities": results})
-		} else {
-			json.NewEncoder(w).Encode(map[string]any{"entities": graph.SearchEntities("", 100)})
-		}
-	case http.MethodPost:
-		var req memory.Entity
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			apperror.WriteCode(w, apperror.CodeBadRequest, "invalid entity")
-			return
-		}
-		e := graph.PutEntity(req)
-		json.NewEncoder(w).Encode(e)
-	case http.MethodDelete:
-		id := r.URL.Query().Get("id")
-		if id == "" {
-			apperror.WriteCode(w, apperror.CodeBadRequest, "id required")
-			return
-		}
-		graph.RemoveEntity(id)
-		json.NewEncoder(w).Encode(map[string]bool{"ok": true})
-	default:
-		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "method not allowed")
-	}
-}
-
-func (g *Gateway) handleGraphRelations(w http.ResponseWriter, r *http.Request) {
-	if g.pipeline == nil || g.pipeline.Graph() == nil {
-		json.NewEncoder(w).Encode(map[string]any{"relations": []any{}})
-		return
-	}
-	graph := g.pipeline.Graph()
-	w.Header().Set("Content-Type", "application/json")
-
-	switch r.Method {
-	case http.MethodGet:
-		entityID := r.URL.Query().Get("entity_id")
-		if entityID == "" {
-			// Return all relations (for graph visualization)
-			rels := graph.AllRelations(500)
-			json.NewEncoder(w).Encode(map[string]any{"relations": rels})
-			return
-		}
-		rels := graph.GetRelations(entityID)
-		json.NewEncoder(w).Encode(map[string]any{"relations": rels})
-	case http.MethodPost:
-		var req memory.Relation
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			apperror.WriteCode(w, apperror.CodeBadRequest, "invalid relation")
-			return
-		}
-		rel := graph.PutRelation(req)
-		json.NewEncoder(w).Encode(rel)
-	default:
-		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "method not allowed")
-	}
-}
-
-func (g *Gateway) handleGraphContext(w http.ResponseWriter, r *http.Request) {
-	if g.pipeline == nil || g.pipeline.Graph() == nil {
-		json.NewEncoder(w).Encode(map[string]string{"context": ""})
-		return
-	}
-	graph := g.pipeline.Graph()
-	w.Header().Set("Content-Type", "application/json")
-
-	entityID := r.URL.Query().Get("entity_id")
-	if entityID == "" {
-		// Search by name
-		name := r.URL.Query().Get("name")
-		if name != "" {
-			if e, ok := graph.FindByName(name); ok {
-				entityID = e.ID
-			}
-		}
-	}
-	if entityID == "" {
-		json.NewEncoder(w).Encode(map[string]string{"context": ""})
-		return
-	}
-
-	ctx := graph.ContextFor(entityID)
-	neighbors := graph.Neighbors(entityID, 2)
-	json.NewEncoder(w).Encode(map[string]any{
-		"context":   ctx,
-		"neighbors": neighbors,
-	})
-}
-
-func (g *Gateway) handleGraphStats(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	if g.pipeline == nil || g.pipeline.Graph() == nil {
-		json.NewEncoder(w).Encode(map[string]int{"entities": 0, "relations": 0})
-		return
-	}
-	json.NewEncoder(w).Encode(g.pipeline.Graph().Stats())
-}
+// Knowledge Graph HTTP handlers (/v1/graph/{entities,relations,context,stats})
+// were de-shelled into the graph pack (internal/packs/graph). The pack reads the
+// graph through the MemoryPipeline() accessor; the planner wiring below stays on
+// the gateway because it injects graph context into the prompt path, not HTTP.
 
 // WireGraphToPlanner connects the pipeline's knowledge graph to the planner's context injection.
 // It preserves any previously-set graphContext (e.g. knowledge base retrieval, Ledger recall).

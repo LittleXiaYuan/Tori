@@ -28,6 +28,17 @@ type ContextAssemblyService struct {
 	cognitiveContext   CognitiveContextFunc
 	beliefContext      BeliefContextFunc
 	cogniService       *CogniContextService
+	// packContext lets enabled capability packs (Tier 0 microkernel) inject
+	// context into the prompt, so a Pack's enablement actually shows up in the
+	// agent's reasoning flow — not just as an HTTP route. nil = no pack context.
+	packContext func(ctx context.Context, tenantID, query string) string
+}
+
+// SetPackContext attaches a source that aggregates context from enabled packs.
+func (s *ContextAssemblyService) SetPackContext(fn func(ctx context.Context, tenantID, query string) string) {
+	if s != nil {
+		s.packContext = fn
+	}
 }
 
 type DynamicContextAssemblyRequest struct {
@@ -36,6 +47,7 @@ type DynamicContextAssemblyRequest struct {
 	Channel     string
 	TaskContext string
 	EmotionHint *emotion.Result
+	IntentHint  string // LocalBrain intent category; see PlanRequest.IntentHint
 }
 
 type DynamicContextAssemblyResult struct {
@@ -265,6 +277,7 @@ func (s *ContextAssemblyService) BuildDynamicContext(ctx context.Context, req Dy
 		Channel:     req.Channel,
 		TaskContext: req.TaskContext,
 		EmotionHint: req.EmotionHint,
+		IntentHint:  req.IntentHint,
 	})
 	layers := append([]string(nil), builder.LastIncludedLayers...)
 	return DynamicContextAssemblyResult{Content: content, IncludedLayers: layers}

@@ -80,9 +80,24 @@ const CORE_PROMOTED_PACK_IDS = new Set<string>([
   "yunque.pack.micro-agent",
 ]);
 
+/** Packs whose surfaces are rendered via the static NAV_ITEMS catalog (gated by
+ *  filterNavItemsByEnabledPacks), so their manifest menus must NOT also be
+ *  emitted here — otherwise enabling the pack would double-list every surface. */
+const STATIC_NAV_PACK_IDS = new Set<string>([
+  "yunque.pack.control-plane",
+  "yunque.pack.work",
+  "yunque.pack.skills",
+  // Default-preloaded packs: rendered via static core nav; their manifest
+  // menus must not double-list when enabled.
+  "yunque.pack.memory",
+  "yunque.pack.knowledge",
+  "yunque.pack.cogni-console",
+  "yunque.pack.workspace",
+]);
+
 export function buildPackNavItems(packs: InstalledPack[]): PackNavItem[] {
   return packs
-    .filter((pack) => !CORE_PROMOTED_PACK_IDS.has(pack.manifest.id))
+    .filter((pack) => !CORE_PROMOTED_PACK_IDS.has(pack.manifest.id) && !STATIC_NAV_PACK_IDS.has(pack.manifest.id))
     .flatMap((pack) => {
       const manifest = pack.manifest;
       const menus = manifest.frontend?.menus || [];

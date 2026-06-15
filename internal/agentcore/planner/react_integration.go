@@ -309,6 +309,7 @@ func (p *Planner) buildReActMessages(ctx context.Context, req PlanRequest, histo
 			Channel:     req.ChannelType,
 			TaskContext: req.TaskContext,
 			EmotionHint: req.EmotionHint,
+			IntentHint:  req.IntentHint,
 		})
 		if assembled != "" {
 			msgs = append(msgs, llm.Message{

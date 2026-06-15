@@ -1,0 +1,63 @@
+{
+  "id": "yunque.pack.work",
+  "name": "Work (任务与工作)",
+  "version": "0.1.0",
+  "description": "任务与工作面：任务中心、任务运行、项目、工作流。默认预装的核心执行能力，可在能力包中心关闭。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": [
+      "work.tasks",
+      "work.projects",
+      "work.workflows"
+    ],
+    "routes": [
+      "/v1/tasks",
+      "/v1/tasks/run",
+      "/v1/tasks/cancel",
+      "/v1/tasks/pause",
+      "/v1/tasks/resume",
+      "/v1/tasks/restart",
+      "/v1/tasks/gaps",
+      "/v1/tasks/gaps/resolve",
+      "/v1/tasks/memory",
+      "/v1/tasks/threads",
+      "/v1/tasks/templates",
+      "/v1/tasks/templates/instantiate",
+      "/v1/projects",
+      "/v1/projects/detail",
+      "/v1/projects/remove",
+      "/v1/workflows",
+      "/v1/workflows/generate",
+      "/v1/workflows/run",
+      "/v1/workflows/instances",
+      "/v1/workflows/cancel"
+    ],
+    "permissions": [
+      "work:read",
+      "work:write"
+    ]
+  },
+  "frontend": {
+    "menus": [
+      { "key": "task-run", "label": "任务运行", "path": "/task-run", "icon": "play", "order": 111 },
+      { "key": "projects", "label": "项目", "path": "/projects", "icon": "folder", "order": 112 },
+      { "key": "workflows", "label": "工作流", "path": "/workflows", "icon": "git-branch", "order": 113 }
+    ],
+    "assets": {
+      "type": "builtin"
+    }
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "group": "work",
+    "phase": "A2",
+    "preload": "true",
+    "note": "Task platform pack: natively owns the task (/v1/tasks/*), project (/v1/projects/*), and workflow (/v1/workflows/*) surfaces. Fully de-shelled — handler impls live in internal/packs/work (no gateway bridge). Default-preloaded like memory/skills so the task/project/workflow UI works out-of-box."
+  },
+  "status": "beta"
+}

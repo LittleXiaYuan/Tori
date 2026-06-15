@@ -49,9 +49,7 @@ func (g *Gateway) registerChatRoutes() {
 	g.mux.HandleFunc("/v1/subagent", g.requireAuth(g.handleSubagent))
 	g.mux.HandleFunc("/v1/subagent/message", g.requireAuth(g.handleSubagentMessage))
 
-	// Bots
-	g.mux.HandleFunc("/v1/bots", g.requireAuth(g.handleBots))
-	g.mux.HandleFunc("/v1/bots/detail", g.requireAuth(g.handleBotDetail))
+	// Bots routes migrated to the control-plane pack (internal/packs/controlplane).
 
 	// Persona
 	g.mux.HandleFunc("/v1/persona", g.requireAuth(g.handlePersona))
@@ -60,13 +58,15 @@ func (g *Gateway) registerChatRoutes() {
 	g.mux.HandleFunc("/v1/persona/presets/custom", g.requireAuth(g.handleCustomPreset))
 	g.mux.HandleFunc("/v1/persona/presets/features", g.requireAuth(g.handlePresetFeatures))
 
-	// Emotion
-	g.mux.HandleFunc("/v1/emotion/stickers", g.requireAuth(g.handleStickers))
-	g.mux.HandleFunc("/v1/emotion/history", g.requireAuth(g.handleEmotionHistory))
+	// Emotion (/v1/emotion/stickers, /v1/emotion/history) are owned by the emotion
+	// pack (internal/packs/emotion), mounted via gw.RegisterModule in
+	// cmd/agent/init_task_engine.go. The sticker-map + history logic lives in that
+	// pack natively; the gateway no longer hosts these routes.
 
-	// User Instructions
-	g.mux.HandleFunc("/v1/instructions", g.requireAuth(g.handleInstructions))
-	g.mux.HandleFunc("/v1/instructions/reorder", g.requireAuth(g.handleInstructionsReorder))
+	// User Instructions (/v1/instructions, /v1/instructions/reorder) are owned by
+	// the instructions pack (internal/packs/instructions), mounted via
+	// gw.RegisterModule in cmd/agent/init_task_engine.go. The CRUD + reorder
+	// logic lives in that pack natively; the gateway no longer hosts these routes.
 
 	// React & Sticker
 	g.mux.HandleFunc("/v1/react", g.requireAuth(g.handleReact))
@@ -75,9 +75,7 @@ func (g *Gateway) registerChatRoutes() {
 	// Channel Groups
 	g.mux.HandleFunc("/v1/channels/groups", g.requireAuth(g.handleChannelGroups))
 
-	// Inbox
-	g.mux.HandleFunc("/v1/inbox", g.requireAuth(g.handleInbox))
-	g.mux.HandleFunc("/v1/inbox/read", g.requireAuth(g.handleInboxRead))
+	// Inbox routes migrated to the control-plane pack (internal/packs/controlplane).
 
 	// Webhooks
 	g.mux.HandleFunc("/webhook/feishu", g.handleFeishuWebhook)
@@ -91,22 +89,18 @@ func (g *Gateway) registerChatRoutes() {
 // ──────────────────────────────────────────────
 
 func (g *Gateway) registerMemoryRoutes() {
-	// Memory
-	g.mux.HandleFunc("/v1/memory/stats", g.requireAuth(g.handleMemoryStats))
-	g.mux.HandleFunc("/v1/memory/search", g.requireAuth(g.handleMemorySearch))
-	g.mux.HandleFunc("/v1/memory/recall/debug", g.requireAuth(g.handleMemoryRecallDebug))
-	g.mux.HandleFunc("/v1/memory/add", g.requireAuth(g.handleMemoryAdd))
-	g.mux.HandleFunc("/v1/memory/compact", g.requireAuth(g.handleMemoryCompact))
+	// Memory (/v1/memory/*) is now mounted as a Pack Runtime backend module
+	// (internal/packs/memory), so toggling yunque.pack.memory enables/disables it
+	// at runtime. Handler implementations still live on the gateway during this
+	// bridge phase (see HandleMemoryPack). Registering them here too would panic
+	// the mux on duplicate patterns. Graph / identity / embeddings / search keep
+	// their own gateway routes below.
 
-	// Persona & Editable Memory
-	g.mux.HandleFunc("/v1/memory/persona", g.requireAuth(g.handleMemoryPersonaGet))
-	g.mux.HandleFunc("/v1/memory/update", g.requireAuth(g.handleMemoryPersonaUpdate))
-
-	// Knowledge Graph
-	g.mux.HandleFunc("/v1/graph/entities", g.requireAuth(g.handleGraphEntities))
-	g.mux.HandleFunc("/v1/graph/relations", g.requireAuth(g.handleGraphRelations))
-	g.mux.HandleFunc("/v1/graph/context", g.requireAuth(g.handleGraphContext))
-	g.mux.HandleFunc("/v1/graph/stats", g.requireAuth(g.handleGraphStats))
+	// Knowledge Graph (/v1/graph/{entities,relations,context,stats}) is owned by
+	// the graph pack (internal/packs/graph), mounted via gw.RegisterModule in
+	// cmd/agent/init_task_engine.go. The graph CRUD/context/stats logic lives in
+	// that pack natively (reading the memory pipeline's graph); the gateway no
+	// longer hosts these routes.
 
 	// Identity
 	g.mux.HandleFunc("/v1/identity/resolve", g.requireAuth(g.handleIdentityResolve))
@@ -133,22 +127,15 @@ func (g *Gateway) registerKnowledgeRoutes() {
 // ──────────────────────────────────────────────
 
 func (g *Gateway) registerPluginRoutes() {
-	// Plugin CRUD
-	g.mux.HandleFunc("/v1/plugins", g.requireAuth(g.handlePlugins))
-	g.mux.HandleFunc("/v1/plugins/toggle", g.requireAuth(g.handlePluginToggle))
-	g.mux.HandleFunc("/v1/plugins/create", g.requireAuth(g.handlePluginCreate))
-	g.mux.HandleFunc("/v1/plugins/delete", g.requireAuth(g.handlePluginDelete))
-	g.mux.HandleFunc("/v1/plugins/files", g.requireAuth(g.handlePluginFiles))
-	g.mux.HandleFunc("/v1/plugins/ui", g.requireAuth(g.handlePluginUI))
-	g.mux.HandleFunc("/v1/plugins/reload", g.requireAuth(g.handlePluginReload))
-	g.mux.HandleFunc("/v1/plugins/open-folder", g.requireAuth(g.handlePluginOpenFolder))
+	// Plugin CRUD routes migrated to the control-plane pack
+	// (internal/packs/controlplane). SkillHub / market keep their own routes below.
 
-	// Skills
-	g.mux.HandleFunc("/v1/skills", g.requireAuth(g.handleSkills))
-	g.mux.HandleFunc("/v1/skills/scan", g.requireAuth(g.handleSkillsScan))
-	g.mux.HandleFunc("/v1/skills/dynamic", g.requireAuth(g.handleSkillsDynamicGet))
-	g.mux.HandleFunc("/v1/skills/approve", g.requireAuth(g.handleSkillsDynamicApprove))
-	g.mux.HandleFunc("/v1/skills/reject", g.requireAuth(g.handleSkillsDynamicReject))
+	// Skills (/v1/skills/*) are now mounted as a Pack Runtime backend module
+	// (internal/packs/skills), so toggling yunque.pack.skills enables/disables
+	// the skill-management surface at runtime. Handler implementations still live
+	// on the gateway during this bridge phase (see HandleSkillsPack). Registering
+	// them here too would panic the mux on duplicate patterns. SkillHub and the
+	// skill market below keep their own gateway routes for now.
 
 	// Skill Market
 	g.mux.HandleFunc("/v1/market/search", g.requireAuth(g.handleMarketSearch))
@@ -177,29 +164,17 @@ func (g *Gateway) registerPluginRoutes() {
 // ──────────────────────────────────────────────
 
 func (g *Gateway) registerTriggerRoutes() {
-	// Triggers (legacy)
-	g.mux.HandleFunc("/v1/triggers", g.requireAuth(g.handleTriggers))
-	g.mux.HandleFunc("/v1/triggers/emit", g.requireAuth(g.handleTriggerEmit))
+	// Trigger routes (/v1/triggers and /v1/triggers/v2*) are owned by the triggers
+	// pack (internal/packs/triggers), mounted via gw.RegisterModule in
+	// cmd/agent/init_task_engine.go.
 
-	// Triggers v2 (unified)
-	g.mux.HandleFunc("/v1/triggers/v2", g.requireAuth(g.handleTriggersV2))
-	g.mux.HandleFunc("/v1/triggers/v2/emit", g.requireAuth(g.handleTriggersV2Emit))
-	g.mux.HandleFunc("/v1/triggers/v2/runs", g.requireAuth(g.handleTriggersV2Runs))
-	g.mux.HandleFunc("/v1/triggers/v2/events", g.requireAuth(g.handleTriggersV2Events))
-
-	// Cron
-	g.mux.HandleFunc("/v1/cron/list", g.requireAuth(g.handleCronList))
-	g.mux.HandleFunc("/v1/cron/add", g.requireAuth(g.handleCronAdd))
-	g.mux.HandleFunc("/v1/cron/remove", g.requireAuth(g.handleCronRemove))
-	g.mux.HandleFunc("/v1/cron/run", g.requireAuth(g.handleCronRun))
+	// Cron routes (/v1/cron/*) are owned by the cron pack (internal/packs/cron),
+	// mounted via gw.RegisterModule in cmd/agent/init_task_engine.go.
 
 	// Scheduler routes moved to schedulerapi sub-package
 
-	// Tools (process execution)
-	g.mux.HandleFunc("/v1/tools/exec", g.requireAuth(g.handleToolExec))
-	g.mux.HandleFunc("/v1/tools/list", g.requireAuth(g.handleToolList))
-	g.mux.HandleFunc("/v1/tools/poll", g.requireAuth(g.handleToolPoll))
-	g.mux.HandleFunc("/v1/tools/kill", g.requireAuth(g.handleToolKill))
+	// Tools (process execution) migrated to the control-plane pack
+	// (internal/packs/controlplane). Sandbox routes below stay admin-gated here.
 
 	// Sandbox (admin-only — arbitrary command execution)
 	g.mux.HandleFunc("/v1/sandbox/exec", g.requireAuth(g.requireAdmin(g.handleSandboxExec)))
@@ -208,10 +183,10 @@ func (g *Gateway) registerTriggerRoutes() {
 	g.mux.HandleFunc("/v1/sandbox/desktop/status", g.requireAuth(g.handleDesktopStatus))
 	g.mux.HandleFunc("/v1/sandbox/desktop/destroy", g.requireAuth(g.handleDesktopDestroy))
 
-	// Agent output files
-	g.mux.HandleFunc("/api/files", g.requireAuth(g.handleFileList))
-	g.mux.HandleFunc("/api/files/preview", g.requireAuth(g.handleFilePreview))
-	g.mux.HandleFunc("/api/files/download", g.requireAuth(g.handleFileDownload))
+	// Agent output files (/api/files, /api/files/preview, /api/files/download)
+	// are owned by the files pack (internal/packs/files), mounted via
+	// gw.RegisterModule in cmd/agent/init_task_engine.go. The handler logic lives
+	// in that pack natively; the gateway no longer hosts these routes.
 }
 
 // ──────────────────────────────────────────────
@@ -219,35 +194,12 @@ func (g *Gateway) registerTriggerRoutes() {
 // ──────────────────────────────────────────────
 
 func (g *Gateway) registerGovernanceRoutes() {
-	// Audit
-	g.mux.HandleFunc("/v1/audit/tail", g.requireAuth(g.handleAuditTail))
-	g.mux.HandleFunc("/v1/audit/verify", g.requireAuth(g.handleAuditVerify))
-	g.mux.HandleFunc("/v1/audit/stats", g.requireAuth(g.handleAuditStats))
-	g.mux.HandleFunc("/api/audit/trail", g.requireAuth(g.handleAuditTrail))
-
-	// Trust
-	g.mux.HandleFunc("/api/trust/scores", g.requireAuth(g.handleTrustScores))
-	g.mux.HandleFunc("/api/trust/reset", g.requireAuth(g.handleTrustReset))
-	g.mux.HandleFunc("/api/trust/grant", g.requireAuth(g.handleTrustGrant))
-
-	// Iterate (self-improvement)
-	g.mux.HandleFunc("/api/iterate/proposals", g.requireAuth(g.handleIterateProposals))
-	g.mux.HandleFunc("/api/iterate/approve", g.requireAuth(g.handleIterateApprove))
-	g.mux.HandleFunc("/api/iterate/reject", g.requireAuth(g.handleIterateReject))
-	g.mux.HandleFunc("/api/iterate/trigger", g.requireAuth(g.handleIterateTrigger))
-	g.mux.HandleFunc("/api/iterate/status", g.requireAuth(g.handleIterateStatus))
-
-	// Review
-	g.mux.HandleFunc("/api/review/status", g.requireAuth(g.handleReviewStatus))
-
-	// Skill Grow
-	g.mux.HandleFunc("/api/skillgrow/patterns", g.requireAuth(g.handleSkillGrowPatterns))
-
-	// Cost routes moved to costapi sub-package
-
-	// Usage / Quota
-	g.mux.HandleFunc("/v1/usage", g.requireAuth(g.handleUsage))
-	g.mux.HandleFunc("/v1/quota", g.requireAuth(g.handleSetQuota))
+	// Governance routes (audit / trust / iterate / review / skillgrow / usage)
+	// migrated to the control-plane pack (internal/packs/controlplane), mounted
+	// via gw.RegisterBackendPack(controlplanepack.NewHandler(gw)) in
+	// cmd/agent/init_task_engine.go. Handlers stay on the gateway
+	// (HandleControlPlanePack) during this bridge phase. Cost routes live in the
+	// costapi sub-package.
 }
 
 // ──────────────────────────────────────────────
@@ -255,23 +207,14 @@ func (g *Gateway) registerGovernanceRoutes() {
 // ──────────────────────────────────────────────
 
 func (g *Gateway) registerProviderRoutes() {
-	g.mux.HandleFunc("/v1/models", g.requireAuth(g.handleModels))
-	g.mux.HandleFunc("/api/providers", g.requireAuth(g.handleProviderList))
-	g.mux.HandleFunc("/api/providers/test", g.requireAuth(g.handleProviderTest))
-	g.mux.HandleFunc("/api/providers/enable", g.requireAuth(g.handleProviderEnable))
-	g.mux.HandleFunc("/api/providers/disable", g.requireAuth(g.handleProviderDisable))
-	g.mux.HandleFunc("/api/providers/switch-model", g.requireAuth(g.handleProviderSwitchModel))
-	g.mux.HandleFunc("/api/providers/session", g.requireAuth(g.handleProviderSessionOverride))
-	g.mux.HandleFunc("/api/providers/local/discover", g.requireAuth(g.handleLocalDiscover))
-	g.mux.HandleFunc("/api/providers/local/register", g.requireAuth(g.handleLocalRegister))
+	// Most provider/model routes (requireAuth) migrated to the control-plane pack
+	// (internal/packs/controlplane); handlers stay on the gateway
+	// (HandleControlPlanePack) during this bridge phase. The setup-flow routes
+	// below stay direct because they are requireSetupOrAuth and must remain
+	// reachable during onboarding without depending on the pack-enabled gate.
 	g.mux.HandleFunc("/api/providers/mode", g.requireSetupOrAuth(g.handleProviderMode))
 	g.mux.HandleFunc("/api/providers/presets", g.requireSetupOrAuth(g.handleProviderPresets))
 	g.mux.HandleFunc("/api/providers/register", g.requireSetupOrAuth(g.handleProviderRegister))
-	g.mux.HandleFunc("/api/providers/delete", g.requireAuth(g.handleProviderDelete))
-	g.mux.HandleFunc("/api/providers/tori/discover", g.requireAuth(g.handleToriDiscover))
-	g.mux.HandleFunc("/v1/router/stats", g.requireAuth(g.handleRouterStats))
-	g.mux.HandleFunc("/api/breaker/reset", g.requireAuth(g.handleBreakerReset))
-	g.mux.HandleFunc("/api/providers/exec", g.requireAuth(g.handleExecProvider))
 }
 
 // ──────────────────────────────────────────────
@@ -279,13 +222,13 @@ func (g *Gateway) registerProviderRoutes() {
 // ──────────────────────────────────────────────
 
 func (g *Gateway) registerReverieRoutes() {
-	g.mux.HandleFunc("/v1/reverie/journal", g.requireAuth(g.handleReverieJournal))
-	g.mux.HandleFunc("/v1/reverie/stats", g.requireAuth(g.handleReverieStats))
-	g.mux.HandleFunc("/v1/reverie/config", g.requireAuth(g.handleReverieConfig))
-	g.mux.HandleFunc("/v1/reverie/think", g.requireAuth(g.handleReverieThink))
-	g.mux.HandleFunc("/v1/reverie/thought", g.requireAuth(g.handleReverieDeleteThought))
-	g.mux.HandleFunc("/v1/reverie/targets", g.requireAuth(g.handleReverieTargets))
-	g.mux.HandleFunc("/v1/reverie/actions", g.requireAuth(g.handleReverieActions))
+	// The reverie inner-monologue surface (/v1/reverie/{journal,stats,config,
+	// think,thought,targets,actions}) is owned by the reverie pack
+	// (internal/packs/reverie), mounted via gw.RegisterModule in
+	// cmd/agent/init_task_engine.go. Only the two routes below stay on the
+	// gateway: dream/status is observability, and the cognitive-layer switch is
+	// admin-gated (pack routes only run through requireAuth, not requireAdmin).
+
 	// Offline dream loop + self-evolution status (read-only observability).
 	g.mux.HandleFunc("/v1/reverie/dream/status", g.requireAuth(g.handleDreamStatus))
 	// Cognitive-layer master switch — runtime hot-toggle (admin-only). GET reads
@@ -306,11 +249,9 @@ func (g *Gateway) registerRBACRoutes() {
 }
 
 func (g *Gateway) registerApprovalRoutes() {
-	g.mux.HandleFunc("/v1/approvals", g.requireAuth(g.handleApprovalRouteSwitch))
-	g.mux.HandleFunc("/v1/approvals/approve", g.requireAuth(g.handleApprovalApprove))
-	g.mux.HandleFunc("/v1/approvals/deny", g.requireAuth(g.handleApprovalDeny))
-	g.mux.HandleFunc("/v1/approvals/decide", g.requireAuth(g.handleApprovalDecide))
-	g.mux.HandleFunc("/v1/approvals/rules", g.requireAuth(g.handleApprovalRules))
+	// Approval (human-in-the-loop) routes migrated to the control-plane pack
+	// (internal/packs/controlplane); handlers stay on the gateway
+	// (HandleControlPlanePack) during this bridge phase.
 }
 
 func (g *Gateway) registerSetupRoutes() {
@@ -351,20 +292,12 @@ func (g *Gateway) registerBrowserRoutes() {
 // Connector and Notify routes are registered via sub-packages
 // (connectorapi, notifyapi) in gateway.go routes().
 
-func (g *Gateway) registerIDERoutes() {
-	g.mux.HandleFunc("/v1/ide/review", g.requireAuth(g.handleIDEReviewCode))
-	g.mux.HandleFunc("/v1/ide/status", g.requireAuth(g.handleIDEStatus))
-}
+// IDE routes (/v1/ide/*) are owned by the IDE pack (internal/packs/ide),
+// mounted via gw.RegisterModule in cmd/agent/init_task_engine.go.
 
-// ──────────────────────────────────────────────
-// Persona Modes
-// ──────────────────────────────────────────────
-
-func (g *Gateway) registerModesRoutes() {
-	g.mux.HandleFunc("/v1/persona/modes", g.requireAuth(g.handleListModes))
-	g.mux.HandleFunc("/v1/persona/mode", g.requireAuth(g.handleSetMode))
-	g.mux.HandleFunc("/v1/persona/mode/current", g.requireAuth(g.handleCurrentMode))
-}
+// Persona-mode routes (/v1/persona/mode*) are now owned by the persona-modes
+// pack (internal/packs/modes), mounted via gw.RegisterModule in
+// cmd/agent/init_task_engine.go. The gateway only exposes ModeManager().
 
 // Workflow routes moved to workflowapi sub-package.
 

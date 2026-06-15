@@ -518,7 +518,8 @@ func (m *cogniModule) Init(ctx context.Context, app *agentrt.App) error {
 			gw.SetNLConfigTranslator(nlTranslator)
 			cogniPackHandler := cognikernelpack.NewHandlerWithRuntimeState(gw, m)
 			gw.SetCogniKernelRuntimeStateHandler(cogniPackHandler.HandleRuntimePackState)
-			gw.RegisterBackendPack(cogniPackHandler)
+			// Cogni Kernel migrated to the v2 Module lifecycle (Tier 0 microkernel).
+			_ = gw.RegisterModule(cogniPackHandler)
 		}
 	}
 

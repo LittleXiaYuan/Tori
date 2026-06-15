@@ -148,6 +148,9 @@ func TestRuntimeStrategyServiceClassifyRequestAppliesDecision(t *testing.T) {
 	if result.Request.ModelOverride != "fast" {
 		t.Fatalf("expected fast model override for greeting, got %q", result.Request.ModelOverride)
 	}
+	if result.Request.IntentHint != "chat" {
+		t.Fatalf("expected intent hint to be carried on the request, got %q", result.Request.IntentHint)
+	}
 	if !result.ToolFree {
 		t.Fatal("expected greeting classification to use tool-free path")
 	}

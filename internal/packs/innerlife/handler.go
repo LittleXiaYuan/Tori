@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"sync/atomic"
 	"time"
 
 	"yunque-agent/internal/cognicore/curiosity"
@@ -30,6 +31,8 @@ type Handler struct {
 	ledger    *ledger.Ledger
 	curiosity *curiosity.Module
 	tenantID  string
+	host      packruntime.Host
+	started   atomic.Bool
 }
 
 // New creates an Inner Life pack handler.
@@ -43,6 +46,33 @@ func New(cfg Config) *Handler {
 
 // PackID returns the stable manifest id.
 func (h *Handler) PackID() string { return PackID }
+
+// compile-time assertion: Inner Life is a v2 capability Module (Tier 0 microkernel).
+var _ packruntime.Module = (*Handler)(nil)
+
+// Init wires the pack against the kernel Host. Inner Life takes its data
+// dependencies via Config, so Host is retained only for kernel services
+// (logging today); no concrete gateway type is referenced.
+func (h *Handler) Init(host packruntime.Host) error {
+	h.host = host
+	return nil
+}
+
+// Start marks the pack live on enable. Inner Life has no background workers, so
+// this only flips the running flag and logs via the kernel logger when present.
+func (h *Handler) Start(ctx context.Context) error {
+	h.started.Store(true)
+	if h.host != nil {
+		h.host.Logger().Info("inner-life pack started", "pack", PackID)
+	}
+	return nil
+}
+
+// Stop marks the pack stopped on disable.
+func (h *Handler) Stop(ctx context.Context) error {
+	h.started.Store(false)
+	return nil
+}
 
 // Routes exposes the read-only inner-life endpoints.
 func (h *Handler) Routes() []packruntime.BackendRoute {

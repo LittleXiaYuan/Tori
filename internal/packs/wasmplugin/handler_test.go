@@ -72,8 +72,8 @@ func TestWASMPluginHandlerRoutesExposePackShellSurface(t *testing.T) {
 		t.Fatalf("PackID = %q, want %q", h.PackID(), PackID)
 	}
 	routes := h.Routes()
-	if len(routes) != 17 {
-		t.Fatalf("expected 17 WASM plugin routes, got %d", len(routes))
+	if len(routes) != 18 {
+		t.Fatalf("expected 18 WASM plugin routes, got %d", len(routes))
 	}
 	byPath := map[string][]string{}
 	for _, route := range routes {
@@ -103,6 +103,7 @@ func TestWASMPluginHandlerRoutesExposePackShellSurface(t *testing.T) {
 		"/v1/wasm-plugin/remote-install/signature-verification/writeback": {http.MethodPost},
 		"/v1/wasm-plugin/remote-install/package/inspect/writeback":        {http.MethodPost},
 		"/v1/wasm-plugin/remote-install/installer/registration/plan":      {http.MethodPost},
+		"/v1/wasm-plugin/remote-install/execute":                          {http.MethodPost},
 		"/v1/wasm-plugin/evidence/":                                       {http.MethodGet},
 	}
 	for path, methods := range expected {

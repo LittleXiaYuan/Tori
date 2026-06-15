@@ -112,8 +112,30 @@
       root.style.colorScheme = theme.mode === "light" ? "light" : "dark";
     }
 
+    // Auto-exercise the bridge after handshake so the demo proves the whole
+    // chain (backend.call / storage / SSE-over-bridge) without any clicks —
+    // the buttons above stay for manual re-runs.
+    async function autorun(info) {
+      const out = { handshake: info };
+      log(out);
+      try { out.ping = await call("backend.call", { method: "POST", path: "/v1/dlc-demo/ping", body: { hello: "dlc" } }); }
+      catch (err) { out.ping = "failed: " + err.message; }
+      log(out);
+      try {
+        await call("storage.set", { key: "theme", value: "dark" });
+        out.storage = await call("storage.get", { key: "theme" });
+      } catch (err) { out.storage = "failed: " + err.message; }
+      log(out);
+      try {
+        const r = await call("events.subscribe", { path: "/v1/events/stream" });
+        setSub(r.sub_id);
+        eventLog("subscribed: " + r.sub_id + " (waiting for events…)");
+      } catch (err) { eventLog("subscribe failed: " + err.message); }
+      reportHeight();
+    }
+
     call("host.handshake", {})
-      .then((info) => { applyTheme(info?.theme); log({ handshake: info }); reportHeight(); })
+      .then((info) => { applyTheme(info?.theme); autorun(info); })
       .catch((err) => log("handshake failed: " + err.message));
   </script>
 </body>

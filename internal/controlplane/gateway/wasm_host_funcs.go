@@ -29,6 +29,9 @@ const (
 	// (ledger_get / ledger_set), namespaced per pack + tenant.
 	PermLedgerRead  = "ledger:read"
 	PermLedgerWrite = "ledger:write"
+	// PermLLMCall lets a pack invoke the host LLM via the llm_chat host function
+	// (ABI v2). Cost-bearing, so it is permission-gated like the others.
+	PermLLMCall = "llm:call"
 )
 
 // wasmHostFetchMaxResponse caps the response bytes a module can receive from
@@ -90,7 +93,37 @@ func (g *Gateway) buildWasmHostFuncs(packID string, permissions []string) []sand
 			Fn:      g.hostLedgerSet(packID),
 		})
 	}
+	if perms[PermLLMCall] && g.llmCall != nil {
+		funcs = append(funcs, sandbox.ModuleHostFunc{
+			Name:    "llm_chat",
+			Params:  4,
+			Results: 1,
+			Fn:      g.hostLLMChat,
+		})
+	}
 	return funcs
+}
+
+// hostLLMChat implements env.llm_chat: invoke the host LLM (ABI v2, gated by
+// llm:call). Request JSON {"system","user"}; response JSON {"reply"} or {"error"}.
+func (g *Gateway) hostLLMChat(ctx context.Context, m api.Module, stack []uint64) {
+	wasmHostIO(m, stack, func(req []byte) any {
+		var q struct {
+			System string `json:"system"`
+			User   string `json:"user"`
+		}
+		if err := json.Unmarshal(req, &q); err != nil || strings.TrimSpace(q.User) == "" {
+			return map[string]any{"error": "llm_chat: invalid request (need user)"}
+		}
+		if g.llmCall == nil {
+			return map[string]any{"error": "llm_chat: llm not configured"}
+		}
+		reply, err := g.llmCall(ctx, q.System, q.User)
+		if err != nil {
+			return map[string]any{"error": err.Error()}
+		}
+		return map[string]any{"reply": reply}
+	})
 }
 
 // wasmHostIO standardizes the read-request / write-response buffer dance shared

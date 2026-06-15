@@ -3,6 +3,7 @@ package gateway
 import (
 	"log/slog"
 	"net/http"
+	"os"
 	"strings"
 
 	"yunque-agent/internal/execution/sandbox"
@@ -44,6 +45,14 @@ func (g *Gateway) dynamicDispatch(next http.Handler) http.Handler {
 func (g *Gateway) mountWasmPack(pack packruntime.InstalledPack, installedDir string) {
 	rt := pack.Manifest.Backend.Runtime
 	if rt == nil || rt.Type != packruntime.RuntimeTypeWasm {
+		return
+	}
+	// Fail closed on an ABI the host cannot run (see pack-wasm-abi.md), so a
+	// downloaded pack built for an unsupported ABI never mounts.
+	if !rt.ABICompatible() {
+		slog.Warn("wasm pack ABI not supported by host; skipping mount",
+			"pack", pack.Manifest.ID, "pack_abi", rt.ABIVersion,
+			"host_abi", packruntime.CurrentABIVersion, "min_abi", packruntime.MinABIVersion)
 		return
 	}
 	packID := pack.Manifest.ID
@@ -101,7 +110,11 @@ func (g *Gateway) unmountPack(packID string) {
 // wasmSandbox lazily builds the shared sandbox used by all wasm pack routes.
 func (g *Gateway) wasmSandbox() *sandbox.WasmSandbox {
 	g.wasmSandboxOnce.Do(func() {
-		g.wasmSandboxInstance = sandbox.NewWasmSandbox(sandbox.DefaultWasmConfig())
+		cfg := sandbox.DefaultWasmConfig()
+		// Opt-in on-disk compilation cache so downloaded yqpack modules survive
+		// restarts without recompiling (production cold-start perf).
+		cfg.CompileCacheDir = strings.TrimSpace(os.Getenv("WASM_COMPILE_CACHE_DIR"))
+		g.wasmSandboxInstance = sandbox.NewWasmSandbox(cfg)
 	})
 	return g.wasmSandboxInstance
 }
@@ -127,7 +140,13 @@ func (g *Gateway) wireWasmPacks() {
 
 	for _, pack := range g.packRegistry.List() {
 		if pack.Manifest.Backend.IsWasm() {
-			g.mountWasmPack(pack, g.packRegistry.InstalledDir(pack.Manifest.ID, pack.Manifest.Version))
+			dir := g.packRegistry.InstalledDir(pack.Manifest.ID, pack.Manifest.Version)
+			g.mountWasmPack(pack, dir)
+			// Agent tools are only registered for enabled packs (routes stay
+			// mounted regardless, gated to 404 while disabled).
+			if pack.Status == packruntime.PackStatusEnabled {
+				g.registerWasmPackTools(pack, dir)
+			}
 		}
 	}
 	g.packRegistry.OnChange(func(ev packruntime.ChangeEvent) {
@@ -139,12 +158,19 @@ func (g *Gateway) wireWasmPacks() {
 		// returns 404 while disabled, mirroring static first-party packs. We
 		// (re)mount on install/update/rollback so route changes take effect,
 		// and on enable as a safety net for manifest-only installs that later
-		// get their module extracted.
+		// get their module extracted. Agent tools (toolSpecs) follow enablement:
+		// registered when enabled, removed on disable.
 		switch ev.Reason {
 		case packruntime.ChangeReasonInstall, packruntime.ChangeReasonUpdate, packruntime.ChangeReasonEnable, packruntime.ChangeReasonRollback:
-			g.mountWasmPack(ev.Pack, g.packRegistry.InstalledDir(packID, ev.Pack.Manifest.Version))
+			dir := g.packRegistry.InstalledDir(packID, ev.Pack.Manifest.Version)
+			g.mountWasmPack(ev.Pack, dir)
+			g.unregisterWasmPackTools(ev.Pack)
+			if ev.Pack.Status == packruntime.PackStatusEnabled {
+				g.registerWasmPackTools(ev.Pack, dir)
+			}
 		case packruntime.ChangeReasonDisable:
-			// Keep routes mounted; the gate handles the disabled state.
+			// Keep routes mounted (gate 404s); remove the pack's agent tools.
+			g.unregisterWasmPackTools(ev.Pack)
 		}
 	})
 }

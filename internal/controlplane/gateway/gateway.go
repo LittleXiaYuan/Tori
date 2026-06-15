@@ -344,6 +344,9 @@ type Gateway struct {
 	wasmWired           bool
 	wasmSandboxOnce     sync.Once
 	wasmSandboxInstance *sandbox.WasmSandbox
+	// kernelLifecycleOnce guards the single OnChange subscription that drives
+	// v2 Module Start/Stop on pack enable/disable (Tier 0 microkernel, Phase 1).
+	kernelLifecycleOnce sync.Once
 	// packTrustRoot resolves publisher keys when installing signed .yqpacks.
 	// nil means signed packs fail closed (only unsigned dev packs install).
 	packTrustRoot packruntime.PublicKeyResolver
@@ -581,6 +584,12 @@ func (g *Gateway) SetOutputDir(dir string) {
 	g.outputDir = dir
 }
 
+// OutputDir exposes the configured agent output directory to capability packs
+// (e.g. internal/packs/files), which own the /api/files* surface natively. It
+// is the narrow host accessor that replaces those packs reaching into the
+// gateway struct. Empty means not configured.
+func (g *Gateway) OutputDir() string { return g.outputDir }
+
 // checkWSOrigin validates WebSocket upgrade origins against allowedOrigins
 // and localhost addresses. Used by all WS endpoints except browser extension
 // which has its own origin checker (allowBrowserWSOrigin).
@@ -724,8 +733,6 @@ func (g *Gateway) routes() {
 	g.registerSSERoutes()          // SSE event stream
 	g.registerTraceRoutes()        // execution trace / audit API
 	g.registerBrowserRoutes()      // browser engine management
-	g.registerIDERoutes()          // IDE supervisor plugin (review, status)
-	g.registerModesRoutes()        // persona mode management (/v1/persona/modes, mode, mode/current)
 	g.registerMCPDispatchRoutes()  // MCP dispatch server for external workers
 	g.registerProjectRoutes()      // project management (orchestrator)
 	g.registerOrchestratorRoutes() // orchestrator daemon control
@@ -743,12 +750,15 @@ func (g *Gateway) routes() {
 		},
 	}).RegisterRoutes(g.mux, g.requireAuth)
 
+	// Workflow handler is created here but its /v1/workflows* routes are mounted
+	// by the work pack (internal/packs/work) so workflow lives in the task
+	// platform rather than as a detached sub-package. Late-binding setters
+	// (SetWorkflowStore/Engine/LLMCall) keep updating this same instance.
 	g.workflowAPIHandler = &workflowapi.Handler{
 		Store:   g.workflowStore,
 		Engine:  g.workflowEngine,
 		LLMCall: g.llmCall,
 	}
-	g.workflowAPIHandler.RegisterRoutes(g.mux, g.requireAuth)
 
 	(&schedulerapi.Handler{
 		Scheduler: g.scheduler,

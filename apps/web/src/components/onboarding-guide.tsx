@@ -10,7 +10,6 @@ import { useOnboarding, markOnboardingComplete, type OnboardingPhase } from "@/h
 import { useI18n } from "@/lib/i18n";
 import { formatErrorMessage } from "@/lib/error-utils";
 import { ONBOARDING_SCENARIOS, scenarioChatHref } from "@/lib/product-scenarios";
-import { writeProfileMode } from "@/lib/profile-mode";
 
 function WelcomeAuroraMark() {
   return (

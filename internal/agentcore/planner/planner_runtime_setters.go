@@ -72,6 +72,14 @@ func (p *Planner) SetStrategyContext(fn func() string) {
 	contextAssembly.SetStrategyContext(fn)
 }
 
+// SetPackContext attaches a source that injects context from enabled capability
+// packs into the prompt (Tier 0 microkernel: pack enablement flows into the
+// agent's reasoning, not just its HTTP routes).
+func (p *Planner) SetPackContext(fn func(ctx context.Context, tenantID, query string) string) {
+	contextAssembly := p.ensureContextAssembly()
+	contextAssembly.SetPackContext(fn)
+}
+
 // SetStrategyContextFor attaches a query-aware reflection strategy provider.
 // The legacy SetStrategyContext callback remains as a fallback for callers that
 // cannot cheaply scope strategy context to the current user message.

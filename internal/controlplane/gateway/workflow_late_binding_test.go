@@ -8,10 +8,15 @@ import (
 	"testing"
 
 	"yunque-agent/internal/agentcore/workflow"
+	workpack "yunque-agent/internal/packs/work"
+	"yunque-agent/pkg/packruntime"
 )
 
 func TestWorkflowRoutesUseLateBoundStore(t *testing.T) {
-	gw, tm := newTestGateway()
+	// Workflow is now owned by the work pack (task platform), so use a gateway
+	// with the work pack registered. Late binding still flows through the shared
+	// workflowapi handler instance.
+	gw, tm := newTestGatewayWithMigrationPack(t, workpack.PackID, packruntime.PackStatusEnabled)
 	tenant := tm.Register("workflow-late-binding")
 
 	store := workflow.NewJSONStore(t.TempDir())

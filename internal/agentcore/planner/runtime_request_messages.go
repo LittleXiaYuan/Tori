@@ -35,6 +35,7 @@ func (p *Planner) BuildMessages(ctx context.Context, req PlanRequest) ([]llm.Mes
 			Channel:     req.ChannelType,
 			TaskContext: req.TaskContext,
 			EmotionHint: req.EmotionHint,
+			IntentHint:  req.IntentHint,
 		}, NewPromptBuilder(p))
 	}
 	if workspaceContext := buildWorkspaceContextMessage(req.WorkspacePaths); workspaceContext != "" {

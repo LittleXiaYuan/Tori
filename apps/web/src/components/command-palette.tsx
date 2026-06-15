@@ -3,13 +3,12 @@
 import { useRouter } from "next/navigation";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
-  Puzzle, Search, FileText, ArrowRight, Sparkles, Layers,
+  Puzzle, Search, FileText, ArrowRight, Sparkles,
 } from "lucide-react";
 import { api, SearchResult } from "@/lib/api";
-import { NAV_ITEMS, NAV_GROUP_ORDER, NAV_GROUP_LABEL_KEYS, navItemLabel, filterNavItemsByProfile, type NavItem, type NavGroup } from "@/lib/nav-items";
+import { NAV_ITEMS, NAV_GROUP_ORDER, NAV_GROUP_LABEL_KEYS, navItemLabel, filterNavItemsByEnabledPacks, DEFAULT_ENABLED_PACK_IDS, type NavItem, type NavGroup } from "@/lib/nav-items";
 import { useI18n } from "@/lib/i18n";
 import { buildPackNavItems, fetchEnabledPacks } from "@/lib/pack-sync";
-import { PROFILE_MODE_KEY, readProfileMode, writeProfileMode } from "@/lib/profile-mode";
 
 interface CommandItem {
   id: string;
@@ -37,7 +36,7 @@ export default function CommandPalette() {
   const [searching, setSearching] = useState(false);
   const [extItems, setExtItems] = useState<NavItem[]>([]);
   const [packItems, setPackItems] = useState<NavItem[]>([]);
-  const [profileMode, setProfileMode] = useState(readProfileMode);
+  const [enabledPackIds, setEnabledPackIds] = useState<Set<string>>(() => new Set(DEFAULT_ENABLED_PACK_IDS));
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<NodeJS.Timeout | undefined>(undefined);
@@ -66,6 +65,7 @@ export default function CommandPalette() {
   useEffect(() => {
     fetchEnabledPacks()
       .then((packs) => {
+        setEnabledPackIds(new Set(packs.map((p) => p.manifest.id)));
         setPackItems(buildPackNavItems(packs).map((item) => ({
           id: `pack-${item.packId}-${item.href}`,
           href: item.href,
@@ -77,15 +77,10 @@ export default function CommandPalette() {
           keywords: item.keywords,
         })));
       })
-      .catch(() => setPackItems([]));
-  }, []);
-
-  useEffect(() => {
-    const handleProfileModeChange = (event: StorageEvent) => {
-      if (event.key === PROFILE_MODE_KEY) setProfileMode(readProfileMode());
-    };
-    window.addEventListener("storage", handleProfileModeChange);
-    return () => window.removeEventListener("storage", handleProfileModeChange);
+      .catch(() => {
+        setEnabledPackIds(new Set());
+        setPackItems([]);
+      });
   }, []);
 
   const close = useCallback(() => {
@@ -139,25 +134,11 @@ export default function CommandPalette() {
   }, [query]);
 
   const visibleNavItems = useMemo(
-    () => filterNavItemsByProfile([...NAV_ITEMS, ...packItems, ...extItems], profileMode),
-    [extItems, packItems, profileMode],
+    () => filterNavItemsByEnabledPacks([...NAV_ITEMS, ...packItems, ...extItems], enabledPackIds),
+    [extItems, packItems, enabledPackIds],
   );
 
   const navCommands: CommandItem[] = useMemo(() => {
-    const isEasy = profileMode === "easy";
-    const profileCmd: CommandItem = {
-      id: "profile-toggle",
-      label: isEasy ? "切换到完整模式" : "切换到轻松模式",
-      group: "操作",
-      icon: isEasy ? <Layers size={16} /> : <Sparkles size={16} />,
-      keywords: "easy full simple profile mode 简洁 轻松 完整 专家 switch toggle",
-      action: () => {
-        const next = isEasy ? "full" : "easy";
-        writeProfileMode(next);
-        window.location.reload();
-        close();
-      },
-    };
     const onboardingCmd: CommandItem = {
       id: "open-onboarding",
       label: "新手引导",
@@ -170,7 +151,6 @@ export default function CommandPalette() {
       },
     };
     return [
-      profileCmd,
       onboardingCmd,
       ...visibleNavItems.map((item) => ({
         ...item,
@@ -180,7 +160,7 @@ export default function CommandPalette() {
         },
       })),
     ];
-  }, [profileMode, router, close, visibleNavItems]);
+  }, [router, close, visibleNavItems]);
 
   const q = query.toLowerCase();
   const filteredNav = q

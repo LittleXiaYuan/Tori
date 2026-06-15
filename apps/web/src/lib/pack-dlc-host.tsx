@@ -9,6 +9,7 @@ import { resolvePackUIOrigin } from "@/lib/pack-ui-origin";
 import { useI18n } from "@/lib/i18n";
 import {
   BRIDGE_VERSION,
+  createBridgeRateLimiter,
   dispatchBridgeRequest,
   makeBackendCallHandler,
   makeNavHandler,
@@ -17,6 +18,7 @@ import {
   type AllowedRoute,
   type BridgeEnvelope,
   type BridgeMethodHandler,
+  type BridgeViolation,
 } from "@/lib/pack-bridge";
 
 export interface PackDlcHostProps {
@@ -39,6 +41,20 @@ export interface PackDlcHostProps {
 export function packBundleUrl(packId: string, entry?: string): string {
   const file = (entry || "index.html").replace(/^\/+/, "");
   return `/v1/packs/${encodeURIComponent(packId)}/ui/${file}`;
+}
+
+/** Caps how many bridge violations one mount reports to the audit trail, so a
+ *  hostile bundle cannot turn the reporter itself into a write-amplifier. */
+const MaxViolationReports = 50;
+
+/** reportBridgeViolation files one refused bridge request into the backend
+ *  audit chain (spec §7.3). Fire-and-forget: auditing must never break the UI. */
+function reportBridgeViolation(packId: string, v: BridgeViolation): void {
+  void fetch(`${BASE}/v1/packs/${encodeURIComponent(packId)}/bridge-violation`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+    body: JSON.stringify({ method: v.method, code: v.code, message: v.message }),
+  }).catch(() => {});
 }
 
 /**
@@ -137,11 +153,20 @@ export function PackDlcHost({ packId, entry, title, allowedRoutes, allowedNavPat
       ...eventSubs.handlers(),
     };
 
+    // Per-mount inbound limiter + capped violation reporting (spec §7.3).
+    const rateLimit = createBridgeRateLimiter();
+    let violationReports = 0;
+    const onViolation = (v: BridgeViolation) => {
+      if (violationReports >= MaxViolationReports) return;
+      violationReports++;
+      reportBridgeViolation(packId, v);
+    };
+
     const onMessage = (event: MessageEvent) => {
       // Source-identity check (opaque origin → event.origin is "null").
       if (!iframeRef.current || event.source !== iframeRef.current.contentWindow) return;
       void dispatchBridgeRequest(
-        { packId, post, handlers: { ...defaultHandlers, ...(extraRef.current || {}) } },
+        { packId, post, handlers: { ...defaultHandlers, ...(extraRef.current || {}) }, rateLimit, onViolation },
         event.data,
       );
     };

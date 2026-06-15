@@ -41,7 +41,22 @@ import (
 	"yunque-agent/internal/observe"
 	experiencepack "yunque-agent/internal/packs/experience"
 	innerlifepack "yunque-agent/internal/packs/innerlife"
+	controlplanepack "yunque-agent/internal/packs/controlplane"
 	knowledgepack "yunque-agent/internal/packs/knowledge"
+	memorypack "yunque-agent/internal/packs/memory"
+	cronpack "yunque-agent/internal/packs/cron"
+	documentspack "yunque-agent/internal/packs/documents"
+	emotionpack "yunque-agent/internal/packs/emotion"
+	filespack "yunque-agent/internal/packs/files"
+	graphpack "yunque-agent/internal/packs/graph"
+	instructionspack "yunque-agent/internal/packs/instructions"
+	idepack "yunque-agent/internal/packs/ide"
+	missionspack "yunque-agent/internal/packs/missions"
+	modespack "yunque-agent/internal/packs/modes"
+	reveriepack "yunque-agent/internal/packs/reverie"
+	triggerspack "yunque-agent/internal/packs/triggers"
+	skillspack "yunque-agent/internal/packs/skills"
+	workpack "yunque-agent/internal/packs/work"
 	microagentpack "yunque-agent/internal/packs/microagent"
 	nightschoolpack "yunque-agent/internal/packs/nightschool"
 	worldmodelpack "yunque-agent/internal/packs/worldmodel"
@@ -129,12 +144,72 @@ func initTaskEngine(
 		skillLifecycle: skillLifecycleRaw.(*selfheal.Lifecycle),
 	})
 
-	// Knowledge (RAG) pack — bridge migration: the pack owns the /v1/knowledge/*
-	// route registration + enablement gate; handler implementations still live on
-	// the gateway (HandleKnowledgePack) during this phase.
-	gw.RegisterBackendPack(knowledgepack.NewHandler(gw))
+	// Knowledge (RAG) pack — the read surface (search/sources/stats) is filled in
+	// (served natively by the pack via the knowledge store); write/ingest/import
+	// stay on the gateway bridge (HandleKnowledgePack) for now.
+	_ = gw.RegisterModule(knowledgepack.NewHandlerWithStore(gw, gw.KnowledgeStore()))
 
-	// Inner Life pack — exposes the soul-layer outputs (curiosity / reflection /
+	// Memory pack — read surface (stats/search) filled in (served natively via
+	// the memory manager); the orchestrator/pipeline-dependent routes stay on the
+	// gateway bridge (HandleMemoryPack) for now.
+	// Memory pack: native stats/search/add/compact via the shared NewWired path
+	// (de-shelled from the gateway). add (short/mid/long) + compact are wired here.
+	_ = gw.RegisterModule(memorypack.NewWired(gw, gw.MemoryManager(), gw.MemoryPipeline(), gw.TenantOf))
+
+	// Skills pack — the listing surface (/v1/skills) is filled in (served natively
+	// via the registry + metrics); scan/dynamic/approve/reject stay on the gateway
+	// bridge (HandleSkillsPack). SkillHub / market keep their own gateway routes.
+	skillsPack := skillspack.NewHandlerWithService(gw, gw.SkillsRegistry(), gw.Metrics())
+	// De-shelled approve/reject persist via the same path the gateway used.
+	skillsPack.SetDynamicSave(func() error {
+		return task.SaveDynamicSkills(gw.SkillsRegistry(), "data/dynamic_skills.json")
+	})
+	_ = gw.RegisterModule(skillsPack)
+
+	// Work pack — bridge migration (group 4): owns the task (/v1/tasks/*) +
+	// project (/v1/projects/*) surfaces; implementations stay on the gateway
+	// (HandleWorkPack) for now. Workflows remain in the workflowapi sub-package.
+	_ = gw.RegisterModule(workpack.NewHandler(gw))
+
+	// Control-plane pack — bridge migration (group 6, governance slice): owns the
+	// audit / trust / iterate / review / skillgrow / usage surfaces; handlers stay
+	// on the gateway (HandleControlPlanePack) for now. Shipped default-enabled (an
+	// always-on core governance surface) so audit/trust stay available out of box.
+	_ = gw.RegisterModule(controlplanepack.NewHandler(gw))
+
+	// Persona-modes pack — owns /v1/persona/mode* natively (de-shelled from the
+	// gateway monolith). Resolves the mode manager lazily, so order is moot.
+	_ = gw.RegisterModule(modespack.New(gw))
+	// Reverie pack — owns /v1/reverie/* natively (de-shelled from the monolith).
+	_ = gw.RegisterModule(reveriepack.New(gw))
+	// IDE pack — owns /v1/ide/* natively (de-shelled from the monolith).
+	_ = gw.RegisterModule(idepack.New(gw))
+	// Cron pack — owns /v1/cron/* natively (split out of the triggers grab-bag).
+	_ = gw.RegisterModule(cronpack.New(gw))
+	// Triggers pack — owns /v1/triggers* natively (split out of the grab-bag).
+	_ = gw.RegisterModule(triggerspack.New(gw))
+	// Documents pack — owns /v1/documents* natively (split out of the grab-bag).
+	_ = gw.RegisterModule(documentspack.New(gw))
+	// Missions pack — owns /v1/missions* natively (split out of the grab-bag).
+	_ = gw.RegisterModule(missionspack.New(gw))
+	// Files pack — owns /api/files* (list/preview/download) natively, the last
+	// non-admin slice split out of the triggers grab-bag. Reads the output dir
+	// via the narrow OutputDir() host accessor.
+	_ = gw.RegisterModule(filespack.New(gw))
+	// Instructions pack — owns /v1/instructions* natively (de-shelled from the
+	// chat-routes grab-bag). Reads the store via the narrow InstructionStore()
+	// host accessor; tenant is resolved from request context.
+	_ = gw.RegisterModule(instructionspack.New(gw))
+	// Emotion pack — owns /v1/emotion/{stickers,history} natively (de-shelled
+	// from the chat-routes grab-bag). Reads the sticker map + history via narrow
+	// host accessors.
+	_ = gw.RegisterModule(emotionpack.New(gw))
+	// Graph pack — owns /v1/graph/{entities,relations,context,stats} natively
+	// (de-shelled from the memory-routes grab-bag). Reads the knowledge graph via
+	// the existing MemoryPipeline() host accessor.
+	_ = gw.RegisterModule(graphpack.New(gw))
+
+		// Inner Life pack — exposes the soul-layer outputs (curiosity / reflection /
 	// dreaming) over a read-only HTTP surface. Registered here because the
 	// curiosity module is built by initSoulLayer.
 	if app.Ledger != nil {
@@ -142,7 +217,11 @@ func initTaskEngine(
 		if cm, ok := app.Get("curiosity"); ok {
 			curiosityMod, _ = cm.(*curiosity.Module)
 		}
-		gw.RegisterBackendPack(innerlifepack.New(innerlifepack.Config{
+		// Inner Life is migrated to the v2 Module lifecycle (Tier 0 microkernel):
+		// RegisterModule runs Init(host) + Start, and wires enable/disable →
+		// Start/Stop through the pack registry. Falls back gracefully if Init/Start
+		// fail (routes still mounted, retryable by toggling the pack).
+		_ = gw.RegisterModule(innerlifepack.New(innerlifepack.Config{
 			Ledger:    app.Ledger,
 			Curiosity: curiosityMod,
 		}))
@@ -156,7 +235,8 @@ func initTaskEngine(
 		if ts, ok := app.Get("trait_store"); ok {
 			traitStore, _ = ts.(*trait.Store)
 		}
-		gw.RegisterBackendPack(nightschoolpack.New(nightschoolpack.Config{
+		// Night School migrated to the v2 Module lifecycle (Tier 0 microkernel).
+		_ = gw.RegisterModule(nightschoolpack.New(nightschoolpack.Config{
 			Ledger:     app.Ledger,
 			TraitStore: traitStore,
 		}))
@@ -173,7 +253,8 @@ func initTaskEngine(
 		if ev, ok := app.Get("evaluator"); ok {
 			evaluator, _ = ev.(*eval.Evaluator)
 		}
-		gw.RegisterBackendPack(experiencepack.New(experiencepack.Config{
+		// Experience migrated to the v2 Module lifecycle (Tier 0 microkernel).
+		_ = gw.RegisterModule(experiencepack.New(experiencepack.Config{
 			Ledger:    app.Ledger,
 			Recommend: recEngine,
 			Evaluator: evaluator,
@@ -191,7 +272,8 @@ func initTaskEngine(
 		if ce, ok := app.Get("causal_engine"); ok {
 			causalEngine, _ = ce.(*causal.CausalEngine)
 		}
-		gw.RegisterBackendPack(worldmodelpack.New(worldmodelpack.Config{
+		// World Model migrated to the v2 Module lifecycle (Tier 0 microkernel).
+		_ = gw.RegisterModule(worldmodelpack.New(worldmodelpack.Config{
 			WorldModel: worldModel,
 			Causal:     causalEngine,
 		}))
@@ -205,7 +287,8 @@ func initTaskEngine(
 		if mr, ok := app.Get("microagent_registry"); ok {
 			maRegistry, _ = mr.(*microagent.Registry)
 		}
-		gw.RegisterBackendPack(microagentpack.New(microagentpack.Config{
+		// Micro-Agent migrated to the v2 Module lifecycle (Tier 0 microkernel).
+		_ = gw.RegisterModule(microagentpack.New(microagentpack.Config{
 			Registry: maRegistry,
 			Ledger:   app.Ledger,
 		}))

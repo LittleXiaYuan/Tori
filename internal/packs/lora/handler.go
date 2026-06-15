@@ -1,7 +1,9 @@
 package lora
 
 import (
+	"context"
 	"net/http"
+	"sync/atomic"
 
 	"yunque-agent/internal/agentcore/localbrain"
 	"yunque-agent/internal/controlplane/gateway/loraapi"
@@ -14,7 +16,9 @@ const PackID = "yunque.pack.lora"
 // The implementation delegates to the existing LoRA API handler, but Gateway
 // mounting, enablement and method gates are now owned by Pack Runtime.
 type Handler struct {
-	api *loraapi.Handler
+	api     *loraapi.Handler
+	host    packruntime.Host
+	started atomic.Bool
 }
 
 type Options struct {
@@ -34,6 +38,30 @@ func NewHandler(opts Options) *Handler {
 }
 
 func (h *Handler) PackID() string { return PackID }
+
+// compile-time assertion: LoRA is a v2 capability Module (Tier 0 microkernel).
+var _ packruntime.Module = (*Handler)(nil)
+
+// Init wires the pack against the kernel Host. Dependencies arrive via Options.
+func (h *Handler) Init(host packruntime.Host) error {
+	h.host = host
+	return nil
+}
+
+// Start marks the pack live on enable.
+func (h *Handler) Start(ctx context.Context) error {
+	h.started.Store(true)
+	if h.host != nil {
+		h.host.Logger().Info("lora pack started", "pack", PackID)
+	}
+	return nil
+}
+
+// Stop marks the pack stopped on disable.
+func (h *Handler) Stop(ctx context.Context) error {
+	h.started.Store(false)
+	return nil
+}
 
 func (h *Handler) Routes() []packruntime.BackendRoute {
 	return []packruntime.BackendRoute{

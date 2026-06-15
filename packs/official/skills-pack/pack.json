@@ -1,0 +1,47 @@
+{
+  "id": "yunque.pack.skills",
+  "name": "Skills (技能管理)",
+  "version": "0.1.0",
+  "description": "技能管理面：技能列表、扫描、动态技能审核。默认预装的核心能力，可在能力包中心关闭。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": [
+      "skills.manage",
+      "skills.analytics"
+    ],
+    "routes": [
+      "/v1/skills",
+      "/v1/skills/scan",
+      "/v1/skills/dynamic",
+      "/v1/skills/approve",
+      "/v1/skills/reject"
+    ],
+    "permissions": [
+      "skills:read",
+      "skills:write"
+    ]
+  },
+  "frontend": {
+    "menus": [
+      { "key": "skills", "label": "技能", "path": "/skills", "icon": "wand", "order": 130 },
+      { "key": "skill-policy", "label": "技能策略", "path": "/skill-policy", "icon": "scale", "order": 131 },
+      { "key": "skill-analytics", "label": "技能分析", "path": "/skill-analytics", "icon": "bar-chart", "order": 132 }
+    ],
+    "assets": {
+      "type": "builtin"
+    }
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "group": "skills",
+    "phase": "A2",
+    "preload": "true",
+    "note": "Bridge migration (group 3): owns the core /v1/skills/* surface; handler impls still live on the gateway (HandleSkillsPack). SkillHub (/api/skillhub/*) and market (/v1/market/*) ownership TBD. Default-preloaded like memory so the skills UI works out-of-box; nav stays static during this phase."
+  },
+  "status": "beta"
+}

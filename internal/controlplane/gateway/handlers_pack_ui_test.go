@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"yunque-agent/internal/agentcore/audit"
 	"yunque-agent/pkg/packruntime"
 )
 
@@ -121,6 +122,55 @@ func TestPackUIAssetNonBundle404(t *testing.T) {
 	w := doRequest(gw, http.MethodGet, "/v1/packs/"+uiTestPackID+"/ui/", "", "")
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("inline pack should 404 on /ui, got %d", w.Code)
+	}
+}
+
+// Bridge violations reported by the shell land in the tamper-evident audit
+// chain with the pack as actor (spec §7.3).
+func TestPackBridgeViolationAuditsToChain(t *testing.T) {
+	gw, _, apiKey := stageUIPackWithKey(t, packruntime.FrontendAssetsTypeIframeBundle)
+	chain, err := audit.NewChain(audit.ChainConfig{})
+	if err != nil {
+		t.Fatalf("NewChain: %v", err)
+	}
+	gw.SetAuditChain(chain)
+
+	w := doRequest(gw, http.MethodPost, "/v1/packs/"+uiTestPackID+"/bridge-violation", apiKey,
+		`{"method":"backend.call","code":"forbidden","message":"route not permitted: POST /v1/admin/wipe"}`)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
+	}
+
+	recs := chain.Search(audit.EventAuth, "pack:"+uiTestPackID, 10)
+	if len(recs) != 1 {
+		t.Fatalf("expected 1 audit record, got %d", len(recs))
+	}
+	rec := recs[0]
+	if rec.Action != "bridge_violation" {
+		t.Fatalf("action = %q", rec.Action)
+	}
+	for _, want := range []string{"code=forbidden", "method=backend.call", "/v1/admin/wipe"} {
+		if !strings.Contains(rec.Detail, want) {
+			t.Fatalf("detail %q missing %q", rec.Detail, want)
+		}
+	}
+}
+
+func TestPackBridgeViolationRequiresAuth(t *testing.T) {
+	gw, _ := stageUIPack(t, packruntime.FrontendAssetsTypeIframeBundle)
+	w := doRequest(gw, http.MethodPost, "/v1/packs/"+uiTestPackID+"/bridge-violation", "",
+		`{"method":"backend.call","code":"forbidden","message":"x"}`)
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("unauthenticated report should 401, got %d", w.Code)
+	}
+}
+
+func TestPackBridgeViolationUnknownPack404(t *testing.T) {
+	gw, _, apiKey := stageUIPackWithKey(t, packruntime.FrontendAssetsTypeIframeBundle)
+	w := doRequest(gw, http.MethodPost, "/v1/packs/yunque.pack.ghost/bridge-violation", apiKey,
+		`{"method":"backend.call","code":"forbidden","message":"x"}`)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("unknown pack should 404, got %d", w.Code)
 	}
 }
 

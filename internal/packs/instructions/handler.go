@@ -1,24 +1,103 @@
-package gateway
+// Package instructionspack mounts the user-instruction surface
+// (/v1/instructions, /v1/instructions/reorder) as a v2 capability pack (Tier 0
+// microkernel). It is a native pack: the CRUD + reorder logic lives here and
+// talks to the instruction store through a narrow host accessor — the gateway
+// no longer hosts these routes.
+package instructionspack
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
+	"sync/atomic"
 
 	"yunque-agent/internal/agentcore/instruction"
 	"yunque-agent/internal/apperror"
+	"yunque-agent/internal/controlplane/gateway/gwshared"
+	"yunque-agent/pkg/packruntime"
 )
 
-func (g *Gateway) handleInstructions(w http.ResponseWriter, r *http.Request) {
-	if g.instructionStore == nil {
+// PackID is the stable manifest id.
+const PackID = "yunque.pack.instructions"
+
+// Gateway is the narrow host surface the instructions pack needs: a handle to
+// the instruction store, resolved per request so registration order does not
+// matter.
+type Gateway interface {
+	InstructionStore() *instruction.Store
+}
+
+// Handler is the instructions pack backend module.
+type Handler struct {
+	gw      Gateway
+	host    packruntime.Host
+	started atomic.Bool
+}
+
+// New builds the instructions pack backed by the host's instruction store.
+func New(gw Gateway) *Handler { return &Handler{gw: gw} }
+
+// compile-time assertion: this is a valid v2 Module.
+var _ packruntime.Module = (*Handler)(nil)
+
+func (h *Handler) PackID() string { return PackID }
+
+// Init wires the pack against the kernel Host.
+func (h *Handler) Init(host packruntime.Host) error {
+	h.host = host
+	return nil
+}
+
+// Start marks the pack live on enable.
+func (h *Handler) Start(ctx context.Context) error {
+	h.started.Store(true)
+	if h.host != nil {
+		h.host.Logger().Info("instructions pack started", "pack", PackID)
+	}
+	return nil
+}
+
+// Stop marks the pack stopped on disable.
+func (h *Handler) Stop(ctx context.Context) error {
+	h.started.Store(false)
+	return nil
+}
+
+// Routes mounts the user-instruction surface natively.
+func (h *Handler) Routes() []packruntime.BackendRoute {
+	return []packruntime.BackendRoute{
+		{
+			Methods: []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete},
+			Path:    "/v1/instructions",
+			Handler: h.handleInstructions,
+		},
+		{
+			Methods: []string{http.MethodPost},
+			Path:    "/v1/instructions/reorder",
+			Handler: h.handleReorder,
+		},
+	}
+}
+
+func (h *Handler) store() *instruction.Store {
+	if h.gw == nil {
+		return nil
+	}
+	return h.gw.InstructionStore()
+}
+
+func (h *Handler) handleInstructions(w http.ResponseWriter, r *http.Request) {
+	store := h.store()
+	if store == nil {
 		apperror.WriteCode(w, apperror.CodeNotFound, "instruction store not configured")
 		return
 	}
 	ctx := r.Context()
-	tenantID := tenantFromCtx(ctx)
+	tenantID := gwshared.TenantFromCtx(ctx)
 
 	switch r.Method {
 	case http.MethodGet:
-		list, err := g.instructionStore.List(ctx, tenantID)
+		list, err := store.List(ctx, tenantID)
 		if err != nil {
 			apperror.WriteCode(w, apperror.CodeInternal, err.Error())
 			return
@@ -44,7 +123,7 @@ func (g *Gateway) handleInstructions(w http.ResponseWriter, r *http.Request) {
 			apperror.WriteCode(w, apperror.CodeBadRequest, "invalid JSON body")
 			return
 		}
-		created, err := g.instructionStore.Create(ctx, tenantID, req)
+		created, err := store.Create(ctx, tenantID, req)
 		if err != nil {
 			apperror.WriteCode(w, apperror.CodeBadRequest, err.Error())
 			return
@@ -63,7 +142,7 @@ func (g *Gateway) handleInstructions(w http.ResponseWriter, r *http.Request) {
 			apperror.WriteCode(w, apperror.CodeBadRequest, "instruction_id is required")
 			return
 		}
-		if err := g.instructionStore.Update(ctx, tenantID, req); err != nil {
+		if err := store.Update(ctx, tenantID, req); err != nil {
 			apperror.WriteCode(w, apperror.CodeNotFound, err.Error())
 			return
 		}
@@ -76,7 +155,7 @@ func (g *Gateway) handleInstructions(w http.ResponseWriter, r *http.Request) {
 			apperror.WriteCode(w, apperror.CodeBadRequest, "id query parameter required")
 			return
 		}
-		if err := g.instructionStore.Delete(ctx, tenantID, id); err != nil {
+		if err := store.Delete(ctx, tenantID, id); err != nil {
 			apperror.WriteCode(w, apperror.CodeNotFound, err.Error())
 			return
 		}
@@ -88,8 +167,9 @@ func (g *Gateway) handleInstructions(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (g *Gateway) handleInstructionsReorder(w http.ResponseWriter, r *http.Request) {
-	if g.instructionStore == nil {
+func (h *Handler) handleReorder(w http.ResponseWriter, r *http.Request) {
+	store := h.store()
+	if store == nil {
 		apperror.WriteCode(w, apperror.CodeNotFound, "instruction store not configured")
 		return
 	}
@@ -98,7 +178,7 @@ func (g *Gateway) handleInstructionsReorder(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	ctx := r.Context()
-	tenantID := tenantFromCtx(ctx)
+	tenantID := gwshared.TenantFromCtx(ctx)
 
 	var req struct {
 		IDs []string `json:"ids"`
@@ -111,7 +191,7 @@ func (g *Gateway) handleInstructionsReorder(w http.ResponseWriter, r *http.Reque
 		apperror.WriteCode(w, apperror.CodeBadRequest, "ids array cannot be empty")
 		return
 	}
-	if err := g.instructionStore.Reorder(ctx, tenantID, req.IDs); err != nil {
+	if err := store.Reorder(ctx, tenantID, req.IDs); err != nil {
 		apperror.WriteCode(w, apperror.CodeInternal, err.Error())
 		return
 	}

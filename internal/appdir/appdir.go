@@ -3,6 +3,7 @@ package appdir
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 )
 
@@ -16,6 +17,10 @@ var (
 // Resolution order:
 //  1. YUNQUE_DATA_DIR environment variable (explicit override)
 //  2. ./data next to the executable
+//  3. ./data under the current working directory when the executable lives in
+//     a `go run` build cache (Temp go-buildNNN dir) — anchoring data next to a
+//     throwaway binary would scatter state into a different Temp dir on every
+//     run and silently "lose" it
 //
 // The directory is created if it doesn't exist.
 func DataDir() string {
@@ -48,10 +53,24 @@ func resolve() string {
 	}
 
 	exe, err := os.Executable()
-	if err != nil {
+	if err != nil || isGoRunBinary(exe) {
 		return filepath.Join(".", "data")
 	}
 	return filepath.Join(filepath.Dir(exe), "data")
+}
+
+// isGoRunBinary reports whether the executable was produced by `go run`, whose
+// binaries land in a per-build cache dir like
+// %TEMP%\go-build123456789\b001\exe\agent.exe (or $GOTMPDIR/go-build…). Data
+// must not be anchored there: the path changes on every build and the OS may
+// purge it at any time.
+func isGoRunBinary(exe string) bool {
+	for _, seg := range strings.Split(filepath.ToSlash(exe), "/") {
+		if strings.HasPrefix(seg, "go-build") {
+			return true
+		}
+	}
+	return false
 }
 
 // LegacyDataDir returns the old data directory path (./data relative to exe).

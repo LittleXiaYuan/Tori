@@ -34,6 +34,15 @@ type Config struct {
 	Sandbox        WasmExecutor
 	PackageFetcher PackageFetcher
 	Now            func() time.Time
+	// RemoteInstallEnforce gates the remote-install executor (Appendix B of
+	// doc/MICROKERNEL-PACK-BLUEPRINT.md). Default false = the executor never
+	// installs (fail closed); only an operator explicitly enabling it AND all
+	// verification gates passing allow a downloaded package to be installed.
+	RemoteInstallEnforce bool
+	// InstallFromCache installs a verified, cached .yqpack from disk. It MUST
+	// re-verify integrity + signature itself (the host wires it to
+	// Registry.InstallFromYqpack). nil = installer not wired (executor blocks).
+	InstallFromCache func(ctx context.Context, cachePath string) error
 }
 
 // WasmExecutor is the narrow sandbox contract used by the pack shell.
@@ -47,11 +56,13 @@ type PackageFetcher func(ctx context.Context, packageURL string) ([]byte, error)
 
 // Handler owns WASM plugin pack routes and local metadata storage.
 type Handler struct {
-	pluginDir      string
-	dataDir        string
-	sandbox        WasmExecutor
-	packageFetcher PackageFetcher
-	now            func() time.Time
+	pluginDir            string
+	dataDir              string
+	sandbox              WasmExecutor
+	packageFetcher       PackageFetcher
+	now                  func() time.Time
+	remoteInstallEnforce bool
+	installFromCache     func(ctx context.Context, cachePath string) error
 }
 
 type PluginPermissionPolicy struct {
@@ -1242,10 +1253,124 @@ func New(cfg Config) *Handler {
 	if packageFetcher == nil {
 		packageFetcher = fetchPackageBytes
 	}
-	return &Handler{pluginDir: pluginDir, dataDir: dataDir, sandbox: exec, packageFetcher: packageFetcher, now: now}
+	return &Handler{
+		pluginDir:            pluginDir,
+		dataDir:              dataDir,
+		sandbox:              exec,
+		packageFetcher:       packageFetcher,
+		now:                  now,
+		remoteInstallEnforce: cfg.RemoteInstallEnforce,
+		installFromCache:     cfg.InstallFromCache,
+	}
 }
 
 func DefaultHandler() *Handler { return New(Config{}) }
+
+// SetInstallFromCache injects the trusted installer after construction. Used by
+// the host when the pack registry / trust root are wired only after the Gateway
+// exists (the closure resolves them lazily at request time). nil keeps the
+// remote-install executor inert.
+func (h *Handler) SetInstallFromCache(fn func(ctx context.Context, cachePath string) error) {
+	h.installFromCache = fn
+}
+
+// RemoteInstallExecuteRequest selects which pack's verified+approved records to
+// install (Appendix B remote-install executor).
+type RemoteInstallExecuteRequest struct {
+	PackID     string `json:"pack_id"`
+	RequestKey string `json:"request_key,omitempty"`
+}
+
+// RemoteInstallExecute is the fail-closed remote-install executor. It NEVER
+// installs unless every gate passes: an approved approval-queue record exists, a
+// cached downloaded package exists, enforcement is explicitly enabled, and a
+// trusted installer is wired. Integrity + signature are re-verified inside the
+// wired installer (Registry.InstallFromYqpack), not trusted from writeback
+// records. Default config (enforce=false, installer nil) makes this inert.
+func (h *Handler) RemoteInstallExecute(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "POST only")
+		return
+	}
+	var req RemoteInstallExecuteRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid remote install execute payload")
+		return
+	}
+	packID := strings.TrimSpace(req.PackID)
+	if packID == "" {
+		writeError(w, http.StatusBadRequest, "pack_id is required")
+		return
+	}
+
+	approved := false
+	if recs, err := h.loadApprovalQueueRecords(); err == nil {
+		for _, rec := range recs {
+			if rec.PackID != packID {
+				continue
+			}
+			if req.RequestKey != "" && rec.RequestKey != req.RequestKey {
+				continue
+			}
+			if strings.EqualFold(strings.TrimSpace(rec.Decision), "approved") {
+				approved = true
+				break
+			}
+		}
+	}
+
+	cachePath := ""
+	if recs, err := h.loadInstallerDownloadRecords(); err == nil {
+		for _, rec := range recs {
+			if rec.PackID == packID && strings.TrimSpace(rec.CachePath) != "" {
+				cachePath = strings.TrimSpace(rec.CachePath)
+			}
+		}
+	}
+
+	resp := map[string]any{
+		"pack_id":              packID,
+		"enforce":              h.remoteInstallEnforce,
+		"approved":             approved,
+		"download_cached":      cachePath != "",
+		"remote_install_ready": false,
+	}
+	writeBlocked := func(reason string) {
+		resp["blocked_reason"] = reason
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(resp)
+	}
+
+	// Fail-closed gates — any miss blocks, never installs.
+	if !approved {
+		writeBlocked("no approved approval-queue record for this pack")
+		return
+	}
+	if cachePath == "" {
+		writeBlocked("no cached downloaded package for this pack")
+		return
+	}
+	if !h.remoteInstallEnforce {
+		writeBlocked("remote install enforcement disabled (RemoteInstallEnforce=false)")
+		return
+	}
+	if h.installFromCache == nil {
+		writeBlocked("installer not wired")
+		return
+	}
+
+	// Execute: the wired installer re-verifies SHA-256 + Ed25519 signature and
+	// extracts/registers atomically. Any failure leaves nothing installed.
+	if err := h.installFromCache(r.Context(), cachePath); err != nil {
+		writeBlocked("install rejected: " + err.Error())
+		return
+	}
+	resp["remote_install_ready"] = true
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(resp)
+}
 
 func (h *Handler) PackID() string { return PackID }
 
@@ -1267,6 +1392,7 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 		{Method: http.MethodPost, Path: "/v1/wasm-plugin/remote-install/signature-verification/writeback", Handler: h.RemoteInstallSignatureVerificationWriteback},
 		{Method: http.MethodPost, Path: "/v1/wasm-plugin/remote-install/package/inspect/writeback", Handler: h.RemoteInstallPackageInspectWriteback},
 		{Method: http.MethodPost, Path: "/v1/wasm-plugin/remote-install/installer/registration/plan", Handler: h.RemoteInstallInstallerRegistrationPlan},
+		{Method: http.MethodPost, Path: "/v1/wasm-plugin/remote-install/execute", Handler: h.RemoteInstallExecute},
 		{Method: http.MethodGet, Path: "/v1/wasm-plugin/evidence/", Handler: h.Evidence},
 	}
 }

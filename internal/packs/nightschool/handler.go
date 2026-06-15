@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"yunque-agent/internal/cognicore/trait"
@@ -32,6 +33,8 @@ type Handler struct {
 	ledger     *ledger.Ledger
 	traitStore *trait.Store
 	tenantID   string
+	host       packruntime.Host
+	started    atomic.Bool
 }
 
 // New creates a Night School pack handler.
@@ -45,6 +48,31 @@ func New(cfg Config) *Handler {
 
 // PackID returns the stable manifest id.
 func (h *Handler) PackID() string { return PackID }
+
+// compile-time assertion: Night School is a v2 capability Module (Tier 0 microkernel).
+var _ packruntime.Module = (*Handler)(nil)
+
+// Init wires the pack against the kernel Host. Dependencies arrive via Config,
+// so Host is retained only for kernel services (logging today).
+func (h *Handler) Init(host packruntime.Host) error {
+	h.host = host
+	return nil
+}
+
+// Start marks the pack live on enable (no background workers — read-only views).
+func (h *Handler) Start(ctx context.Context) error {
+	h.started.Store(true)
+	if h.host != nil {
+		h.host.Logger().Info("night-school pack started", "pack", PackID)
+	}
+	return nil
+}
+
+// Stop marks the pack stopped on disable.
+func (h *Handler) Stop(ctx context.Context) error {
+	h.started.Store(false)
+	return nil
+}
 
 // Routes exposes the read-only night-school endpoints.
 func (h *Handler) Routes() []packruntime.BackendRoute {

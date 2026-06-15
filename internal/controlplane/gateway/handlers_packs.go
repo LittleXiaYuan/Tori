@@ -103,6 +103,8 @@ func (g *Gateway) registerPackRoutes() {
 	g.mux.HandleFunc("GET /v1/packs/{id}/ui", g.handlePackUIAsset)
 	g.mux.HandleFunc("GET /v1/packs/{id}/ui/{path...}", g.handlePackUIAsset)
 	g.mux.HandleFunc("/v1/packs/ui-origin", g.requireAuth(g.handlePackUIOrigin))
+	// Bridge-violation audit sink (spec §7.3) — reported by the authed shell.
+	g.mux.HandleFunc("POST /v1/packs/{id}/bridge-violation", g.requireAuth(g.handlePackBridgeViolation))
 	g.registerBuiltinBackendPacks()
 }
 

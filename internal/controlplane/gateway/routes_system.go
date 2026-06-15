@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"time"
 
-	"yunque-agent/internal/apperror"
 	"yunque-agent/internal/desktop"
 	"yunque-agent/internal/sbom"
 	"yunque-agent/internal/version"
@@ -104,24 +103,9 @@ func (g *Gateway) registerSystemRoutes() {
 		}
 	}))
 
-	// System info & metrics
-	g.mux.HandleFunc("/v1/system/info", g.requireAuth(g.handleSystemInfo))
-	g.mux.HandleFunc("/v1/system/stats", g.requireAuth(g.handleSystemStats))
-	g.mux.HandleFunc("/v1/metrics", g.requireAuth(g.handleMetrics))
-	g.mux.HandleFunc("/v1/metrics/prometheus", g.requireAuth(g.handleMetricsPrometheus))
-	g.mux.HandleFunc("/v1/cache/stats", g.requireAuth(g.handleCacheStats))
-
-	// Tenants
-	g.mux.HandleFunc("/v1/tenants", g.requireAuth(func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case http.MethodPost:
-			g.handleCreateTenant(w, r)
-		case http.MethodGet:
-			g.handleListTenants(w, r)
-		default:
-			apperror.WriteCode(w, apperror.CodeMethodNotAllow, "method not allowed")
-		}
-	}))
+	// System info / metrics / cache stats and tenants migrated to the
+	// control-plane pack (internal/packs/controlplane); handlers stay on the
+	// gateway (HandleControlPlanePack) during this bridge phase.
 
 	// Settings (env config management + setup check)
 	g.mux.HandleFunc("/api/settings/schema", g.requireAuth(g.handleSettingsSchema))

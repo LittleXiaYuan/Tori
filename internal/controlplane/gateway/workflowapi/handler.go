@@ -22,13 +22,32 @@ type Handler struct {
 	mu sync.RWMutex
 }
 
-// RegisterRoutes mounts all /v1/workflows/* endpoints.
+// RegisterRoutes mounts all /v1/workflows/* endpoints. Retained for callers that
+// own a raw mux (e.g. workflowapi's own tests); the gateway now mounts these
+// through the work pack via RouteSpecs so workflow lives in the task platform.
 func (h *Handler) RegisterRoutes(mux *http.ServeMux, auth gwshared.AuthFunc) {
-	mux.HandleFunc("/v1/workflows", auth(h.handleRouteSwitch))
-	mux.HandleFunc("/v1/workflows/generate", auth(h.handleGenerate))
-	mux.HandleFunc("/v1/workflows/run", auth(h.handleRun))
-	mux.HandleFunc("/v1/workflows/instances", auth(h.handleInstances))
-	mux.HandleFunc("/v1/workflows/cancel", auth(h.handleCancel))
+	for _, rt := range h.RouteSpecs() {
+		mux.HandleFunc(rt.Path, auth(rt.Handler))
+	}
+}
+
+// Route is one workflow HTTP endpoint (path + handler), used to embed the
+// workflow surface into the work pack (internal/packs/work) instead of mounting
+// it as a detached gateway sub-package.
+type Route struct {
+	Path    string
+	Handler http.HandlerFunc
+}
+
+// RouteSpecs returns the workflow endpoints so another pack/mux can own them.
+func (h *Handler) RouteSpecs() []Route {
+	return []Route{
+		{Path: "/v1/workflows", Handler: h.handleRouteSwitch},
+		{Path: "/v1/workflows/generate", Handler: h.handleGenerate},
+		{Path: "/v1/workflows/run", Handler: h.handleRun},
+		{Path: "/v1/workflows/instances", Handler: h.handleInstances},
+		{Path: "/v1/workflows/cancel", Handler: h.handleCancel},
+	}
 }
 
 // SetStore updates the backing workflow store after the handler has already

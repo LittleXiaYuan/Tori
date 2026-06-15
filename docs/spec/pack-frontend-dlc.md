@@ -196,11 +196,14 @@ iframe 创建约束：
 
 关键安全点：**token 永不过桥**。`backend.call` 在宿主侧（同源、持 token）补 `Authorization`/`X-API-Key` 后转发，响应体回传 iframe。Pack 只表达「我要调用我声明过的这个路由」。
 
-### 7.3 校验与健壮性
+### 7.3 校验与健壮性（已实现）
 
 - 宿主对每条入站消息校验：`event.source` 命中本 iframe、信封结构、`method` 在白名单、`backend.call` 的 path 命中本 Pack 路由表（复用 `manifest.AllowsRoute` 同等语义）。
-- 每个 `req` 设超时（默认 30s）；超时回 `res{error: timeout}`。
-- 未知 `method` / 越权 → `res{error: forbidden}`，并计一次审计事件（接入 `internal/observe`）。
+- `backend.call` 宿主侧超时（默认 30s，AbortController）：guest 自己的计时器放弃后，宿主的 fetch 不会继续挂着；请求体上限 256K 字符（`BackendCallMaxBodyChars`）。
+- 未知 `method` / 越权 → `res{error: forbidden}`；配额超限 → `res{error: quota_exceeded}`（`BridgeViolationError` 类型化区分，运维性失败仍回 `error`）。
+- 违规审计：宿主把每次拒绝经 `POST /v1/packs/{id}/bridge-violation`（鉴权，由持 token 的宿主上报，bundle 无法直接调用）写入 Merkle 审计链，actor=`pack:{id}`、action=`bridge_violation`，可在 `/v1/audit/tail` 查询；每次挂载上报上限 50 条，防止上报通道本身被恶意 bundle 当作写放大器。
+- 入站限流：令牌桶（突发 80、回填 20/s，`createBridgeRateLimiter`）；超限回 `res{error: rate_limited}` 并计一次违规。
+- `storage.set` 配额：每 Pack ≤64 键、键 ≤128 字符、值 ≤32K 字符（localStorage 与宿主共享 ~5MB，防恶意包塞爆宿主存储）；超限回 `quota_exceeded`。
 
 ---
 

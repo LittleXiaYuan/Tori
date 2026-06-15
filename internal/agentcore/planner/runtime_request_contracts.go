@@ -19,6 +19,7 @@ type PlanRequest struct {
 	TenantID          string
 	ModelOverride     string          // pool key (e.g. "fast","smart","expert") — EXPLICIT caller override; suppresses LocalBrain classification
 	RoutedTier        string          // pool key chosen by the gateway smart router / thinking level — AUTOMATIC routing hint; lower precedence than ModelOverride and does NOT suppress classification (so the tool-free fast path can still fire)
+	IntentHint        string          // LocalBrain intent category (chat/code/search/tool/complex), set by applyRuntimeClassification; drives retrieval skipping and adaptive context budgets
 	EmotionHint       *emotion.Result // optional emotion detected from user input (STT or text analysis)
 	TaskID            string          // if set, this request is part of a task thread
 	TaskContext       string          // pre-rendered task working memory (injected by gateway)

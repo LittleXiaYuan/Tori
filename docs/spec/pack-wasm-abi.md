@@ -78,10 +78,12 @@
 | `memory_search` | `memory:read` | `Orchestrator` | `{"query"}` → `{"context"}`（按请求 tenant 召回） |
 | `ledger_get` | `ledger:read` | Pack KV（Ledger） | `{"key"}` → `{"found","value"}` |
 | `ledger_set` | `ledger:write` | Pack KV（Ledger） | `{"key","value"}` → `{"ok","error"}` |
+| `llm_chat`（ABI v2） | `llm:call` | 宿主 LLM 管线 | `{"system","user"}` → `{"reply","error"}` |
 
 - `http_fetch`：宿主对 `url` 执行 SSRF 校验（拒绝 loopback/私网/元数据，重定向与连接期二次校验），15s 超时，响应体上限 256 KiB；传输/SSRF 失败以 `{"status":0,"error":...}` 信封返回（仍是成功写入）。
 - `memory_search`：tenant 取自请求上下文，调用宿主内存编排器的召回。
 - `ledger_*`：键被命名空间化为 `{packID}:{tenant}:{key}`，Pack 之间、Tenant 之间互不可见。
+- `llm_chat`（ABI v2 新增）：调用宿主 LLM（有 API 成本，故权限门控）。声明 `llm:call` 权限的包应同时把 `runtime.abiVersion` 设为 `2`。
 
 > 更多特权 host 函数沿用同一模式（权限门控 + provider 接线 + ptr/len 约定）按需扩展。
 
@@ -103,4 +105,18 @@ func main() {
 ```
 
 编译：`GOOS=wasip1 GOARCH=wasm go build -o module.wasm main.go`。
-TinyGo 产物体积约小一个数量级（Go 原生最小模块约 2–3 MB，冷启动数百 ms）；宿主未来会缓存 `CompiledModule` 摊销编译开销。
+TinyGo 产物体积约小一个数量级（Go 原生最小模块约 2–3 MB，冷启动数百 ms）。宿主**已缓存** `CompiledModule`（编一次复用），并可经 `WASM_COMPILE_CACHE_DIR` 环境变量将编译产物**持久化到磁盘**，跨重启免重编。
+
+---
+
+## 8. ABI 版本（abiVersion）
+
+- Manifest `backend.runtime.abiVersion` 声明模块构建时所依据的 host↔模块 ABI；`0`（缺省）按原始 v1 处理。
+- 宿主支持区间 `[MinABIVersion, CurrentABIVersion]`（当前 `MinABIVersion=1`、`CurrentABIVersion=2`；v2 新增 `llm_chat`）。**不在区间内的模块拒绝挂载**（fail closed），并跳过其工具注册——下载到为更新/更旧 ABI 构建的包时不会误执行。v1 模块在 v2 宿主上继续可用（host 函数只增不改）。
+- 兼容铁律：host 函数**只能新增，不能改签名**；扩展能力时 bump `CurrentABIVersion`，旧模块继续可用；退役旧 ABI 走 `MinABIVersion` 抬升 + deprecation 窗口。
+
+## 9. Agent 工具（toolSpecs）
+
+- Manifest `backend.toolSpecs[]`（`{name, description, entrypoint, parameters}`）声明该 WASM 包贡献的 **agent 工具**。
+- 包**启用**时，宿主为每条 spec 构建一个沙箱 `WasmSkill` 并注册进技能注册表，planner 即可调用；调用时把工具参数包成请求信封（§3）dispatch 进模块，读响应信封 body（§4）。**禁用**时移除这些工具。
+- 工具执行复用同一套权限门控 host 函数（§6）与 `runtime.sha256` 完整性校验。

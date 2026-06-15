@@ -3,6 +3,7 @@ package planner
 import (
 	"context"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"yunque-agent/internal/agentcore/llm"
@@ -153,5 +154,54 @@ func TestContextAssemblyServiceBuildDynamicContext(t *testing.T) {
 	}
 	if len(layers) == 0 {
 		t.Fatalf("expected layers from append helper")
+	}
+}
+
+// Casual-chat turns (LocalBrain IntentHint == "chat", short message) must keep
+// the memory layer but skip graph/ledger recall and code retrieval — both carry
+// network hops with near-zero relevance for small talk. Regression guard for
+// the IntentHint plumbing: without it casualChat can never fire.
+func TestBuildDynamicContextCasualChatSkipsGraphAndCode(t *testing.T) {
+	type calls struct {
+		memory, graph, code atomic.Bool
+	}
+
+	run := func(intentHint string) *calls {
+		c := &calls{}
+		service := NewContextAssemblyService()
+		service.SetMemory(func(_ context.Context, _, _ string) string {
+			c.memory.Store(true)
+			return "memory context"
+		})
+		service.SetGraphContext(func(_ string) string {
+			c.graph.Store(true)
+			return "graph context"
+		})
+		service.SetCodeContext(func(_ string) string {
+			c.code.Store(true)
+			return "code context"
+		})
+		builder := &PromptBuilder{contextAssembly: service, dynBudget: 1000}
+		service.BuildDynamicContext(context.Background(), DynamicContextAssemblyRequest{
+			LastMessage: "你好呀，今天过得怎么样", // > 6 runes (not skipRetrieval), < 24 (casual when chat)
+			TenantID:    "tenant",
+			Channel:     "web",
+			IntentHint:  intentHint,
+		}, builder)
+		return c
+	}
+
+	chat := run("chat")
+	if !chat.memory.Load() {
+		t.Fatal("casual chat must still query the memory layer")
+	}
+	if chat.graph.Load() || chat.code.Load() {
+		t.Fatalf("casual chat must skip graph/code retrieval, got graph=%v code=%v", chat.graph.Load(), chat.code.Load())
+	}
+
+	unclassified := run("")
+	if !unclassified.memory.Load() || !unclassified.graph.Load() || !unclassified.code.Load() {
+		t.Fatalf("without intent hint all retrieval layers must run, got memory=%v graph=%v code=%v",
+			unclassified.memory.Load(), unclassified.graph.Load(), unclassified.code.Load())
 	}
 }

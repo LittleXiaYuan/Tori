@@ -14,7 +14,7 @@ import (
 )
 
 func TestMetricsEndpointSanitizesRecentErrors(t *testing.T) {
-	gw, tm := newTestGateway()
+	gw, tm := newTestGatewayMigrationEnabled() // /v1/metrics is owned by the control-plane pack
 	tenant := tm.Register("metrics-friendly-errors")
 	raw := `handoff agent "general_exec" execution failed: planner fc step 1: all fallback LLM clients failed: Post "https://api.moonshot.ai/v1/chat/completions": EOF; context deadline exceeded`
 	gw.metrics.RecordRequest(10*time.Millisecond, 0, 0, errors.New(raw))
@@ -53,7 +53,7 @@ func TestSanitizeMetricsSnapshotForUserDoesNotMutateRawTracker(t *testing.T) {
 }
 
 func TestMetricsEndpointContextCancellationIsFriendly(t *testing.T) {
-	gw, tm := newTestGateway()
+	gw, tm := newTestGatewayMigrationEnabled() // /v1/metrics is owned by the control-plane pack
 	tenant := tm.Register("metrics-context-cancel")
 	gw.metrics.RecordRequest(10*time.Millisecond, 0, 0, context.DeadlineExceeded)
 

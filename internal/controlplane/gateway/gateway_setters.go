@@ -101,6 +101,15 @@ func (g *Gateway) SetPackTrustRoot(tr packruntime.PublicKeyResolver) {
 	g.packTrustRoot = tr
 }
 
+// PackRegistry exposes the Pack Runtime registry to host-side wiring (e.g. the
+// wasm-plugin pack's remote-install executor, which installs verified cached
+// .yqpacks via Registry.InstallFromYqpack). May be nil before init.
+func (g *Gateway) PackRegistry() *packruntime.Registry { return g.packRegistry }
+
+// PackTrustRoot exposes the signed-pack public-key resolver used to verify
+// .yqpack signatures at install time. May be nil (signed packs fail closed).
+func (g *Gateway) PackTrustRoot() packruntime.PublicKeyResolver { return g.packTrustRoot }
+
 // SetPackCatalogSources attaches local pack manifest directories used by the
 // read-only Pack Runtime catalog. Sources can point at directories containing
 // pack.json files directly or nested pack folders.
@@ -237,6 +246,10 @@ func (g *Gateway) SetKnowledgeDir(dir string) { g.knowledgeDir = dir }
 // SetCronManager attaches the cron job manager.
 func (g *Gateway) SetCronManager(cm *cron.Manager) { g.cronMgr = cm }
 
+// CronManager exposes the cron manager to the cron pack (internal/packs/cron),
+// which owns /v1/cron/* natively. May be nil if not configured.
+func (g *Gateway) CronManager() *cron.Manager { return g.cronMgr }
+
 // SetToolsManager attaches the process/tools manager.
 func (g *Gateway) SetToolsManager(tm *tools.ProcessManager) { g.toolsMgr = tm }
 
@@ -368,11 +381,25 @@ func (g *Gateway) SetEmotionAnalyzer(ea *emotion.Analyzer) { g.emotionAnalyzer =
 // SetEmotionHistory attaches the emotion history store.
 func (g *Gateway) SetEmotionHistory(h *emotion.History) { g.emotionHistory = h }
 
+// EmotionHistory exposes the emotion history store to the emotion pack
+// (internal/packs/emotion), which owns /v1/emotion/history natively. May be nil.
+func (g *Gateway) EmotionHistory() *emotion.History { return g.emotionHistory }
+
 // SetInstructionStore attaches the user instruction store.
 func (g *Gateway) SetInstructionStore(s *instruction.Store) { g.instructionStore = s }
 
+// InstructionStore exposes the user instruction store to the instructions pack
+// (internal/packs/instructions), which owns /v1/instructions* natively. It is
+// the narrow host accessor that replaces the pack reaching into the gateway
+// struct. May be nil if not configured.
+func (g *Gateway) InstructionStore() *instruction.Store { return g.instructionStore }
+
 // SetStickerMap attaches a sticker suggestion map.
 func (g *Gateway) SetStickerMap(sm *emotion.StickerMap) { g.stickerMap = sm }
+
+// StickerMap exposes the sticker suggestion map to the emotion pack
+// (internal/packs/emotion), which owns /v1/emotion/stickers natively. May be nil.
+func (g *Gateway) StickerMap() *emotion.StickerMap { return g.stickerMap }
 
 // SetStickerCollector attaches a sticker collector for interactive sticker learning.
 func (g *Gateway) SetStickerCollector(sc *emotion.StickerCollector) { g.stickerCollector = sc }
@@ -436,6 +463,11 @@ func (g *Gateway) SetTriggerRuntime(rt *trigger.Runtime) { g.triggerRT = rt }
 
 // SetTriggerManager attaches the unified trigger manager.
 func (g *Gateway) SetTriggerManager(m *trigger.Manager) { g.triggerMgr = m }
+
+// TriggerManager / TriggerRuntime expose the trigger subsystems to the triggers
+// pack (internal/packs/triggers), which owns /v1/triggers* natively. May be nil.
+func (g *Gateway) TriggerManager() *trigger.Manager { return g.triggerMgr }
+func (g *Gateway) TriggerRuntime() *trigger.Runtime { return g.triggerRT }
 
 // SetChannelRegistry attaches the channel registry for react/sticker operations.
 func (g *Gateway) SetChannelRegistry(cr *channel.Registry) { g.channelReg = cr }
