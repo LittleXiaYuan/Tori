@@ -5,8 +5,8 @@
 // interface.
 //
 // Migrated slices so far:
-//   - governance (registerGovernanceRoutes): audit, trust, iterate, review,
-//     iterate (bridge), audit/trust/review/skillgrow + usage/quota (native).
+//   - governance (registerGovernanceRoutes): audit/trust/iterate/review/
+//     skillgrow + usage/quota (native).
 //   - approvals (registerApprovalRoutes): human-in-the-loop approval surface
 //     (native).
 //   - observability: system info/stats, metrics/prometheus and cache stats
@@ -41,6 +41,7 @@ import (
 	"yunque-agent/internal/agentcore/llm/distill"
 	"yunque-agent/internal/agentcore/planner"
 	"yunque-agent/internal/agentcore/review"
+	"yunque-agent/internal/agentcore/selfheal/iterate"
 	"yunque-agent/internal/agentcore/skillgrowth/adapter"
 	"yunque-agent/internal/agentcore/tools"
 	"yunque-agent/internal/agentcore/trust"
@@ -142,6 +143,7 @@ type ControlPlaneGateway interface {
 	ReviewGate() *review.Gate
 	Distiller() *distill.Distiller
 	SkillGrowDetector() *adapter.Detector
+	IterateEngine() *iterate.Engine
 	OutputDir() string
 	MetricsSnapshot() observe.MetricsSnapshot
 	MetricsPrometheus() string
@@ -224,6 +226,16 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 			handler = h.handleReviewStatus
 		case "/api/skillgrow/patterns":
 			handler = h.handleSkillGrowPatterns
+		case "/api/iterate/proposals":
+			handler = h.handleIterateProposals
+		case "/api/iterate/approve":
+			handler = h.handleIterateApprove
+		case "/api/iterate/reject":
+			handler = h.handleIterateReject
+		case "/api/iterate/trigger":
+			handler = h.handleIterateTrigger
+		case "/api/iterate/status":
+			handler = h.handleIterateStatus
 		case "/v1/approvals":
 			handler = h.handleApprovalRouteSwitch
 		case "/v1/approvals/approve":

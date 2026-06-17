@@ -9,16 +9,6 @@ import "net/http"
 // handler's original method behavior.
 func (g *Gateway) HandleControlPlanePack(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path {
-	case "/api/iterate/proposals":
-		g.handleIterateProposals(w, r)
-	case "/api/iterate/approve":
-		g.handleIterateApprove(w, r)
-	case "/api/iterate/reject":
-		g.handleIterateReject(w, r)
-	case "/api/iterate/trigger":
-		g.handleIterateTrigger(w, r)
-	case "/api/iterate/status":
-		g.handleIterateStatus(w, r)
 	case "/v1/plugins":
 		g.handlePlugins(w, r)
 	case "/v1/plugins/toggle":

@@ -122,7 +122,7 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 | 3   | skills         | ✅   | `/v1/skills` 全原生：列表、scan、dynamic、approve、reject（无网关桥接；scan 经 `Gateway.ScanSkills()` 注入）   |
 | 4   | work           | ✅   | tasks / projects / workflows 全原生（workflow 由 `WorkflowHandler().RouteSpecs()` 合并挂载）       |
 | 5   | cogni-console  | ⬜   | 多为菜单指向已有 `/v1/cognis/*`（cogni-kernel 后端已原生）                                              |
-| 6   | control-plane  | 🟡  | 路由所有权已覆盖 governance/approvals/inbox/tools/bots/plugins/metrics/system/tenants/models/providers 等；observability / audit / trust / review / skillgrow / approvals / tenants / inbox / bots / tools / models / usage/quota 已原生，其余仍通过 gateway bridge |
+| 6   | control-plane  | 🟡  | 路由所有权已覆盖 governance/approvals/inbox/tools/bots/plugins/metrics/system/tenants/models/providers 等；observability / audit / trust / iterate / review / skillgrow / approvals / tenants / inbox / bots / tools / models / usage/quota 已原生，其余仍通过 gateway bridge |
 | 7   | workspace      | ⬜   | 纯 dashboard 导航，暂无后端路由                                                                    |
 
 计划外额外完成（已上生产、全原生）：v2 微内核生命周期（enable/disable → Start/Stop）；单体抽离包 modes / reverie / ide / cron / triggers / documents / missions / files / instructions / emotion / graph。
@@ -136,7 +136,7 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 ### 仍待“填肉”的 bridge 路由
 
 - knowledge：无，已全原生。
-- control-plane：plugins / providers 及 iterate governance 面仍通过 `HandleControlPlanePack` 桥接，后续继续按低风险 surface 小切片迁移。
+- control-plane：plugins / providers 面仍通过 `HandleControlPlanePack` 桥接，后续继续按低风险 surface 小切片迁移。
 
 > 2026-06-15 增量：skills `/v1/skills/scan` 已去壳进 `internal/packs/skills`（删除 `handlers_skills_pack.go` 桥接与网关 `handleSkillsScan`，新增 `Gateway.ScanSkills()` 注入），skills 组转为 ✅ 全原生。
 
@@ -161,3 +161,5 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 > 2026-06-18 增量：control-plane trust 三条路由已原生（`/api/trust/scores`、`/api/trust/reset`、`/api/trust/grant`），gateway 仅暴露 `TrustTracker()` / `RoleOf()` 窄 accessor。
 
 > 2026-06-18 增量：control-plane review/skillgrow 状态路由已原生（`/api/review/status`、`/api/skillgrow/patterns`），gateway 仅暴露 `ReviewGate()` / `Distiller()` / `SkillGrowDetector()` 窄 accessor。
+
+> 2026-06-18 增量：control-plane iterate 五条自迭代路由已原生（proposals/approve/reject/trigger/status），gateway 仅暴露 `IterateEngine()` 窄 accessor，保留审批、拒绝和手动触发 cycle 的原行为。

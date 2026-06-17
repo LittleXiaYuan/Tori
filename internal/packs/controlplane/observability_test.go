@@ -17,6 +17,7 @@ import (
 	"yunque-agent/internal/agentcore/llm/distill"
 	"yunque-agent/internal/agentcore/planner"
 	"yunque-agent/internal/agentcore/review"
+	"yunque-agent/internal/agentcore/selfheal/iterate"
 	"yunque-agent/internal/agentcore/skillgrowth/adapter"
 	"yunque-agent/internal/agentcore/tools"
 	"yunque-agent/internal/agentcore/trust"
@@ -66,6 +67,8 @@ func (f *fakeControlPlaneGateway) ReviewGate() *review.Gate { return nil }
 func (f *fakeControlPlaneGateway) Distiller() *distill.Distiller { return nil }
 
 func (f *fakeControlPlaneGateway) SkillGrowDetector() *adapter.Detector { return nil }
+
+func (f *fakeControlPlaneGateway) IterateEngine() *iterate.Engine { return nil }
 
 func (f *fakeControlPlaneGateway) OutputDir() string { return "" }
 
