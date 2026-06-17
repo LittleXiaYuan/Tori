@@ -41,16 +41,6 @@ func (g *Gateway) HandleControlPlanePack(w http.ResponseWriter, r *http.Request)
 		g.handleUsage(w, r)
 	case "/v1/quota":
 		g.handleSetQuota(w, r)
-	case "/v1/approvals":
-		g.handleApprovalRouteSwitch(w, r)
-	case "/v1/approvals/approve":
-		g.handleApprovalApprove(w, r)
-	case "/v1/approvals/deny":
-		g.handleApprovalDeny(w, r)
-	case "/v1/approvals/decide":
-		g.handleApprovalDecide(w, r)
-	case "/v1/approvals/rules":
-		g.handleApprovalRules(w, r)
 	case "/v1/inbox":
 		g.handleInbox(w, r)
 	case "/v1/inbox/read":

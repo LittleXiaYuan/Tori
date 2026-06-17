@@ -8,7 +8,7 @@
 //   - governance (registerGovernanceRoutes): audit, trust, iterate, review,
 //     skillgrow, usage/quota (bridge).
 //   - approvals (registerApprovalRoutes): human-in-the-loop approval surface
-//     (bridge).
+//     (native).
 //   - observability: system info/stats, metrics/prometheus and cache stats
 //     (native).
 //
@@ -20,8 +20,8 @@
 // slice: the pack route gate wraps handlers with requireAuth, so surfaces that
 // need requireAdmin or requireSetupOrAuth (e.g. sandbox, rbac, setup, some
 // provider routes) must wait until the pack auth modes are extended. Remaining
-// ops surfaces (tenants, metrics, plugins, models, inbox, tools, bots,
-// providers) are migrated in later slices.
+// ops surfaces (tenants, plugins, models, inbox, tools, bots, providers) are
+// migrated in later slices.
 package controlplanepack
 
 import (
@@ -29,6 +29,7 @@ import (
 	"net/http"
 	"sync/atomic"
 
+	"yunque-agent/internal/agentcore/approval"
 	"yunque-agent/internal/agentcore/planner"
 	"yunque-agent/internal/observe"
 	"yunque-agent/pkg/packruntime"
@@ -112,6 +113,8 @@ var Paths = []string{
 // ControlPlaneGateway is the narrow gateway surface the control-plane pack needs.
 type ControlPlaneGateway interface {
 	HandleControlPlanePack(w http.ResponseWriter, r *http.Request)
+	ApprovalManager() *approval.Manager
+	TenantOf(ctx context.Context) string
 	MetricsSnapshot() observe.MetricsSnapshot
 	MetricsPrometheus() string
 	ModelRuntimeHealth() planner.ModelRuntimeHealth
@@ -170,6 +173,16 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 	for _, p := range Paths {
 		handler := d
 		switch p {
+		case "/v1/approvals":
+			handler = h.handleApprovalRouteSwitch
+		case "/v1/approvals/approve":
+			handler = h.handleApprovalApprove
+		case "/v1/approvals/deny":
+			handler = h.handleApprovalDeny
+		case "/v1/approvals/decide":
+			handler = h.handleApprovalDecide
+		case "/v1/approvals/rules":
+			handler = h.handleApprovalRules
 		case "/v1/system/info":
 			handler = h.handleSystemInfo
 		case "/v1/system/stats":

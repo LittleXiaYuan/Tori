@@ -3,9 +3,17 @@ package gateway
 import (
 	"context"
 
+	"yunque-agent/internal/agentcore/approval"
 	"yunque-agent/internal/agentcore/planner"
 	"yunque-agent/internal/observe"
 )
+
+func (g *Gateway) ApprovalManager() *approval.Manager {
+	if g == nil {
+		return nil
+	}
+	return g.approvalMgr
+}
 
 // MetricsSnapshot exposes a user-safe copy point for the control-plane pack's
 // native observability routes.

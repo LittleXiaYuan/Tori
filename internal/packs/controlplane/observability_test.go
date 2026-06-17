@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"yunque-agent/internal/agentcore/approval"
 	"yunque-agent/internal/agentcore/planner"
 	"yunque-agent/internal/observe"
 )
@@ -27,6 +28,10 @@ func (f *fakeControlPlaneGateway) HandleControlPlanePack(w http.ResponseWriter, 
 	f.bridged++
 	w.WriteHeader(http.StatusTeapot)
 }
+
+func (f *fakeControlPlaneGateway) ApprovalManager() *approval.Manager { return nil }
+
+func (f *fakeControlPlaneGateway) TenantOf(ctx context.Context) string { return "test-tenant" }
 
 func (f *fakeControlPlaneGateway) MetricsSnapshot() observe.MetricsSnapshot { return f.snapshot }
 
