@@ -73,16 +73,6 @@ func (g *Gateway) HandleControlPlanePack(w http.ResponseWriter, r *http.Request)
 		g.handlePluginReload(w, r)
 	case "/v1/plugins/open-folder":
 		g.handlePluginOpenFolder(w, r)
-	case "/v1/tenants":
-		// Preserve the original collection method switch.
-		switch r.Method {
-		case http.MethodPost:
-			g.handleCreateTenant(w, r)
-		case http.MethodGet:
-			g.handleListTenants(w, r)
-		default:
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		}
 	case "/v1/models":
 		g.handleModels(w, r)
 	case "/api/providers":

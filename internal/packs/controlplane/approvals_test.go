@@ -11,6 +11,7 @@ import (
 
 	"yunque-agent/internal/agentcore/approval"
 	"yunque-agent/internal/agentcore/planner"
+	"yunque-agent/internal/controlplane/tenant"
 	"yunque-agent/internal/observe"
 )
 
@@ -26,6 +27,8 @@ func (g *approvalGateway) HandleControlPlanePack(w http.ResponseWriter, r *http.
 }
 
 func (g *approvalGateway) ApprovalManager() *approval.Manager { return g.manager }
+
+func (g *approvalGateway) TenantManager() *tenant.Manager { return nil }
 
 func (g *approvalGateway) TenantOf(ctx context.Context) string { return g.tenant }
 

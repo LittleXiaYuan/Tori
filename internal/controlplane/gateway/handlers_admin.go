@@ -17,27 +17,6 @@ import (
 	"yunque-agent/internal/execution/sandbox"
 )
 
-func (g *Gateway) handleCreateTenant(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "POST only")
-		return
-	}
-	var req struct {
-		Name string `json:"name"`
-	}
-	json.NewDecoder(r.Body).Decode(&req)
-	t := g.tenants.Register(req.Name)
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(t)
-}
-
-func (g *Gateway) handleListTenants(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	list := g.tenants.List()
-	json.NewEncoder(w).Encode(map[string]any{"tenants": list, "count": len(list)})
-}
-
 func (g *Gateway) handleTokenGenerate(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
