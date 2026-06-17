@@ -1,12 +1,16 @@
 // Package controlplanepack mounts the governance/ops control-plane HTTP surface
-// as a Pack Runtime backend module. Bridge phase: the pack owns route
-// registration + the enable gate, while the gateway still hosts the handler
-// implementations (via the narrow ControlPlaneGateway interface).
+// as a Pack Runtime backend module. The pack owns route registration + the
+// enable gate; filled-in slices host their handlers here, while remaining slices
+// still dispatch through the gateway bridge via the narrow ControlPlaneGateway
+// interface.
 //
 // Migrated slices so far:
 //   - governance (registerGovernanceRoutes): audit, trust, iterate, review,
-//     skillgrow, usage/quota.
-//   - approvals (registerApprovalRoutes): human-in-the-loop approval surface.
+//     skillgrow, usage/quota (bridge).
+//   - approvals (registerApprovalRoutes): human-in-the-loop approval surface
+//     (bridge).
+//   - observability: system info/stats, metrics/prometheus and cache stats
+//     (native).
 //
 // It ships default-enabled (an always-on core surface) so audit/trust and the
 // other governance APIs stay available out of the box; operators can still
@@ -25,6 +29,8 @@ import (
 	"net/http"
 	"sync/atomic"
 
+	"yunque-agent/internal/agentcore/planner"
+	"yunque-agent/internal/observe"
 	"yunque-agent/pkg/packruntime"
 )
 
@@ -106,6 +112,11 @@ var Paths = []string{
 // ControlPlaneGateway is the narrow gateway surface the control-plane pack needs.
 type ControlPlaneGateway interface {
 	HandleControlPlanePack(w http.ResponseWriter, r *http.Request)
+	MetricsSnapshot() observe.MetricsSnapshot
+	MetricsPrometheus() string
+	ModelRuntimeHealth() planner.ModelRuntimeHealth
+	LLMResponseCacheStats() map[string]any
+	SystemStats(ctx context.Context) map[string]any
 }
 
 // Handler is the control-plane pack's backend module.
@@ -146,8 +157,8 @@ func (h *Handler) Stop(ctx context.Context) error {
 	return nil
 }
 
-// Routes mounts the governance surface. Methods are declared broadly so the
-// bridge keeps the original routes' permissive (handler-decides) method
+// Routes mounts the governance/ops surface. Methods are declared broadly so
+// bridge-backed routes keep the original permissive (handler-decides) method
 // behavior; the manifest lists these as path-only routes so the pack gate allows
 // any method. Tightening to exact methods is a fill-the-flesh follow-up.
 func (h *Handler) Routes() []packruntime.BackendRoute {
@@ -157,7 +168,20 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 	}
 	routes := make([]packruntime.BackendRoute, 0, len(Paths))
 	for _, p := range Paths {
-		routes = append(routes, packruntime.BackendRoute{Methods: methods, Path: p, Handler: d})
+		handler := d
+		switch p {
+		case "/v1/system/info":
+			handler = h.handleSystemInfo
+		case "/v1/system/stats":
+			handler = h.handleSystemStats
+		case "/v1/metrics":
+			handler = h.handleMetrics
+		case "/v1/metrics/prometheus":
+			handler = h.handleMetricsPrometheus
+		case "/v1/cache/stats":
+			handler = h.handleCacheStats
+		}
+		routes = append(routes, packruntime.BackendRoute{Methods: methods, Path: p, Handler: handler})
 	}
 	return routes
 }

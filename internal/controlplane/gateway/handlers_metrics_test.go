@@ -41,10 +41,19 @@ func TestMetricsEndpointSanitizesRecentErrors(t *testing.T) {
 }
 
 func TestSanitizeMetricsSnapshotForUserDoesNotMutateRawTracker(t *testing.T) {
-	gw, _ := newTestGateway()
+	gw, tm := newTestGatewayMigrationEnabled()
+	tenant := tm.Register("metrics-raw-tracker")
 	raw := `context deadline exceeded`
 	gw.metrics.RecordRequest(10*time.Millisecond, 0, 0, errors.New(raw))
-	_ = sanitizeMetricsSnapshotForUser(gw.metrics.Snapshot())
+	req := authedRequest(http.MethodGet, "/v1/metrics", "", tenant.APIKey)
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected metrics 200, got %d body=%s", w.Code, w.Body.String())
+	}
+	if strings.Contains(strings.ToLower(w.Body.String()), raw) {
+		t.Fatalf("metrics response should hide raw timeout, got %s", w.Body.String())
+	}
 
 	rawSnap := gw.metrics.Snapshot()
 	if len(rawSnap.RecentErrors) != 1 || !strings.Contains(rawSnap.RecentErrors[0].Message, raw) {

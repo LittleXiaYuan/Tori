@@ -15,25 +15,7 @@ import (
 	"yunque-agent/internal/appdir"
 	"yunque-agent/internal/apperror"
 	"yunque-agent/internal/execution/sandbox"
-	"yunque-agent/internal/observe"
 )
-
-func (g *Gateway) handleMetrics(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(sanitizeMetricsSnapshotForUser(g.metrics.Snapshot()))
-}
-
-func (g *Gateway) handleMetricsPrometheus(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.Write([]byte(g.metrics.PrometheusFormat()))
-}
-
-func sanitizeMetricsSnapshotForUser(snapshot observe.MetricsSnapshot) observe.MetricsSnapshot {
-	for i := range snapshot.RecentErrors {
-		snapshot.RecentErrors[i].Message = plannerCheckpointDisplayError(snapshot.RecentErrors[i].Message)
-	}
-	return snapshot
-}
 
 func (g *Gateway) handleCreateTenant(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -54,45 +36,6 @@ func (g *Gateway) handleListTenants(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	list := g.tenants.List()
 	json.NewEncoder(w).Encode(map[string]any{"tenants": list, "count": len(list)})
-}
-
-func (g *Gateway) handleSystemInfo(w http.ResponseWriter, r *http.Request) {
-	info := sandbox.SystemInfo()
-	modelHealth := g.planner.ModelRuntimeHealth()
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{
-		"system": info,
-		"breaker": map[string]any{
-			"state":      modelHealth.BreakerState,
-			"failures":   modelHealth.Failures,
-			"configured": modelHealth.Configured,
-		},
-	})
-}
-
-func (g *Gateway) handleSystemStats(w http.ResponseWriter, r *http.Request) {
-	tid := tenantFromCtx(r.Context())
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{
-		"requests_total": g.reqCount.Load(),
-		"tenants":        len(g.tenants.List()),
-		"skills":         len(g.registry.All()),
-		"plugins":        len(g.pluginReg.AllIncludeDisabled()),
-		"scheduler_jobs": len(g.scheduler.List()),
-		"conversations":  g.convStore.Count(),
-		"memory":         g.memory.Stats(tid),
-	})
-}
-
-func (g *Gateway) handleCacheStats(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	stats := map[string]any{}
-	if g.planner != nil {
-		if cacheStats := g.planner.LLMResponseCacheStats(); cacheStats != nil {
-			stats["llm_response_cache"] = cacheStats
-		}
-	}
-	json.NewEncoder(w).Encode(stats)
 }
 
 func (g *Gateway) handleTokenGenerate(w http.ResponseWriter, r *http.Request) {

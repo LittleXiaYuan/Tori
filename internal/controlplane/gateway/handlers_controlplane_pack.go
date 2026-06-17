@@ -2,12 +2,11 @@ package gateway
 
 import "net/http"
 
-// HandleControlPlanePack is the exported bridge entrypoint for the control-plane
-// pack (internal/packs/controlplane). The pack owns route registration + the
-// enablement gate; the gateway still hosts the governance handler
-// implementations during this bridge phase. It dispatches the governance subset
-// (audit / trust / iterate / review / skillgrow / usage) by path, preserving
-// each handler's original method behavior.
+// HandleControlPlanePack is the compatibility bridge entrypoint for the
+// control-plane pack (internal/packs/controlplane). The pack owns route
+// registration + the enablement gate. Native slices live in the pack itself;
+// remaining governance/ops handlers dispatch here by path, preserving each
+// handler's original method behavior.
 func (g *Gateway) HandleControlPlanePack(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path {
 	case "/v1/audit/tail":
@@ -84,16 +83,6 @@ func (g *Gateway) HandleControlPlanePack(w http.ResponseWriter, r *http.Request)
 		g.handlePluginReload(w, r)
 	case "/v1/plugins/open-folder":
 		g.handlePluginOpenFolder(w, r)
-	case "/v1/system/info":
-		g.handleSystemInfo(w, r)
-	case "/v1/system/stats":
-		g.handleSystemStats(w, r)
-	case "/v1/metrics":
-		g.handleMetrics(w, r)
-	case "/v1/metrics/prometheus":
-		g.handleMetricsPrometheus(w, r)
-	case "/v1/cache/stats":
-		g.handleCacheStats(w, r)
 	case "/v1/tenants":
 		// Preserve the original collection method switch.
 		switch r.Method {

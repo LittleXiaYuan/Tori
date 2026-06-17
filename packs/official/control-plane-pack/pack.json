@@ -101,7 +101,7 @@
   "metadata": {
     "group": "control-plane",
     "phase": "A2",
-    "note": "Always-on core governance pack: default-enabled so audit/trust/usage governance APIs stay available out of the box. Backend route ownership migrated in slices — this slice owns the registerGovernanceRoutes subset (audit/trust/iterate/review/skillgrow/usage); broader ops surfaces (tenants/metrics/plugins/models/inbox/tools/bots/providers/approvals) migrate later."
+    "note": "Always-on core governance pack: default-enabled so audit/trust/usage governance APIs stay available out of the box. Backend route ownership has migrated in slices; observability routes (system info/stats, metrics/prometheus, cache stats) are native, while remaining governance/ops surfaces continue through the gateway bridge until filled in."
   },
   "status": "beta"
 }
