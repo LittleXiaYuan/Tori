@@ -9,22 +9,6 @@ import "net/http"
 // handler's original method behavior.
 func (g *Gateway) HandleControlPlanePack(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path {
-	case "/v1/plugins":
-		g.handlePlugins(w, r)
-	case "/v1/plugins/toggle":
-		g.handlePluginToggle(w, r)
-	case "/v1/plugins/create":
-		g.handlePluginCreate(w, r)
-	case "/v1/plugins/delete":
-		g.handlePluginDelete(w, r)
-	case "/v1/plugins/files":
-		g.handlePluginFiles(w, r)
-	case "/v1/plugins/ui":
-		g.handlePluginUI(w, r)
-	case "/v1/plugins/reload":
-		g.handlePluginReload(w, r)
-	case "/v1/plugins/open-folder":
-		g.handlePluginOpenFolder(w, r)
 	case "/api/providers":
 		g.handleProviderList(w, r)
 	case "/api/providers/test":

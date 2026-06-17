@@ -26,7 +26,7 @@
 // slice: the pack route gate wraps handlers with requireAuth, so surfaces that
 // need requireAdmin or requireSetupOrAuth (e.g. sandbox, rbac, setup, some
 // provider routes) must wait until the pack auth modes are extended. Remaining
-// ops surfaces (plugins, providers) are migrated in later slices.
+// provider surfaces are migrated in later slices.
 package controlplanepack
 
 import (
@@ -49,6 +49,7 @@ import (
 	"yunque-agent/internal/controlplane/tenant"
 	"yunque-agent/internal/observe"
 	"yunque-agent/pkg/packruntime"
+	"yunque-agent/pkg/plugin"
 )
 
 const PackID = "yunque.pack.control-plane"
@@ -155,6 +156,12 @@ type ControlPlaneGateway interface {
 	DeleteProviderModel(id string) bool
 	UsageSnapshot(ctx context.Context) any
 	SetUsageQuota(ctx context.Context, tenantID string, maxChatCalls, maxTokensPerDay int64)
+}
+
+type pluginGateway interface {
+	PluginRegistry() *plugin.Registry
+	PluginLoader() *plugin.Loader
+	RebuildSkillsFromPlugins() int
 }
 
 // Handler is the control-plane pack's backend module.
@@ -264,6 +271,22 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 			handler = h.handleToolPoll
 		case "/v1/tools/kill":
 			handler = h.handleToolKill
+		case "/v1/plugins":
+			handler = h.handlePlugins
+		case "/v1/plugins/toggle":
+			handler = h.handlePluginToggle
+		case "/v1/plugins/create":
+			handler = h.handlePluginCreate
+		case "/v1/plugins/delete":
+			handler = h.handlePluginDelete
+		case "/v1/plugins/files":
+			handler = h.handlePluginFiles
+		case "/v1/plugins/ui":
+			handler = h.handlePluginUI
+		case "/v1/plugins/reload":
+			handler = h.handlePluginReload
+		case "/v1/plugins/open-folder":
+			handler = h.handlePluginOpenFolder
 		case "/v1/system/info":
 			handler = h.handleSystemInfo
 		case "/v1/system/stats":

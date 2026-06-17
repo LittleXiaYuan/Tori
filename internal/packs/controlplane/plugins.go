@@ -1,4 +1,4 @@
-package gateway
+package controlplanepack
 
 import (
 	"encoding/json"
@@ -13,14 +13,52 @@ import (
 	"yunque-agent/pkg/plugin"
 )
 
-func (g *Gateway) handlePlugins(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{"plugins": g.pluginReg.AllIncludeDisabled()})
+func (h *Handler) pluginGateway() pluginGateway {
+	g, _ := h.gateway.(pluginGateway)
+	return g
 }
 
-func (g *Gateway) handlePluginToggle(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) pluginRegistry() *plugin.Registry {
+	g := h.pluginGateway()
+	if g == nil {
+		return nil
+	}
+	return g.PluginRegistry()
+}
+
+func (h *Handler) pluginLoader() *plugin.Loader {
+	g := h.pluginGateway()
+	if g == nil {
+		return nil
+	}
+	return g.PluginLoader()
+}
+
+func (h *Handler) rebuildSkillsFromPlugins() int {
+	g := h.pluginGateway()
+	if g == nil {
+		return 0
+	}
+	return g.RebuildSkillsFromPlugins()
+}
+
+func (h *Handler) handlePlugins(w http.ResponseWriter, r *http.Request) {
+	reg := h.pluginRegistry()
+	if reg == nil {
+		writeJSON(w, map[string]any{"plugins": []any{}})
+		return
+	}
+	writeJSON(w, map[string]any{"plugins": reg.AllIncludeDisabled()})
+}
+
+func (h *Handler) handlePluginToggle(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "POST only")
+		return
+	}
+	reg := h.pluginRegistry()
+	if reg == nil {
+		apperror.WriteCode(w, apperror.CodeInternal, "plugin registry not configured")
 		return
 	}
 	var req struct {
@@ -31,26 +69,23 @@ func (g *Gateway) handlePluginToggle(w http.ResponseWriter, r *http.Request) {
 		apperror.WriteCode(w, apperror.CodeMissingField, "name is required")
 		return
 	}
-	ok := g.pluginReg.SetEnabled(req.Name, req.Enabled)
-	if !ok {
+	if !reg.SetEnabled(req.Name, req.Enabled) {
 		apperror.WriteCode(w, apperror.CodeNotFound, "plugin not found")
 		return
 	}
 
-	g.registry.ReplaceAll(g.pluginReg.AllSkills())
-	g.planner.SetDomainPrompt(g.pluginReg.CombinedPrompt())
-	slog.Info("plugin toggled, skills rebuilt", "plugin", req.Name, "enabled", req.Enabled, "skills", len(g.registry.All()))
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{"name": req.Name, "enabled": req.Enabled, "skills_count": len(g.registry.All())})
+	skillsCount := h.rebuildSkillsFromPlugins()
+	slog.Info("plugin toggled, skills rebuilt", "plugin", req.Name, "enabled", req.Enabled, "skills", skillsCount)
+	writeJSON(w, map[string]any{"name": req.Name, "enabled": req.Enabled, "skills_count": skillsCount})
 }
 
-func (g *Gateway) handlePluginCreate(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handlePluginCreate(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "POST only")
 		return
 	}
-	if g.pluginLoader == nil {
+	loader := h.pluginLoader()
+	if loader == nil {
 		apperror.WriteCode(w, apperror.CodeInternal, "plugin loader not configured")
 		return
 	}
@@ -71,7 +106,7 @@ func (g *Gateway) handlePluginCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	safeName := sanitizePluginName(req.Name)
-	pluginDir := filepath.Join(g.pluginLoader.Dir(), safeName)
+	pluginDir := filepath.Join(loader.Dir(), safeName)
 	if _, err := os.Stat(pluginDir); err == nil {
 		apperror.WriteCode(w, apperror.CodeInvalidField, "plugin already exists")
 		return
@@ -101,26 +136,27 @@ func (g *Gateway) handlePluginCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	scaffoldPluginDir(pluginDir, req.Language, req.Name, req.Description)
 
-	g.pluginLoader.LoadAll()
-	g.rebuildSkillsFromPlugins()
+	loader.LoadAll()
+	h.rebuildSkillsFromPlugins()
 
 	slog.Info("plugin created", "name", req.Name, "lang", req.Language, "dir", pluginDir)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]any{"status": "created", "name": req.Name, "dir": safeName, "full_path": pluginDir})
+	writeJSON(w, map[string]any{"status": "created", "name": req.Name, "dir": safeName, "full_path": pluginDir})
 }
 
-func (g *Gateway) handlePluginOpenFolder(w http.ResponseWriter, r *http.Request) {
-	if g.pluginLoader == nil {
+func (h *Handler) handlePluginOpenFolder(w http.ResponseWriter, r *http.Request) {
+	loader := h.pluginLoader()
+	if loader == nil {
 		apperror.WriteCode(w, apperror.CodeInternal, "plugin loader not configured")
 		return
 	}
 	name := r.URL.Query().Get("name")
 	var dir string
 	if name != "" {
-		dir = filepath.Join(g.pluginLoader.Dir(), sanitizePluginName(name))
+		dir = filepath.Join(loader.Dir(), sanitizePluginName(name))
 	} else {
-		dir = g.pluginLoader.Dir()
+		dir = loader.Dir()
 	}
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		apperror.WriteCode(w, apperror.CodeNotFound, "directory not found")
@@ -143,12 +179,14 @@ func openFileExplorer(dir string) {
 	_ = cmd.Start()
 }
 
-func (g *Gateway) handlePluginDelete(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handlePluginDelete(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodDelete {
 		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "DELETE only")
 		return
 	}
-	if g.pluginLoader == nil {
+	loader := h.pluginLoader()
+	reg := h.pluginRegistry()
+	if loader == nil {
 		apperror.WriteCode(w, apperror.CodeInternal, "plugin loader not configured")
 		return
 	}
@@ -163,7 +201,7 @@ func (g *Gateway) handlePluginDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pluginDir := filepath.Join(g.pluginLoader.Dir(), sanitizePluginName(name))
+	pluginDir := filepath.Join(loader.Dir(), sanitizePluginName(name))
 	if _, err := os.Stat(pluginDir); os.IsNotExist(err) {
 		apperror.WriteCode(w, apperror.CodeNotFound, "plugin not found")
 		return
@@ -174,16 +212,18 @@ func (g *Gateway) handlePluginDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	g.pluginReg.Unregister(name)
-	g.rebuildSkillsFromPlugins()
+	if reg != nil {
+		reg.Unregister(name)
+	}
+	h.rebuildSkillsFromPlugins()
 
 	slog.Info("plugin deleted", "name", name)
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{"status": "deleted", "name": name})
+	writeJSON(w, map[string]any{"status": "deleted", "name": name})
 }
 
-func (g *Gateway) handlePluginFiles(w http.ResponseWriter, r *http.Request) {
-	if g.pluginLoader == nil {
+func (h *Handler) handlePluginFiles(w http.ResponseWriter, r *http.Request) {
+	loader := h.pluginLoader()
+	if loader == nil {
 		apperror.WriteCode(w, apperror.CodeInternal, "plugin loader not configured")
 		return
 	}
@@ -195,11 +235,10 @@ func (g *Gateway) handlePluginFiles(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case http.MethodGet:
-		pluginDir := filepath.Join(g.pluginLoader.Dir(), sanitizePluginName(name))
+		pluginDir := filepath.Join(loader.Dir(), sanitizePluginName(name))
 		entries, err := os.ReadDir(pluginDir)
 		if err != nil {
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]any{"files": []any{}, "builtin": true})
+			writeJSON(w, map[string]any{"files": []any{}, "builtin": true})
 			return
 		}
 		type fileInfo struct {
@@ -224,8 +263,7 @@ func (g *Gateway) handlePluginFiles(w http.ResponseWriter, r *http.Request) {
 			}
 			files = append(files, fileInfo{Name: e.Name(), Content: content, Size: size})
 		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{"files": files})
+		writeJSON(w, map[string]any{"files": files})
 
 	case http.MethodPut:
 		var req struct {
@@ -241,7 +279,7 @@ func (g *Gateway) handlePluginFiles(w http.ResponseWriter, r *http.Request) {
 		if req.Plugin != "" {
 			pluginName = req.Plugin
 		}
-		pluginDir := filepath.Join(g.pluginLoader.Dir(), sanitizePluginName(pluginName))
+		pluginDir := filepath.Join(loader.Dir(), sanitizePluginName(pluginName))
 		if _, err := os.Stat(pluginDir); os.IsNotExist(err) {
 			apperror.WriteCode(w, apperror.CodeNotFound, "plugin not found")
 			return
@@ -251,46 +289,41 @@ func (g *Gateway) handlePluginFiles(w http.ResponseWriter, r *http.Request) {
 			apperror.Write(w, apperror.Wrap(apperror.CodeInternal, "write file", err))
 			return
 		}
-		g.pluginLoader.LoadAll()
-		g.rebuildSkillsFromPlugins()
+		loader.LoadAll()
+		h.rebuildSkillsFromPlugins()
 		slog.Info("plugin file saved", "plugin", pluginName, "file", safeFile)
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{"status": "saved"})
+		writeJSON(w, map[string]any{"status": "saved"})
 
 	default:
 		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET or PUT")
 	}
 }
 
-func (g *Gateway) handlePluginReload(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handlePluginReload(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "POST only")
 		return
 	}
-	if g.pluginLoader == nil {
+	loader := h.pluginLoader()
+	if loader == nil {
 		apperror.WriteCode(w, apperror.CodeInternal, "plugin loader not configured")
 		return
 	}
-	g.pluginLoader.LoadAll()
-	g.rebuildSkillsFromPlugins()
+	loader.LoadAll()
+	skillsCount := h.rebuildSkillsFromPlugins()
 	slog.Info("plugins reloaded via API")
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{"status": "reloaded", "skills": len(g.registry.All())})
+	writeJSON(w, map[string]any{"status": "reloaded", "skills": skillsCount})
 }
 
-// rebuildSkillsFromPlugins rebuilds the skill registry and planner domain prompt.
-// Uses ReplaceAll for atomicity — the registry is never observably empty, which
-// matters because request handlers iterate All()/Get() concurrently. The
-// skillFileLoader is run after the replace so that file-sourced skills layer
-// on top of plugin-sourced ones via Register().
-func (g *Gateway) rebuildSkillsFromPlugins() {
-	g.registry.ReplaceAll(g.pluginReg.AllSkills())
-	if g.skillFileLoader != nil {
-		g.skillFileLoader.LoadAll()
+func (h *Handler) handlePluginUI(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET required")
+		return
 	}
-	g.planner.SetDomainPrompt(g.pluginReg.CombinedPrompt())
+	reg := h.pluginRegistry()
+	if reg == nil {
+		writeJSON(w, map[string]any{"tabs": []any{}})
+		return
+	}
+	writeJSON(w, map[string]any{"tabs": reg.AllUITabs()})
 }
-
-// handleSkillsScan was de-shelled into the skills pack (internal/packs/skills);
-// the scan handler now lives there and rescans via the Gateway.ScanSkills()
-// accessor (see handlers_admin_skills.go).

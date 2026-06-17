@@ -533,20 +533,3 @@ func (g *Gateway) handleSubagentMessage(w http.ResponseWriter, r *http.Request) 
 	}
 	json.NewEncoder(w).Encode(map[string]bool{"ok": true})
 }
-
-// --- Plugin UI Discovery API ---
-
-// handlePluginUI returns all UI tabs from enabled plugins that implement UIPlugin.
-// GET /v1/plugins/ui
-func (g *Gateway) handlePluginUI(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET required")
-		return
-	}
-
-	tabs := g.pluginReg.AllUITabs()
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{
-		"tabs": tabs,
-	})
-}

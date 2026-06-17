@@ -1,4 +1,4 @@
-package gateway
+package controlplanepack
 
 // plugin_templates.go — Generates starter handler files for new plugins.
 // Extracted from handlers_admin.go to keep handler files focused on HTTP logic.

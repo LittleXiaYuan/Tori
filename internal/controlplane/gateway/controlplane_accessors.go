@@ -16,6 +16,7 @@ import (
 	"yunque-agent/internal/agentcore/trust"
 	"yunque-agent/internal/controlplane/tenant"
 	"yunque-agent/internal/observe"
+	"yunque-agent/pkg/plugin"
 )
 
 func (g *Gateway) ApprovalManager() *approval.Manager {
@@ -197,4 +198,29 @@ func (g *Gateway) SetUsageQuota(ctx context.Context, tenantID string, maxChatCal
 		MaxChatCalls:    maxChatCalls,
 		MaxTokensPerDay: maxTokensPerDay,
 	})
+}
+
+func (g *Gateway) PluginRegistry() *plugin.Registry {
+	if g == nil {
+		return nil
+	}
+	return g.pluginReg
+}
+
+func (g *Gateway) PluginLoader() *plugin.Loader {
+	if g == nil {
+		return nil
+	}
+	return g.pluginLoader
+}
+
+func (g *Gateway) RebuildSkillsFromPlugins() int {
+	if g == nil {
+		return 0
+	}
+	g.rebuildSkillsFromPlugins()
+	if g.registry == nil {
+		return 0
+	}
+	return len(g.registry.All())
 }
