@@ -19,10 +19,6 @@ func (g *Gateway) HandleControlPlanePack(w http.ResponseWriter, r *http.Request)
 		g.handleIterateTrigger(w, r)
 	case "/api/iterate/status":
 		g.handleIterateStatus(w, r)
-	case "/api/review/status":
-		g.handleReviewStatus(w, r)
-	case "/api/skillgrow/patterns":
-		g.handleSkillGrowPatterns(w, r)
 	case "/v1/plugins":
 		g.handlePlugins(w, r)
 	case "/v1/plugins/toggle":

@@ -6,7 +6,7 @@
 //
 // Migrated slices so far:
 //   - governance (registerGovernanceRoutes): audit, trust, iterate, review,
-//     iterate/review/skillgrow (bridge), audit/trust + usage/quota (native).
+//     iterate (bridge), audit/trust/review/skillgrow + usage/quota (native).
 //   - approvals (registerApprovalRoutes): human-in-the-loop approval surface
 //     (native).
 //   - observability: system info/stats, metrics/prometheus and cache stats
@@ -38,7 +38,10 @@ import (
 	"yunque-agent/internal/agentcore/audit"
 	"yunque-agent/internal/agentcore/bots"
 	"yunque-agent/internal/agentcore/inbox"
+	"yunque-agent/internal/agentcore/llm/distill"
 	"yunque-agent/internal/agentcore/planner"
+	"yunque-agent/internal/agentcore/review"
+	"yunque-agent/internal/agentcore/skillgrowth/adapter"
 	"yunque-agent/internal/agentcore/tools"
 	"yunque-agent/internal/agentcore/trust"
 	"yunque-agent/internal/controlplane/models"
@@ -136,6 +139,9 @@ type ControlPlaneGateway interface {
 	ToolsManager() *tools.ProcessManager
 	TrustTracker() *trust.Tracker
 	RoleOf(ctx context.Context) string
+	ReviewGate() *review.Gate
+	Distiller() *distill.Distiller
+	SkillGrowDetector() *adapter.Detector
 	OutputDir() string
 	MetricsSnapshot() observe.MetricsSnapshot
 	MetricsPrometheus() string
@@ -214,6 +220,10 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 			handler = h.handleTrustReset
 		case "/api/trust/grant":
 			handler = h.handleTrustGrant
+		case "/api/review/status":
+			handler = h.handleReviewStatus
+		case "/api/skillgrow/patterns":
+			handler = h.handleSkillGrowPatterns
 		case "/v1/approvals":
 			handler = h.handleApprovalRouteSwitch
 		case "/v1/approvals/approve":

@@ -7,7 +7,10 @@ import (
 	"yunque-agent/internal/agentcore/audit"
 	"yunque-agent/internal/agentcore/bots"
 	"yunque-agent/internal/agentcore/inbox"
+	"yunque-agent/internal/agentcore/llm/distill"
 	"yunque-agent/internal/agentcore/planner"
+	"yunque-agent/internal/agentcore/review"
+	"yunque-agent/internal/agentcore/skillgrowth/adapter"
 	"yunque-agent/internal/agentcore/tools"
 	"yunque-agent/internal/agentcore/trust"
 	"yunque-agent/internal/controlplane/tenant"
@@ -68,6 +71,27 @@ func (g *Gateway) TrustTracker() *trust.Tracker {
 		return nil
 	}
 	return g.trustTracker
+}
+
+func (g *Gateway) ReviewGate() *review.Gate {
+	if g == nil {
+		return nil
+	}
+	return g.reviewGate
+}
+
+func (g *Gateway) Distiller() *distill.Distiller {
+	if g == nil {
+		return nil
+	}
+	return g.distiller
+}
+
+func (g *Gateway) SkillGrowDetector() *adapter.Detector {
+	if g == nil {
+		return nil
+	}
+	return g.skillGrow
 }
 
 func (g *Gateway) RoleOf(ctx context.Context) string {

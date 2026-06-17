@@ -12,7 +12,10 @@ import (
 	"yunque-agent/internal/agentcore/audit"
 	"yunque-agent/internal/agentcore/bots"
 	"yunque-agent/internal/agentcore/inbox"
+	"yunque-agent/internal/agentcore/llm/distill"
 	"yunque-agent/internal/agentcore/planner"
+	"yunque-agent/internal/agentcore/review"
+	"yunque-agent/internal/agentcore/skillgrowth/adapter"
 	"yunque-agent/internal/agentcore/tools"
 	"yunque-agent/internal/agentcore/trust"
 	"yunque-agent/internal/controlplane/models"
@@ -51,6 +54,12 @@ func (g *tenantGateway) ToolsManager() *tools.ProcessManager { return nil }
 func (g *tenantGateway) TrustTracker() *trust.Tracker { return nil }
 
 func (g *tenantGateway) RoleOf(ctx context.Context) string { return "user" }
+
+func (g *tenantGateway) ReviewGate() *review.Gate { return nil }
+
+func (g *tenantGateway) Distiller() *distill.Distiller { return nil }
+
+func (g *tenantGateway) SkillGrowDetector() *adapter.Detector { return nil }
 
 func (g *tenantGateway) OutputDir() string { return "" }
 
