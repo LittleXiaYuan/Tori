@@ -6,7 +6,7 @@
 //
 // Migrated slices so far:
 //   - governance (registerGovernanceRoutes): audit, trust, iterate, review,
-//     skillgrow (bridge), audit + usage/quota (native).
+//     iterate/review/skillgrow (bridge), audit/trust + usage/quota (native).
 //   - approvals (registerApprovalRoutes): human-in-the-loop approval surface
 //     (native).
 //   - observability: system info/stats, metrics/prometheus and cache stats
@@ -40,6 +40,7 @@ import (
 	"yunque-agent/internal/agentcore/inbox"
 	"yunque-agent/internal/agentcore/planner"
 	"yunque-agent/internal/agentcore/tools"
+	"yunque-agent/internal/agentcore/trust"
 	"yunque-agent/internal/controlplane/models"
 	"yunque-agent/internal/controlplane/tenant"
 	"yunque-agent/internal/observe"
@@ -133,6 +134,8 @@ type ControlPlaneGateway interface {
 	TenantManager() *tenant.Manager
 	TenantOf(ctx context.Context) string
 	ToolsManager() *tools.ProcessManager
+	TrustTracker() *trust.Tracker
+	RoleOf(ctx context.Context) string
 	OutputDir() string
 	MetricsSnapshot() observe.MetricsSnapshot
 	MetricsPrometheus() string
@@ -205,6 +208,12 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 			handler = h.handleAuditStats
 		case "/api/audit/trail":
 			handler = h.handleAuditTrail
+		case "/api/trust/scores":
+			handler = h.handleTrustScores
+		case "/api/trust/reset":
+			handler = h.handleTrustReset
+		case "/api/trust/grant":
+			handler = h.handleTrustGrant
 		case "/v1/approvals":
 			handler = h.handleApprovalRouteSwitch
 		case "/v1/approvals/approve":

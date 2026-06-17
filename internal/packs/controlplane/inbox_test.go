@@ -14,6 +14,7 @@ import (
 	"yunque-agent/internal/agentcore/inbox"
 	"yunque-agent/internal/agentcore/planner"
 	"yunque-agent/internal/agentcore/tools"
+	"yunque-agent/internal/agentcore/trust"
 	"yunque-agent/internal/controlplane/models"
 	"yunque-agent/internal/controlplane/tenant"
 	"yunque-agent/internal/observe"
@@ -46,6 +47,10 @@ func (g *inboxGateway) TenantManager() *tenant.Manager { return nil }
 func (g *inboxGateway) TenantOf(ctx context.Context) string { return "tenant-a" }
 
 func (g *inboxGateway) ToolsManager() *tools.ProcessManager { return nil }
+
+func (g *inboxGateway) TrustTracker() *trust.Tracker { return nil }
+
+func (g *inboxGateway) RoleOf(ctx context.Context) string { return "user" }
 
 func (g *inboxGateway) OutputDir() string { return "" }
 
