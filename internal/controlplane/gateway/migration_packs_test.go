@@ -26,6 +26,7 @@ import (
 	modespack "yunque-agent/internal/packs/modes"
 	reveriepack "yunque-agent/internal/packs/reverie"
 	skillspack "yunque-agent/internal/packs/skills"
+	statepack "yunque-agent/internal/packs/state"
 	triggerspack "yunque-agent/internal/packs/triggers"
 	workpack "yunque-agent/internal/packs/work"
 	"yunque-agent/pkg/packruntime"
@@ -74,6 +75,9 @@ var migrationPackPaths = map[string][]string{
 		"/v1/triggers", "/v1/triggers/emit", "/v1/triggers/v2",
 		"/v1/triggers/v2/emit", "/v1/triggers/v2/runs", "/v1/triggers/v2/events",
 	},
+	statepack.PackID: {
+		"/v1/state", "/v1/state/goals", "/v1/state/focus", "/v1/state/resources",
+	},
 }
 
 var migrationPackNames = map[string]string{
@@ -89,9 +93,10 @@ var migrationPackNames = map[string]string{
 	triggerspack.PackID:     "Triggers",
 	documentspack.PackID:    "Documents",
 	missionspack.PackID:     "Missions",
+	statepack.PackID:        "State Kernel",
 }
 
-// newMigrationPackRegistry returns a registry with the bridge core packs
+// newMigrationPackRegistry returns a registry with the migrated core packs
 // installed and enabled, mirroring production so test gateways behave like the
 // real one after the route migration.
 func newMigrationPackRegistry() *packruntime.Registry {
@@ -118,9 +123,9 @@ func newMigrationPackRegistry() *packruntime.Registry {
 	return reg
 }
 
-// registerMigrationPacks mounts the bridge core packs on gw (matches
+// registerMigrationPacks mounts the migrated core packs on gw (matches
 // cmd/agent/init_task_engine.go) so migrated /v1/{knowledge,memory,skills,
-// tasks,projects} routes exist and are auth-gated in tests.
+// tasks,projects,state} routes exist and are auth-gated in tests.
 func registerMigrationPacks(gw *Gateway) {
 	gw.RegisterBackendPack(knowledgepack.NewHandlerWithStore(gw, gw.KnowledgeStore()))
 	gw.RegisterBackendPack(memorypack.NewWired(gw.MemoryManager(), gw.MemoryPipeline(), gw.MemoryOrchestrator, gw.TenantOf))
@@ -135,6 +140,7 @@ func registerMigrationPacks(gw *Gateway) {
 	_ = gw.RegisterModule(triggerspack.New(gw))
 	_ = gw.RegisterModule(documentspack.New(gw))
 	_ = gw.RegisterModule(missionspack.New(gw))
+	_ = gw.RegisterModule(statepack.New(gw))
 }
 
 // newTestGatewayMigrationEnabled returns a default test gateway with all four
@@ -183,6 +189,8 @@ func newTestGatewayWithMigrationPack(t *testing.T, packID string, status packrun
 		gw.RegisterBackendPack(workpack.NewHandler(gw))
 	case controlplanepack.PackID:
 		gw.RegisterBackendPack(controlplanepack.NewHandler(gw))
+	case statepack.PackID:
+		_ = gw.RegisterModule(statepack.New(gw))
 	}
 	return gw, tm
 }
@@ -202,6 +210,7 @@ func TestMigrationPackRouteGating(t *testing.T) {
 		{"memory", memorypack.PackID, "/v1/memory/stats"},
 		{"skills", skillspack.PackID, "/v1/skills"},
 		{"work", workpack.PackID, "/v1/tasks"},
+		{"state", statepack.PackID, "/v1/state"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

@@ -4,7 +4,7 @@
 > Pack Runtime 下（先桥接、后填肉），消除空壳包，最终让能力面都能在能力包中心
 > 热启停。本计划是工程化执行蓝图，按组推进、每组可回滚、每步带测试。
 
-状态：执行中（基线已收敛）。截至 2026-06-18：干净基线已提交，v2 微内核 + 5 个 surface 包已迁移上生产，knowledge 已全原生，control-plane 已开始按切片填肉；`go test` 与前端 pack 测试全绿；逐组真实进度见 §6。
+状态：执行中（基线已收敛）。截至 2026-06-18：干净基线已提交，v2 微内核 + 核心 surface 包已迁移上生产，knowledge / memory / skills / work / state 已全原生，control-plane requireAuth 面已按切片填肉；`go test` 与前端 pack 测试全绿；逐组真实进度见 §6。
 
 ---
 
@@ -125,13 +125,14 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 | 6   | control-plane  | ✅   | requireAuth 控制面已去壳：observability / audit / trust / iterate / review / skillgrow / approvals / tenants / inbox / bots / tools / plugins / models / providers / router / usage/quota 均已原生；requireSetupOrAuth / requireAdmin 特殊面仍保留网关直连 |
 | 7   | workspace      | ⬜   | 纯 dashboard 导航，暂无后端路由                                                                    |
 
-计划外额外完成（已上生产、全原生）：v2 微内核生命周期（enable/disable → Start/Stop）；单体抽离包 modes / reverie / ide / cron / triggers / documents / missions / files / instructions / emotion / graph。
+计划外额外完成（已上生产、全原生）：v2 微内核生命周期（enable/disable → Start/Stop）；单体抽离包 modes / reverie / ide / cron / triggers / documents / missions / files / instructions / emotion / graph / state。
 
 ### 验证门禁（2026-06-15 基线收敛）
 
-- `go test ./pkg/packruntime ./internal/controlplane/gateway ./internal/packs/... ./cmd/agent -count=1` → 全 **ok**（memory / state 暂无单测；迁移路由行为由网关迁移测试与各 pack 单测覆盖）。
+- `go test ./pkg/packruntime ./internal/controlplane/gateway ./internal/packs/... ./cmd/agent -count=1` → 全 **ok**（迁移路由行为由网关迁移测试与各 pack 单测覆盖）。
 - `apps/web` → `npm test -- pack`：**18 文件 / 103 测试全过** + SDK 边界检查 ok。
 - manifest `backend.routes` ↔ `handler.Routes()`：五个迁移包（knowledge/memory/skills/work/control-plane）均一致；网关已无被迁路径的直连注册（无 `http.ServeMux` 重复注册风险）。
+- `cmd/openapi-gen` 已从只扫 gateway 扩展为默认扫描 `internal/controlplane/gateway` + `internal/packs`，避免 native pack 路由（如 `/v1/state*`）迁出 gateway 后从 OpenAPI 漏掉。
 
 ### 仍待处理的特殊认证直连路由
 
@@ -153,6 +154,8 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 > 2026-06-18 增量：control-plane provider 管理面已原生（provider list/test/enable/disable/switch/session/local/tori/delete、router stats、breaker reset、exec provider），gateway 仅提供 provider registry / Tori token / smart router / exec provider 窄 accessor；首次配置三条 setup-flow provider 路由继续直连。
 
 > 2026-06-18 增量：browser-intent 普通 HTTP 路由已原生（status/config/navigate/screenshot/ocr/screenshot/latest/opp/status/action/scenarios/run），gateway 仅保留 `/api/browser/ext/session` 作为扩展授权桥接。
+
+> 2026-06-18 增量：state-kernel 四条 `/v1/state*` 路由已原生并注册为 `yunque.pack.state` 官方包（snapshot/goals/focus/resources）；gateway 仅提供 `StateKernel()` 窄 accessor。OpenAPI 路由扫描同步覆盖 `internal/packs`，防止 pack 化路由漏出 API 契约。
 
 > 2026-06-18 增量：control-plane bots 两条 Bot 管理路由已原生（collection + detail CRUD），gateway 仅提供 `BotManager()` 窄 accessor。
 

@@ -1,0 +1,44 @@
+{
+  "id": "yunque.pack.state",
+  "name": "State Kernel (状态内核)",
+  "version": "0.1.0",
+  "description": "结构化状态内核：状态快照、目标、焦点与资源追踪。默认预装的核心上下文能力，可在能力包中心关闭。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": [
+      "state.snapshot",
+      "state.goals",
+      "state.focus",
+      "state.resources"
+    ],
+    "routes": [
+      "/v1/state",
+      "/v1/state/goals",
+      "/v1/state/focus",
+      "/v1/state/resources"
+    ],
+    "permissions": [
+      "state:read",
+      "state:write"
+    ]
+  },
+  "frontend": {
+    "menus": [],
+    "assets": {
+      "type": "builtin"
+    }
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "group": "work",
+    "phase": "A2",
+    "preload": "true",
+    "note": "Default-preloaded core context pack: natively owns /v1/state* through the state-kernel accessor. No separate menu; UI surfaces consume the API from existing task/work views."
+  },
+  "status": "beta"
+}

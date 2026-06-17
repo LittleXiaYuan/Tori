@@ -104,8 +104,7 @@ func (g *Gateway) registerSystemRoutes() {
 	}))
 
 	// System info / metrics / cache stats and tenants migrated to the
-	// control-plane pack (internal/packs/controlplane); handlers stay on the
-	// gateway (HandleControlPlanePack) during this bridge phase.
+	// control-plane pack (internal/packs/controlplane).
 
 	// Settings (env config management + setup check)
 	g.mux.HandleFunc("/api/settings/schema", g.requireAuth(g.handleSettingsSchema))

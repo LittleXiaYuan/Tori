@@ -182,11 +182,25 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 		t.Fatal("expected WASM Plugin installer registration plan routeSpec")
 	}
 
+	statePack, ok := registry.Get("yunque.pack.state")
+	if !ok {
+		t.Fatal("expected State Kernel builtin pack to be installed")
+	}
+	if statePack.Status != packruntime.PackStatusEnabled {
+		t.Fatalf("expected State Kernel default enabled, got %s", statePack.Status)
+	}
+	if !hasBackendRoute(statePack.Manifest, "/v1/state") {
+		t.Fatal("expected State Kernel snapshot route to be installed from manifest")
+	}
+	if !hasBackendRoute(statePack.Manifest, "/v1/state/resources") {
+		t.Fatal("expected State Kernel resources route to be installed from manifest")
+	}
+
 	ensureBuiltinPacks(registry)
 	// Count reflects the current packs/official/ set (incl. the newer
 	// console/control-plane/knowledge/memory/skills/work/workspace packs and the
-	// cognitive-layer pack). Adjust if the builtin pack set changes.
-	if got := len(registry.List()); got != 25 {
+	// cognitive-layer/state packs). Adjust if the builtin pack set changes.
+	if got := len(registry.List()); got != 26 {
 		t.Fatalf("expected idempotent builtin install, got %d packs", got)
 	}
 }

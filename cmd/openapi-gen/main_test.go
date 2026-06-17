@@ -108,6 +108,25 @@ func TestExtractPathsScansGatewaySubpackages(t *testing.T) {
 	}
 }
 
+func TestExtractPathsFromDirsScansPackRoutes(t *testing.T) {
+	paths, err := extractPathsFromDirs([]string{
+		"../../internal/controlplane/gateway",
+		"../../internal/packs",
+	})
+	if err != nil {
+		t.Fatalf("extractPathsFromDirs: %v", err)
+	}
+	seen := map[string]bool{}
+	for _, p := range paths {
+		seen[p] = true
+	}
+	for _, want := range []string{"/v1/state", "/v1/state/goals", "/v1/state/focus", "/v1/state/resources"} {
+		if !seen[want] {
+			t.Fatalf("expected pack route scan to include %s", want)
+		}
+	}
+}
+
 func TestMakeOperationID(t *testing.T) {
 	cases := []struct {
 		method, path, want string

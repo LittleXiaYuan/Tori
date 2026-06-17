@@ -1,9 +1,9 @@
 // Package workpack mounts the task + project HTTP surface as a Pack Runtime
-// backend module. Bridge phase: the pack owns route registration + the
-// enable/disable gate, while the gateway still hosts the handler
-// implementations (via the narrow WorkGateway interface). Planner recovery,
-// missions, state kernel, reflection and documents stay on the gateway;
-// workflows remain in the workflowapi sub-package.
+// backend module. The pack owns route registration, the enable/disable gate and
+// the task/project handler implementations through the narrow WorkGateway
+// interface. Planner recovery and reflection stay on the gateway; missions,
+// state kernel and documents are owned by their sibling packs. Workflows remain
+// in the workflowapi sub-package and are mounted through this pack.
 package workpack
 
 import (
@@ -46,7 +46,7 @@ type Handler struct {
 	started atomic.Bool
 }
 
-// NewHandler builds the work pack backed by the gateway bridge.
+// NewHandler builds the work pack backed by narrow gateway accessors.
 func NewHandler(gateway WorkGateway) *Handler { return &Handler{gateway: gateway} }
 
 // PackID returns the stable manifest id.
@@ -77,10 +77,10 @@ func (h *Handler) Stop(ctx context.Context) error {
 	return nil
 }
 
-// Routes mounts the task + project surface. Methods are declared broadly so the
-// bridge keeps the original routes' permissive (handler-decides) method
-// behavior; the manifest lists these as path-only routes so the pack gate allows
-// any method.
+// Routes mounts the task + project surface. Methods are declared broadly to
+// preserve the original routes' permissive (handler-decides) method behavior;
+// the manifest lists these as path-only routes so the pack gate allows any
+// method.
 func (h *Handler) Routes() []packruntime.BackendRoute {
 	methods := []string{
 		http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodPatch,

@@ -1,10 +1,8 @@
 package gateway
 
-// registerTaskRoutes registers planner recovery, missions, state kernel,
-// reflection, and document generation routes. The task surface (/v1/tasks/*)
-// and project surface (/v1/projects/*) moved to the work pack
-// (internal/packs/work, see HandleWorkPack) so toggling yunque.pack.work
-// enables/disables them at runtime; registering them here too would panic the
+// registerTaskRoutes registers planner recovery and reflection routes. The task
+// (/v1/tasks/*), project (/v1/projects/*), state (/v1/state*) and document
+// surfaces moved to native packs, so registering them here too would panic the
 // mux on duplicate patterns.
 func (g *Gateway) registerTaskRoutes() {
 	// Planner recovery checkpoints
@@ -16,16 +14,13 @@ func (g *Gateway) registerTaskRoutes() {
 	g.mux.HandleFunc("/v1/planner/checkpoints/resume-plan/jobs", g.requireAuth(g.handlePlannerCheckpointResumePlanJob))
 
 	// Task gaps + context (/v1/tasks/gaps*, /v1/tasks/{memory,threads,templates,
-	// templates/instantiate}) moved to the work pack bridge (HandleWorkPack).
+	// templates/instantiate}) are owned by the work pack (internal/packs/work).
 
 	// Missions (/v1/missions/*) are owned by the missions pack
 	// (internal/packs/missions), mounted via gw.RegisterModule.
 
-	// State Kernel
-	g.mux.HandleFunc("/v1/state", g.requireAuth(g.handleStateSnapshot))
-	g.mux.HandleFunc("/v1/state/goals", g.requireAuth(g.handleStateGoals))
-	g.mux.HandleFunc("/v1/state/focus", g.requireAuth(g.handleStateFocus))
-	g.mux.HandleFunc("/v1/state/resources", g.requireAuth(g.handleStateResources))
+	// State Kernel (/v1/state*) is owned by the state pack
+	// (internal/packs/state), mounted via gw.RegisterModule.
 
 	// Reflection / Experience
 	g.mux.HandleFunc("/v1/reflect/experiences", g.requireAuth(g.handleExperiences))

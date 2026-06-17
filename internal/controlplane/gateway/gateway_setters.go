@@ -438,6 +438,10 @@ func (g *Gateway) SetGapAnalyzer(a *task.GapAnalyzer) { g.gapAnalyzer = a }
 // SetStateKernel attaches the structured state kernel.
 func (g *Gateway) SetStateKernel(sk *state.Kernel) { g.stateKernel = sk }
 
+// StateKernel exposes the structured state kernel to the state pack, which owns
+// /v1/state* natively. May be nil until the task engine finishes wiring.
+func (g *Gateway) StateKernel() *state.Kernel { return g.stateKernel }
+
 // SetExperienceStore attaches the reflection experience store.
 func (g *Gateway) SetExperienceStore(es *reflectpkg.ExperienceStore) { g.experienceStore = es }
 

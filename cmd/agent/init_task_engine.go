@@ -57,6 +57,7 @@ import (
 	nightschoolpack "yunque-agent/internal/packs/nightschool"
 	reveriepack "yunque-agent/internal/packs/reverie"
 	skillspack "yunque-agent/internal/packs/skills"
+	statepack "yunque-agent/internal/packs/state"
 	triggerspack "yunque-agent/internal/packs/triggers"
 	workpack "yunque-agent/internal/packs/work"
 	worldmodelpack "yunque-agent/internal/packs/worldmodel"
@@ -496,6 +497,8 @@ func initTaskEngine(
 	gw.SetStateKernel(stateKernel)
 	p.SetStateContext(stateKernel.CompileForLLM)
 	app.Set(agentrt.CompStateKernel, stateKernel)
+	// State pack — owns /v1/state* natively via the state-kernel accessor.
+	_ = gw.RegisterModule(statepack.New(gw))
 
 	// Wire task events → State Kernel + SSE
 	taskRunner.OnTaskEvent(func(event, taskID, detail string) {
