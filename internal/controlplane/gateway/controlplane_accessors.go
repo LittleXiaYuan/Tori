@@ -7,6 +7,7 @@ import (
 	"yunque-agent/internal/agentcore/bots"
 	"yunque-agent/internal/agentcore/inbox"
 	"yunque-agent/internal/agentcore/planner"
+	"yunque-agent/internal/agentcore/tools"
 	"yunque-agent/internal/controlplane/tenant"
 	"yunque-agent/internal/observe"
 )
@@ -32,11 +33,25 @@ func (g *Gateway) InboxStore() *inbox.Store {
 	return g.inbox
 }
 
+func (g *Gateway) ShellPolicy() *tools.ShellExecPolicy {
+	if g == nil {
+		return nil
+	}
+	return g.shellPolicy
+}
+
 func (g *Gateway) TenantManager() *tenant.Manager {
 	if g == nil {
 		return nil
 	}
 	return g.tenants
+}
+
+func (g *Gateway) ToolsManager() *tools.ProcessManager {
+	if g == nil {
+		return nil
+	}
+	return g.toolsMgr
 }
 
 // MetricsSnapshot exposes a user-safe copy point for the control-plane pack's

@@ -53,21 +53,6 @@ func TestCheckWSOriginAllowsConfigured(t *testing.T) {
 	}
 }
 
-// ── Test 10: ENABLE_TOOLS_EXEC disabled returns 403 ──
-
-func TestToolExecDisabledByDefault(t *testing.T) {
-	os.Unsetenv("ENABLE_TOOLS_EXEC")
-
-	g := &Gateway{}
-	req := httptest.NewRequest(http.MethodPost, "/v1/tools/exec", nil)
-	w := httptest.NewRecorder()
-	g.handleToolExec(w, req)
-
-	if w.Code != http.StatusForbidden {
-		t.Fatalf("expected 403 when ENABLE_TOOLS_EXEC not set, got %d", w.Code)
-	}
-}
-
 // ── Test 11: shared SSRF guard rejects loopback / metadata URLs ──
 
 func TestValidateSSRFTargetRejectsPrivateTargets(t *testing.T) {

@@ -12,6 +12,7 @@ import (
 	"yunque-agent/internal/agentcore/bots"
 	"yunque-agent/internal/agentcore/inbox"
 	"yunque-agent/internal/agentcore/planner"
+	"yunque-agent/internal/agentcore/tools"
 	"yunque-agent/internal/controlplane/tenant"
 	"yunque-agent/internal/observe"
 )
@@ -32,9 +33,15 @@ func (g *tenantGateway) BotManager() *bots.Manager { return nil }
 
 func (g *tenantGateway) InboxStore() *inbox.Store { return nil }
 
+func (g *tenantGateway) ShellPolicy() *tools.ShellExecPolicy { return nil }
+
 func (g *tenantGateway) TenantManager() *tenant.Manager { return g.tenants }
 
 func (g *tenantGateway) TenantOf(ctx context.Context) string { return "tenant-a" }
+
+func (g *tenantGateway) ToolsManager() *tools.ProcessManager { return nil }
+
+func (g *tenantGateway) OutputDir() string { return "" }
 
 func (g *tenantGateway) MetricsSnapshot() observe.MetricsSnapshot { return observe.MetricsSnapshot{} }
 

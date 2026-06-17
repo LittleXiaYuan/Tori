@@ -14,6 +14,7 @@
 //   - tenants: list/create tenant collection route (native).
 //   - inbox: message collection and mark-read route (native).
 //   - bots: bot collection/detail CRUD routes (native).
+//   - tools: process execution/session routes (native).
 //
 // It ships default-enabled (an always-on core surface) so audit/trust and the
 // other governance APIs stay available out of the box; operators can still
@@ -35,6 +36,7 @@ import (
 	"yunque-agent/internal/agentcore/bots"
 	"yunque-agent/internal/agentcore/inbox"
 	"yunque-agent/internal/agentcore/planner"
+	"yunque-agent/internal/agentcore/tools"
 	"yunque-agent/internal/controlplane/tenant"
 	"yunque-agent/internal/observe"
 	"yunque-agent/pkg/packruntime"
@@ -121,8 +123,11 @@ type ControlPlaneGateway interface {
 	ApprovalManager() *approval.Manager
 	BotManager() *bots.Manager
 	InboxStore() *inbox.Store
+	ShellPolicy() *tools.ShellExecPolicy
 	TenantManager() *tenant.Manager
 	TenantOf(ctx context.Context) string
+	ToolsManager() *tools.ProcessManager
+	OutputDir() string
 	MetricsSnapshot() observe.MetricsSnapshot
 	MetricsPrometheus() string
 	ModelRuntimeHealth() planner.ModelRuntimeHealth
@@ -201,6 +206,14 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 			handler = h.handleBots
 		case "/v1/bots/detail":
 			handler = h.handleBotDetail
+		case "/v1/tools/exec":
+			handler = h.handleToolExec
+		case "/v1/tools/list":
+			handler = h.handleToolList
+		case "/v1/tools/poll":
+			handler = h.handleToolPoll
+		case "/v1/tools/kill":
+			handler = h.handleToolKill
 		case "/v1/system/info":
 			handler = h.handleSystemInfo
 		case "/v1/system/stats":

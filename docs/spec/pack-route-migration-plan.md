@@ -122,7 +122,7 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 | 3   | skills         | ✅   | `/v1/skills` 全原生：列表、scan、dynamic、approve、reject（无网关桥接；scan 经 `Gateway.ScanSkills()` 注入）   |
 | 4   | work           | ✅   | tasks / projects / workflows 全原生（workflow 由 `WorkflowHandler().RouteSpecs()` 合并挂载）       |
 | 5   | cogni-console  | ⬜   | 多为菜单指向已有 `/v1/cognis/*`（cogni-kernel 后端已原生）                                              |
-| 6   | control-plane  | 🟡  | 路由所有权已覆盖 governance/approvals/inbox/tools/bots/plugins/metrics/system/tenants/providers 等；observability / approvals / tenants / inbox / bots 已原生，其余仍通过 gateway bridge |
+| 6   | control-plane  | 🟡  | 路由所有权已覆盖 governance/approvals/inbox/tools/bots/plugins/metrics/system/tenants/providers 等；observability / approvals / tenants / inbox / bots / tools 已原生，其余仍通过 gateway bridge |
 | 7   | workspace      | ⬜   | 纯 dashboard 导航，暂无后端路由                                                                    |
 
 计划外额外完成（已上生产、全原生）：v2 微内核生命周期（enable/disable → Start/Stop）；单体抽离包 modes / reverie / ide / cron / triggers / documents / missions / files / instructions / emotion / graph。
@@ -136,7 +136,7 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 ### 仍待“填肉”的 bridge 路由
 
 - knowledge：无，已全原生。
-- control-plane：plugins / models / tools / providers 及部分 governance 面仍通过 `HandleControlPlanePack` 桥接，后续继续按低风险 surface 小切片迁移。
+- control-plane：plugins / models / providers 及部分 governance 面仍通过 `HandleControlPlanePack` 桥接，后续继续按低风险 surface 小切片迁移。
 
 > 2026-06-15 增量：skills `/v1/skills/scan` 已去壳进 `internal/packs/skills`（删除 `handlers_skills_pack.go` 桥接与网关 `handleSkillsScan`，新增 `Gateway.ScanSkills()` 注入），skills 组转为 ✅ 全原生。
 
@@ -149,3 +149,5 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 > 2026-06-18 增量：control-plane inbox 两条消息路由已原生（collection + mark-read），gateway 仅提供 `InboxStore()` 窄 accessor。
 
 > 2026-06-18 增量：control-plane bots 两条 Bot 管理路由已原生（collection + detail CRUD），gateway 仅提供 `BotManager()` 窄 accessor。
+
+> 2026-06-18 增量：control-plane tools 四条进程执行/会话路由已原生，保留 ENABLE_TOOLS_EXEC、shell policy、cwd allowlist 与环境变量 denylist 安全门。
