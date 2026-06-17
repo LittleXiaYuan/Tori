@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"yunque-agent/internal/agentcore/knowledge"
 	"yunque-agent/internal/agentcore/planner"
 	"yunque-agent/internal/appdir"
 	"yunque-agent/internal/apperror"
@@ -223,8 +224,8 @@ func (g *Gateway) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 	if parseMeta := fileParseMetadata(localParse, 6000); parseMeta != nil {
 		resp["parse"] = parseMeta
 	}
-	if isMinerUSupportedExt(ext) && g.documentParser != nil && g.documentParser.Enabled() {
-		if parsed, perr := g.parseFileWithMinerU(r.Context(), filename, content); perr != nil {
+	if knowledge.IsMinerUSupportedExt(ext) && g.documentParser != nil && g.documentParser.Enabled() {
+		if parsed, perr := knowledge.ParseFileWithMinerU(r.Context(), g.documentParser, filename, content); perr != nil {
 			slog.Warn("upload MinerU parse failed", "name", filename, "err", perr)
 		} else {
 			snippet = parsed.Markdown

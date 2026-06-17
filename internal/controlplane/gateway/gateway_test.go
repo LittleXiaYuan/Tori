@@ -249,12 +249,12 @@ func (s stubDocumentParser) ParseFile(ctx context.Context, filePath string) (*mi
 
 func TestIsMinerUSupportedExt(t *testing.T) {
 	for _, ext := range []string{".pdf", ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx", ".png", ".jpeg", ".tiff"} {
-		if !isMinerUSupportedExt(ext) {
+		if !knowledge.IsMinerUSupportedExt(ext) {
 			t.Fatalf("expected supported ext: %s", ext)
 		}
 	}
 	for _, ext := range []string{".txt", ".md", ".zip", ""} {
-		if isMinerUSupportedExt(ext) {
+		if knowledge.IsMinerUSupportedExt(ext) {
 			t.Fatalf("expected unsupported ext: %s", ext)
 		}
 	}
@@ -269,7 +269,7 @@ func TestIngestKnowledgeWithMinerU(t *testing.T) {
 		},
 	}
 
-	parsed, err := g.parseFileWithMinerU(context.Background(), "demo.pdf", []byte("pdf bytes"))
+	parsed, err := knowledge.ParseFileWithMinerU(context.Background(), g.documentParser, "demo.pdf", []byte("pdf bytes"))
 	if err != nil {
 		t.Fatalf("unexpected parse error: %v", err)
 	}
@@ -280,7 +280,7 @@ func TestIngestKnowledgeWithMinerU(t *testing.T) {
 		t.Fatalf("expected preview metadata, got %#v", parsed.Parse)
 	}
 
-	res, err := g.ingestKnowledgeWithMinerU(context.Background(), "demo.pdf", []byte("pdf bytes"))
+	res, err := knowledge.IngestWithMinerU(context.Background(), g.knowledgeStore, g.documentParser, "demo.pdf", []byte("pdf bytes"))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -313,7 +313,7 @@ func TestParseFileWithMinerUPreviewKeepsUTF8AndRuneCount(t *testing.T) {
 		},
 	}
 
-	parsed, err := g.parseFileWithMinerU(context.Background(), "demo.pdf", []byte("pdf bytes"))
+	parsed, err := knowledge.ParseFileWithMinerU(context.Background(), g.documentParser, "demo.pdf", []byte("pdf bytes"))
 	if err != nil {
 		t.Fatalf("unexpected parse error: %v", err)
 	}

@@ -16,9 +16,12 @@ func (g *Gateway) FetchImportPage(rawURL, fallbackName string) (*knowledge.Impor
 	return fetchKnowledgeURLPage(rawURL, fallbackName)
 }
 
+// DocumentParser exposes the configured document parser to the knowledge pack's
+// native upload handler.
+func (g *Gateway) DocumentParser() knowledge.DocumentParser { return g.documentParser }
+
 // The knowledge read surface (search / sources / stats), the write surface
-// (ingest / source delete / source update) and the import surface (import-url /
-// import-repo) were de-shelled into the knowledge pack (internal/packs/
-// knowledge); their handler logic now lives there and talks to the store
-// directly. Only upload remains on the gateway bridge (HandleKnowledgePack) for
-// now (it shares the MinerU document parser with the admin upload path).
+// (ingest / source delete / source update), the import surface (import-url /
+// import-repo) and upload were de-shelled into the knowledge pack
+// (internal/packs/knowledge); their handler logic now lives there and talks to
+// the store directly.

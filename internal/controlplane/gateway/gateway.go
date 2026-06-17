@@ -74,7 +74,6 @@ import (
 	"yunque-agent/internal/execution/sandbox"
 	"yunque-agent/internal/execution/scheduler"
 	reflectpkg "yunque-agent/internal/experimental/reflect"
-	"yunque-agent/internal/integrations/mineru"
 	mcpserver "yunque-agent/internal/mcp/server"
 	"yunque-agent/internal/observe"
 	"yunque-agent/internal/orchestrator"
@@ -88,11 +87,6 @@ import (
 type ctxKeyType string
 
 const ctxKeyReqID ctxKeyType = "req_id"
-
-type documentParser interface {
-	Enabled() bool
-	ParseFile(ctx context.Context, filePath string) (*mineru.ParseResult, error)
-}
 
 type healthChecker interface {
 	HealthCheck(ctx context.Context) error
@@ -284,7 +278,7 @@ type Gateway struct {
 
 	// Connector Registry (GitHub, Gmail, Calendar, etc.)
 	connectorReg   *connectors.Registry
-	documentParser documentParser
+	documentParser knowledge.DocumentParser
 
 	notifier *notify.Notifier
 

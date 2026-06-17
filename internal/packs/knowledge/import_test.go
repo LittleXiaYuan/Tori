@@ -38,6 +38,8 @@ func (f *fakeKnowledgeGateway) FetchImportPage(rawURL, fallbackName string) (*kn
 	return nil, fmt.Errorf("no fetcher configured")
 }
 
+func (f *fakeKnowledgeGateway) DocumentParser() knowledge.DocumentParser { return nil }
+
 func (f *fakeKnowledgeGateway) OutputDir() string { return f.outputDir }
 
 func (f *fakeKnowledgeGateway) TenantOf(ctx context.Context) string { return "test-tenant" }

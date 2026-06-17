@@ -3,11 +3,9 @@
 //
 // Migration status: the pack owns route registration + the enable/disable gate.
 // The read surface (search / sources / stats), the write surface (ingest /
-// source delete / update) and the import surface (import-url / import-repo) have
-// all been "filled in" — their handler implementations now live in this package
-// and talk to the knowledge store directly. Only upload is still served by the
-// gateway bridge (it shares the MinerU document parser with the admin upload
-// path), consumed via the narrow KnowledgeGateway interface.
+// source delete / update), the import surface (import-url / import-repo) and
+// upload have all been "filled in" — their handler implementations now live in
+// this package and talk to the knowledge store directly.
 package knowledgepack
 
 import (
@@ -26,17 +24,15 @@ import (
 const PackID = "yunque.pack.knowledge"
 
 // KnowledgeGateway is the narrow gateway surface the knowledge pack needs. It is
-// deliberately not the concrete *Gateway: only the upload bridge plus a few
-// cross-cutting capabilities (SSRF-safe fetch, output dir, tenant resolution)
-// the native import handlers consume.
+// deliberately not the concrete *Gateway: only cross-cutting capabilities
+// (SSRF-safe fetch, document parser, output dir, tenant resolution) are exposed.
 type KnowledgeGateway interface {
-	// HandleKnowledgePack bridges the still-gateway-hosted upload route (it
-	// shares the MinerU document parser with the admin upload path).
-	HandleKnowledgePack(w http.ResponseWriter, r *http.Request)
 	// FetchImportPage performs an SSRF-safe fetch + content extraction for the
 	// native import-url handler. The SSRF guard stays in the gateway because it
 	// is shared with other outbound-fetch features.
 	FetchImportPage(rawURL, fallbackName string) (*knowledge.ImportPage, error)
+	// DocumentParser returns the configured document parser used by upload.
+	DocumentParser() knowledge.DocumentParser
 	// OutputDir is the configured agent output dir, used as the base allow-list
 	// root for native import-repo path resolution.
 	OutputDir() string
@@ -55,8 +51,8 @@ type Handler struct {
 	started atomic.Bool
 }
 
-// NewHandler builds the knowledge pack backed only by the gateway bridge (no
-// native store wiring). Used by tests that exercise route gating.
+// NewHandler builds the knowledge pack without native store wiring. Used by
+// tests that exercise route gating.
 func NewHandler(gateway KnowledgeGateway) *Handler { return &Handler{gateway: gateway} }
 
 // NewHandlerWithStore builds the knowledge pack with the knowledge store wired,
@@ -93,12 +89,10 @@ func (h *Handler) Stop(ctx context.Context) error {
 	return nil
 }
 
-// Routes mounts the knowledge surface. All routes except upload are served by
-// this package's native handlers; upload is still dispatched to the gateway
-// bridge. Methods are declared broadly so the manifest's path-only routes keep
-// the original permissive (handler-decides) behavior.
+// Routes mounts the knowledge surface. Every route is served by this package's
+// native handlers. Methods are declared broadly so the manifest's path-only
+// routes keep the original permissive (handler-decides) behavior.
 func (h *Handler) Routes() []packruntime.BackendRoute {
-	bridge := h.gateway.HandleKnowledgePack
 	methods := []string{
 		http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodPatch,
 	}
@@ -120,8 +114,9 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 		// provides the SSRF-safe fetch + output dir via the narrow interface.
 		mk("/v1/knowledge/import-url", h.handleImportURL),
 		mk("/v1/knowledge/import-repo", h.handleImportRepo),
-		// Still bridged to the gateway (file upload shares MinerU parsing).
-		mk("/v1/knowledge/upload", bridge),
+		// Upload is native: multipart handling lives in this pack; the gateway
+		// only provides the configured document parser via the narrow interface.
+		mk("/v1/knowledge/upload", h.handleUpload),
 	}
 }
 
