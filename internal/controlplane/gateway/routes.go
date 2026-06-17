@@ -208,10 +208,9 @@ func (g *Gateway) registerGovernanceRoutes() {
 
 func (g *Gateway) registerProviderRoutes() {
 	// Most provider/model routes (requireAuth) migrated to the control-plane pack
-	// (internal/packs/controlplane); handlers stay on the gateway
-	// (HandleControlPlanePack) during this bridge phase. The setup-flow routes
-	// below stay direct because they are requireSetupOrAuth and must remain
-	// reachable during onboarding without depending on the pack-enabled gate.
+	// (internal/packs/controlplane). The setup-flow routes below stay direct
+	// because they are requireSetupOrAuth and must remain reachable during
+	// onboarding without depending on the pack-enabled gate.
 	g.mux.HandleFunc("/api/providers/mode", g.requireSetupOrAuth(g.handleProviderMode))
 	g.mux.HandleFunc("/api/providers/presets", g.requireSetupOrAuth(g.handleProviderPresets))
 	g.mux.HandleFunc("/api/providers/register", g.requireSetupOrAuth(g.handleProviderRegister))

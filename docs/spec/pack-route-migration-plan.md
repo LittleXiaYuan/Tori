@@ -122,7 +122,7 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 | 3   | skills         | ✅   | `/v1/skills` 全原生：列表、scan、dynamic、approve、reject（无网关桥接；scan 经 `Gateway.ScanSkills()` 注入）   |
 | 4   | work           | ✅   | tasks / projects / workflows 全原生（workflow 由 `WorkflowHandler().RouteSpecs()` 合并挂载）       |
 | 5   | cogni-console  | ⬜   | 多为菜单指向已有 `/v1/cognis/*`（cogni-kernel 后端已原生）                                              |
-| 6   | control-plane  | 🟡  | 路由所有权已覆盖 governance/approvals/inbox/tools/bots/plugins/metrics/system/tenants/models/providers 等；observability / audit / trust / iterate / review / skillgrow / approvals / tenants / inbox / bots / tools / plugins / models / usage/quota 已原生，其余仍通过 gateway bridge |
+| 6   | control-plane  | ✅/🟡 | requireAuth 控制面已去壳：observability / audit / trust / iterate / review / skillgrow / approvals / tenants / inbox / bots / tools / plugins / models / providers / router / usage/quota 均已原生；requireSetupOrAuth / requireAdmin 特殊面仍保留网关直连 |
 | 7   | workspace      | ⬜   | 纯 dashboard 导航，暂无后端路由                                                                    |
 
 计划外额外完成（已上生产、全原生）：v2 微内核生命周期（enable/disable → Start/Stop）；单体抽离包 modes / reverie / ide / cron / triggers / documents / missions / files / instructions / emotion / graph。
@@ -133,10 +133,10 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 - `apps/web` → `npm test -- pack`：**18 文件 / 103 测试全过** + SDK 边界检查 ok。
 - manifest `backend.routes` ↔ `handler.Routes()`：五个迁移包（knowledge/memory/skills/work/control-plane）均一致；网关已无被迁路径的直连注册（无 `http.ServeMux` 重复注册风险）。
 
-### 仍待“填肉”的 bridge 路由
+### 仍待处理的特殊认证直连路由
 
 - knowledge：无，已全原生。
-- control-plane：providers 面仍通过 `HandleControlPlanePack` 桥接，后续继续按低风险 surface 小切片迁移。
+- control-plane：`HandleControlPlanePack` 已无剩余桥接；setup-flow provider 路由（`/api/providers/mode`、`/api/providers/presets`、`/api/providers/register`）仍直连网关，因为它们需要 `requireSetupOrAuth`，必须在首次配置期间可用；requireAdmin 面（如 sandbox / rbac 等）等待 pack auth mode 扩展后再迁。
 
 > 2026-06-15 增量：skills `/v1/skills/scan` 已去壳进 `internal/packs/skills`（删除 `handlers_skills_pack.go` 桥接与网关 `handleSkillsScan`，新增 `Gateway.ScanSkills()` 注入），skills 组转为 ✅ 全原生。
 
@@ -149,6 +149,8 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 > 2026-06-18 增量：control-plane inbox 两条消息路由已原生（collection + mark-read），gateway 仅提供 `InboxStore()` 窄 accessor。
 
 > 2026-06-18 增量：control-plane plugins 八条 CRUD/UI/reload/open-folder 路由已原生，模板脚手架迁入 `internal/packs/controlplane`，gateway 仅提供 plugin registry / loader / rebuild skills 窄 accessor。
+
+> 2026-06-18 增量：control-plane provider 管理面已原生（provider list/test/enable/disable/switch/session/local/tori/delete、router stats、breaker reset、exec provider），gateway 仅提供 provider registry / Tori token / smart router / exec provider 窄 accessor；首次配置三条 setup-flow provider 路由继续直连。
 
 > 2026-06-18 增量：control-plane bots 两条 Bot 管理路由已原生（collection + detail CRUD），gateway 仅提供 `BotManager()` 窄 accessor。
 

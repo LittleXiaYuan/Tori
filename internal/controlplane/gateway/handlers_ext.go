@@ -362,20 +362,6 @@ func verifyFeishuRequest(h http.Header, body []byte) error {
 	return nil
 }
 
-// --- Smart Router API ---
-
-func (g *Gateway) handleRouterStats(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	if g.smartRouter == nil {
-		json.NewEncoder(w).Encode(map[string]string{"status": "not configured"})
-		return
-	}
-	json.NewEncoder(w).Encode(map[string]any{
-		"slots": g.smartRouter.GetSlots(),
-		"stats": g.smartRouter.GetStats(),
-	})
-}
-
 // --- Identity API ---
 
 func (g *Gateway) handleIdentityResolve(w http.ResponseWriter, r *http.Request) {

@@ -1,8 +1,7 @@
 // Package controlplanepack mounts the governance/ops control-plane HTTP surface
 // as a Pack Runtime backend module. The pack owns route registration + the
-// enable gate; filled-in slices host their handlers here, while remaining slices
-// still dispatch through the gateway bridge via the narrow ControlPlaneGateway
-// interface.
+// enable gate; migrated slices host their handlers here and obtain runtime state
+// through the narrow ControlPlaneGateway interface.
 //
 // Migrated slices so far:
 //   - governance (registerGovernanceRoutes): audit/trust/iterate/review/
@@ -17,6 +16,9 @@
 //   - tools: process execution/session routes (native).
 //   - models: explicit model catalog plus provider-derived models (native).
 //   - usage/quota: tenant usage read and quota write routes (native).
+//   - plugins: CRUD/files/UI/reload/open-folder routes (native).
+//   - providers/router: requireAuth provider management, router stats, breaker
+//     reset and exec-provider routes (native).
 //
 // It ships default-enabled (an always-on core surface) so audit/trust and the
 // other governance APIs stay available out of the box; operators can still
@@ -25,8 +27,7 @@
 // Only surfaces whose gateway routes are uniformly requireAuth are migrated per
 // slice: the pack route gate wraps handlers with requireAuth, so surfaces that
 // need requireAdmin or requireSetupOrAuth (e.g. sandbox, rbac, setup, some
-// provider routes) must wait until the pack auth modes are extended. Remaining
-// provider surfaces are migrated in later slices.
+// provider setup routes) must wait until the pack auth modes are extended.
 package controlplanepack
 
 import (
@@ -38,9 +39,11 @@ import (
 	"yunque-agent/internal/agentcore/audit"
 	"yunque-agent/internal/agentcore/bots"
 	"yunque-agent/internal/agentcore/inbox"
+	"yunque-agent/internal/agentcore/llm"
 	"yunque-agent/internal/agentcore/llm/distill"
 	"yunque-agent/internal/agentcore/planner"
 	"yunque-agent/internal/agentcore/review"
+	"yunque-agent/internal/agentcore/router"
 	"yunque-agent/internal/agentcore/selfheal/iterate"
 	"yunque-agent/internal/agentcore/skillgrowth/adapter"
 	"yunque-agent/internal/agentcore/tools"
@@ -48,6 +51,7 @@ import (
 	"yunque-agent/internal/controlplane/models"
 	"yunque-agent/internal/controlplane/tenant"
 	"yunque-agent/internal/observe"
+	"yunque-agent/internal/tori"
 	"yunque-agent/pkg/packruntime"
 	"yunque-agent/pkg/plugin"
 )
@@ -164,6 +168,14 @@ type pluginGateway interface {
 	RebuildSkillsFromPlugins() int
 }
 
+type providerGateway interface {
+	ProviderRegistry() *llm.ProviderRegistry
+	ToriTokenStore() *tori.TokenStore
+	SmartRouter() *router.Router
+	ExecProvider() string
+	SetExecProvider(id string)
+}
+
 // Handler is the control-plane pack's backend module.
 type Handler struct {
 	gateway ControlPlaneGateway
@@ -171,7 +183,7 @@ type Handler struct {
 	started atomic.Bool
 }
 
-// NewHandler builds the control-plane pack backed by the gateway bridge.
+// NewHandler builds the control-plane pack backed by narrow gateway accessors.
 func NewHandler(gateway ControlPlaneGateway) *Handler { return &Handler{gateway: gateway} }
 
 // PackID returns the stable manifest id.
@@ -202,10 +214,10 @@ func (h *Handler) Stop(ctx context.Context) error {
 	return nil
 }
 
-// Routes mounts the governance/ops surface. Methods are declared broadly so
-// bridge-backed routes keep the original permissive (handler-decides) method
-// behavior; the manifest lists these as path-only routes so the pack gate allows
-// any method. Tightening to exact methods is a fill-the-flesh follow-up.
+// Routes mounts the governance/ops surface. Methods are declared broadly to
+// preserve the original handler-decides method behavior; the manifest lists
+// these as path-only routes so the pack gate allows any method. Tightening to
+// exact methods is a follow-up.
 func (h *Handler) Routes() []packruntime.BackendRoute {
 	d := h.gateway.HandleControlPlanePack
 	methods := []string{
@@ -299,6 +311,32 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 			handler = h.handleCacheStats
 		case "/v1/models":
 			handler = h.handleModels
+		case "/api/providers":
+			handler = h.handleProviderList
+		case "/api/providers/test":
+			handler = h.handleProviderTest
+		case "/api/providers/enable":
+			handler = h.handleProviderEnable
+		case "/api/providers/disable":
+			handler = h.handleProviderDisable
+		case "/api/providers/switch-model":
+			handler = h.handleProviderSwitchModel
+		case "/api/providers/session":
+			handler = h.handleProviderSessionOverride
+		case "/api/providers/local/discover":
+			handler = h.handleLocalDiscover
+		case "/api/providers/local/register":
+			handler = h.handleLocalRegister
+		case "/api/providers/delete":
+			handler = h.handleProviderDelete
+		case "/api/providers/tori/discover":
+			handler = h.handleToriDiscover
+		case "/v1/router/stats":
+			handler = h.handleRouterStats
+		case "/api/breaker/reset":
+			handler = h.handleBreakerReset
+		case "/api/providers/exec":
+			handler = h.handleExecProvider
 		case "/v1/usage":
 			handler = h.handleUsage
 		case "/v1/quota":

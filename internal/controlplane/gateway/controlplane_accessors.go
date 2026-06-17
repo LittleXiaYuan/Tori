@@ -7,15 +7,18 @@ import (
 	"yunque-agent/internal/agentcore/audit"
 	"yunque-agent/internal/agentcore/bots"
 	"yunque-agent/internal/agentcore/inbox"
+	"yunque-agent/internal/agentcore/llm"
 	"yunque-agent/internal/agentcore/llm/distill"
 	"yunque-agent/internal/agentcore/planner"
 	"yunque-agent/internal/agentcore/review"
+	"yunque-agent/internal/agentcore/router"
 	"yunque-agent/internal/agentcore/selfheal/iterate"
 	"yunque-agent/internal/agentcore/skillgrowth/adapter"
 	"yunque-agent/internal/agentcore/tools"
 	"yunque-agent/internal/agentcore/trust"
 	"yunque-agent/internal/controlplane/tenant"
 	"yunque-agent/internal/observe"
+	"yunque-agent/internal/tori"
 	"yunque-agent/pkg/plugin"
 )
 
@@ -223,4 +226,25 @@ func (g *Gateway) RebuildSkillsFromPlugins() int {
 		return 0
 	}
 	return len(g.registry.All())
+}
+
+func (g *Gateway) ProviderRegistry() *llm.ProviderRegistry {
+	if g == nil {
+		return nil
+	}
+	return g.providerReg
+}
+
+func (g *Gateway) ToriTokenStore() *tori.TokenStore {
+	if g == nil {
+		return nil
+	}
+	return g.toriTokenStore
+}
+
+func (g *Gateway) SmartRouter() *router.Router {
+	if g == nil {
+		return nil
+	}
+	return g.smartRouter
 }

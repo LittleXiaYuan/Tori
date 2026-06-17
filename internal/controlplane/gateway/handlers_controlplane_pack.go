@@ -2,40 +2,9 @@ package gateway
 
 import "net/http"
 
-// HandleControlPlanePack is the compatibility bridge entrypoint for the
-// control-plane pack (internal/packs/controlplane). The pack owns route
-// registration + the enablement gate. Native slices live in the pack itself;
-// remaining governance/ops handlers dispatch here by path, preserving each
-// handler's original method behavior.
+// HandleControlPlanePack is retained as a compatibility no-op entrypoint for
+// older tests and modules. The control-plane pack now owns its migrated route
+// handlers directly; unexpected legacy dispatches should fall through to 404.
 func (g *Gateway) HandleControlPlanePack(w http.ResponseWriter, r *http.Request) {
-	switch r.URL.Path {
-	case "/api/providers":
-		g.handleProviderList(w, r)
-	case "/api/providers/test":
-		g.handleProviderTest(w, r)
-	case "/api/providers/enable":
-		g.handleProviderEnable(w, r)
-	case "/api/providers/disable":
-		g.handleProviderDisable(w, r)
-	case "/api/providers/switch-model":
-		g.handleProviderSwitchModel(w, r)
-	case "/api/providers/session":
-		g.handleProviderSessionOverride(w, r)
-	case "/api/providers/local/discover":
-		g.handleLocalDiscover(w, r)
-	case "/api/providers/local/register":
-		g.handleLocalRegister(w, r)
-	case "/api/providers/delete":
-		g.handleProviderDelete(w, r)
-	case "/api/providers/tori/discover":
-		g.handleToriDiscover(w, r)
-	case "/v1/router/stats":
-		g.handleRouterStats(w, r)
-	case "/api/breaker/reset":
-		g.handleBreakerReset(w, r)
-	case "/api/providers/exec":
-		g.handleExecProvider(w, r)
-	default:
-		http.NotFound(w, r)
-	}
+	http.NotFound(w, r)
 }

@@ -14,6 +14,7 @@ import (
 	"yunque-agent/internal/agentcore/persona"
 	"yunque-agent/internal/agentcore/skillmarket"
 	"yunque-agent/internal/agentcore/websearch"
+	controlplanepack "yunque-agent/internal/packs/controlplane"
 	"yunque-agent/pkg/cogni"
 )
 
@@ -152,7 +153,7 @@ func TestExecProviderRejectsUnavailableProvider(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/api/providers/exec", strings.NewReader(`{"provider_id":"local-ollama"}`))
 	w := httptest.NewRecorder()
-	gw.handleExecProvider(w, req)
+	controlPlaneRoute(t, gw, "/api/providers/exec")(w, req)
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400 for unavailable provider, got %d: %s", w.Code, w.Body.String())
 	}
@@ -167,13 +168,24 @@ func TestProviderSessionOverrideRejectsUnavailableProvider(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/api/providers/session", strings.NewReader(`{"session_id":"s1","provider_id":"local-ollama"}`))
 	w := httptest.NewRecorder()
-	gw.handleProviderSessionOverride(w, req)
+	controlPlaneRoute(t, gw, "/api/providers/session")(w, req)
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400 for unavailable provider, got %d: %s", w.Code, w.Body.String())
 	}
 	if got := gw.providerReg.GetForSession("s1"); got != nil {
 		t.Fatalf("session provider should not change, got %#v", got)
 	}
+}
+
+func controlPlaneRoute(t *testing.T, gw *Gateway, path string) http.HandlerFunc {
+	t.Helper()
+	for _, route := range controlplanepack.NewHandler(gw).Routes() {
+		if route.Path == path {
+			return route.Handler
+		}
+	}
+	t.Fatalf("control-plane route %s not found", path)
+	return nil
 }
 
 func TestNLConfigExecSystemInfoReturnsRuntimeState(t *testing.T) {
