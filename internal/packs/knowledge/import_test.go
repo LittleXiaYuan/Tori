@@ -27,10 +27,6 @@ type fakeKnowledgeGateway struct {
 
 var _ KnowledgeGateway = (*fakeKnowledgeGateway)(nil)
 
-func (f *fakeKnowledgeGateway) HandleKnowledgePack(w http.ResponseWriter, r *http.Request) {
-	http.NotFound(w, r)
-}
-
 func (f *fakeKnowledgeGateway) FetchImportPage(rawURL, fallbackName string) (*knowledge.ImportPage, error) {
 	if f.fetch != nil {
 		return f.fetch(rawURL, fallbackName)

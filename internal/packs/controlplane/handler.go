@@ -133,7 +133,6 @@ var Paths = []string{
 
 // ControlPlaneGateway is the narrow gateway surface the control-plane pack needs.
 type ControlPlaneGateway interface {
-	HandleControlPlanePack(w http.ResponseWriter, r *http.Request)
 	ApprovalManager() *approval.Manager
 	AuditChain() *audit.Chain
 	AuditTrail() *audit.Trail
@@ -219,13 +218,12 @@ func (h *Handler) Stop(ctx context.Context) error {
 // these as path-only routes so the pack gate allows any method. Tightening to
 // exact methods is a follow-up.
 func (h *Handler) Routes() []packruntime.BackendRoute {
-	d := h.gateway.HandleControlPlanePack
 	methods := []string{
 		http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodPatch,
 	}
 	routes := make([]packruntime.BackendRoute, 0, len(Paths))
 	for _, p := range Paths {
-		handler := d
+		handler := http.NotFound
 		switch p {
 		case "/v1/audit/tail":
 			handler = h.handleAuditTail

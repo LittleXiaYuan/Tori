@@ -39,26 +39,26 @@ import (
 	reflectpkg "yunque-agent/internal/experimental/reflect"
 	iledger "yunque-agent/internal/ledger"
 	"yunque-agent/internal/observe"
-	experiencepack "yunque-agent/internal/packs/experience"
-	innerlifepack "yunque-agent/internal/packs/innerlife"
 	controlplanepack "yunque-agent/internal/packs/controlplane"
-	knowledgepack "yunque-agent/internal/packs/knowledge"
-	memorypack "yunque-agent/internal/packs/memory"
 	cronpack "yunque-agent/internal/packs/cron"
 	documentspack "yunque-agent/internal/packs/documents"
 	emotionpack "yunque-agent/internal/packs/emotion"
+	experiencepack "yunque-agent/internal/packs/experience"
 	filespack "yunque-agent/internal/packs/files"
 	graphpack "yunque-agent/internal/packs/graph"
-	instructionspack "yunque-agent/internal/packs/instructions"
 	idepack "yunque-agent/internal/packs/ide"
+	innerlifepack "yunque-agent/internal/packs/innerlife"
+	instructionspack "yunque-agent/internal/packs/instructions"
+	knowledgepack "yunque-agent/internal/packs/knowledge"
+	memorypack "yunque-agent/internal/packs/memory"
+	microagentpack "yunque-agent/internal/packs/microagent"
 	missionspack "yunque-agent/internal/packs/missions"
 	modespack "yunque-agent/internal/packs/modes"
-	reveriepack "yunque-agent/internal/packs/reverie"
-	triggerspack "yunque-agent/internal/packs/triggers"
-	skillspack "yunque-agent/internal/packs/skills"
-	workpack "yunque-agent/internal/packs/work"
-	microagentpack "yunque-agent/internal/packs/microagent"
 	nightschoolpack "yunque-agent/internal/packs/nightschool"
+	reveriepack "yunque-agent/internal/packs/reverie"
+	skillspack "yunque-agent/internal/packs/skills"
+	triggerspack "yunque-agent/internal/packs/triggers"
+	workpack "yunque-agent/internal/packs/work"
 	worldmodelpack "yunque-agent/internal/packs/worldmodel"
 	"yunque-agent/pkg/skills"
 
@@ -144,16 +144,12 @@ func initTaskEngine(
 		skillLifecycle: skillLifecycleRaw.(*selfheal.Lifecycle),
 	})
 
-	// Knowledge (RAG) pack — the read surface (search/sources/stats) is filled in
-	// (served natively by the pack via the knowledge store); write/ingest/import
-	// stay on the gateway bridge (HandleKnowledgePack) for now.
+	// Knowledge (RAG) pack — the read + import surface is served natively by the
+	// pack via the knowledge store.
 	_ = gw.RegisterModule(knowledgepack.NewHandlerWithStore(gw, gw.KnowledgeStore()))
 
-	// Memory pack — read surface (stats/search) filled in (served natively via
-	// the memory manager); the orchestrator/pipeline-dependent routes stay on the
-	// gateway bridge (HandleMemoryPack) for now.
-	// Memory pack: native stats/search/add/compact via the shared NewWired path
-	// (de-shelled from the gateway). add (short/mid/long) + compact are wired here.
+	// Memory pack — native stats/search/add/compact via the shared NewWired path
+	// (de-shelled from the gateway).
 	_ = gw.RegisterModule(memorypack.NewWired(gw.MemoryManager(), gw.MemoryPipeline(), gw.MemoryOrchestrator, gw.TenantOf))
 
 	// Skills pack — fully de-shelled: listing / scan / dynamic / approve / reject
@@ -168,15 +164,13 @@ func initTaskEngine(
 	skillsPack.SetScan(gw.ScanSkills)
 	_ = gw.RegisterModule(skillsPack)
 
-	// Work pack — bridge migration (group 4): owns the task (/v1/tasks/*) +
-	// project (/v1/projects/*) surfaces; implementations stay on the gateway
-	// (HandleWorkPack) for now. Workflows remain in the workflowapi sub-package.
+	// Work pack — owns the task (/v1/tasks/*) + project (/v1/projects/*)
+	// surfaces natively. Workflows remain in the workflowapi sub-package.
 	_ = gw.RegisterModule(workpack.NewHandler(gw))
 
-	// Control-plane pack — bridge migration (group 6, governance slice): owns the
-	// audit / trust / iterate / review / skillgrow / usage surfaces; handlers stay
-	// on the gateway (HandleControlPlanePack) for now. Shipped default-enabled (an
-	// always-on core governance surface) so audit/trust stay available out of box.
+	// Control-plane pack — owns the audit / trust / iterate / review / skillgrow /
+	// usage surfaces natively. Shipped default-enabled (an always-on core
+	// governance surface) so audit/trust stay available out of box.
 	_ = gw.RegisterModule(controlplanepack.NewHandler(gw))
 
 	// Persona-modes pack — owns /v1/persona/mode* natively (de-shelled from the
@@ -211,7 +205,7 @@ func initTaskEngine(
 	// the existing MemoryPipeline() host accessor.
 	_ = gw.RegisterModule(graphpack.New(gw))
 
-		// Inner Life pack — exposes the soul-layer outputs (curiosity / reflection /
+	// Inner Life pack — exposes the soul-layer outputs (curiosity / reflection /
 	// dreaming) over a read-only HTTP surface. Registered here because the
 	// curiosity module is built by initSoulLayer.
 	if app.Ledger != nil {

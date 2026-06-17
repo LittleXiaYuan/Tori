@@ -91,10 +91,9 @@ func (g *Gateway) registerChatRoutes() {
 func (g *Gateway) registerMemoryRoutes() {
 	// Memory (/v1/memory/*) is now mounted as a Pack Runtime backend module
 	// (internal/packs/memory), so toggling yunque.pack.memory enables/disables it
-	// at runtime. Handler implementations still live on the gateway during this
-	// bridge phase (see HandleMemoryPack). Registering them here too would panic
-	// the mux on duplicate patterns. Graph / identity / embeddings / search keep
-	// their own gateway routes below.
+	// at runtime. Registering them here too would panic the mux on duplicate
+	// patterns. Graph / identity / embeddings / search keep their own gateway
+	// routes below.
 
 	// Knowledge Graph (/v1/graph/{entities,relations,context,stats}) is owned by
 	// the graph pack (internal/packs/graph), mounted via gw.RegisterModule in
@@ -117,9 +116,8 @@ func (g *Gateway) registerMemoryRoutes() {
 func (g *Gateway) registerKnowledgeRoutes() {
 	// Knowledge (RAG) routes are now mounted as a Pack Runtime backend module
 	// (internal/packs/knowledge), so toggling yunque.pack.knowledge enables or
-	// disables the surface at runtime. The handler implementations still live on
-	// the gateway during this bridge phase (see HandleKnowledgePack). Registering
-	// them here too would panic the mux on duplicate patterns.
+	// disables the surface at runtime. Registering them here too would panic the
+	// mux on duplicate patterns.
 }
 
 // ──────────────────────────────────────────────
@@ -132,10 +130,9 @@ func (g *Gateway) registerPluginRoutes() {
 
 	// Skills (/v1/skills/*) are now mounted as a Pack Runtime backend module
 	// (internal/packs/skills), so toggling yunque.pack.skills enables/disables
-	// the skill-management surface at runtime. Handler implementations still live
-	// on the gateway during this bridge phase (see HandleSkillsPack). Registering
-	// them here too would panic the mux on duplicate patterns. SkillHub and the
-	// skill market below keep their own gateway routes for now.
+	// the skill-management surface at runtime. Registering them here too would
+	// panic the mux on duplicate patterns. SkillHub and the skill market below
+	// keep their own gateway routes for now.
 
 	// Skill Market
 	g.mux.HandleFunc("/v1/market/search", g.requireAuth(g.handleMarketSearch))
@@ -196,10 +193,8 @@ func (g *Gateway) registerTriggerRoutes() {
 func (g *Gateway) registerGovernanceRoutes() {
 	// Governance routes (audit / trust / iterate / review / skillgrow / usage)
 	// migrated to the control-plane pack (internal/packs/controlplane), mounted
-	// via gw.RegisterBackendPack(controlplanepack.NewHandler(gw)) in
-	// cmd/agent/init_task_engine.go. Handlers stay on the gateway
-	// (HandleControlPlanePack) during this bridge phase. Cost routes live in the
-	// costapi sub-package.
+	// via gw.RegisterModule(controlplanepack.NewHandler(gw)) in
+	// cmd/agent/init_task_engine.go. Cost routes live in the costapi sub-package.
 }
 
 // ──────────────────────────────────────────────
@@ -249,8 +244,7 @@ func (g *Gateway) registerRBACRoutes() {
 
 func (g *Gateway) registerApprovalRoutes() {
 	// Approval (human-in-the-loop) routes migrated to the control-plane pack
-	// (internal/packs/controlplane); handlers stay on the gateway
-	// (HandleControlPlanePack) during this bridge phase.
+	// (internal/packs/controlplane).
 }
 
 func (g *Gateway) registerSetupRoutes() {
