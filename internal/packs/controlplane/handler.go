@@ -12,6 +12,7 @@
 //   - observability: system info/stats, metrics/prometheus and cache stats
 //     (native).
 //   - tenants: list/create tenant collection route (native).
+//   - inbox: message collection and mark-read route (native).
 //
 // It ships default-enabled (an always-on core surface) so audit/trust and the
 // other governance APIs stay available out of the box; operators can still
@@ -21,8 +22,8 @@
 // slice: the pack route gate wraps handlers with requireAuth, so surfaces that
 // need requireAdmin or requireSetupOrAuth (e.g. sandbox, rbac, setup, some
 // provider routes) must wait until the pack auth modes are extended. Remaining
-// ops surfaces (plugins, models, inbox, tools, bots, providers) are migrated in
-// later slices.
+// ops surfaces (plugins, models, tools, bots, providers) are migrated in later
+// slices.
 package controlplanepack
 
 import (
@@ -31,6 +32,7 @@ import (
 	"sync/atomic"
 
 	"yunque-agent/internal/agentcore/approval"
+	"yunque-agent/internal/agentcore/inbox"
 	"yunque-agent/internal/agentcore/planner"
 	"yunque-agent/internal/controlplane/tenant"
 	"yunque-agent/internal/observe"
@@ -116,6 +118,7 @@ var Paths = []string{
 type ControlPlaneGateway interface {
 	HandleControlPlanePack(w http.ResponseWriter, r *http.Request)
 	ApprovalManager() *approval.Manager
+	InboxStore() *inbox.Store
 	TenantManager() *tenant.Manager
 	TenantOf(ctx context.Context) string
 	MetricsSnapshot() observe.MetricsSnapshot
@@ -188,6 +191,10 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 			handler = h.handleApprovalRules
 		case "/v1/tenants":
 			handler = h.handleTenants
+		case "/v1/inbox":
+			handler = h.handleInbox
+		case "/v1/inbox/read":
+			handler = h.handleInboxRead
 		case "/v1/system/info":
 			handler = h.handleSystemInfo
 		case "/v1/system/stats":

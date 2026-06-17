@@ -41,10 +41,6 @@ func (g *Gateway) HandleControlPlanePack(w http.ResponseWriter, r *http.Request)
 		g.handleUsage(w, r)
 	case "/v1/quota":
 		g.handleSetQuota(w, r)
-	case "/v1/inbox":
-		g.handleInbox(w, r)
-	case "/v1/inbox/read":
-		g.handleInboxRead(w, r)
 	case "/v1/tools/exec":
 		g.handleToolExec(w, r)
 	case "/v1/tools/list":

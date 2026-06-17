@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"yunque-agent/internal/agentcore/approval"
+	"yunque-agent/internal/agentcore/inbox"
 	"yunque-agent/internal/agentcore/planner"
 	"yunque-agent/internal/controlplane/tenant"
 	"yunque-agent/internal/observe"
@@ -31,6 +32,8 @@ func (f *fakeControlPlaneGateway) HandleControlPlanePack(w http.ResponseWriter, 
 }
 
 func (f *fakeControlPlaneGateway) ApprovalManager() *approval.Manager { return nil }
+
+func (f *fakeControlPlaneGateway) InboxStore() *inbox.Store { return nil }
 
 func (f *fakeControlPlaneGateway) TenantManager() *tenant.Manager { return nil }
 
