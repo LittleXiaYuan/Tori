@@ -37,10 +37,6 @@ func (g *Gateway) HandleControlPlanePack(w http.ResponseWriter, r *http.Request)
 		g.handleReviewStatus(w, r)
 	case "/api/skillgrow/patterns":
 		g.handleSkillGrowPatterns(w, r)
-	case "/v1/usage":
-		g.handleUsage(w, r)
-	case "/v1/quota":
-		g.handleSetQuota(w, r)
 	case "/v1/plugins":
 		g.handlePlugins(w, r)
 	case "/v1/plugins/toggle":

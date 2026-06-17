@@ -64,6 +64,11 @@ func (g *approvalGateway) ProviderModels() []models.ProviderModel { return nil }
 
 func (g *approvalGateway) DeleteProviderModel(id string) bool { return false }
 
+func (g *approvalGateway) UsageSnapshot(ctx context.Context) any { return nil }
+
+func (g *approvalGateway) SetUsageQuota(ctx context.Context, tenantID string, maxChatCalls, maxTokensPerDay int64) {
+}
+
 func newApprovalHandler(t *testing.T) (*Handler, *approval.Manager, *approvalGateway) {
 	t.Helper()
 	manager := approval.NewManagerWithRules(approval.DefaultPolicy(), approval.NewRuleStore(t.TempDir()))

@@ -62,6 +62,11 @@ func (g *inboxGateway) ProviderModels() []models.ProviderModel { return nil }
 
 func (g *inboxGateway) DeleteProviderModel(id string) bool { return false }
 
+func (g *inboxGateway) UsageSnapshot(ctx context.Context) any { return nil }
+
+func (g *inboxGateway) SetUsageQuota(ctx context.Context, tenantID string, maxChatCalls, maxTokensPerDay int64) {
+}
+
 func TestInboxRoutesAreNative(t *testing.T) {
 	gateway := &inboxGateway{store: inbox.NewStore(10)}
 	h := NewHandler(gateway)

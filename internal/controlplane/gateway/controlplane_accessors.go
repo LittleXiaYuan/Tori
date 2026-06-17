@@ -118,3 +118,24 @@ func (g *Gateway) SystemStats(ctx context.Context) map[string]any {
 	}
 	return stats
 }
+
+func (g *Gateway) UsageSnapshot(ctx context.Context) any {
+	tid := tenantFromCtx(ctx)
+	if g == nil || g.usage == nil {
+		return &UsageRecord{TenantID: tid}
+	}
+	return g.usage.GetUsage(tid)
+}
+
+func (g *Gateway) SetUsageQuota(ctx context.Context, tenantID string, maxChatCalls, maxTokensPerDay int64) {
+	if g == nil || g.usage == nil {
+		return
+	}
+	if tenantID == "" {
+		tenantID = tenantFromCtx(ctx)
+	}
+	g.usage.SetQuota(tenantID, QuotaConfig{
+		MaxChatCalls:    maxChatCalls,
+		MaxTokensPerDay: maxTokensPerDay,
+	})
+}

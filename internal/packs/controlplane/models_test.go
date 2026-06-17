@@ -72,6 +72,11 @@ func (g *modelsGateway) DeleteProviderModel(id string) bool {
 	return false
 }
 
+func (g *modelsGateway) UsageSnapshot(ctx context.Context) any { return nil }
+
+func (g *modelsGateway) SetUsageQuota(ctx context.Context, tenantID string, maxChatCalls, maxTokensPerDay int64) {
+}
+
 func TestModelRouteIsNative(t *testing.T) {
 	gateway := &modelsGateway{manager: models.NewManager()}
 	h := NewHandler(gateway)

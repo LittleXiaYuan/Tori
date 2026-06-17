@@ -62,6 +62,11 @@ func (g *botGateway) ProviderModels() []models.ProviderModel { return nil }
 
 func (g *botGateway) DeleteProviderModel(id string) bool { return false }
 
+func (g *botGateway) UsageSnapshot(ctx context.Context) any { return nil }
+
+func (g *botGateway) SetUsageQuota(ctx context.Context, tenantID string, maxChatCalls, maxTokensPerDay int64) {
+}
+
 func TestBotRoutesAreNative(t *testing.T) {
 	gateway := &botGateway{manager: bots.NewManager()}
 	h := NewHandler(gateway)

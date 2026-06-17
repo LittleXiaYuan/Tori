@@ -2,9 +2,7 @@ package gateway
 
 import (
 	"context"
-	"encoding/json"
 	"log/slog"
-	"net/http"
 	"sync"
 	"time"
 )
@@ -188,33 +186,4 @@ func (u *UsageTracker) resetDayIfNeeded() {
 		u.daily = make(map[string]int64)
 		u.dayKey = today
 	}
-}
-
-// --- Gateway handlers ---
-
-func (g *Gateway) handleUsage(w http.ResponseWriter, r *http.Request) {
-	tid := tenantFromCtx(r.Context())
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(g.usage.GetUsage(tid))
-}
-
-func (g *Gateway) handleSetQuota(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
-	var req struct {
-		TenantID string     `json:"tenant_id"`
-		Quota    QuotaConfig `json:"quota"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, `{"error":"invalid json"}`, http.StatusBadRequest)
-		return
-	}
-	if req.TenantID == "" {
-		req.TenantID = tenantFromCtx(r.Context())
-	}
-	g.usage.SetQuota(req.TenantID, req.Quota)
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }

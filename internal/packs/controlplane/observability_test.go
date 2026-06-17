@@ -68,6 +68,11 @@ func (f *fakeControlPlaneGateway) ProviderModels() []models.ProviderModel { retu
 
 func (f *fakeControlPlaneGateway) DeleteProviderModel(id string) bool { return false }
 
+func (f *fakeControlPlaneGateway) UsageSnapshot(ctx context.Context) any { return nil }
+
+func (f *fakeControlPlaneGateway) SetUsageQuota(ctx context.Context, tenantID string, maxChatCalls, maxTokensPerDay int64) {
+}
+
 func TestObservabilityRoutesAreNative(t *testing.T) {
 	gw := &fakeControlPlaneGateway{
 		prometheus: "yunque_requests_total 1\n",

@@ -64,6 +64,11 @@ func (g *toolsGateway) ProviderModels() []models.ProviderModel { return nil }
 
 func (g *toolsGateway) DeleteProviderModel(id string) bool { return false }
 
+func (g *toolsGateway) UsageSnapshot(ctx context.Context) any { return nil }
+
+func (g *toolsGateway) SetUsageQuota(ctx context.Context, tenantID string, maxChatCalls, maxTokensPerDay int64) {
+}
+
 func TestToolRoutesAreNative(t *testing.T) {
 	gateway := &toolsGateway{manager: tools.NewProcessManager()}
 	h := NewHandler(gateway)
