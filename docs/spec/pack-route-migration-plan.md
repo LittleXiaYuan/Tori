@@ -122,7 +122,7 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 | 3   | skills         | ✅   | `/v1/skills` 全原生：列表、scan、dynamic、approve、reject（无网关桥接；scan 经 `Gateway.ScanSkills()` 注入）   |
 | 4   | work           | ✅   | tasks / projects / workflows 全原生（workflow 由 `WorkflowHandler().RouteSpecs()` 合并挂载）       |
 | 5   | cogni-console  | ⬜   | 多为菜单指向已有 `/v1/cognis/*`（cogni-kernel 后端已原生）                                              |
-| 6   | control-plane  | ✅/🟡 | requireAuth 控制面已去壳：observability / audit / trust / iterate / review / skillgrow / approvals / tenants / inbox / bots / tools / plugins / models / providers / router / usage/quota 均已原生；requireSetupOrAuth / requireAdmin 特殊面仍保留网关直连 |
+| 6   | control-plane  | ✅   | requireAuth 控制面已去壳：observability / audit / trust / iterate / review / skillgrow / approvals / tenants / inbox / bots / tools / plugins / models / providers / router / usage/quota 均已原生；requireSetupOrAuth / requireAdmin 特殊面仍保留网关直连 |
 | 7   | workspace      | ⬜   | 纯 dashboard 导航，暂无后端路由                                                                    |
 
 计划外额外完成（已上生产、全原生）：v2 微内核生命周期（enable/disable → Start/Stop）；单体抽离包 modes / reverie / ide / cron / triggers / documents / missions / files / instructions / emotion / graph。
@@ -151,6 +151,8 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 > 2026-06-18 增量：control-plane plugins 八条 CRUD/UI/reload/open-folder 路由已原生，模板脚手架迁入 `internal/packs/controlplane`，gateway 仅提供 plugin registry / loader / rebuild skills 窄 accessor。
 
 > 2026-06-18 增量：control-plane provider 管理面已原生（provider list/test/enable/disable/switch/session/local/tori/delete、router stats、breaker reset、exec provider），gateway 仅提供 provider registry / Tori token / smart router / exec provider 窄 accessor；首次配置三条 setup-flow provider 路由继续直连。
+
+> 2026-06-18 增量：browser-intent 普通 HTTP 路由已原生（status/config/navigate/screenshot/ocr/screenshot/latest/opp/status/action/scenarios/run），gateway 仅保留 `/api/browser/ext/session` 作为扩展授权桥接。
 
 > 2026-06-18 增量：control-plane bots 两条 Bot 管理路由已原生（collection + detail CRUD），gateway 仅提供 `BotManager()` 窄 accessor。
 

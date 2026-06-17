@@ -552,6 +552,27 @@ func (g *Gateway) BrowserHub() *BrowserHub {
 	return g.browserHub
 }
 
+// BrowserConnectedForTenant reports whether a browser extension is connected for tenantID.
+func (g *Gateway) BrowserConnectedForTenant(tenantID string) bool {
+	return g.browserHub != nil && g.browserHub.ConnectedForTenant(tenantID)
+}
+
+// BrowserHealth exposes a copy of the browser hub health snapshot.
+func (g *Gateway) BrowserHealth() map[string]any {
+	if g.browserHub == nil {
+		return map[string]any{"connected": false}
+	}
+	return g.browserHub.Health()
+}
+
+// SendBrowserActionRaw sends one raw browser action through the extension hub.
+func (g *Gateway) SendBrowserActionRaw(ctx context.Context, action json.RawMessage) (json.RawMessage, error) {
+	if g.browserHub == nil {
+		return nil, fmt.Errorf("browser extension not connected")
+	}
+	return g.browserHub.SendActionRaw(ctx, action)
+}
+
 type browserHubAdapter struct{ hub *BrowserHub }
 
 func (a *browserHubAdapter) Connected() bool { return a.hub.Connected() }

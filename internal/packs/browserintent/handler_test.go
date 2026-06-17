@@ -1,6 +1,7 @@
 package browserintent
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -9,13 +10,9 @@ import (
 )
 
 type fakeBrowserGateway struct {
-	packCalls    int
 	sessionCalls int
-}
-
-func (g *fakeBrowserGateway) HandleBrowserIntentPack(w http.ResponseWriter, _ *http.Request) {
-	g.packCalls++
-	w.WriteHeader(http.StatusNoContent)
+	connected    bool
+	actions      int
 }
 
 func (g *fakeBrowserGateway) HandleBrowserIntentSession(w http.ResponseWriter, _ *http.Request) {
@@ -23,8 +20,28 @@ func (g *fakeBrowserGateway) HandleBrowserIntentSession(w http.ResponseWriter, _
 	w.WriteHeader(http.StatusAccepted)
 }
 
+func (g *fakeBrowserGateway) TenantOf(context.Context) string { return "tenant-a" }
+
+func (g *fakeBrowserGateway) BrowserConnectedForTenant(string) bool { return g.connected }
+
+func (g *fakeBrowserGateway) BrowserHealth() map[string]any {
+	return map[string]any{"connected": g.connected, "version": "test", "pending": 0}
+}
+
+func (g *fakeBrowserGateway) SendBrowserActionRaw(_ context.Context, raw json.RawMessage) (json.RawMessage, error) {
+	g.actions++
+	var action map[string]any
+	_ = json.Unmarshal(raw, &action)
+	switch action["type"] {
+	case "browser_get_content":
+		return json.RawMessage(`{"ok":true,"content":"hello"}`), nil
+	default:
+		return json.RawMessage(`{"ok":true,"screenshot":"data:image/png;base64,abc","title":"Page","url":"https://example.com"}`), nil
+	}
+}
+
 func TestBrowserIntentHandlerRoutesExposeSurface(t *testing.T) {
-	gateway := &fakeBrowserGateway{}
+	gateway := &fakeBrowserGateway{connected: true}
 	handler := NewHandler(gateway)
 
 	if handler.PackID() != PackID {
@@ -72,8 +89,8 @@ func TestBrowserIntentHandlerRoutesExposeSurface(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/v1/browser/status", nil)
 	w := httptest.NewRecorder()
 	routes[0].Handler(w, req)
-	if w.Code != http.StatusNoContent || gateway.packCalls != 1 {
-		t.Fatalf("expected pack route to delegate to gateway, status=%d calls=%d", w.Code, gateway.packCalls)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected native pack route, status=%d", w.Code)
 	}
 
 	req = httptest.NewRequest(http.MethodPost, "/api/browser/ext/session", nil)

@@ -3,29 +3,30 @@ package browserintent
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"sync/atomic"
 	"time"
 
+	"yunque-agent/internal/agentcore/browserskill"
 	"yunque-agent/pkg/packruntime"
 )
 
 const PackID = "yunque.pack.browser-intent"
 
-// BrowserGateway is the narrow Gateway surface required by the Browser Intent
-// pack. The pack owns route registration and enablement gates while Gateway
-// continues to host the existing browser connector implementation during this
-// bridge phase.
+// BrowserGateway is the narrow Gateway surface required by the Browser Intent pack.
 type BrowserGateway interface {
-	HandleBrowserIntentPack(w http.ResponseWriter, r *http.Request)
 	HandleBrowserIntentSession(w http.ResponseWriter, r *http.Request)
+	TenantOf(ctx context.Context) string
+	BrowserConnectedForTenant(tenantID string) bool
+	BrowserHealth() map[string]any
+	SendBrowserActionRaw(ctx context.Context, action json.RawMessage) (json.RawMessage, error)
 }
 
 // Handler exposes browser connection, capture, OPP preview and extension
-// scenario surfaces as a Pack Runtime backend module. The bridge keeps the
-// migration reversible: disabling the pack removes the HTTP surface without
-// touching the browser WebSocket hub or skill implementation.
+// scenario surfaces as a Pack Runtime backend module. Disabling the pack removes
+// the HTTP surface without touching the browser WebSocket hub or skill implementation.
 type Handler struct {
 	gateway BrowserGateway
 	host    packruntime.Host
@@ -65,21 +66,300 @@ func (h *Handler) Stop(ctx context.Context) error {
 
 func (h *Handler) Routes() []packruntime.BackendRoute {
 	return []packruntime.BackendRoute{
-		{Method: http.MethodGet, Path: "/v1/browser/status", Handler: h.gateway.HandleBrowserIntentPack},
-		{Method: http.MethodGet, Path: "/v1/browser/config", Handler: h.gateway.HandleBrowserIntentPack},
+		{Method: http.MethodGet, Path: "/v1/browser/status", Handler: h.BrowserStatus},
+		{Method: http.MethodGet, Path: "/v1/browser/config", Handler: h.BrowserConfig},
 		{Method: http.MethodPost, Path: "/v1/browser/intent/plan", Handler: h.BrowserActPlan},
-		{Method: http.MethodPost, Path: "/v1/browser/navigate", Handler: h.gateway.HandleBrowserIntentPack},
-		{Method: http.MethodGet, Path: "/v1/browser/screenshot", Handler: h.gateway.HandleBrowserIntentPack},
-		{Method: http.MethodPost, Path: "/v1/browser/ocr", Handler: h.gateway.HandleBrowserIntentPack},
-		{Method: http.MethodGet, Path: "/v1/browser/screenshot/latest", Handler: h.gateway.HandleBrowserIntentPack},
-		{Method: http.MethodGet, Path: "/v1/browser/opp/pending", Handler: h.gateway.HandleBrowserIntentPack},
-		{Method: http.MethodPost, Path: "/v1/browser/opp/decide", Handler: h.gateway.HandleBrowserIntentPack},
-		{Method: http.MethodGet, Path: "/api/browser/ext/status", Handler: h.gateway.HandleBrowserIntentPack},
+		{Method: http.MethodPost, Path: "/v1/browser/navigate", Handler: h.BrowserNavigate},
+		{Method: http.MethodGet, Path: "/v1/browser/screenshot", Handler: h.BrowserScreenshot},
+		{Method: http.MethodPost, Path: "/v1/browser/ocr", Handler: h.BrowserOCR},
+		{Method: http.MethodGet, Path: "/v1/browser/screenshot/latest", Handler: h.BrowserScreenshotLatest},
+		{Method: http.MethodGet, Path: "/v1/browser/opp/pending", Handler: h.OPPPending},
+		{Method: http.MethodPost, Path: "/v1/browser/opp/decide", Handler: h.OPPDecide},
+		{Method: http.MethodGet, Path: "/api/browser/ext/status", Handler: h.BrowserExtStatus},
 		{Method: http.MethodPost, Path: "/api/browser/ext/session", Auth: packruntime.BackendRouteAuthPassthrough, Handler: h.gateway.HandleBrowserIntentSession},
-		{Method: http.MethodPost, Path: "/api/browser/ext/action", Handler: h.gateway.HandleBrowserIntentPack},
-		{Method: http.MethodGet, Path: "/api/browser/ext/scenarios", Handler: h.gateway.HandleBrowserIntentPack},
-		{Method: http.MethodPost, Path: "/api/browser/ext/scenarios/run", Handler: h.gateway.HandleBrowserIntentPack},
+		{Method: http.MethodPost, Path: "/api/browser/ext/action", Handler: h.BrowserExtAction},
+		{Method: http.MethodGet, Path: "/api/browser/ext/scenarios", Handler: h.BrowserScenarios},
+		{Method: http.MethodPost, Path: "/api/browser/ext/scenarios/run", Handler: h.BrowserRunScenario},
 	}
+}
+
+func (h *Handler) tenantOf(r *http.Request) string {
+	if h.gateway == nil {
+		return "default"
+	}
+	return h.gateway.TenantOf(r.Context())
+}
+
+func (h *Handler) browserConnected(r *http.Request) bool {
+	return h.gateway != nil && h.gateway.BrowserConnectedForTenant(h.tenantOf(r))
+}
+
+func (h *Handler) sendBrowserAction(ctx context.Context, action map[string]any) (map[string]any, error) {
+	if h.gateway == nil {
+		return nil, fmt.Errorf("browser gateway not configured")
+	}
+	raw, err := json.Marshal(action)
+	if err != nil {
+		return nil, err
+	}
+	resultRaw, err := h.gateway.SendBrowserActionRaw(ctx, raw)
+	if err != nil {
+		return nil, err
+	}
+	var result map[string]any
+	if err := json.Unmarshal(resultRaw, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (h *Handler) BrowserStatus(w http.ResponseWriter, r *http.Request) {
+	connected := h.browserConnected(r)
+	status := map[string]any{
+		"enabled":             connected,
+		"connected":           connected,
+		"extension_connected": connected,
+		"state":               "disabled",
+	}
+	if connected {
+		status["state"] = "extension"
+		if h.gateway != nil {
+			if version, ok := h.gateway.BrowserHealth()["version"]; ok {
+				status["version"] = version
+			}
+		}
+	}
+	writeJSON(w, http.StatusOK, status)
+}
+
+func (h *Handler) BrowserConfig(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]any{
+		"mode":      "extension",
+		"connected": h.browserConnected(r),
+		"headless":  false,
+	})
+}
+
+func (h *Handler) BrowserScreenshotLatest(w http.ResponseWriter, r *http.Request) {
+	h.browserScreenshot(w, r)
+}
+
+func (h *Handler) BrowserNavigate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "POST only")
+		return
+	}
+	var req struct {
+		URL string `json:"url"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.URL == "" {
+		writeError(w, http.StatusBadRequest, "url is required")
+		return
+	}
+	if !h.browserConnected(r) {
+		writeError(w, http.StatusInternalServerError, "browser extension not connected for current tenant")
+		return
+	}
+	result, err := h.sendBrowserAction(r.Context(), map[string]any{"type": "browser_navigate", "url": req.URL})
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "navigate failed: "+err.Error())
+		return
+	}
+	if !resultOK(result) {
+		writeError(w, http.StatusInternalServerError, "navigate failed: "+resultError(result))
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"screenshot": stripDataPrefix(stringValue(result["screenshot"])),
+		"title":      result["title"],
+		"url":        result["url"],
+	})
+}
+
+func (h *Handler) BrowserScreenshot(w http.ResponseWriter, r *http.Request) {
+	h.browserScreenshot(w, r)
+}
+
+func (h *Handler) browserScreenshot(w http.ResponseWriter, r *http.Request) {
+	if !h.browserConnected(r) {
+		writeError(w, http.StatusInternalServerError, "browser extension not connected for current tenant")
+		return
+	}
+	result, err := h.sendBrowserAction(r.Context(), map[string]any{"type": "browser_screenshot"})
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "screenshot failed: "+err.Error())
+		return
+	}
+	if !resultOK(result) {
+		writeError(w, http.StatusInternalServerError, "screenshot failed: "+resultError(result))
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"screenshot": stripDataPrefix(stringValue(result["screenshot"])),
+		"timestamp":  time.Now().Format(time.RFC3339),
+	})
+}
+
+func (h *Handler) BrowserOCR(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "POST only")
+		return
+	}
+	if !h.browserConnected(r) {
+		writeError(w, http.StatusInternalServerError, "browser extension not connected for current tenant")
+		return
+	}
+	result, err := h.sendBrowserAction(r.Context(), map[string]any{"type": "browser_get_content"})
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "content extraction failed: "+err.Error())
+		return
+	}
+	content := stringValue(result["content"])
+	writeJSON(w, http.StatusOK, map[string]string{"text": content, "result": content})
+}
+
+func (h *Handler) OPPPending(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]any{"items": []any{}, "total": 0})
+}
+
+func (h *Handler) OPPDecide(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "POST only")
+		return
+	}
+	var req struct {
+		ProblemID string `json:"problem_id"`
+		ID        string `json:"id"`
+		Decision  string `json:"decision"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON")
+		return
+	}
+	if req.ProblemID == "" {
+		req.ProblemID = req.ID
+	}
+	if req.ProblemID == "" {
+		writeError(w, http.StatusBadRequest, "problem_id or id is required")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"status": "resolved", "problem_id": req.ProblemID})
+}
+
+func (h *Handler) BrowserExtStatus(w http.ResponseWriter, r *http.Request) {
+	if h.gateway == nil {
+		writeJSON(w, http.StatusOK, map[string]any{"connected": false, "error": "browser hub not initialized"})
+		return
+	}
+	health := h.gateway.BrowserHealth()
+	connected := h.browserConnected(r)
+	status := map[string]any{"connected": connected}
+	if connected {
+		if version, ok := health["version"]; ok {
+			status["version"] = version
+		}
+		if pending, ok := health["pending"]; ok {
+			status["pending"] = pending
+		}
+	}
+	writeJSON(w, http.StatusOK, status)
+}
+
+func (h *Handler) BrowserExtAction(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "POST required")
+		return
+	}
+	if !h.browserConnected(r) {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"ok": false, "error": "browser extension not connected for current tenant"})
+		return
+	}
+	var action map[string]any
+	if err := json.NewDecoder(r.Body).Decode(&action); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "invalid action: " + err.Error()})
+		return
+	}
+	result, err := h.sendBrowserAction(r.Context(), action)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (h *Handler) BrowserScenarios(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]any{"scenarios": browserskill.PresetScenarios()})
+}
+
+func (h *Handler) BrowserRunScenario(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "POST required")
+		return
+	}
+	if !h.browserConnected(r) {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"ok": false, "error": "browser extension not connected for current tenant"})
+		return
+	}
+	var req struct {
+		ScenarioID string `json:"scenario_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ScenarioID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "scenario_id is required"})
+		return
+	}
+	var scenario *browserskill.Scenario
+	for _, s := range browserskill.PresetScenarios() {
+		if s.ID == req.ScenarioID {
+			scenario = &s
+			break
+		}
+	}
+	if scenario == nil {
+		writeJSON(w, http.StatusNotFound, map[string]any{"ok": false, "error": "scenario not found: " + req.ScenarioID})
+		return
+	}
+	var results []map[string]any
+	for i, step := range scenario.Steps {
+		result, err := h.sendBrowserAction(r.Context(), step)
+		entry := map[string]any{"step": i, "action": step["type"]}
+		if err != nil {
+			entry["ok"] = false
+			entry["error"] = err.Error()
+			results = append(results, entry)
+			break
+		}
+		entry["ok"] = resultOK(result)
+		if errText := resultError(result); errText != "" {
+			entry["error"] = errText
+		}
+		if stringValue(result["screenshot"]) != "" {
+			entry["has_screenshot"] = true
+		}
+		results = append(results, entry)
+		time.Sleep(500 * time.Millisecond)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "scenario": scenario.ID, "results": results})
+}
+
+func resultOK(result map[string]any) bool {
+	ok, _ := result["ok"].(bool)
+	return ok
+}
+
+func resultError(result map[string]any) string {
+	return stringValue(result["error"])
+}
+
+func stringValue(v any) string {
+	s, _ := v.(string)
+	return s
+}
+
+func stripDataPrefix(s string) string {
+	if i := strings.Index(s, "base64,"); i >= 0 {
+		return s[i+7:]
+	}
+	return s
 }
 
 // BrowserActPlanRequest describes one semantic browser_act intent for the
