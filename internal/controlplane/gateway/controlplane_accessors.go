@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"yunque-agent/internal/agentcore/approval"
+	"yunque-agent/internal/agentcore/bots"
 	"yunque-agent/internal/agentcore/inbox"
 	"yunque-agent/internal/agentcore/planner"
 	"yunque-agent/internal/controlplane/tenant"
@@ -15,6 +16,13 @@ func (g *Gateway) ApprovalManager() *approval.Manager {
 		return nil
 	}
 	return g.approvalMgr
+}
+
+func (g *Gateway) BotManager() *bots.Manager {
+	if g == nil {
+		return nil
+	}
+	return g.botMgr
 }
 
 func (g *Gateway) InboxStore() *inbox.Store {

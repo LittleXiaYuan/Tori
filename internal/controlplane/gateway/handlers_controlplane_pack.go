@@ -49,10 +49,6 @@ func (g *Gateway) HandleControlPlanePack(w http.ResponseWriter, r *http.Request)
 		g.handleToolPoll(w, r)
 	case "/v1/tools/kill":
 		g.handleToolKill(w, r)
-	case "/v1/bots":
-		g.handleBots(w, r)
-	case "/v1/bots/detail":
-		g.handleBotDetail(w, r)
 	case "/v1/plugins":
 		g.handlePlugins(w, r)
 	case "/v1/plugins/toggle":

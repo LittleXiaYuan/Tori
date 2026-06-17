@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"yunque-agent/internal/agentcore/approval"
+	"yunque-agent/internal/agentcore/bots"
 	"yunque-agent/internal/agentcore/inbox"
 	"yunque-agent/internal/agentcore/planner"
 	"yunque-agent/internal/controlplane/tenant"
@@ -28,6 +29,8 @@ func (g *approvalGateway) HandleControlPlanePack(w http.ResponseWriter, r *http.
 }
 
 func (g *approvalGateway) ApprovalManager() *approval.Manager { return g.manager }
+
+func (g *approvalGateway) BotManager() *bots.Manager { return nil }
 
 func (g *approvalGateway) InboxStore() *inbox.Store { return nil }
 
