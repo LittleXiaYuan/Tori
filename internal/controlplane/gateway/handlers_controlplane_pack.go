@@ -57,8 +57,6 @@ func (g *Gateway) HandleControlPlanePack(w http.ResponseWriter, r *http.Request)
 		g.handlePluginReload(w, r)
 	case "/v1/plugins/open-folder":
 		g.handlePluginOpenFolder(w, r)
-	case "/v1/models":
-		g.handleModels(w, r)
 	case "/api/providers":
 		g.handleProviderList(w, r)
 	case "/api/providers/test":

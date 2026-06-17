@@ -15,6 +15,7 @@
 //   - inbox: message collection and mark-read route (native).
 //   - bots: bot collection/detail CRUD routes (native).
 //   - tools: process execution/session routes (native).
+//   - models: explicit model catalog plus provider-derived models (native).
 //
 // It ships default-enabled (an always-on core surface) so audit/trust and the
 // other governance APIs stay available out of the box; operators can still
@@ -24,7 +25,7 @@
 // slice: the pack route gate wraps handlers with requireAuth, so surfaces that
 // need requireAdmin or requireSetupOrAuth (e.g. sandbox, rbac, setup, some
 // provider routes) must wait until the pack auth modes are extended. Remaining
-// ops surfaces (plugins, models, tools, providers) are migrated in later slices.
+// ops surfaces (plugins, providers) are migrated in later slices.
 package controlplanepack
 
 import (
@@ -37,6 +38,7 @@ import (
 	"yunque-agent/internal/agentcore/inbox"
 	"yunque-agent/internal/agentcore/planner"
 	"yunque-agent/internal/agentcore/tools"
+	"yunque-agent/internal/controlplane/models"
 	"yunque-agent/internal/controlplane/tenant"
 	"yunque-agent/internal/observe"
 	"yunque-agent/pkg/packruntime"
@@ -133,6 +135,9 @@ type ControlPlaneGateway interface {
 	ModelRuntimeHealth() planner.ModelRuntimeHealth
 	LLMResponseCacheStats() map[string]any
 	SystemStats(ctx context.Context) map[string]any
+	ModelManager() *models.Manager
+	ProviderModels() []models.ProviderModel
+	DeleteProviderModel(id string) bool
 }
 
 // Handler is the control-plane pack's backend module.
@@ -224,6 +229,8 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 			handler = h.handleMetricsPrometheus
 		case "/v1/cache/stats":
 			handler = h.handleCacheStats
+		case "/v1/models":
+			handler = h.handleModels
 		}
 		routes = append(routes, packruntime.BackendRoute{Methods: methods, Path: p, Handler: handler})
 	}

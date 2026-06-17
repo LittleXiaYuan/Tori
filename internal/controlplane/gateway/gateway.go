@@ -69,6 +69,7 @@ import (
 	"yunque-agent/internal/controlplane/gateway/notifyapi"
 	"yunque-agent/internal/controlplane/gateway/schedulerapi"
 	"yunque-agent/internal/controlplane/gateway/workflowapi"
+	"yunque-agent/internal/controlplane/models"
 	"yunque-agent/internal/controlplane/tenant"
 	"yunque-agent/internal/execution/channel"
 	"yunque-agent/internal/execution/sandbox"
@@ -186,7 +187,7 @@ type Gateway struct {
 
 	// ── LLM Providers & Routing ────────────────
 	providerReg *llm.ProviderRegistry
-	modelMgr    *modelManager
+	modelMgr    *models.Manager
 	smartRouter *router.Router
 	costTracker *costtrack.Tracker
 	llmCall     workflow.LLMCallFunc
@@ -468,7 +469,7 @@ func NewFromConfig(cfg GatewayConfig) *Gateway {
 		startTime:             time.Now(),
 		baseCtx:               context.Background(),
 		browserSessions:       NewBrowserSessionStore(),
-		modelMgr:              newModelManager(),
+		modelMgr:              models.NewManager(),
 		oauthPending:          make(map[string]*oauthPendingState),
 	}
 	g.searchOn.Store(true)

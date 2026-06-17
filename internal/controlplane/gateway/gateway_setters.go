@@ -35,8 +35,10 @@ import (
 	agentrt "yunque-agent/internal/agentcore/runtime"
 	"yunque-agent/internal/agentcore/runtime/heartbeat"
 	"yunque-agent/internal/agentcore/selfheal"
+	"yunque-agent/internal/agentcore/selfheal/iterate"
 	"yunque-agent/internal/agentcore/session"
 	"yunque-agent/internal/agentcore/skillgrowth"
+	"yunque-agent/internal/agentcore/skillgrowth/adapter"
 	"yunque-agent/internal/agentcore/skillmarket"
 	"yunque-agent/internal/agentcore/speech"
 	"yunque-agent/internal/agentcore/state"
@@ -49,11 +51,10 @@ import (
 	"yunque-agent/internal/agentcore/workflow"
 	"yunque-agent/internal/cognikernel"
 	"yunque-agent/internal/connectors"
+	"yunque-agent/internal/controlplane/models"
 	"yunque-agent/internal/execution/channel"
 	"yunque-agent/internal/execution/scheduler"
-	"yunque-agent/internal/agentcore/selfheal/iterate"
 	reflectpkg "yunque-agent/internal/experimental/reflect"
-	"yunque-agent/internal/agentcore/skillgrowth/adapter"
 	"yunque-agent/internal/integrations/mineru"
 	"yunque-agent/internal/observe"
 	"yunque-agent/internal/orchestrator"
@@ -578,10 +579,45 @@ func (g *Gateway) ProviderClient(id string) (*llm.Client, bool) {
 }
 
 // SetModelKVStore injects a Ledger KV store into the model manager for persistence.
-func (g *Gateway) SetModelKVStore(kvs modelKVStore) {
+func (g *Gateway) SetModelKVStore(kvs models.KVStore) {
 	if g.modelMgr != nil {
 		g.modelMgr.SetKVStore(kvs)
 	}
+}
+
+func (g *Gateway) ModelManager() *models.Manager {
+	return g.modelMgr
+}
+
+func (g *Gateway) ProviderModels() []models.ProviderModel {
+	if g.providerReg == nil {
+		return nil
+	}
+	providers := g.providerReg.List()
+	out := make([]models.ProviderModel, 0, len(providers))
+	for _, p := range providers {
+		out = append(out, models.ProviderModel{
+			ID:      p.ID,
+			Model:   p.Model,
+			Type:    string(p.Type),
+			BaseURL: p.BaseURL,
+		})
+	}
+	return out
+}
+
+func (g *Gateway) DeleteProviderModel(id string) bool {
+	if g.providerReg == nil {
+		return false
+	}
+	for _, p := range g.providerReg.List() {
+		syntheticID := p.ID + "-" + p.Model
+		if syntheticID == id || p.ID == id {
+			_ = g.providerReg.Delete(p.ID)
+			return true
+		}
+	}
+	return false
 }
 
 // SetUsageKVStore injects a Ledger KV store into the usage tracker for persistence.

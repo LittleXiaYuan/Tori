@@ -15,6 +15,7 @@ import (
 	"yunque-agent/internal/agentcore/inbox"
 	"yunque-agent/internal/agentcore/planner"
 	"yunque-agent/internal/agentcore/tools"
+	"yunque-agent/internal/controlplane/models"
 	"yunque-agent/internal/controlplane/tenant"
 	"yunque-agent/internal/observe"
 )
@@ -60,6 +61,12 @@ func (f *fakeControlPlaneGateway) ModelRuntimeHealth() planner.ModelRuntimeHealt
 func (f *fakeControlPlaneGateway) LLMResponseCacheStats() map[string]any { return f.cache }
 
 func (f *fakeControlPlaneGateway) SystemStats(ctx context.Context) map[string]any { return f.stats }
+
+func (f *fakeControlPlaneGateway) ModelManager() *models.Manager { return nil }
+
+func (f *fakeControlPlaneGateway) ProviderModels() []models.ProviderModel { return nil }
+
+func (f *fakeControlPlaneGateway) DeleteProviderModel(id string) bool { return false }
 
 func TestObservabilityRoutesAreNative(t *testing.T) {
 	gw := &fakeControlPlaneGateway{

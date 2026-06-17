@@ -13,6 +13,7 @@ import (
 	"yunque-agent/internal/agentcore/inbox"
 	"yunque-agent/internal/agentcore/planner"
 	"yunque-agent/internal/agentcore/tools"
+	"yunque-agent/internal/controlplane/models"
 	"yunque-agent/internal/controlplane/tenant"
 	"yunque-agent/internal/observe"
 )
@@ -54,6 +55,12 @@ func (g *inboxGateway) ModelRuntimeHealth() planner.ModelRuntimeHealth {
 func (g *inboxGateway) LLMResponseCacheStats() map[string]any { return nil }
 
 func (g *inboxGateway) SystemStats(ctx context.Context) map[string]any { return map[string]any{} }
+
+func (g *inboxGateway) ModelManager() *models.Manager { return nil }
+
+func (g *inboxGateway) ProviderModels() []models.ProviderModel { return nil }
+
+func (g *inboxGateway) DeleteProviderModel(id string) bool { return false }
 
 func TestInboxRoutesAreNative(t *testing.T) {
 	gateway := &inboxGateway{store: inbox.NewStore(10)}
