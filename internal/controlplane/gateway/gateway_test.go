@@ -193,7 +193,7 @@ func TestRateLimiter(t *testing.T) {
 
 func TestExtractKnowledgeHTML(t *testing.T) {
 	raw := `<html><head><title>VS Code Codebase Overview</title><style>.x{}</style></head><body><main><h1>VS Code Codebase Overview</h1><p>This page describes the VS Code repository.</p><script>alert(1)</script></main></body></html>`
-	text := extractKnowledgeHTML(raw)
+	text := knowledge.ExtractHTML(raw)
 	if !strings.Contains(text, "VS Code Codebase Overview") {
 		t.Fatal("expected title text")
 	}
@@ -207,7 +207,7 @@ func TestExtractKnowledgeHTML(t *testing.T) {
 
 func TestExtractDeepWikiChildLinks(t *testing.T) {
 	raw := `<a href="/microsoft/vscode/1-vs-code-codebase-overview">Overview</a><a href="https://deepwiki.com/microsoft/vscode/2-core-editor-(monaco)">Monaco</a><a href="/other/repo/page">Other</a><a href="#local">Skip</a>`
-	links := extractDeepWikiChildLinks("https://deepwiki.com/microsoft/vscode", raw, 10)
+	links := knowledge.ExtractChildLinks("https://deepwiki.com/microsoft/vscode", raw, 10)
 	if len(links) != 2 {
 		t.Fatalf("expected 2 links, got %d", len(links))
 	}
@@ -217,13 +217,13 @@ func TestExtractDeepWikiChildLinks(t *testing.T) {
 }
 
 func TestBuildKnowledgeImportTree(t *testing.T) {
-	root := &knowledgeImportPage{URL: "https://deepwiki.com/microsoft/vscode", Name: "VS Code"}
+	root := &knowledge.ImportPage{URL: "https://deepwiki.com/microsoft/vscode", Name: "VS Code"}
 	imported := []*knowledge.Source{
 		{Name: "VS Code", Path: "https://deepwiki.com/microsoft/vscode"},
 		{Name: "Overview", Path: "https://deepwiki.com/microsoft/vscode/1-vs-code-codebase-overview"},
 		{Name: "Startup", Path: "https://deepwiki.com/microsoft/vscode/1.1-application-startup-and-process-architecture"},
 	}
-	tree := buildKnowledgeImportTree(root, imported)
+	tree := knowledge.BuildImportTree(root, imported)
 	if len(tree.Children) != 1 {
 		t.Fatalf("expected 1 top-level chapter, got %d", len(tree.Children))
 	}

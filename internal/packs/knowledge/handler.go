@@ -2,11 +2,12 @@
 // Runtime backend module.
 //
 // Migration status: the pack owns route registration + the enable/disable gate.
-// The read surface (search / sources / stats) has been "filled in" — its handler
-// implementations now live in this package and talk to the knowledge store
-// directly (decoupled from the gateway). The write/ingest/import surface is
-// still served by the gateway during the bridge phase (consumed via the narrow
-// KnowledgeGateway interface) and will be filled in later.
+// The read surface (search / sources / stats), the write surface (ingest /
+// source delete / update) and the import surface (import-url / import-repo) have
+// all been "filled in" — their handler implementations now live in this package
+// and talk to the knowledge store directly. Only upload is still served by the
+// gateway bridge (it shares the MinerU document parser with the admin upload
+// path), consumed via the narrow KnowledgeGateway interface.
 package knowledgepack
 
 import (
@@ -24,10 +25,24 @@ import (
 
 const PackID = "yunque.pack.knowledge"
 
-// KnowledgeGateway is the narrow gateway surface the still-bridged knowledge
-// write/ingest/import routes need.
+// KnowledgeGateway is the narrow gateway surface the knowledge pack needs. It is
+// deliberately not the concrete *Gateway: only the upload bridge plus a few
+// cross-cutting capabilities (SSRF-safe fetch, output dir, tenant resolution)
+// the native import handlers consume.
 type KnowledgeGateway interface {
+	// HandleKnowledgePack bridges the still-gateway-hosted upload route (it
+	// shares the MinerU document parser with the admin upload path).
 	HandleKnowledgePack(w http.ResponseWriter, r *http.Request)
+	// FetchImportPage performs an SSRF-safe fetch + content extraction for the
+	// native import-url handler. The SSRF guard stays in the gateway because it
+	// is shared with other outbound-fetch features.
+	FetchImportPage(rawURL, fallbackName string) (*knowledge.ImportPage, error)
+	// OutputDir is the configured agent output dir, used as the base allow-list
+	// root for native import-repo path resolution.
+	OutputDir() string
+	// TenantOf resolves the tenant id from the request context (audit logging
+	// of rejected import-repo attempts).
+	TenantOf(ctx context.Context) string
 }
 
 // Handler is the knowledge pack's backend module. store may be nil (e.g. in
@@ -78,11 +93,10 @@ func (h *Handler) Stop(ctx context.Context) error {
 	return nil
 }
 
-// Routes mounts the knowledge surface. The read routes are served by this
-// package's native handlers; the write/ingest/import routes are still dispatched
-// to the gateway bridge during this migration phase. Methods are declared
-// broadly so the manifest's path-only routes keep the original permissive
-// (handler-decides) behavior.
+// Routes mounts the knowledge surface. All routes except upload are served by
+// this package's native handlers; upload is still dispatched to the gateway
+// bridge. Methods are declared broadly so the manifest's path-only routes keep
+// the original permissive (handler-decides) behavior.
 func (h *Handler) Routes() []packruntime.BackendRoute {
 	bridge := h.gateway.HandleKnowledgePack
 	methods := []string{
@@ -101,10 +115,13 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 		// source delete + update are de-shelled — served natively via the store.
 		mk("/v1/knowledge/source", h.handleDelete),
 		mk("/v1/knowledge/source/update", h.handleUpdate),
-		// Still bridged to the gateway (file upload / remote fetch).
+		// import-url / import-repo are native: the handler logic lives in this
+		// pack (import.go) and talks to the store directly; the gateway only
+		// provides the SSRF-safe fetch + output dir via the narrow interface.
+		mk("/v1/knowledge/import-url", h.handleImportURL),
+		mk("/v1/knowledge/import-repo", h.handleImportRepo),
+		// Still bridged to the gateway (file upload shares MinerU parsing).
 		mk("/v1/knowledge/upload", bridge),
-		mk("/v1/knowledge/import-url", bridge),
-		mk("/v1/knowledge/import-repo", bridge),
 	}
 }
 

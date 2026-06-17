@@ -22,6 +22,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 )
 
@@ -100,6 +101,19 @@ func newSSRFSafeClient(timeout time.Duration) *http.Client {
 // isPrivateIP is the low-level variant used by DialContext, where we already
 // have an IP in hand.
 func isPrivateIP(ip net.IP) bool {
+	return ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() ||
+		ip.IsLinkLocalMulticast() || ip.IsUnspecified()
+}
+
+// isPrivateOrLoopback checks if an IP or hostname belongs to private, loopback,
+// link-local, or other non-routable address ranges (SSRF protection).
+func isPrivateOrLoopback(host string) bool {
+	ip := net.ParseIP(host)
+	if ip == nil {
+		lower := strings.ToLower(host)
+		return lower == "localhost" || strings.HasSuffix(lower, ".local") ||
+			lower == "metadata.google.internal" || lower == "169.254.169.254"
+	}
 	return ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() ||
 		ip.IsLinkLocalMulticast() || ip.IsUnspecified()
 }

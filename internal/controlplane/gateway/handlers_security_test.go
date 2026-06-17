@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"yunque-agent/internal/agentcore/knowledge"
 )
 
 // safeResolve and handleFileDownload security tests moved to the files pack
@@ -100,7 +102,7 @@ func TestResolveKBRepoPathRejectsPathOutsideRoots(t *testing.T) {
 	t.Setenv("KB_IMPORT_ALLOW_ANY", "")
 	root := t.TempDir()
 	outside := t.TempDir()
-	if _, err := resolveKBRepoPath(root, outside); err == nil {
+	if _, err := knowledge.ResolveRepoPath(root, outside); err == nil {
 		t.Fatal("expected repo import outside configured roots to be rejected")
 	}
 }
@@ -112,7 +114,7 @@ func TestResolveKBRepoPathAllowsPathInsideOutputDir(t *testing.T) {
 	if err := os.MkdirAll(inside, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	resolved, err := resolveKBRepoPath(root, inside)
+	resolved, err := knowledge.ResolveRepoPath(root, inside)
 	if err != nil {
 		t.Fatalf("expected repo import inside output dir to be allowed: %v", err)
 	}
