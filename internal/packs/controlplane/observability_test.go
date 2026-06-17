@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"yunque-agent/internal/agentcore/approval"
+	"yunque-agent/internal/agentcore/audit"
 	"yunque-agent/internal/agentcore/bots"
 	"yunque-agent/internal/agentcore/inbox"
 	"yunque-agent/internal/agentcore/planner"
@@ -35,6 +36,10 @@ func (f *fakeControlPlaneGateway) HandleControlPlanePack(w http.ResponseWriter, 
 }
 
 func (f *fakeControlPlaneGateway) ApprovalManager() *approval.Manager { return nil }
+
+func (f *fakeControlPlaneGateway) AuditChain() *audit.Chain { return nil }
+
+func (f *fakeControlPlaneGateway) AuditTrail() *audit.Trail { return nil }
 
 func (f *fakeControlPlaneGateway) BotManager() *bots.Manager { return nil }
 

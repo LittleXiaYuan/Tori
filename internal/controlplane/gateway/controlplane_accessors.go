@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"yunque-agent/internal/agentcore/approval"
+	"yunque-agent/internal/agentcore/audit"
 	"yunque-agent/internal/agentcore/bots"
 	"yunque-agent/internal/agentcore/inbox"
 	"yunque-agent/internal/agentcore/planner"
@@ -17,6 +18,20 @@ func (g *Gateway) ApprovalManager() *approval.Manager {
 		return nil
 	}
 	return g.approvalMgr
+}
+
+func (g *Gateway) AuditChain() *audit.Chain {
+	if g == nil {
+		return nil
+	}
+	return g.auditChain
+}
+
+func (g *Gateway) AuditTrail() *audit.Trail {
+	if g == nil {
+		return nil
+	}
+	return g.auditTrail
 }
 
 func (g *Gateway) BotManager() *bots.Manager {

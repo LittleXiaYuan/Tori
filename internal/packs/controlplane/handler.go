@@ -6,7 +6,7 @@
 //
 // Migrated slices so far:
 //   - governance (registerGovernanceRoutes): audit, trust, iterate, review,
-//     skillgrow, usage/quota (bridge).
+//     skillgrow (bridge), audit + usage/quota (native).
 //   - approvals (registerApprovalRoutes): human-in-the-loop approval surface
 //     (native).
 //   - observability: system info/stats, metrics/prometheus and cache stats
@@ -35,6 +35,7 @@ import (
 	"sync/atomic"
 
 	"yunque-agent/internal/agentcore/approval"
+	"yunque-agent/internal/agentcore/audit"
 	"yunque-agent/internal/agentcore/bots"
 	"yunque-agent/internal/agentcore/inbox"
 	"yunque-agent/internal/agentcore/planner"
@@ -124,6 +125,8 @@ var Paths = []string{
 type ControlPlaneGateway interface {
 	HandleControlPlanePack(w http.ResponseWriter, r *http.Request)
 	ApprovalManager() *approval.Manager
+	AuditChain() *audit.Chain
+	AuditTrail() *audit.Trail
 	BotManager() *bots.Manager
 	InboxStore() *inbox.Store
 	ShellPolicy() *tools.ShellExecPolicy
@@ -194,6 +197,14 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 	for _, p := range Paths {
 		handler := d
 		switch p {
+		case "/v1/audit/tail":
+			handler = h.handleAuditTail
+		case "/v1/audit/verify":
+			handler = h.handleAuditVerify
+		case "/v1/audit/stats":
+			handler = h.handleAuditStats
+		case "/api/audit/trail":
+			handler = h.handleAuditTrail
 		case "/v1/approvals":
 			handler = h.handleApprovalRouteSwitch
 		case "/v1/approvals/approve":

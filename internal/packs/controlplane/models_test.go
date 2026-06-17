@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"yunque-agent/internal/agentcore/approval"
+	"yunque-agent/internal/agentcore/audit"
 	"yunque-agent/internal/agentcore/bots"
 	"yunque-agent/internal/agentcore/inbox"
 	"yunque-agent/internal/agentcore/planner"
@@ -31,6 +32,10 @@ func (g *modelsGateway) HandleControlPlanePack(w http.ResponseWriter, r *http.Re
 }
 
 func (g *modelsGateway) ApprovalManager() *approval.Manager { return nil }
+
+func (g *modelsGateway) AuditChain() *audit.Chain { return nil }
+
+func (g *modelsGateway) AuditTrail() *audit.Trail { return nil }
 
 func (g *modelsGateway) BotManager() *bots.Manager { return nil }
 

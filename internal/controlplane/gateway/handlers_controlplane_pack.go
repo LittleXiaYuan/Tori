@@ -9,14 +9,6 @@ import "net/http"
 // handler's original method behavior.
 func (g *Gateway) HandleControlPlanePack(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path {
-	case "/v1/audit/tail":
-		g.handleAuditTail(w, r)
-	case "/v1/audit/verify":
-		g.handleAuditVerify(w, r)
-	case "/v1/audit/stats":
-		g.handleAuditStats(w, r)
-	case "/api/audit/trail":
-		g.handleAuditTrail(w, r)
 	case "/api/trust/scores":
 		g.handleTrustScores(w, r)
 	case "/api/trust/reset":
