@@ -32,6 +32,7 @@ import { buildPackNavItems } from "@/lib/pack-sync";
 import { useNavigationPreferences } from "@/hooks/use-user-preferences";
 import {
   capabilitySurfaceLabels,
+  catalogActionForEntry,
   entryInstallRequest,
   formatPackInstallError,
   groupPackPermissions,
@@ -77,13 +78,6 @@ function packStatusBadge(packStatus?: string): { label: string; color: string; b
   return { label: "未知", color: "var(--yunque-text-muted)", bg: "rgba(255,255,255,0.05)" };
 }
 
-function actionLabel(action?: string): string {
-  if (action === "use") return "已安装";
-  if (action === "enable") return "启用";
-  if (action === "update") return "更新";
-  return "安装";
-}
-
 function sourceName(url: string): string {
   try {
     return new URL(url).host;
@@ -116,9 +110,9 @@ export default function PacksPageOptimized() {
     other: packs.filter((p) => !["stable", "beta", "alpha"].includes(String(p.manifest.status || ""))),
   }), [packs]);
   const catalogEntries = catalog?.entries || [];
-  const privateCatalogEntries = catalogEntries.filter((entry) => !entry.installed);
+  const privateCatalogEntries = catalogEntries.filter((entry) => catalogActionForEntry(entry).kind !== "use");
   const stats = useMemo(() => ({
-    available: (releaseCatalog.entries?.length || 0) + privateCatalogEntries.length,
+    available: (releaseCatalog.entries || []).filter((entry) => catalogActionForEntry(entry).kind !== "use").length + privateCatalogEntries.length,
     installed: packs.length,
     enabled: packs.filter((p) => p.status === "enabled").length,
   }), [packs, privateCatalogEntries.length, releaseCatalog.entries]);
@@ -143,6 +137,8 @@ export default function PacksPageOptimized() {
 
   const installLocal = () => run("install:local", () => packsClient.install({ manifestPath, download: false }), "已安装，可在详情页启用");
   const installRelease = (entry: PackReleaseCatalogEntry) => {
+    const action = catalogActionForEntry(entry);
+    if (action.kind === "enable") return enable(entry.manifest.id);
     const request = entryInstallRequest({ ...entry, source: entry.release_url });
     if (!request) {
       showToast("此能力包没有可用的安装源", "error");
@@ -151,6 +147,8 @@ export default function PacksPageOptimized() {
     return run(`install:${entry.package_url}`, () => packsClient.install(request), "已安装，可继续启用或打开详情");
   };
   const installCatalogEntry = (entry: PackCatalogEntry) => {
+    const action = catalogActionForEntry(entry);
+    if (action.kind === "enable") return enable(entry.manifest.id);
     const request = entryInstallRequest(entry);
     if (!request) {
       showToast("此能力包没有可用的安装源", "error");
@@ -265,8 +263,7 @@ export default function PacksPageOptimized() {
                 key: entry.package_url,
                 source: entry.release_tag || sourceName(entry.release_url),
                 size: formatBytes(entry.size_bytes),
-                action: entry.update_action,
-                downloadable: entry.downloadable,
+                action: catalogActionForEntry(entry),
                 busyKey: `install:${entry.package_url}`,
                 onInstall: () => installRelease(entry),
               }))}
@@ -326,8 +323,7 @@ export default function PacksPageOptimized() {
               {privateCatalogEntries.map((entry) => renderInstallableCard(entry.manifest, {
                 key: entry.manifest.id,
                 source: entry.source || entry.manifest_path || entry.manifest_url || entry.package_url,
-                action: entry.update_action,
-                downloadable: entry.downloadable,
+                action: catalogActionForEntry(entry),
                 busyKey: `install:${entry.manifest.id}`,
                 onInstall: () => installCatalogEntry(entry),
               }))}
@@ -408,14 +404,15 @@ export default function PacksPageOptimized() {
 
   function renderInstallableCard(
     manifest: PackManifest,
-    options: { key: string; source?: string; size?: string; action?: string; downloadable?: boolean; busyKey: string; onInstall: () => void },
+    options: { key: string; source?: string; size?: string; action: ReturnType<typeof catalogActionForEntry>; busyKey: string; onInstall: () => void },
   ) {
     const badge = packStatusBadge(manifest.status);
     const risk = riskProfileForPack(manifest);
     const examples = packExamples(manifest);
     const permissionGroups = groupPackPermissions(manifest.backend?.permissions || []);
     const labels = capabilitySurfaceLabels(manifest);
-    const disabled = options.action === "use" || !options.downloadable || busy === options.busyKey;
+    const actionBusyKey = options.action.kind === "enable" ? `enable:${manifest.id}` : options.busyKey;
+    const disabled = options.action.disabled || busy === actionBusyKey;
     const primaryEntry = manifest.frontend?.menus?.[0] || manifest.frontend?.routes?.[0];
 
     return (
@@ -437,8 +434,14 @@ export default function PacksPageOptimized() {
               <div className="text-xs mt-2" style={{ color: "var(--yunque-text-secondary)" }}>{manifest.description}</div>
             )}
           </div>
-          <Button size="sm" className={options.action === "update" ? "btn-accent" : undefined} variant={options.action === "update" ? undefined : "outline"} isDisabled={disabled} onPress={options.onInstall}>
-            <Download size={14} /> {actionLabel(options.action)}
+          <Button
+            size="sm"
+            className={options.action.kind === "install" || options.action.kind === "update" || options.action.kind === "enable" ? "btn-accent" : undefined}
+            variant={options.action.kind === "use" ? "outline" : undefined}
+            isDisabled={disabled}
+            onPress={options.onInstall}
+          >
+            {options.action.kind === "enable" ? <Power size={14} /> : <Download size={14} />} {options.action.label}
           </Button>
         </div>
 

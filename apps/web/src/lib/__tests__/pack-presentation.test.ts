@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { PackManifest } from "yunque-client/packs";
 import {
   capabilitySurfaceLabels,
+  catalogActionForEntry,
   entryInstallRequest,
   formatPackInstallError,
   groupPackPermissions,
@@ -106,6 +107,42 @@ describe("pack-presentation", () => {
       source: "local",
       downloadable: false,
     })).toEqual({ manifestPath: "packs/official/demo/pack.json", source: "local", download: false });
+  });
+
+  it("maps catalog entries to install, enable, update and use actions", () => {
+    const manifest: PackManifest = { id: "yunque.pack.demo", name: "Demo", version: "0.1.0" };
+
+    expect(catalogActionForEntry({
+      manifest,
+      package_url: "https://oss.example.com/demo.yqpack",
+      downloadable: true,
+      installed: false,
+      enabled: false,
+      update_action: "install",
+    })).toEqual({ kind: "install", label: "安装", disabled: false, needsInstallSource: true });
+    expect(catalogActionForEntry({
+      manifest,
+      installed: true,
+      enabled: false,
+      update_action: "enable",
+      downloadable: false,
+    })).toEqual({ kind: "enable", label: "启用", disabled: false, needsInstallSource: false });
+    expect(catalogActionForEntry({
+      manifest,
+      package_url: "https://oss.example.com/demo.yqpack",
+      installed: true,
+      enabled: true,
+      update_action: "update",
+      downloadable: true,
+    })).toEqual({ kind: "update", label: "更新", disabled: false, needsInstallSource: true });
+    expect(catalogActionForEntry({
+      manifest,
+      package_url: "https://oss.example.com/demo.yqpack",
+      installed: true,
+      enabled: false,
+      update_action: "update",
+      downloadable: true,
+    })).toEqual({ kind: "update", label: "更新", disabled: false, needsInstallSource: true });
   });
 
   it("turns install failures into clear user-facing reasons", () => {

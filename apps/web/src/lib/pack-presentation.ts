@@ -34,6 +34,15 @@ export type PackFeatureFlags = {
   canRollback: boolean;
 };
 
+export type PackCatalogActionKind = "install" | "enable" | "update" | "use";
+
+export type PackCatalogAction = {
+  kind: PackCatalogActionKind;
+  label: string;
+  disabled: boolean;
+  needsInstallSource: boolean;
+};
+
 type EntryLike = {
   manifest: PackManifest;
   package_url?: string;
@@ -43,6 +52,9 @@ type EntryLike = {
   release_url?: string;
   downloadable?: boolean;
   sha256?: string;
+  installed?: boolean;
+  enabled?: boolean;
+  update_action?: string;
 };
 
 const PERMISSION_GROUPS: Array<Omit<PackPermissionGroup, "permissions"> & { matches: RegExp[] }> = [
@@ -268,6 +280,19 @@ export function entryInstallRequest(entry: EntryLike): PackInstallRequest | null
     };
   }
   return null;
+}
+
+export function catalogActionForEntry(entry: EntryLike): PackCatalogAction {
+  if (entry.update_action === "update") {
+    return { kind: "update", label: "更新", disabled: !Boolean(entryInstallRequest(entry)), needsInstallSource: true };
+  }
+  if (entry.enabled || entry.update_action === "use") {
+    return { kind: "use", label: "已可用", disabled: true, needsInstallSource: false };
+  }
+  if (entry.installed || entry.update_action === "enable") {
+    return { kind: "enable", label: "启用", disabled: false, needsInstallSource: false };
+  }
+  return { kind: "install", label: "安装", disabled: !Boolean(entryInstallRequest(entry)), needsInstallSource: true };
 }
 
 export function formatPackInstallError(error: unknown, fallback = "安装失败"): string {
