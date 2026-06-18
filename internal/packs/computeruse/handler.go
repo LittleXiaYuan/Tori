@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"yunque-agent/pkg/packruntime"
+	"yunque-agent/pkg/skills"
 )
 
 const PackID = "yunque.pack.computer-use"
@@ -40,6 +41,8 @@ func New(gateway Gateway) *Handler {
 }
 
 var _ packruntime.Module = (*Handler)(nil)
+var _ packruntime.ContextProvider = (*Handler)(nil)
+var _ packruntime.SkillProvider = (*Handler)(nil)
 
 func (h *Handler) PackID() string { return PackID }
 
@@ -67,6 +70,30 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 		{Method: http.MethodPost, Path: "/v1/computer/intent/plan", Handler: h.IntentPlan},
 		{Method: http.MethodGet, Path: "/v1/computer/screenshot", Handler: h.Screenshot},
 	}
+}
+
+// Skills exposes a plan-only tool. RegisterModule only publishes it while this
+// pack is enabled, so Pack state controls whether Cogni/Planner can select it.
+func (h *Handler) Skills() []skills.Skill {
+	return []skills.Skill{computerUsePlanSkill{handler: h}}
+}
+
+// BuildContext lets the enabled pack show up in the planner's reasoning flow
+// only when the user asks for screen/browser/computer operation.
+func (h *Handler) BuildContext(ctx context.Context, message, tenant string) string {
+	if !computerUseRelevant(message) {
+		return ""
+	}
+	status := h.statusPayloadFor(ctx, tenant)
+	executionReady, _ := status["execution_ready"].(bool)
+	return fmt.Sprintf(
+		"## Computer Use Pack\n"+
+			"- Pack: %s is enabled and available as a plan-first capability.\n"+
+			"- Execution ready: %v. Dangerous desktop actions are still blocked by approval/runtime gates.\n"+
+			"- Use skill `computer_use_plan` to produce a non-destructive plan before any browser, cloud desktop, or local desktop action.\n"+
+			"- Read-only browser screenshots may be available when the browser connector is connected; local desktop control is not enabled in beta.",
+		PackID, executionReady,
+	)
 }
 
 func (h *Handler) tenantOf(r *http.Request) string {
@@ -103,7 +130,7 @@ func (h *Handler) IntentPlan(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "goal is required")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"plan": h.buildIntentPlan(r, req)})
+	writeJSON(w, http.StatusOK, map[string]any{"plan": h.buildIntentPlanFor(r.Context(), h.tenantOf(r), req)})
 }
 
 func (h *Handler) Screenshot(w http.ResponseWriter, r *http.Request) {
@@ -142,14 +169,18 @@ func (h *Handler) Screenshot(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) statusPayload(r *http.Request) map[string]any {
-	connected := h.browserConnected(r)
+	return h.statusPayloadFor(r.Context(), h.tenantOf(r))
+}
+
+func (h *Handler) statusPayloadFor(ctx context.Context, tenantID string) map[string]any {
+	connected := h.gateway != nil && h.gateway.BrowserConnectedForTenant(tenantID)
 	health := map[string]any{"connected": false}
 	if h.gateway != nil {
 		health = h.gateway.BrowserHealth()
 	}
 	desktop := map[string]any{"available": false, "running": false, "status": "not_wired"}
 	if h.gateway != nil {
-		desktop = h.gateway.DesktopSandboxStatus(r.Context())
+		desktop = h.gateway.DesktopSandboxStatus(ctx)
 	}
 	return map[string]any{
 		"pack_id":         PackID,
@@ -234,10 +265,10 @@ type gatePlan struct {
 	PolicyEnforced bool     `json:"policy_enforced"`
 }
 
-func (h *Handler) buildIntentPlan(r *http.Request, req intentPlanRequest) intentPlanReport {
+func (h *Handler) buildIntentPlanFor(ctx context.Context, tenantID string, req intentPlanRequest) intentPlanReport {
 	surface := normalizeSurface(req.Surface)
 	if surface == "auto" {
-		if h.browserConnected(r) {
+		if h.gateway != nil && h.gateway.BrowserConnectedForTenant(tenantID) {
 			surface = "browser"
 		} else {
 			surface = "desktop_sandbox"
@@ -311,13 +342,79 @@ func (h *Handler) buildIntentPlan(r *http.Request, req intentPlanRequest) intent
 			},
 		},
 		BlockedBy: blockedBy,
-		Surfaces:  h.statusPayload(r)["surfaces"].(map[string]any),
+		Surfaces:  h.statusPayloadFor(ctx, tenantID)["surfaces"].(map[string]any),
 		Artifacts: []string{"computer-use-plan.json", "computer-permission-gate.json", "computer-approval-gate.json"},
 		Notes: []string{
 			"This route is plan-only. It never moves the mouse, types keys, runs commands, writes files or opens network targets.",
 			"Browser screenshots are the only wired read action in this slice, and only after the pack is enabled and the browser connector is connected.",
 		},
 	}
+}
+
+type computerUsePlanSkill struct {
+	handler *Handler
+}
+
+func (s computerUsePlanSkill) Name() string { return "computer_use_plan" }
+
+func (s computerUsePlanSkill) Description() string {
+	return "Create a non-destructive computer-use plan for browser, cloud desktop, or local desktop work. It never clicks, types, runs commands, writes files, or controls the desktop."
+}
+
+func (s computerUsePlanSkill) Parameters() map[string]any {
+	return map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"goal": map[string]any{
+				"type":        "string",
+				"description": "The user's goal, e.g. inspect a page, prepare a browser workflow, or plan desktop steps.",
+			},
+			"surface": map[string]any{
+				"type":        "string",
+				"enum":        []string{"auto", "browser", "desktop_sandbox", "local_desktop"},
+				"description": "Target surface. Defaults to auto.",
+			},
+			"allow_execute": map[string]any{
+				"type":        "boolean",
+				"description": "Whether the caller asks for execution. The skill still returns plan-only output in this pack slice.",
+			},
+		},
+		"required": []string{"goal"},
+	}
+}
+
+func (s computerUsePlanSkill) Execute(ctx context.Context, args map[string]any, env *skills.Environment) (string, error) {
+	goal, _ := args["goal"].(string)
+	if strings.TrimSpace(goal) == "" {
+		return "", fmt.Errorf("goal is required")
+	}
+	surface, _ := args["surface"].(string)
+	allowExecute, _ := args["allow_execute"].(bool)
+	tenantID := "default"
+	if env != nil && strings.TrimSpace(env.TenantID) != "" {
+		tenantID = env.TenantID
+	}
+	req := intentPlanRequest{Goal: goal, Surface: surface, AllowExecute: allowExecute, RequestedBy: "planner"}
+	plan := s.handler.buildIntentPlanFor(ctx, tenantID, req)
+	data, err := json.MarshalIndent(plan, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+func computerUseRelevant(message string) bool {
+	msg := strings.ToLower(message)
+	keywords := []string{
+		"computer", "desktop", "screen", "screenshot", "browser", "click", "type", "gui", "rpa",
+		"电脑", "桌面", "屏幕", "截图", "浏览器", "点击", "输入", "操作", "自动化",
+	}
+	for _, kw := range keywords {
+		if strings.Contains(msg, kw) {
+			return true
+		}
+	}
+	return false
 }
 
 func normalizeSurface(surface string) string {

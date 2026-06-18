@@ -8,7 +8,11 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"yunque-agent/pkg/packruntime"
+	"yunque-agent/pkg/skills"
 )
 
 type fakeGateway struct {
@@ -121,6 +125,39 @@ func TestIntentPlanIsNonDestructive(t *testing.T) {
 	}
 }
 
+func TestBuildContextOnlyForRelevantComputerUseRequests(t *testing.T) {
+	h := New(&fakeGateway{connected: true})
+	if got := h.BuildContext(context.Background(), "hello, write a short poem", "tenant"); got != "" {
+		t.Fatalf("expected unrelated request to produce no pack context, got %q", got)
+	}
+	got := h.BuildContext(context.Background(), "帮我看一下浏览器截图再计划下一步", "tenant")
+	if !strings.Contains(got, "Computer Use Pack") || !strings.Contains(got, "computer_use_plan") {
+		t.Fatalf("expected computer-use guidance, got %q", got)
+	}
+}
+
+func TestComputerUsePlanSkillIsPlanOnly(t *testing.T) {
+	h := New(&fakeGateway{connected: true})
+	skillsList := h.Skills()
+	if len(skillsList) != 1 {
+		t.Fatalf("expected one skill, got %d", len(skillsList))
+	}
+	out, err := skillsList[0].Execute(context.Background(), map[string]any{
+		"goal":          "open settings and click save",
+		"surface":       "browser",
+		"allow_execute": true,
+	}, &skills.Environment{TenantID: "tenant"})
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if !strings.Contains(out, `"execution_ready": false`) {
+		t.Fatalf("skill must stay plan-only, got %s", out)
+	}
+	if !strings.Contains(out, `"controls_local_desktop": false`) || !strings.Contains(out, `"executes_commands": false`) {
+		t.Fatalf("skill output must not claim destructive capability, got %s", out)
+	}
+}
+
 func TestScreenshotProxiesBrowserReadOnly(t *testing.T) {
 	fg := &fakeGateway{connected: true}
 	h := New(fg)
@@ -142,6 +179,11 @@ func TestScreenshotProxiesBrowserReadOnly(t *testing.T) {
 	if !bytes.Contains(fg.action, []byte(`browser_screenshot`)) {
 		t.Fatalf("expected browser_screenshot action, got %s", string(fg.action))
 	}
+}
+
+func TestComputerUseImplementsPackRuntimeExtensions(t *testing.T) {
+	var _ packruntime.ContextProvider = (*Handler)(nil)
+	var _ packruntime.SkillProvider = (*Handler)(nil)
 }
 
 func TestScreenshotRequiresConnectedBrowser(t *testing.T) {
