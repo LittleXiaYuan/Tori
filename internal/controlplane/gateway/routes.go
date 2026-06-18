@@ -43,7 +43,8 @@ func (g *Gateway) registerChatRoutes() {
 	g.mux.HandleFunc("/v1/conversations/manage", g.requireAuth(g.handleConversationManage))
 	g.mux.HandleFunc("/v1/conversations/replay", g.requireAuth(g.handleConversationReplay))
 
-	// Fork routes moved to forkapi sub-package
+	// Fork routes (/v1/fork*) are owned by the conversation forks pack
+	// (internal/packs/forks), mounted via gw.RegisterModule.
 
 	// Subagent
 	g.mux.HandleFunc("/v1/subagent", g.requireAuth(g.handleSubagent))

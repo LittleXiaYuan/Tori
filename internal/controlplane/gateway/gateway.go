@@ -62,7 +62,6 @@ import (
 	"yunque-agent/internal/apperror"
 	"yunque-agent/internal/cognikernel"
 	"yunque-agent/internal/connectors"
-	"yunque-agent/internal/controlplane/gateway/forkapi"
 	"yunque-agent/internal/controlplane/gateway/gwshared"
 	"yunque-agent/internal/controlplane/gateway/workflowapi"
 	"yunque-agent/internal/controlplane/models"
@@ -246,8 +245,6 @@ type Gateway struct {
 	// Sub-package API handlers retained so their dependencies (injected via
 	// setters AFTER NewFromConfig) can be late-bound. Without this they would
 	// keep the nil deps captured at routes() time and degrade permanently.
-	forkAPIHandler *forkapi.Handler
-
 	// RBAC
 	rbacEnforcer   *rbac.Enforcer
 	rbacMiddleware *rbac.Middleware
@@ -757,12 +754,6 @@ func (g *Gateway) routes() {
 		Engine:  g.workflowEngine,
 		LLMCall: g.llmCall,
 	}
-
-	g.forkAPIHandler = &forkapi.Handler{
-		ForkTree:  g.forkTree,
-		Persister: g.forkPersister,
-	}
-	g.forkAPIHandler.RegisterRoutes(g.mux, g.requireAuth)
 
 	// Root "/" serves the embedded Next.js static UI (SPA).
 	// Falls back to pure HTML dashboard if no frontend build is available.

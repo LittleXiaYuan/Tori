@@ -1,0 +1,74 @@
+{
+  "id": "yunque.pack.forks",
+  "name": "Conversation Forks (对话分支)",
+  "version": "0.1.0",
+  "description": "对话分支能力：创建、查看、删除会话分叉，并从任意消息位置创建新分支。默认预装，由聊天与会话历史相关界面调用。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": [
+      "forks.read",
+      "forks.create",
+      "forks.delete",
+      "forks.branch",
+      "forks.list"
+    ],
+    "routes": [
+      "/v1/fork",
+      "/v1/fork/branch",
+      "/v1/fork/list"
+    ],
+    "permissions": [
+      "forks:read",
+      "forks:write"
+    ],
+    "routeSpecs": [
+      {
+        "method": "GET",
+        "path": "/v1/fork",
+        "description": "Read a conversation fork or the root fork for a session."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/fork",
+        "description": "Create a root conversation fork."
+      },
+      {
+        "method": "DELETE",
+        "path": "/v1/fork",
+        "description": "Delete a conversation fork."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/fork/branch",
+        "description": "Create a branch from an existing conversation fork."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/fork/list",
+        "description": "List conversation forks for a session."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [],
+    "assets": {
+      "type": "builtin"
+    }
+  },
+  "sdk": {
+    "typescript": "yunque-client/forks"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "group": "chat",
+    "phase": "A3",
+    "preload": "true",
+    "note": "Default-preloaded chat-history pack: natively owns /v1/fork* through Pack Runtime. Existing chat/session surfaces consume this API."
+  },
+  "status": "beta"
+}

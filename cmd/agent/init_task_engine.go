@@ -47,6 +47,7 @@ import (
 	emotionpack "yunque-agent/internal/packs/emotion"
 	experiencepack "yunque-agent/internal/packs/experience"
 	filespack "yunque-agent/internal/packs/files"
+	forkspack "yunque-agent/internal/packs/forks"
 	graphpack "yunque-agent/internal/packs/graph"
 	idepack "yunque-agent/internal/packs/ide"
 	innerlifepack "yunque-agent/internal/packs/innerlife"
@@ -189,6 +190,9 @@ func initTaskEngine(
 	// Scheduler pack — owns /v1/scheduler/* natively. The execution scheduler is
 	// provided by the gateway config and can be swapped in tests via SetScheduler.
 	_ = gw.RegisterModule(schedulerpack.NewProvider(gw.Scheduler))
+	// Forks pack — owns /v1/fork* natively. The fork tree/persister are wired by
+	// session auth init, so the pack resolves them lazily per request.
+	_ = gw.RegisterModule(forkspack.NewProvider(gw.ForkTree, gw.ForkPersister))
 
 	// Persona-modes pack — owns /v1/persona/mode* natively (de-shelled from the
 	// gateway monolith). Resolves the mode manager lazily, so order is moot.

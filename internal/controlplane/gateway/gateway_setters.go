@@ -176,21 +176,22 @@ func (g *Gateway) SetCostTracker(ct *costtrack.Tracker) {
 	g.costTracker = ct
 }
 
-// SetForkTree attaches a conversation fork tree. Late-binds the /v1/fork/* handler.
+// SetForkTree attaches a conversation fork tree. /v1/fork* is mounted by the
+// forks pack and resolves the current tree lazily.
 func (g *Gateway) SetForkTree(ft *session.ForkTree) {
 	g.forkTree = ft
-	if g.forkAPIHandler != nil {
-		g.forkAPIHandler.ForkTree = ft
-	}
 }
 
 // SetForkPersister attaches a fork tree persister for saving state to disk.
 func (g *Gateway) SetForkPersister(fp *session.ForkPersister) {
 	g.forkPersister = fp
-	if g.forkAPIHandler != nil {
-		g.forkAPIHandler.Persister = fp
-	}
 }
+
+// ForkTree returns the conversation fork tree.
+func (g *Gateway) ForkTree() *session.ForkTree { return g.forkTree }
+
+// ForkPersister returns the conversation fork persister.
+func (g *Gateway) ForkPersister() *session.ForkPersister { return g.forkPersister }
 
 // SetEmbeddings attaches an embeddings resolver.
 func (g *Gateway) SetEmbeddings(er *embeddings.Resolver) { g.embedResolver = er }

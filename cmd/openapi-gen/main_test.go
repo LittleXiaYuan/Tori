@@ -120,7 +120,7 @@ func TestExtractPathsFromDirsScansPackRoutes(t *testing.T) {
 	for _, p := range paths {
 		seen[p] = true
 	}
-	for _, want := range []string{"/api/connectors", "/api/notify/channels", "/v1/scheduler/jobs"} {
+	for _, want := range []string{"/api/connectors", "/api/notify/channels", "/v1/fork", "/v1/scheduler/jobs"} {
 		if !seen[want] {
 			t.Fatalf("expected pack route scan to include %s", want)
 		}

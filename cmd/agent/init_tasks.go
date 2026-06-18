@@ -703,6 +703,7 @@ func fallbackBuiltinPackManifestPaths() []string {
 		"packs/official/cogni-kernel-pack/pack.json",
 		"packs/official/connectors-pack/pack.json",
 		"packs/official/cost-pack/pack.json",
+		"packs/official/forks-pack/pack.json",
 		"packs/official/inner-life-pack/pack.json",
 		"packs/official/night-school-pack/pack.json",
 		"packs/official/experience-pack/pack.json",
