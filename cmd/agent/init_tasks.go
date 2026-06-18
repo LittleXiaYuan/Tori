@@ -717,6 +717,7 @@ func fallbackBuiltinPackManifestPaths() []string {
 		"packs/official/guardrail-fuzzer-pack/pack.json",
 		"packs/official/memory-time-travel-pack/pack.json",
 		"packs/official/rpa-replay-pack/pack.json",
+		"packs/official/scheduler-pack/pack.json",
 		"packs/official/sbom-drift-pack/pack.json",
 		"packs/official/skill-anomaly-pack/pack.json",
 		"packs/official/wasm-plugin-pack/pack.json",

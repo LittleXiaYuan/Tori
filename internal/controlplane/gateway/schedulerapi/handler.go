@@ -11,25 +11,62 @@ import (
 	"yunque-agent/internal/execution/scheduler"
 )
 
+// Route declares one scheduler HTTP route.
+type Route struct {
+	Method      string
+	Path        string
+	Description string
+	Handler     http.HandlerFunc
+}
+
 // Handler serves scheduler job management HTTP endpoints.
 type Handler struct {
-	Scheduler *scheduler.Scheduler
+	Scheduler     *scheduler.Scheduler
+	SchedulerFunc func() *scheduler.Scheduler
+}
+
+// RouteSpecs returns the scheduler surface without mounting it. Pack Runtime
+// uses this to own route registration while preserving the existing handler
+// implementation.
+func (h *Handler) RouteSpecs() []Route {
+	return []Route{
+		{Method: http.MethodGet, Path: "/v1/scheduler/jobs", Description: "List scheduled jobs.", Handler: h.handleJobs},
+		{Method: http.MethodPost, Path: "/v1/scheduler/add", Description: "Add a scheduled job.", Handler: h.handleAdd},
+		{Method: http.MethodPost, Path: "/v1/scheduler/remove", Description: "Remove a scheduled job.", Handler: h.handleRemove},
+	}
 }
 
 // RegisterRoutes mounts all /v1/scheduler/* endpoints.
 func (h *Handler) RegisterRoutes(mux *http.ServeMux, auth gwshared.AuthFunc) {
-	mux.HandleFunc("/v1/scheduler/jobs", auth(h.handleJobs))
-	mux.HandleFunc("/v1/scheduler/add", auth(h.handleAdd))
-	mux.HandleFunc("/v1/scheduler/remove", auth(h.handleRemove))
+	for _, route := range h.RouteSpecs() {
+		mux.HandleFunc(route.Path, auth(route.Handler))
+	}
+}
+
+func (h *Handler) scheduler() *scheduler.Scheduler {
+	if h.SchedulerFunc != nil {
+		return h.SchedulerFunc()
+	}
+	return h.Scheduler
 }
 
 func (h *Handler) handleJobs(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	jobs := h.Scheduler.List()
+	sched := h.scheduler()
+	if sched == nil {
+		json.NewEncoder(w).Encode(map[string]any{"jobs": []any{}, "count": 0, "error": "scheduler not available"})
+		return
+	}
+	jobs := sched.List()
 	json.NewEncoder(w).Encode(map[string]any{"jobs": jobs, "count": len(jobs)})
 }
 
 func (h *Handler) handleAdd(w http.ResponseWriter, r *http.Request) {
+	sched := h.scheduler()
+	if sched == nil {
+		gwshared.WriteJSONStatus(w, http.StatusServiceUnavailable, map[string]any{"error": "scheduler not available"})
+		return
+	}
 	tid := gwshared.TenantFromCtx(r.Context())
 	var req struct {
 		Name     string `json:"name"`
@@ -52,13 +89,18 @@ func (h *Handler) handleAdd(w http.ResponseWriter, r *http.Request) {
 		Interval: dur,
 		Prompt:   req.Prompt,
 	}
-	h.Scheduler.Add(job)
+	sched.Add(job)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(job)
 }
 
 func (h *Handler) handleRemove(w http.ResponseWriter, r *http.Request) {
+	sched := h.scheduler()
+	if sched == nil {
+		gwshared.WriteJSONStatus(w, http.StatusServiceUnavailable, map[string]any{"error": "scheduler not available"})
+		return
+	}
 	var req struct {
 		ID string `json:"id"`
 	}
@@ -66,7 +108,7 @@ func (h *Handler) handleRemove(w http.ResponseWriter, r *http.Request) {
 		apperror.WriteCode(w, apperror.CodeMissingField, "id is required")
 		return
 	}
-	h.Scheduler.Remove(req.ID)
+	sched.Remove(req.ID)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "removed"})
 }

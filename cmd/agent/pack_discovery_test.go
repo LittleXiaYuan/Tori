@@ -26,6 +26,7 @@ func TestDiscoverBuiltinPackManifestPaths(t *testing.T) {
 		"packs/official/memory-pack/pack.json",
 		"packs/official/knowledge-pack/pack.json",
 		"packs/official/notifications-pack/pack.json",
+		"packs/official/scheduler-pack/pack.json",
 		"packs/official/cogni-console-pack/pack.json",
 		"packs/official/workspace-pack/pack.json",
 	}

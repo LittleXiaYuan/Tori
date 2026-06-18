@@ -29,6 +29,7 @@ import (
 	modespack "yunque-agent/internal/packs/modes"
 	notificationspack "yunque-agent/internal/packs/notifications"
 	reveriepack "yunque-agent/internal/packs/reverie"
+	schedulerpack "yunque-agent/internal/packs/scheduler"
 	skillspack "yunque-agent/internal/packs/skills"
 	statepack "yunque-agent/internal/packs/state"
 	triggerspack "yunque-agent/internal/packs/triggers"
@@ -68,6 +69,7 @@ var migrationPackPaths = map[string][]string{
 	controlplanepack.PackID:  controlplanepack.Paths,
 	costpack.PackID:          costpack.Paths(),
 	notificationspack.PackID: notificationspack.Paths(),
+	schedulerpack.PackID:     schedulerpack.Paths(),
 	// Monolith route groups extracted into native packs (Tier 0 microkernel).
 	modespack.PackID: {"/v1/persona/modes", "/v1/persona/mode", "/v1/persona/mode/current"},
 	reveriepack.PackID: {
@@ -96,6 +98,7 @@ var migrationPackNames = map[string]string{
 	controlplanepack.PackID:  "Control Plane",
 	costpack.PackID:          "Cost",
 	notificationspack.PackID: "Notifications",
+	schedulerpack.PackID:     "Scheduler",
 	modespack.PackID:         "Persona Modes",
 	reveriepack.PackID:       "Reverie",
 	idepack.PackID:           "IDE",
@@ -145,6 +148,7 @@ func registerMigrationPacks(gw *Gateway) {
 	gw.RegisterBackendPack(controlplanepack.NewHandler(gw))
 	_ = gw.RegisterModule(costpack.NewProvider(func() *costtrack.Tracker { return gw.costTracker }))
 	_ = gw.RegisterModule(notificationspack.NewProvider(gw.Notifier))
+	_ = gw.RegisterModule(schedulerpack.NewProvider(gw.Scheduler))
 	// Native monolith-extracted packs (mirror cmd/agent/init_task_engine.go).
 	_ = gw.RegisterModule(modespack.New(gw))
 	_ = gw.RegisterModule(reveriepack.New(gw))
@@ -208,6 +212,8 @@ func newTestGatewayWithMigrationPack(t *testing.T, packID string, status packrun
 		_ = gw.RegisterModule(costpack.New(nil))
 	case notificationspack.PackID:
 		_ = gw.RegisterModule(notificationspack.New(nil))
+	case schedulerpack.PackID:
+		_ = gw.RegisterModule(schedulerpack.New(nil))
 	case statepack.PackID:
 		_ = gw.RegisterModule(statepack.New(gw))
 	}
@@ -232,6 +238,7 @@ func TestMigrationPackRouteGating(t *testing.T) {
 		{"connectors", connectorspack.PackID, "/api/connectors"},
 		{"cost", costpack.PackID, "/v1/cost/summary"},
 		{"notifications", notificationspack.PackID, "/api/notify/channels"},
+		{"scheduler", schedulerpack.PackID, "/v1/scheduler/jobs"},
 		{"state", statepack.PackID, "/v1/state"},
 	}
 	for _, tc := range cases {

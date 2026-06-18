@@ -168,7 +168,8 @@ func (g *Gateway) registerTriggerRoutes() {
 	// Cron routes (/v1/cron/*) are owned by the cron pack (internal/packs/cron),
 	// mounted via gw.RegisterModule in cmd/agent/init_task_engine.go.
 
-	// Scheduler routes moved to schedulerapi sub-package
+	// Scheduler routes (/v1/scheduler/*) are owned by the scheduler pack
+	// (internal/packs/scheduler), mounted via gw.RegisterModule.
 
 	// Tools (process execution) migrated to the control-plane pack
 	// (internal/packs/controlplane). Sandbox routes below stay admin-gated here.

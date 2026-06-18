@@ -64,7 +64,6 @@ import (
 	"yunque-agent/internal/connectors"
 	"yunque-agent/internal/controlplane/gateway/forkapi"
 	"yunque-agent/internal/controlplane/gateway/gwshared"
-	"yunque-agent/internal/controlplane/gateway/schedulerapi"
 	"yunque-agent/internal/controlplane/gateway/workflowapi"
 	"yunque-agent/internal/controlplane/models"
 	"yunque-agent/internal/controlplane/tenant"
@@ -758,10 +757,6 @@ func (g *Gateway) routes() {
 		Engine:  g.workflowEngine,
 		LLMCall: g.llmCall,
 	}
-
-	(&schedulerapi.Handler{
-		Scheduler: g.scheduler,
-	}).RegisterRoutes(g.mux, g.requireAuth)
 
 	g.forkAPIHandler = &forkapi.Handler{
 		ForkTree:  g.forkTree,

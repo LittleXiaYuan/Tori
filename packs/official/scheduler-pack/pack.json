@@ -1,0 +1,62 @@
+{
+  "id": "yunque.pack.scheduler",
+  "name": "Scheduler (定时任务)",
+  "version": "0.1.0",
+  "description": "定时任务调度：查看、添加和移除周期性任务。默认预装，无独立页面，由任务与自动化相关界面调用。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": [
+      "scheduler.jobs",
+      "scheduler.add",
+      "scheduler.remove"
+    ],
+    "routes": [
+      "/v1/scheduler/jobs",
+      "/v1/scheduler/add",
+      "/v1/scheduler/remove"
+    ],
+    "permissions": [
+      "scheduler:read",
+      "scheduler:write"
+    ],
+    "routeSpecs": [
+      {
+        "method": "GET",
+        "path": "/v1/scheduler/jobs",
+        "description": "List scheduled jobs."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/scheduler/add",
+        "description": "Add a scheduled job."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/scheduler/remove",
+        "description": "Remove a scheduled job."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [],
+    "assets": {
+      "type": "builtin"
+    }
+  },
+  "sdk": {
+    "typescript": "yunque-client/scheduler"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "group": "automation",
+    "phase": "A3",
+    "preload": "true",
+    "note": "Default-preloaded automation pack: natively owns /v1/scheduler/* through Pack Runtime. Existing task/automation surfaces consume this API."
+  },
+  "status": "beta"
+}

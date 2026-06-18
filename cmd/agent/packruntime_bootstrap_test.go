@@ -86,6 +86,23 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 		t.Fatal("expected Notifications share routeSpec")
 	}
 
+	scheduler, ok := registry.Get("yunque.pack.scheduler")
+	if !ok {
+		t.Fatal("expected Scheduler builtin pack to be installed")
+	}
+	if scheduler.Status != packruntime.PackStatusEnabled {
+		t.Fatalf("expected Scheduler default enabled, got %s", scheduler.Status)
+	}
+	if scheduler.Manifest.SDK.TypeScript != "yunque-client/scheduler" {
+		t.Fatalf("unexpected Scheduler SDK import: %s", scheduler.Manifest.SDK.TypeScript)
+	}
+	if !hasRouteSpec(scheduler.Manifest.Backend.RouteSpecs, "GET", "/v1/scheduler/jobs") {
+		t.Fatal("expected Scheduler jobs routeSpec")
+	}
+	if !hasRouteSpec(scheduler.Manifest.Backend.RouteSpecs, "POST", "/v1/scheduler/add") {
+		t.Fatal("expected Scheduler add routeSpec")
+	}
+
 	cost, ok := registry.Get("yunque.pack.cost")
 	if !ok {
 		t.Fatal("expected Cost Governance builtin pack to be installed")
@@ -265,7 +282,7 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 	// Count reflects the current packs/official/ set (incl. the newer
 	// console/control-plane/knowledge/memory/skills/work/workspace packs and the
 	// cognitive-layer/state packs). Adjust if the builtin pack set changes.
-	if got := len(registry.List()); got != 30 {
+	if got := len(registry.List()); got != 31 {
 		t.Fatalf("expected idempotent builtin install, got %d packs", got)
 	}
 }

@@ -516,6 +516,9 @@ func (g *Gateway) SetLastPlanCache(c *sync.Map) { g.lastPlanCache = c }
 // SetScheduler replaces the scheduler reference (used in init wiring).
 func (g *Gateway) SetScheduler(s *scheduler.Scheduler) { g.scheduler = s }
 
+// Scheduler returns the execution scheduler.
+func (g *Gateway) Scheduler() *scheduler.Scheduler { return g.scheduler }
+
 // SetUpdateChecker sets the callback for checking available updates.
 func (g *Gateway) SetUpdateChecker(fn func() (tagName, htmlURL string, hasNew bool)) {
 	g.updateChecker = fn

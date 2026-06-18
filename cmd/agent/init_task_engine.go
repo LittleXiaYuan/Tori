@@ -59,6 +59,7 @@ import (
 	nightschoolpack "yunque-agent/internal/packs/nightschool"
 	notificationspack "yunque-agent/internal/packs/notifications"
 	reveriepack "yunque-agent/internal/packs/reverie"
+	schedulerpack "yunque-agent/internal/packs/scheduler"
 	skillspack "yunque-agent/internal/packs/skills"
 	statepack "yunque-agent/internal/packs/state"
 	triggerspack "yunque-agent/internal/packs/triggers"
@@ -185,6 +186,9 @@ func initTaskEngine(
 	// Notifications pack — owns /api/notify/* natively. The notifier is wired
 	// by initTasks, so the pack resolves it lazily per request.
 	_ = gw.RegisterModule(notificationspack.NewProvider(gw.Notifier))
+	// Scheduler pack — owns /v1/scheduler/* natively. The execution scheduler is
+	// provided by the gateway config and can be swapped in tests via SetScheduler.
+	_ = gw.RegisterModule(schedulerpack.NewProvider(gw.Scheduler))
 
 	// Persona-modes pack — owns /v1/persona/mode* natively (de-shelled from the
 	// gateway monolith). Resolves the mode manager lazily, so order is moot.
