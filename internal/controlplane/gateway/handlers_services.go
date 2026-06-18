@@ -8,28 +8,6 @@ import (
 	"yunque-agent/internal/apperror"
 )
 
-// from handlers_federation.go
-func (g *Gateway) handleFedPeers(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	if g.fedHub == nil {
-		json.NewEncoder(w).Encode(map[string]string{"error": "federation not configured"})
-		return
-	}
-	json.NewEncoder(w).Encode(map[string]any{
-		"local_id": string(g.fedHub.LocalID()),
-		"peers":    g.fedHub.ListPeers(),
-	})
-}
-
-func (g *Gateway) handleFedStats(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	if g.fedHub == nil {
-		json.NewEncoder(w).Encode(map[string]string{"error": "federation not configured"})
-		return
-	}
-	json.NewEncoder(w).Encode(g.fedHub.Stats())
-}
-
 //	from handlers_iterate.go
 //
 // handleIterateProposals returns all proposals or just pending ones.

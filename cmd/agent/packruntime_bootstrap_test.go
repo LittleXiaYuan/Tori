@@ -180,6 +180,20 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 		t.Fatal("expected Heartbeat trigger routeSpec")
 	}
 
+	federationPack, ok := registry.Get("yunque.pack.federation")
+	if !ok {
+		t.Fatal("expected Federation builtin pack to be installed")
+	}
+	if federationPack.Status != packruntime.PackStatusEnabled {
+		t.Fatalf("expected Federation default enabled, got %s", federationPack.Status)
+	}
+	if federationPack.Manifest.SDK.TypeScript != "yunque-client/federation" {
+		t.Fatalf("unexpected Federation SDK import: %s", federationPack.Manifest.SDK.TypeScript)
+	}
+	if !hasRouteSpec(federationPack.Manifest.Backend.RouteSpecs, "POST", "/v1/federation/receive") {
+		t.Fatal("expected Federation receive routeSpec")
+	}
+
 	forks, ok := registry.Get("yunque.pack.forks")
 	if !ok {
 		t.Fatal("expected Conversation Forks builtin pack to be installed")
@@ -430,7 +444,7 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 	// Count reflects the current packs/official/ set (incl. the newer
 	// console/control-plane/knowledge/memory/skills/work/workspace packs and the
 	// cognitive-layer/state packs). Adjust if the builtin pack set changes.
-	if got := len(registry.List()); got != 39 {
+	if got := len(registry.List()); got != 40 {
 		t.Fatalf("expected idempotent builtin install, got %d packs", got)
 	}
 }

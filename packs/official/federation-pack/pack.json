@@ -1,0 +1,101 @@
+{
+  "id": "yunque.pack.federation",
+  "name": "Federation (跨实例协作)",
+  "version": "0.1.0",
+  "description": "跨实例协作能力：查看联邦 peer、发布/发现 OPP 能力、委派任务、广播能力，并接收远端联邦协议消息。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": [
+      "federation.peers",
+      "federation.stats",
+      "federation.capabilities",
+      "federation.discover",
+      "federation.delegate",
+      "federation.receive"
+    ],
+    "routes": [
+      "/v1/federation/peers",
+      "/v1/federation/stats",
+      "/v1/federation/capabilities",
+      "/v1/federation/discover",
+      "/v1/federation/delegate",
+      "/v1/federation/bridge/stats",
+      "/v1/federation/broadcast",
+      "/v1/federation/receive"
+    ],
+    "permissions": [
+      "federation:read",
+      "federation:write",
+      "network:peer"
+    ],
+    "routeSpecs": [
+      {
+        "method": "GET",
+        "path": "/v1/federation/peers",
+        "description": "List known federation peers."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/federation/stats",
+        "description": "Read federation hub statistics."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/federation/capabilities",
+        "description": "Read local and peer OPP capabilities."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/federation/capabilities",
+        "description": "Update local OPP capabilities."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/federation/discover",
+        "description": "Discover peers matching model or intent requirements."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/federation/delegate",
+        "description": "Delegate a task through the federation bridge."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/federation/bridge/stats",
+        "description": "Read model-aware federation bridge statistics."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/federation/broadcast",
+        "description": "Broadcast local capabilities to known peers."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/federation/receive",
+        "description": "Receive signed federation protocol messages from peers."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [],
+    "assets": {
+      "type": "builtin"
+    }
+  },
+  "sdk": {
+    "typescript": "yunque-client/federation"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "group": "collaboration",
+    "phase": "A3",
+    "preload": "true",
+    "note": "Natively owns /v1/federation* through Pack Runtime. /v1/federation/receive keeps protocol-level authentication and is still Pack-gated."
+  },
+  "status": "beta"
+}

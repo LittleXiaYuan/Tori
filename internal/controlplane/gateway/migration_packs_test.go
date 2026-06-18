@@ -23,6 +23,7 @@ import (
 	costpack "yunque-agent/internal/packs/cost"
 	cronpack "yunque-agent/internal/packs/cron"
 	documentspack "yunque-agent/internal/packs/documents"
+	federationpack "yunque-agent/internal/packs/federation"
 	forkspack "yunque-agent/internal/packs/forks"
 	heartbeatpack "yunque-agent/internal/packs/heartbeat"
 	idepack "yunque-agent/internal/packs/ide"
@@ -77,6 +78,7 @@ var migrationPackPaths = map[string][]string{
 	connectorspack.PackID:    connectorspack.Paths(),
 	controlplanepack.PackID:  controlplanepack.Paths,
 	costpack.PackID:          costpack.Paths(),
+	federationpack.PackID:    federationpack.Paths(),
 	forkspack.PackID:         forkspack.Paths(),
 	heartbeatpack.PackID:     heartbeatpack.Paths(),
 	marketpack.PackID:        marketpack.Paths(),
@@ -114,6 +116,7 @@ var migrationPackNames = map[string]string{
 	connectorspack.PackID:    "Connectors",
 	controlplanepack.PackID:  "Control Plane",
 	costpack.PackID:          "Cost",
+	federationpack.PackID:    "Federation",
 	forkspack.PackID:         "Forks",
 	heartbeatpack.PackID:     "Heartbeat",
 	marketpack.PackID:        "Skill Market",
@@ -172,6 +175,7 @@ func registerMigrationPacks(gw *Gateway) {
 	_ = gw.RegisterModule(connectorspack.NewProvider(gw.ConnectorRegistry))
 	gw.RegisterBackendPack(controlplanepack.NewHandler(gw))
 	_ = gw.RegisterModule(costpack.NewProvider(func() *costtrack.Tracker { return gw.costTracker }))
+	_ = gw.RegisterModule(federationpack.New(gw))
 	_ = gw.RegisterModule(forkspack.NewProvider(gw.ForkTree, gw.ForkPersister))
 	_ = gw.RegisterModule(heartbeatpack.New(gw))
 	_ = gw.RegisterModule(marketpack.New(gw))
@@ -244,6 +248,8 @@ func newTestGatewayWithMigrationPack(t *testing.T, packID string, status packrun
 		gw.RegisterBackendPack(controlplanepack.NewHandler(gw))
 	case costpack.PackID:
 		_ = gw.RegisterModule(costpack.New(nil))
+	case federationpack.PackID:
+		_ = gw.RegisterModule(federationpack.New(nil))
 	case forkspack.PackID:
 		_ = gw.RegisterModule(forkspack.New(nil, nil))
 	case heartbeatpack.PackID:
@@ -286,6 +292,7 @@ func TestMigrationPackRouteGating(t *testing.T) {
 		{"work", workpack.PackID, "/v1/tasks"},
 		{"connectors", connectorspack.PackID, "/api/connectors"},
 		{"cost", costpack.PackID, "/v1/cost/summary"},
+		{"federation", federationpack.PackID, "/v1/federation/peers"},
 		{"forks", forkspack.PackID, "/v1/fork/list"},
 		{"heartbeat", heartbeatpack.PackID, "/v1/heartbeat"},
 		{"market", marketpack.PackID, "/v1/market/search"},

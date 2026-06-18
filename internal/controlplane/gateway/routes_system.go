@@ -132,19 +132,8 @@ func (g *Gateway) registerSystemRoutes() {
 	// Heartbeat (/v1/heartbeat*) is owned by the heartbeat pack
 	// (internal/packs/heartbeat), mounted via gw.RegisterModule.
 
-	// Federation (legacy)
-	g.mux.HandleFunc("/v1/federation/peers", g.requireAuth(g.handleFedPeers))
-	g.mux.HandleFunc("/v1/federation/stats", g.requireAuth(g.handleFedStats))
-
-	// Federation OPP v3 (model-aware A2A)
-	g.mux.HandleFunc("/v1/federation/capabilities", g.requireAuth(g.handleFedCapabilities))
-	g.mux.HandleFunc("/v1/federation/discover", g.requireAuth(g.handleFedDiscover))
-	g.mux.HandleFunc("/v1/federation/delegate", g.requireAuth(g.handleFedDelegate))
-	g.mux.HandleFunc("/v1/federation/bridge/stats", g.requireAuth(g.handleFedBridgeStats))
-	g.mux.HandleFunc("/v1/federation/broadcast", g.requireAuth(g.handleFedBroadcast))
-	if g.fedTransport != nil {
-		g.mux.HandleFunc("/v1/federation/receive", g.fedTransport.HTTPHandler())
-	}
+	// Federation (/v1/federation*) is owned by the federation pack
+	// (internal/packs/federation), mounted via gw.RegisterModule.
 
 	// Modules (hot-pluggable subsystems)
 	g.mux.HandleFunc("/v1/modules", g.requireAuth(g.handleModules))

@@ -47,6 +47,7 @@ import (
 	documentspack "yunque-agent/internal/packs/documents"
 	emotionpack "yunque-agent/internal/packs/emotion"
 	experiencepack "yunque-agent/internal/packs/experience"
+	federationpack "yunque-agent/internal/packs/federation"
 	filespack "yunque-agent/internal/packs/files"
 	forkspack "yunque-agent/internal/packs/forks"
 	graphpack "yunque-agent/internal/packs/graph"
@@ -216,6 +217,10 @@ func initTaskEngine(
 	// Heartbeat pack — owns /v1/heartbeat* natively via the autonomous heartbeat
 	// service wired before the task engine.
 	_ = gw.RegisterModule(heartbeatpack.New(gw))
+	// Federation pack — owns /v1/federation* natively. The peer receive endpoint
+	// keeps passthrough auth because federation messages authenticate at the
+	// protocol layer while Pack Runtime still owns enablement.
+	_ = gw.RegisterModule(federationpack.New(gw))
 	// MCP Dispatch pack — owns /mcp/v1 plus worker-management routes natively.
 	// It keeps method-sensitive auth inside the pack: probe reads are open,
 	// JSON-RPC writes are authenticated through the host RequireAuth wrapper.

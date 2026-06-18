@@ -245,11 +245,20 @@ func (g *Gateway) SkillMarket() *skillmarket.Market { return g.skillMarket }
 // SetFederationHub attaches the federation hub.
 func (g *Gateway) SetFederationHub(h *federation.Hub) { g.fedHub = h }
 
+// FederationHub exposes the legacy federation hub to the federation pack.
+func (g *Gateway) FederationHub() *federation.Hub { return g.fedHub }
+
 // SetFederationBridge attaches the OPP v3 bridge for model-aware federation.
 func (g *Gateway) SetFederationBridge(b *federation.OPPBridge) { g.fedBridge = b }
 
+// FederationBridge exposes the OPP federation bridge to the federation pack.
+func (g *Gateway) FederationBridge() *federation.OPPBridge { return g.fedBridge }
+
 // SetFederationTransport attaches the federation HTTP transport.
 func (g *Gateway) SetFederationTransport(t *federation.Transport) { g.fedTransport = t }
+
+// FederationTransport exposes the federation HTTP transport to the federation pack.
+func (g *Gateway) FederationTransport() *federation.Transport { return g.fedTransport }
 
 // SetKnowledgeStore attaches the knowledge base.
 func (g *Gateway) SetKnowledgeStore(ks *knowledge.Store) { g.knowledgeStore = ks }
