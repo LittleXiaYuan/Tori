@@ -12,10 +12,12 @@ import {
   Download,
   ExternalLink,
   Info,
+  LockKeyhole,
   PackageCheck,
   PackageX,
   Power,
   RotateCcw,
+  ShieldAlert,
   ShieldCheck,
   Sparkles,
   Workflow,
@@ -30,6 +32,15 @@ import {
 } from "yunque-client/packs";
 import { createYunqueSDKClientOptions } from "@/lib/sdk-client";
 import { formatErrorMessage } from "@/lib/error-utils";
+import {
+  capabilitySurfaceLabels,
+  entryInstallRequest,
+  formatPackInstallError,
+  groupPackPermissions,
+  packFeatureFlags,
+  packUsageExplanation,
+  riskProfileForPack,
+} from "@/lib/pack-presentation";
 
 const packsClient = createPacksClient(createYunqueSDKClientOptions());
 
@@ -126,7 +137,7 @@ export default function PackDetailClientPage() {
       showToast("操作成功", "success");
       await reload();
     } catch (e) {
-      showToast(formatErrorMessage(e, "操作失败"), "error");
+      showToast(label === "install" ? formatPackInstallError(e) : formatErrorMessage(e, "操作失败"), "error");
     } finally {
       setBusy(null);
     }
@@ -171,21 +182,30 @@ export default function PackDetailClientPage() {
   const routeSpecs = manifest.backend?.routeSpecs || [];
   const permissions = manifest.backend?.permissions || [];
   const menus = manifest.frontend?.menus || [];
+  const routesFrontend = manifest.frontend?.routes || [];
   const distribution = manifest.distribution;
   const sdk = manifest.sdk || {};
   const update = manifest.update;
   const sdkLanguages = Object.entries(sdk).filter(([, v]) => typeof v === "string" && v.trim());
+  const permissionGroups = groupPackPermissions(permissions);
+  const risk = riskProfileForPack(manifest);
+  const featureFlags = packFeatureFlags(manifest);
+  const surfaceLabels = capabilitySurfaceLabels(manifest);
+  const usageExplanation = packUsageExplanation(manifest);
+  const openPath = menus[0]?.path || routesFrontend[0]?.path;
 
   const installFromCatalog = () => {
-    if (!catalogEntry?.manifest_path) {
+    if (!catalogEntry) {
+      showToast("此能力包没有可用的安装源", "error");
+      return;
+    }
+    const request = entryInstallRequest(catalogEntry);
+    if (!request) {
       showToast("此能力包没有可用的安装源", "error");
       return;
     }
     return run("install", () =>
-      packsClient.install({
-        manifestPath: catalogEntry.manifest_path,
-        download: catalogEntry.downloadable,
-      }),
+      packsClient.install(request),
     );
   };
 
@@ -244,10 +264,10 @@ export default function PackDetailClientPage() {
               <RotateCcw size={14} /> 回滚到 v{installedPack.previousVersion}
             </Button>
           )}
-          {installed && enabled && menus[0]?.path && (
-            <Link href={menus[0].path}>
+          {installed && enabled && openPath && (
+            <Link href={openPath}>
               <Button variant="outline">
-                <ExternalLink size={14} /> 打开 {menus[0].label}
+                <ExternalLink size={14} /> 打开能力界面
               </Button>
             </Link>
           )}
@@ -276,6 +296,77 @@ export default function PackDetailClientPage() {
           </Card>
         )}
 
+        <Card className="section-card p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <ShieldCheck size={16} style={{ color: "var(--yunque-accent)" }} />
+            <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
+              安装前确认
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="rounded-md p-3 border" style={{ borderColor: "var(--yunque-border)" }}>
+              <div className="text-xs font-medium mb-2" style={{ color: "var(--yunque-text)" }}>它会获得什么能力</div>
+              {permissionGroups.length > 0 ? (
+                <div className="space-y-2">
+                  {permissionGroups.map((group) => (
+                    <div key={group.key}>
+                      <div className="flex items-center gap-2 text-xs" style={{ color: "var(--yunque-text-secondary)" }}>
+                        <LockKeyhole size={12} style={{ color: "var(--yunque-warning)" }} />
+                        <span className="font-medium">{group.label}</span>
+                        <span style={{ color: "var(--yunque-text-muted)" }}>{group.permissions.length} 项</span>
+                      </div>
+                      <div className="text-[11px] mt-1" style={{ color: "var(--yunque-text-muted)" }}>{group.description}</div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>未声明额外权限。</div>
+              )}
+            </div>
+            <div className="rounded-md p-3 border" style={{ borderColor: "var(--yunque-border)" }}>
+              <div className="text-xs font-medium mb-2" style={{ color: "var(--yunque-text)" }}>风险与回滚</div>
+              <Chip size="sm" style={{
+                background: risk.level === "high" ? "rgba(239,68,68,0.12)" : risk.level === "medium" ? "rgba(245,158,11,0.12)" : "rgba(34,197,94,0.10)",
+                color: risk.level === "high" ? "var(--yunque-danger)" : risk.level === "medium" ? "var(--yunque-warning)" : "var(--yunque-success)",
+              }}>
+                {risk.label}
+              </Chip>
+              <div className="text-xs mt-2" style={{ color: "var(--yunque-text-muted)" }}>{risk.description}</div>
+              <div className="text-xs mt-2" style={{ color: "var(--yunque-text-muted)" }}>
+                不会做什么：启用能力包不会自动泄露 API Key，不会绕过云雀的权限声明，也不会获得未声明 route 的调用能力。
+              </div>
+              <div className="text-xs mt-2" style={{ color: "var(--yunque-text-muted)" }}>
+                {update?.rollback ? "支持回滚到上一版本；也可以随时禁用。" : "可以随时禁用；此包未声明版本回滚。"}
+              </div>
+            </div>
+          </div>
+          {risk.requiresAuthorization && (
+            <div className="mt-3 flex items-start gap-2 rounded-md p-3" style={{ background: "rgba(239,68,68,0.10)", color: "var(--yunque-warning)" }}>
+              <ShieldAlert size={15} className="mt-0.5" />
+              <div className="text-xs">
+                这个能力包涉及高风险能力。请确认来源可信，并在启用后按需授权具体动作。
+              </div>
+            </div>
+          )}
+        </Card>
+
+        <Card className="section-card p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Sparkles size={16} style={{ color: "var(--yunque-primary)" }} />
+            <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
+              云雀如何使用它
+            </div>
+          </div>
+          <div className="space-y-2">
+            {usageExplanation.map((line) => (
+              <div key={line} className="flex items-start gap-2 text-sm" style={{ color: "var(--yunque-text-secondary)" }}>
+                <span style={{ color: "var(--yunque-accent)" }}>•</span>
+                <span>{line}</span>
+              </div>
+            ))}
+          </div>
+        </Card>
+
         {/* 能力清单 */}
         {caps.length > 0 && (
           <Card className="section-card p-4">
@@ -300,41 +391,37 @@ export default function PackDetailClientPage() {
           </Card>
         )}
 
-        {/* 权限 */}
-        {permissions.length > 0 && (
+        {surfaceLabels.length > 0 && (
           <Card className="section-card p-4">
             <div className="flex items-center gap-2 mb-3">
-              <ShieldCheck size={16} style={{ color: "var(--yunque-warning)" }} />
+              <Workflow size={16} style={{ color: "var(--yunque-accent)" }} />
               <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
-                需要的权限 ({permissions.length})
+                能力形态
               </div>
             </div>
             <div className="flex flex-wrap gap-1.5">
-              {permissions.map((p) => (
-                <Chip
-                  key={p}
-                  size="sm"
-                  className="font-mono"
-                  style={{ background: "rgba(245,158,11,0.10)", color: "var(--yunque-warning)" }}
-                >
-                  {p}
+              {surfaceLabels.map((label) => (
+                <Chip key={label} size="sm" style={{ background: "rgba(59,130,246,0.08)", color: "var(--yunque-primary)" }}>
+                  {label}
                 </Chip>
               ))}
             </div>
-            <div className="text-xs mt-2" style={{ color: "var(--yunque-text-muted)" }}>
-              启用此能力包后，云雀的相关功能将获得这些权限。可随时在能力包列表禁用。
-            </div>
+            {featureFlags.isIframeBundle && (
+              <div className="mt-3 rounded-md p-3 text-xs" style={{ background: "rgba(59,130,246,0.08)", color: "var(--yunque-text-secondary)" }}>
+                独立界面包运行在 iframe 沙箱中：不直接获得云雀 token，默认隔离页面能力，只能通过自身声明的 route 与云雀通信，越权 bridge call 会被拒绝并记录。
+              </div>
+            )}
           </Card>
         )}
 
         {/* 前端入口 */}
-        {menus.length > 0 && (
+        {(menus.length > 0 || routesFrontend.length > 0) && (
           <Card className="section-card p-4">
             <div className="text-sm font-semibold mb-3" style={{ color: "var(--yunque-text)" }}>
               界面入口
             </div>
             <div className="space-y-2">
-              {menus.map((menu) => (
+              {[...menus, ...routesFrontend.map((route) => ({ key: route.path, label: route.title || route.path, path: route.path }))].map((menu) => (
                 <Link key={menu.key} href={menu.path}>
                   <div
                     className="flex items-center justify-between p-2 rounded hover:bg-white/5 transition-colors text-sm"
