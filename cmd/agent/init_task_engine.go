@@ -61,6 +61,7 @@ import (
 	nightschoolpack "yunque-agent/internal/packs/nightschool"
 	notificationspack "yunque-agent/internal/packs/notifications"
 	orchestratorpack "yunque-agent/internal/packs/orchestrator"
+	reflectionpack "yunque-agent/internal/packs/reflection"
 	reveriepack "yunque-agent/internal/packs/reverie"
 	schedulerpack "yunque-agent/internal/packs/scheduler"
 	skillspack "yunque-agent/internal/packs/skills"
@@ -175,6 +176,9 @@ func initTaskEngine(
 	// Work pack — owns the task (/v1/tasks/*) + project (/v1/projects/*)
 	// surfaces natively. Workflows remain in the workflowapi sub-package.
 	_ = gw.RegisterModule(workpack.NewHandler(gw))
+	// Reflection pack — owns /v1/reflect/* natively, keeping experience capture
+	// and strategy compilation Pack-gated while sharing the canonical loop.
+	_ = gw.RegisterModule(reflectionpack.New(gw))
 
 	// Control-plane pack — owns the audit / trust / iterate / review / skillgrow /
 	// usage surfaces natively. Shipped default-enabled (an always-on core

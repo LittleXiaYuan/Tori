@@ -1,6 +1,6 @@
 package gateway
 
-// registerTaskRoutes registers planner recovery and reflection routes. The task
+// registerTaskRoutes registers planner recovery routes. The task
 // (/v1/tasks/*), project (/v1/projects/*), state (/v1/state*) and document
 // surfaces moved to native packs, so registering them here too would panic the
 // mux on duplicate patterns.
@@ -22,9 +22,8 @@ func (g *Gateway) registerTaskRoutes() {
 	// State Kernel (/v1/state*) is owned by the state pack
 	// (internal/packs/state), mounted via gw.RegisterModule.
 
-	// Reflection / Experience
-	g.mux.HandleFunc("/v1/reflect/experiences", g.requireAuth(g.handleExperiences))
-	g.mux.HandleFunc("/v1/reflect/strategies", g.requireAuth(g.handleStrategies))
+	// Reflection (/v1/reflect/*) is owned by the reflection pack
+	// (internal/packs/reflection), mounted via gw.RegisterModule.
 
 	// Document generation (/v1/documents/*) is owned by the documents pack
 	// (internal/packs/documents), mounted via gw.RegisterModule.

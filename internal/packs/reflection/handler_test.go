@@ -1,4 +1,4 @@
-package gateway
+package reflectionpack
 
 import (
 	"bytes"
@@ -9,12 +9,13 @@ import (
 	"strings"
 	"testing"
 
+	"yunque-agent/internal/cognikernel"
 	reflectpkg "yunque-agent/internal/experimental/reflect"
 )
 
 func TestHandleExperiencesPostStoresWorkloadFeedback(t *testing.T) {
 	store := reflectpkg.NewExperienceStore(filepath.Join(t.TempDir(), "experiences.json"))
-	g := &Gateway{experienceStore: store}
+	h := NewProvider(func() *reflectpkg.ExperienceStore { return store }, nil)
 	body := bytes.NewBufferString(`{
 		"id":"workload-feedback-browser-rpa",
 		"source":"workload_feedback",
@@ -28,7 +29,7 @@ func TestHandleExperiencesPostStoresWorkloadFeedback(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/v1/reflect/experiences", body)
 	rec := httptest.NewRecorder()
 
-	g.handleExperiences(rec, req)
+	h.Experiences(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
@@ -40,15 +41,25 @@ func TestHandleExperiencesPostStoresWorkloadFeedback(t *testing.T) {
 	if all[0].Source != "workload_feedback" || all[0].Category != "workload_feedback" {
 		t.Fatalf("unexpected stored workload feedback: %#v", all[0])
 	}
-	if !strings.Contains(all[0].Lesson, "最顺手") || !reflectExperienceHasTag(all[0], "workload:browser-rpa") {
+	if !strings.Contains(all[0].Lesson, "最顺手") || !experienceHasTag(all[0], "workload:browser-rpa") {
 		t.Fatalf("stored experience lost workload detail: %#v", all[0])
 	}
 }
 
 func TestHandleExperiencesPostFeedsWorkloadFeedbackThroughReflectiveLoop(t *testing.T) {
 	store := reflectpkg.NewExperienceStore(filepath.Join(t.TempDir(), "experiences.json"))
-	g := &Gateway{experienceStore: store}
-	g.WireReflectionLoop()
+	loop := cognikernel.NewReflectiveLoop()
+	loop.SetExperienceRecord(func(source, category, outcome, lesson, lctx string, tags []string) {
+		store.Add(reflectpkg.Experience{
+			Source:   source,
+			Category: category,
+			Outcome:  outcome,
+			Lesson:   lesson,
+			Context:  lctx,
+			Tags:     tags,
+		})
+	})
+	h := NewProvider(func() *reflectpkg.ExperienceStore { return store }, func() *cognikernel.ReflectiveLoop { return loop })
 
 	body := strings.NewReader(`{
 		"source":"workload_feedback",
@@ -62,7 +73,7 @@ func TestHandleExperiencesPostFeedsWorkloadFeedbackThroughReflectiveLoop(t *test
 	req := httptest.NewRequest(http.MethodPost, "/v1/reflect/experiences", body)
 	rec := httptest.NewRecorder()
 
-	g.handleExperiences(rec, req)
+	h.Experiences(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
@@ -82,7 +93,7 @@ func TestHandleExperiencesPostFeedsWorkloadFeedbackThroughReflectiveLoop(t *test
 		t.Fatalf("expected one stored feedback experience, got %d", len(all))
 	}
 	for _, want := range []string{"source:workload_feedback", "category:workload_feedback", "outcome:success", "source_id:browser-rpa"} {
-		if !reflectExperienceHasTag(all[0], want) {
+		if !experienceHasTag(all[0], want) {
 			t.Fatalf("reflective loop did not annotate feedback tag %q: %#v", want, all[0])
 		}
 	}
@@ -112,11 +123,11 @@ func TestHandleExperiencesSearchRespectsFilters(t *testing.T) {
 		Lesson:   "search strategy helped answer chat context",
 	})
 
-	g := &Gateway{experienceStore: store}
+	h := NewProvider(func() *reflectpkg.ExperienceStore { return store }, nil)
 	req := httptest.NewRequest(http.MethodGet, "/v1/reflect/experiences?q=search&source=task&outcome=success", nil)
 	rec := httptest.NewRecorder()
 
-	g.handleExperiences(rec, req)
+	h.Experiences(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
@@ -155,11 +166,11 @@ func TestHandleExperiencesSearchFiltersBeforeLimit(t *testing.T) {
 		})
 	}
 
-	g := &Gateway{experienceStore: store}
+	h := NewProvider(func() *reflectpkg.ExperienceStore { return store }, nil)
 	req := httptest.NewRequest(http.MethodGet, "/v1/reflect/experiences?q=needle&source=task&limit=1", nil)
 	rec := httptest.NewRecorder()
 
-	g.handleExperiences(rec, req)
+	h.Experiences(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
@@ -193,11 +204,11 @@ func TestHandleExperiencesSearchMatchesNaturalQueryTokens(t *testing.T) {
 		Lesson:   "web search should cite sources before summarizing news",
 	})
 
-	g := &Gateway{experienceStore: store}
+	h := NewProvider(func() *reflectpkg.ExperienceStore { return store }, nil)
 	req := httptest.NewRequest(http.MethodGet, "/v1/reflect/experiences?q=%E8%AF%B7%E5%81%9A+code+review&limit=1", nil)
 	rec := httptest.NewRecorder()
 
-	g.handleExperiences(rec, req)
+	h.Experiences(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
@@ -220,11 +231,11 @@ func TestHandleExperiencesLimitAppliesAfterFilters(t *testing.T) {
 	store.Add(reflectpkg.Experience{ID: "chat", Source: "interaction", Category: "strategy", Outcome: "partial", Lesson: "chat lesson"})
 	store.Add(reflectpkg.Experience{ID: "new-task", Source: "task", Category: "strategy", Outcome: "partial", Lesson: "newer task lesson"})
 
-	g := &Gateway{experienceStore: store}
+	h := NewProvider(func() *reflectpkg.ExperienceStore { return store }, nil)
 	req := httptest.NewRequest(http.MethodGet, "/v1/reflect/experiences?source=task&limit=1", nil)
 	rec := httptest.NewRecorder()
 
-	g.handleExperiences(rec, req)
+	h.Experiences(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
@@ -250,11 +261,11 @@ func TestHandleExperiencesFiltersByTag(t *testing.T) {
 	store.Add(reflectpkg.Experience{ID: "high-quality", Source: "task", Category: "strategy", Outcome: "success", Lesson: "high quality lesson", Tags: []string{"quality:9", "outcome:success"}})
 	store.Add(reflectpkg.Experience{ID: "chat-high", Source: "interaction", Category: "strategy", Outcome: "success", Lesson: "chat high lesson", Tags: []string{"quality:9", "outcome:success"}})
 
-	g := &Gateway{experienceStore: store}
+	h := NewProvider(func() *reflectpkg.ExperienceStore { return store }, nil)
 	req := httptest.NewRequest(http.MethodGet, "/v1/reflect/experiences?source=task&tag=quality:9", nil)
 	rec := httptest.NewRecorder()
 
-	g.handleExperiences(rec, req)
+	h.Experiences(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
@@ -279,11 +290,11 @@ func TestHandleStrategiesRespectsLimit(t *testing.T) {
 	store.Add(reflectpkg.Experience{ID: "first", Outcome: "success", Lesson: "first strategy lesson should appear in compiled hints"})
 	store.Add(reflectpkg.Experience{ID: "second", Outcome: "success", Lesson: "second strategy lesson should appear in compiled hints"})
 
-	g := &Gateway{experienceStore: store}
+	h := NewProvider(func() *reflectpkg.ExperienceStore { return store }, nil)
 	req := httptest.NewRequest(http.MethodGet, "/v1/reflect/strategies?limit=1", nil)
 	rec := httptest.NewRecorder()
 
-	g.handleStrategies(rec, req)
+	h.Strategies(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
@@ -308,11 +319,11 @@ func TestHandleStrategiesRespectsFilters(t *testing.T) {
 	store.Add(reflectpkg.Experience{ID: "target", Source: "task", Category: "strategy", Outcome: "success", Lesson: "high quality strategy lesson should appear", Tags: []string{"quality:9"}})
 	store.Add(reflectpkg.Experience{ID: "chat", Source: "interaction", Category: "strategy", Outcome: "success", Lesson: "chat high quality strategy lesson should not appear", Tags: []string{"quality:9"}})
 
-	g := &Gateway{experienceStore: store}
+	h := NewProvider(func() *reflectpkg.ExperienceStore { return store }, nil)
 	req := httptest.NewRequest(http.MethodGet, "/v1/reflect/strategies?source=task&tag=quality:9", nil)
 	rec := httptest.NewRecorder()
 
-	g.handleStrategies(rec, req)
+	h.Strategies(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
@@ -337,11 +348,11 @@ func TestHandleExperienceStatsRespectsFilters(t *testing.T) {
 	store.Add(reflectpkg.Experience{ID: "task-failure", Source: "task", Category: "strategy", Outcome: "failure", Lesson: "task failure lesson"})
 	store.Add(reflectpkg.Experience{ID: "chat-success", Source: "interaction", Category: "strategy", Outcome: "success", Lesson: "chat success lesson"})
 
-	g := &Gateway{experienceStore: store}
+	h := NewProvider(func() *reflectpkg.ExperienceStore { return store }, nil)
 	req := httptest.NewRequest(http.MethodGet, "/v1/reflect/experiences?stats=true&source=task&outcome=success", nil)
 	rec := httptest.NewRecorder()
 
-	g.handleExperiences(rec, req)
+	h.Experiences(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
@@ -366,11 +377,11 @@ func TestHandleExperienceStatsRespectsTagFilter(t *testing.T) {
 	store.Add(reflectpkg.Experience{ID: "ok", Source: "task", Category: "strategy", Outcome: "success", Lesson: "ok lesson", Tags: []string{"quality:9"}})
 	store.Add(reflectpkg.Experience{ID: "partial", Source: "task", Category: "strategy", Outcome: "partial", Lesson: "partial lesson", Tags: []string{"quality:5"}})
 
-	g := &Gateway{experienceStore: store}
+	h := NewProvider(func() *reflectpkg.ExperienceStore { return store }, nil)
 	req := httptest.NewRequest(http.MethodGet, "/v1/reflect/experiences?stats=true&tag=quality:9", nil)
 	rec := httptest.NewRecorder()
 
-	g.handleExperiences(rec, req)
+	h.Experiences(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
@@ -411,11 +422,11 @@ func TestHandleExperienceStatsReturnsWorkloadFeedbackDogfoodMetrics(t *testing.T
 	})
 	store.Add(reflectpkg.Experience{ID: "task", Source: "task", Category: "strategy", Outcome: "success"})
 
-	g := &Gateway{experienceStore: store}
+	h := NewProvider(func() *reflectpkg.ExperienceStore { return store }, nil)
 	req := httptest.NewRequest(http.MethodGet, "/v1/reflect/experiences?stats=true&kind=workload_feedback&source=workload_feedback&category=workload_feedback&workloads=browser-rpa,memory-review,wasm-workload", nil)
 	rec := httptest.NewRecorder()
 
-	g.handleExperiences(rec, req)
+	h.Experiences(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())

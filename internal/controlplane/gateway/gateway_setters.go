@@ -448,6 +448,9 @@ func (g *Gateway) StateKernel() *state.Kernel { return g.stateKernel }
 // SetExperienceStore attaches the reflection experience store.
 func (g *Gateway) SetExperienceStore(es *reflectpkg.ExperienceStore) { g.experienceStore = es }
 
+// ExperienceStore exposes the reflection experience store to the reflection pack.
+func (g *Gateway) ExperienceStore() *reflectpkg.ExperienceStore { return g.experienceStore }
+
 // SetReflectiveLoop attaches the canonical reflection loop used for explicit
 // feedback ingestion and post-turn learning.
 func (g *Gateway) SetReflectiveLoop(rl *cognikernel.ReflectiveLoop) { g.reflectiveLoop = rl }

@@ -1,0 +1,63 @@
+{
+  "id": "yunque.pack.reflection",
+  "name": "Reflection (反思经验)",
+  "version": "0.1.0",
+  "description": "反思经验沉淀：记录反馈、查询经验，并把经验编译成可复用策略。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": [
+      "reflection.experiences.read",
+      "reflection.experiences.write",
+      "reflection.strategies"
+    ],
+    "routes": [
+      "/v1/reflect/experiences",
+      "/v1/reflect/strategies"
+    ],
+    "permissions": [
+      "experience:read",
+      "experience:write",
+      "reflection:read",
+      "reflection:write"
+    ],
+    "routeSpecs": [
+      {
+        "method": "GET",
+        "path": "/v1/reflect/experiences",
+        "description": "List, search, filter, or summarize learned experiences."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/reflect/experiences",
+        "description": "Record one learned experience or workload feedback item."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/reflect/strategies",
+        "description": "Compile learned experiences into reusable strategy hints."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [],
+    "assets": {
+      "type": "builtin"
+    }
+  },
+  "sdk": {
+    "typescript": "yunque-client/reflection"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "group": "cognition",
+    "phase": "A2",
+    "preload": "true",
+    "note": "Natively owns /v1/reflect/* through the Pack Runtime gate. Shares the canonical ReflectiveLoop and ExperienceStore; no separate menu because Chat/feedback/Cogni surfaces consume these APIs."
+  },
+  "status": "beta"
+}

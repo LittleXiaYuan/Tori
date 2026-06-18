@@ -137,6 +137,26 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 		t.Fatal("expected IDE Work Orchestrator policy update routeSpec")
 	}
 
+	reflection, ok := registry.Get("yunque.pack.reflection")
+	if !ok {
+		t.Fatal("expected Reflection builtin pack to be installed")
+	}
+	if reflection.Status != packruntime.PackStatusEnabled {
+		t.Fatalf("expected Reflection default enabled, got %s", reflection.Status)
+	}
+	if reflection.Manifest.SDK.TypeScript != "yunque-client/reflection" {
+		t.Fatalf("unexpected Reflection SDK import: %s", reflection.Manifest.SDK.TypeScript)
+	}
+	if !hasRouteSpec(reflection.Manifest.Backend.RouteSpecs, "GET", "/v1/reflect/experiences") {
+		t.Fatal("expected Reflection experiences read routeSpec")
+	}
+	if !hasRouteSpec(reflection.Manifest.Backend.RouteSpecs, "POST", "/v1/reflect/experiences") {
+		t.Fatal("expected Reflection experiences write routeSpec")
+	}
+	if !hasRouteSpec(reflection.Manifest.Backend.RouteSpecs, "GET", "/v1/reflect/strategies") {
+		t.Fatal("expected Reflection strategies routeSpec")
+	}
+
 	mcpDispatch, ok := registry.Get("yunque.pack.mcp-dispatch")
 	if !ok {
 		t.Fatal("expected MCP Dispatch builtin pack to be installed")
@@ -333,7 +353,7 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 	// Count reflects the current packs/official/ set (incl. the newer
 	// console/control-plane/knowledge/memory/skills/work/workspace packs and the
 	// cognitive-layer/state packs). Adjust if the builtin pack set changes.
-	if got := len(registry.List()); got != 34 {
+	if got := len(registry.List()); got != 35 {
 		t.Fatalf("expected idempotent builtin install, got %d packs", got)
 	}
 }
