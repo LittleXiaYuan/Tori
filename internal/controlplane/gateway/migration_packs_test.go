@@ -26,6 +26,7 @@ import (
 	forkspack "yunque-agent/internal/packs/forks"
 	idepack "yunque-agent/internal/packs/ide"
 	knowledgepack "yunque-agent/internal/packs/knowledge"
+	marketpack "yunque-agent/internal/packs/market"
 	mcpdispatchpack "yunque-agent/internal/packs/mcpdispatch"
 	memorypack "yunque-agent/internal/packs/memory"
 	missionspack "yunque-agent/internal/packs/missions"
@@ -75,6 +76,7 @@ var migrationPackPaths = map[string][]string{
 	controlplanepack.PackID:  controlplanepack.Paths,
 	costpack.PackID:          costpack.Paths(),
 	forkspack.PackID:         forkspack.Paths(),
+	marketpack.PackID:        marketpack.Paths(),
 	mcpdispatchpack.PackID:   mcpdispatchpack.Paths(),
 	notificationspack.PackID: notificationspack.Paths(),
 	orchestratorpack.PackID:  orchestratorpack.Paths(),
@@ -109,6 +111,7 @@ var migrationPackNames = map[string]string{
 	controlplanepack.PackID:  "Control Plane",
 	costpack.PackID:          "Cost",
 	forkspack.PackID:         "Forks",
+	marketpack.PackID:        "Skill Market",
 	mcpdispatchpack.PackID:   "MCP Dispatch",
 	notificationspack.PackID: "Notifications",
 	orchestratorpack.PackID:  "IDE Work Orchestrator",
@@ -164,6 +167,7 @@ func registerMigrationPacks(gw *Gateway) {
 	gw.RegisterBackendPack(controlplanepack.NewHandler(gw))
 	_ = gw.RegisterModule(costpack.NewProvider(func() *costtrack.Tracker { return gw.costTracker }))
 	_ = gw.RegisterModule(forkspack.NewProvider(gw.ForkTree, gw.ForkPersister))
+	_ = gw.RegisterModule(marketpack.New(gw))
 	_ = gw.RegisterModule(mcpdispatchpack.New(gw))
 	_ = gw.RegisterModule(notificationspack.NewProvider(gw.Notifier))
 	_ = gw.RegisterModule(orchestratorpack.New(gw))
@@ -234,6 +238,8 @@ func newTestGatewayWithMigrationPack(t *testing.T, packID string, status packrun
 		_ = gw.RegisterModule(costpack.New(nil))
 	case forkspack.PackID:
 		_ = gw.RegisterModule(forkspack.New(nil, nil))
+	case marketpack.PackID:
+		_ = gw.RegisterModule(marketpack.New(nil))
 	case mcpdispatchpack.PackID:
 		_ = gw.RegisterModule(mcpdispatchpack.New(gw))
 	case notificationspack.PackID:
@@ -269,6 +275,7 @@ func TestMigrationPackRouteGating(t *testing.T) {
 		{"connectors", connectorspack.PackID, "/api/connectors"},
 		{"cost", costpack.PackID, "/v1/cost/summary"},
 		{"forks", forkspack.PackID, "/v1/fork/list"},
+		{"market", marketpack.PackID, "/v1/market/search"},
 		{"mcp-dispatch", mcpdispatchpack.PackID, "/v1/workers"},
 		{"notifications", notificationspack.PackID, "/api/notify/channels"},
 		{"orchestrator", orchestratorpack.PackID, "/v1/orchestrator/status"},

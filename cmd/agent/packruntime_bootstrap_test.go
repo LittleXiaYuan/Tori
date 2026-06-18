@@ -72,6 +72,26 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 		t.Fatal("expected Channels groups routeSpec")
 	}
 
+	market, ok := registry.Get("yunque.pack.market")
+	if !ok {
+		t.Fatal("expected Skill Market builtin pack to be installed")
+	}
+	if market.Status != packruntime.PackStatusEnabled {
+		t.Fatalf("expected Skill Market default enabled, got %s", market.Status)
+	}
+	if market.Manifest.SDK.TypeScript != "yunque-client/market" {
+		t.Fatalf("unexpected Skill Market SDK import: %s", market.Manifest.SDK.TypeScript)
+	}
+	if !hasRouteSpec(market.Manifest.Backend.RouteSpecs, "GET", "/v1/market/search") {
+		t.Fatal("expected Skill Market search routeSpec")
+	}
+	if !hasRouteSpec(market.Manifest.Backend.RouteSpecs, "GET", "/v1/market/top") {
+		t.Fatal("expected Skill Market top routeSpec")
+	}
+	if !hasRouteSpec(market.Manifest.Backend.RouteSpecs, "GET", "/v1/market/stats") {
+		t.Fatal("expected Skill Market stats routeSpec")
+	}
+
 	connectors, ok := registry.Get("yunque.pack.connectors")
 	if !ok {
 		t.Fatal("expected Connectors builtin pack to be installed")
@@ -373,7 +393,7 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 	// Count reflects the current packs/official/ set (incl. the newer
 	// console/control-plane/knowledge/memory/skills/work/workspace packs and the
 	// cognitive-layer/state packs). Adjust if the builtin pack set changes.
-	if got := len(registry.List()); got != 36 {
+	if got := len(registry.List()); got != 37 {
 		t.Fatalf("expected idempotent builtin install, got %d packs", got)
 	}
 }

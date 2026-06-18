@@ -236,6 +236,9 @@ func (g *Gateway) SetAuditChain(ac *audit.Chain) { g.auditChain = ac }
 // SetSkillMarket attaches the skill marketplace.
 func (g *Gateway) SetSkillMarket(sm *skillmarket.Market) { g.skillMarket = sm }
 
+// SkillMarket exposes the local skill marketplace to the market pack.
+func (g *Gateway) SkillMarket() *skillmarket.Market { return g.skillMarket }
+
 // SetFederationHub attaches the federation hub.
 func (g *Gateway) SetFederationHub(h *federation.Hub) { g.fedHub = h }
 

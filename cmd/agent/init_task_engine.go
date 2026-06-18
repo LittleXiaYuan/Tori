@@ -54,6 +54,7 @@ import (
 	innerlifepack "yunque-agent/internal/packs/innerlife"
 	instructionspack "yunque-agent/internal/packs/instructions"
 	knowledgepack "yunque-agent/internal/packs/knowledge"
+	marketpack "yunque-agent/internal/packs/market"
 	mcpdispatchpack "yunque-agent/internal/packs/mcpdispatch"
 	memorypack "yunque-agent/internal/packs/memory"
 	microagentpack "yunque-agent/internal/packs/microagent"
@@ -176,6 +177,8 @@ func initTaskEngine(
 	// Channels pack — owns channel reactions, native sticker sending and group
 	// discovery through the shared channel registry.
 	_ = gw.RegisterModule(channelspack.New(gw))
+	// Market pack — owns the local skill-market discovery routes natively.
+	_ = gw.RegisterModule(marketpack.New(gw))
 
 	// Work pack — owns the task (/v1/tasks/*) + project (/v1/projects/*)
 	// surfaces natively. Workflows remain in the workflowapi sub-package.

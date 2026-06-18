@@ -132,10 +132,8 @@ func (g *Gateway) registerPluginRoutes() {
 	// panic the mux on duplicate patterns. SkillHub and the skill market below
 	// keep their own gateway routes for now.
 
-	// Skill Market
-	g.mux.HandleFunc("/v1/market/search", g.requireAuth(g.handleMarketSearch))
-	g.mux.HandleFunc("/v1/market/top", g.requireAuth(g.handleMarketTop))
-	g.mux.HandleFunc("/v1/market/stats", g.requireAuth(g.handleMarketStats))
+	// Skill Market (/v1/market/*) is owned by the market pack
+	// (internal/packs/market), mounted via gw.RegisterModule.
 
 	// SkillHub API
 	g.mux.HandleFunc("/api/skillhub/search", g.requireAuth(g.handleSkillHubSearch))

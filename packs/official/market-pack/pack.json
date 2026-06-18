@@ -1,0 +1,61 @@
+{
+  "id": "yunque.pack.market",
+  "name": "Skill Market (技能市场)",
+  "version": "0.1.0",
+  "description": "本地技能市场：搜索、热门/高评分排序与统计概览。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": [
+      "market.skills.search",
+      "market.skills.rank",
+      "market.stats"
+    ],
+    "routes": [
+      "/v1/market/search",
+      "/v1/market/top",
+      "/v1/market/stats"
+    ],
+    "permissions": [
+      "market:read"
+    ],
+    "routeSpecs": [
+      {
+        "method": "GET",
+        "path": "/v1/market/search",
+        "description": "Search the local skill market catalog."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/market/top",
+        "description": "List top local skill market entries by popularity or rating."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/market/stats",
+        "description": "Return aggregate local skill market statistics."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [],
+    "assets": {
+      "type": "builtin"
+    }
+  },
+  "sdk": {
+    "typescript": "yunque-client/market"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "group": "extensions",
+    "phase": "A2",
+    "preload": "true",
+    "note": "Natively owns /v1/market/search, /v1/market/top and /v1/market/stats through the Pack Runtime gate. Remote SkillHub install/update remains a separate migration slice."
+  },
+  "status": "beta"
+}
