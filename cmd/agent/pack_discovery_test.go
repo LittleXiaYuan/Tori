@@ -25,6 +25,7 @@ func TestDiscoverBuiltinPackManifestPaths(t *testing.T) {
 		"packs/official/inner-life-pack/pack.json",
 		"packs/official/market-pack/pack.json",
 		"packs/official/mcp-dispatch-pack/pack.json",
+		"packs/official/skillhub-pack/pack.json",
 		"packs/official/work-pack/pack.json",
 		"packs/official/skills-pack/pack.json",
 		"packs/official/memory-pack/pack.json",

@@ -92,6 +92,26 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 		t.Fatal("expected Skill Market stats routeSpec")
 	}
 
+	skillhub, ok := registry.Get("yunque.pack.skillhub")
+	if !ok {
+		t.Fatal("expected SkillHub builtin pack to be installed")
+	}
+	if skillhub.Status != packruntime.PackStatusEnabled {
+		t.Fatalf("expected SkillHub default enabled, got %s", skillhub.Status)
+	}
+	if skillhub.Manifest.SDK.TypeScript != "yunque-client/skillhub" {
+		t.Fatalf("unexpected SkillHub SDK import: %s", skillhub.Manifest.SDK.TypeScript)
+	}
+	if !hasRouteSpec(skillhub.Manifest.Backend.RouteSpecs, "GET", "/api/skillhub/search") {
+		t.Fatal("expected SkillHub search routeSpec")
+	}
+	if !hasRouteSpec(skillhub.Manifest.Backend.RouteSpecs, "POST", "/api/skillhub/install") {
+		t.Fatal("expected SkillHub install routeSpec")
+	}
+	if !hasRouteSpec(skillhub.Manifest.Backend.RouteSpecs, "GET", "/api/skillhub/policy/check") {
+		t.Fatal("expected SkillHub policy check routeSpec")
+	}
+
 	connectors, ok := registry.Get("yunque.pack.connectors")
 	if !ok {
 		t.Fatal("expected Connectors builtin pack to be installed")
@@ -393,7 +413,7 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 	// Count reflects the current packs/official/ set (incl. the newer
 	// console/control-plane/knowledge/memory/skills/work/workspace packs and the
 	// cognitive-layer/state packs). Adjust if the builtin pack set changes.
-	if got := len(registry.List()); got != 37 {
+	if got := len(registry.List()); got != 38 {
 		t.Fatalf("expected idempotent builtin install, got %d packs", got)
 	}
 }

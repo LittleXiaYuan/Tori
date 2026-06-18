@@ -135,20 +135,8 @@ func (g *Gateway) registerPluginRoutes() {
 	// Skill Market (/v1/market/*) is owned by the market pack
 	// (internal/packs/market), mounted via gw.RegisterModule.
 
-	// SkillHub API
-	g.mux.HandleFunc("/api/skillhub/search", g.requireAuth(g.handleSkillHubSearch))
-	g.mux.HandleFunc("/api/skillhub/install", g.requireAuth(g.handleSkillHubInstall))
-	g.mux.HandleFunc("/api/skillhub/installed", g.requireAuth(g.handleSkillHubInstalled))
-	g.mux.HandleFunc("/api/skillhub/uninstall", g.requireAuth(g.handleSkillHubUninstall))
-	g.mux.HandleFunc("/api/skillhub/trending", g.requireAuth(g.handleSkillHubTrending))
-	g.mux.HandleFunc("/api/skillhub/detail", g.requireAuth(g.handleSkillHubDetail))
-	g.mux.HandleFunc("/api/skillhub/check-updates", g.requireAuth(g.handleSkillHubCheckUpdates))
-	g.mux.HandleFunc("/api/skillhub/update", g.requireAuth(g.handleSkillHubUpdate))
-	g.mux.HandleFunc("/api/skillhub/rollback", g.requireAuth(g.handleSkillHubRollback))
-	g.mux.HandleFunc("/api/skillhub/versions", g.requireAuth(g.handleSkillHubVersions))
-	g.mux.HandleFunc("/api/skillhub/policy", g.requireAuth(g.handleSkillHubPolicy))
-	g.mux.HandleFunc("/api/skillhub/policy/check", g.requireAuth(g.handleSkillHubPolicyCheck))
-	g.mux.HandleFunc("/api/skillhub/analytics", g.requireAuth(g.handleSkillHubAnalytics))
+	// SkillHub (/api/skillhub/*) is owned by the skillhub pack
+	// (internal/packs/skillhub), mounted via gw.RegisterModule.
 	g.mux.HandleFunc("/v1/skill-suggestions", g.requireAuth(g.handleSkillSuggestions))
 }
 

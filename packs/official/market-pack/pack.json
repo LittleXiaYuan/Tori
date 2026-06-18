@@ -55,7 +55,7 @@
     "group": "extensions",
     "phase": "A2",
     "preload": "true",
-    "note": "Natively owns /v1/market/search, /v1/market/top and /v1/market/stats through the Pack Runtime gate. Remote SkillHub install/update remains a separate migration slice."
+    "note": "Natively owns /v1/market/search, /v1/market/top and /v1/market/stats through the Pack Runtime gate. Remote SkillHub discovery/install/update is owned by yunque.pack.skillhub."
   },
   "status": "beta"
 }

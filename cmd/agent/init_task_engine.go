@@ -66,6 +66,7 @@ import (
 	reflectionpack "yunque-agent/internal/packs/reflection"
 	reveriepack "yunque-agent/internal/packs/reverie"
 	schedulerpack "yunque-agent/internal/packs/scheduler"
+	skillhubpack "yunque-agent/internal/packs/skillhub"
 	skillspack "yunque-agent/internal/packs/skills"
 	statepack "yunque-agent/internal/packs/state"
 	triggerspack "yunque-agent/internal/packs/triggers"
@@ -164,8 +165,8 @@ func initTaskEngine(
 	_ = gw.RegisterModule(memorypack.NewWired(gw.MemoryManager(), gw.MemoryPipeline(), gw.MemoryOrchestrator, gw.TenantOf))
 
 	// Skills pack — fully de-shelled: listing / scan / dynamic / approve / reject
-	// all served natively via the registry + metrics + file scanner. SkillHub /
-	// market keep their own gateway routes.
+	// all served natively via the registry + metrics + file scanner. SkillHub and
+	// market live in their own native packs.
 	skillsPack := skillspack.NewHandlerWithService(gw.SkillsRegistry(), gw.Metrics())
 	// De-shelled approve/reject persist via the same path the gateway used.
 	skillsPack.SetDynamicSave(func() error {
@@ -179,6 +180,8 @@ func initTaskEngine(
 	_ = gw.RegisterModule(channelspack.New(gw))
 	// Market pack — owns the local skill-market discovery routes natively.
 	_ = gw.RegisterModule(marketpack.New(gw))
+	// SkillHub pack — owns remote skill discovery/install/update/policy routes.
+	_ = gw.RegisterModule(skillhubpack.New(gw))
 
 	// Work pack — owns the task (/v1/tasks/*) + project (/v1/projects/*)
 	// surfaces natively. Workflows remain in the workflowapi sub-package.

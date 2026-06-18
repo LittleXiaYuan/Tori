@@ -294,14 +294,26 @@ func (g *Gateway) SetSanitizer(s *guardrails.Sanitizer) { g.sanitizer = s }
 // SetSkillInstaller attaches the skill installer for SkillHub API.
 func (g *Gateway) SetSkillInstaller(si *skillmarket.Installer) { g.skillInstaller = si }
 
+// SkillInstaller exposes the SkillHub installer to the SkillHub pack.
+func (g *Gateway) SkillInstaller() *skillmarket.Installer { return g.skillInstaller }
+
 // SetSkillPolicy attaches the security policy for SkillHub enforcement.
 func (g *Gateway) SetSkillPolicy(sp *skillmarket.SecurityPolicy) { g.skillPolicy = sp }
+
+// SkillPolicy exposes the SkillHub security policy to the SkillHub pack.
+func (g *Gateway) SkillPolicy() *skillmarket.SecurityPolicy { return g.skillPolicy }
 
 // SetClawHubProvider attaches the ClawHub remote skill provider.
 func (g *Gateway) SetClawHubProvider(ch *skillmarket.ClawHubProvider) { g.clawHub = ch }
 
+// ClawHubProvider exposes the ClawHub remote source to the SkillHub pack.
+func (g *Gateway) ClawHubProvider() *skillmarket.ClawHubProvider { return g.clawHub }
+
 // SetToriHubProvider attaches the ToriHub remote skill provider.
 func (g *Gateway) SetToriHubProvider(th *skillmarket.ToriHubProvider) { g.toriHub = th }
+
+// ToriHubProvider exposes the ToriHub remote source to the SkillHub pack.
+func (g *Gateway) ToriHubProvider() *skillmarket.ToriHubProvider { return g.toriHub }
 
 // SetIterateEngine attaches the self-iteration engine.
 func (g *Gateway) SetIterateEngine(ie *iterate.Engine) { g.iterateEngine = ie }

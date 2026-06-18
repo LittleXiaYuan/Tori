@@ -41,7 +41,7 @@
     "group": "skills",
     "phase": "A2",
     "preload": "true",
-    "note": "Fully de-shelled: natively owns the core /v1/skills/* surface (listing/scan/dynamic/approve/reject) in internal/packs/skills — no gateway bridge. SkillHub (/api/skillhub/*) and market (/v1/market/*) ownership TBD. Default-preloaded like memory so the skills UI works out-of-box; nav stays static during this phase."
+    "note": "Fully de-shelled: natively owns the core /v1/skills/* surface (listing/scan/dynamic/approve/reject) in internal/packs/skills — no gateway bridge. SkillHub (/api/skillhub/*) and market (/v1/market/*) now live in their own native packs. Default-preloaded like memory so the skills UI works out-of-box; nav stays static during this phase."
   },
   "status": "beta"
 }

@@ -1,0 +1,142 @@
+{
+  "id": "yunque.pack.skillhub",
+  "name": "SkillHub (技能生态)",
+  "version": "0.1.0",
+  "description": "远程技能生态：搜索、详情、安装、更新、回滚与安全策略检查。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": [
+      "skillhub.search",
+      "skillhub.install",
+      "skillhub.update",
+      "skillhub.policy",
+      "skillhub.analytics"
+    ],
+    "routes": [
+      "/api/skillhub/search",
+      "/api/skillhub/install",
+      "/api/skillhub/installed",
+      "/api/skillhub/uninstall",
+      "/api/skillhub/trending",
+      "/api/skillhub/detail",
+      "/api/skillhub/check-updates",
+      "/api/skillhub/update",
+      "/api/skillhub/rollback",
+      "/api/skillhub/versions",
+      "/api/skillhub/policy",
+      "/api/skillhub/policy/check",
+      "/api/skillhub/analytics"
+    ],
+    "permissions": [
+      "network:read",
+      "skills:read",
+      "skills:write",
+      "policy:read",
+      "policy:write"
+    ],
+    "routeSpecs": [
+      {
+        "method": "GET",
+        "path": "/api/skillhub/search",
+        "description": "Search local and remote SkillHub sources."
+      },
+      {
+        "method": "POST",
+        "path": "/api/skillhub/install",
+        "description": "Install a skill through the SkillHub security pipeline."
+      },
+      {
+        "method": "GET",
+        "path": "/api/skillhub/installed",
+        "description": "List locally installed SkillHub skills."
+      },
+      {
+        "method": "DELETE",
+        "path": "/api/skillhub/uninstall",
+        "description": "Uninstall a locally installed SkillHub skill."
+      },
+      {
+        "method": "POST",
+        "path": "/api/skillhub/uninstall",
+        "description": "Uninstall a locally installed SkillHub skill."
+      },
+      {
+        "method": "GET",
+        "path": "/api/skillhub/trending",
+        "description": "List trending skills from configured SkillHub sources."
+      },
+      {
+        "method": "GET",
+        "path": "/api/skillhub/detail",
+        "description": "Return detailed local or remote SkillHub skill metadata."
+      },
+      {
+        "method": "GET",
+        "path": "/api/skillhub/check-updates",
+        "description": "Check installed SkillHub skills for updates."
+      },
+      {
+        "method": "POST",
+        "path": "/api/skillhub/update",
+        "description": "Update an installed SkillHub skill."
+      },
+      {
+        "method": "POST",
+        "path": "/api/skillhub/rollback",
+        "description": "Roll back an installed SkillHub skill to an archived version."
+      },
+      {
+        "method": "GET",
+        "path": "/api/skillhub/versions",
+        "description": "List archived versions for an installed SkillHub skill."
+      },
+      {
+        "method": "GET",
+        "path": "/api/skillhub/policy",
+        "description": "Read the SkillHub installation security policy."
+      },
+      {
+        "method": "POST",
+        "path": "/api/skillhub/policy",
+        "description": "Update the SkillHub installation security policy."
+      },
+      {
+        "method": "PUT",
+        "path": "/api/skillhub/policy",
+        "description": "Update the SkillHub installation security policy."
+      },
+      {
+        "method": "GET",
+        "path": "/api/skillhub/policy/check",
+        "description": "Dry-run the SkillHub installation security policy for a skill."
+      },
+      {
+        "method": "GET",
+        "path": "/api/skillhub/analytics",
+        "description": "Return SkillHub marketplace and installation analytics."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [],
+    "assets": {
+      "type": "builtin"
+    }
+  },
+  "sdk": {
+    "typescript": "yunque-client/skillhub"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "group": "extensions",
+    "phase": "A2",
+    "preload": "true",
+    "note": "Natively owns /api/skillhub/* through the Pack Runtime gate. It keeps the original installer, audit, update, rollback and policy semantics while removing the direct gateway registrations."
+  },
+  "status": "beta"
+}

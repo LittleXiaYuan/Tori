@@ -724,6 +724,7 @@ func fallbackBuiltinPackManifestPaths() []string {
 		"packs/official/rpa-replay-pack/pack.json",
 		"packs/official/market-pack/pack.json",
 		"packs/official/scheduler-pack/pack.json",
+		"packs/official/skillhub-pack/pack.json",
 		"packs/official/sbom-drift-pack/pack.json",
 		"packs/official/skill-anomaly-pack/pack.json",
 		"packs/official/wasm-plugin-pack/pack.json",

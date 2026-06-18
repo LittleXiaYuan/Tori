@@ -1,16 +1,132 @@
-package gateway
+package skillhubpack
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"sync/atomic"
 
 	"yunque-agent/internal/agentcore/skillmarket"
 	"yunque-agent/internal/apperror"
+	"yunque-agent/pkg/packruntime"
 )
 
+const PackID = "yunque.pack.skillhub"
+
+type Gateway interface {
+	SkillMarket() *skillmarket.Market
+	SkillInstaller() *skillmarket.Installer
+	SkillPolicy() *skillmarket.SecurityPolicy
+	ClawHubProvider() *skillmarket.ClawHubProvider
+	ToriHubProvider() *skillmarket.ToriHubProvider
+}
+
+// Handler owns the remote/local SkillHub API surface as a native capability pack.
+type Handler struct {
+	skillMarket    *skillmarket.Market
+	skillInstaller *skillmarket.Installer
+	skillPolicy    *skillmarket.SecurityPolicy
+	clawHub        *skillmarket.ClawHubProvider
+	toriHub        *skillmarket.ToriHubProvider
+	host           packruntime.Host
+	started        atomic.Bool
+}
+
+func New(gateway Gateway) *Handler {
+	if gateway == nil {
+		return &Handler{}
+	}
+	return &Handler{
+		skillMarket:    gateway.SkillMarket(),
+		skillInstaller: gateway.SkillInstaller(),
+		skillPolicy:    gateway.SkillPolicy(),
+		clawHub:        gateway.ClawHubProvider(),
+		toriHub:        gateway.ToriHubProvider(),
+	}
+}
+
+func (h *Handler) PackID() string { return PackID }
+
+var _ packruntime.Module = (*Handler)(nil)
+
+func (h *Handler) Init(host packruntime.Host) error {
+	h.host = host
+	return nil
+}
+
+func (h *Handler) Start(ctx context.Context) error {
+	h.started.Store(true)
+	if h.host != nil {
+		h.host.Logger().Info("skillhub pack started", "pack", PackID)
+	}
+	return nil
+}
+
+func (h *Handler) Stop(ctx context.Context) error {
+	h.started.Store(false)
+	return nil
+}
+
+func (h *Handler) Routes() []packruntime.BackendRoute {
+	return []packruntime.BackendRoute{
+		{Method: http.MethodGet, Path: "/api/skillhub/search", Handler: h.handleSkillHubSearch},
+		{Method: http.MethodPost, Path: "/api/skillhub/install", Handler: h.handleSkillHubInstall},
+		{Method: http.MethodGet, Path: "/api/skillhub/installed", Handler: h.handleSkillHubInstalled},
+		{Methods: []string{http.MethodDelete, http.MethodPost}, Path: "/api/skillhub/uninstall", Handler: h.handleSkillHubUninstall},
+		{Method: http.MethodGet, Path: "/api/skillhub/trending", Handler: h.handleSkillHubTrending},
+		{Method: http.MethodGet, Path: "/api/skillhub/detail", Handler: h.handleSkillHubDetail},
+		{Method: http.MethodGet, Path: "/api/skillhub/check-updates", Handler: h.handleSkillHubCheckUpdates},
+		{Method: http.MethodPost, Path: "/api/skillhub/update", Handler: h.handleSkillHubUpdate},
+		{Method: http.MethodPost, Path: "/api/skillhub/rollback", Handler: h.handleSkillHubRollback},
+		{Method: http.MethodGet, Path: "/api/skillhub/versions", Handler: h.handleSkillHubVersions},
+		{Methods: []string{http.MethodGet, http.MethodPost, http.MethodPut}, Path: "/api/skillhub/policy", Handler: h.handleSkillHubPolicy},
+		{Method: http.MethodGet, Path: "/api/skillhub/policy/check", Handler: h.handleSkillHubPolicyCheck},
+		{Method: http.MethodGet, Path: "/api/skillhub/analytics", Handler: h.handleSkillHubAnalytics},
+	}
+}
+
+func RouteSpecs() []packruntime.BackendRouteSpec {
+	return []packruntime.BackendRouteSpec{
+		{Method: http.MethodGet, Path: "/api/skillhub/search", Description: "Search local and remote SkillHub sources."},
+		{Method: http.MethodPost, Path: "/api/skillhub/install", Description: "Install a skill through the SkillHub security pipeline."},
+		{Method: http.MethodGet, Path: "/api/skillhub/installed", Description: "List locally installed SkillHub skills."},
+		{Method: http.MethodDelete, Path: "/api/skillhub/uninstall", Description: "Uninstall a locally installed SkillHub skill."},
+		{Method: http.MethodPost, Path: "/api/skillhub/uninstall", Description: "Uninstall a locally installed SkillHub skill."},
+		{Method: http.MethodGet, Path: "/api/skillhub/trending", Description: "List trending skills from configured SkillHub sources."},
+		{Method: http.MethodGet, Path: "/api/skillhub/detail", Description: "Return detailed local or remote SkillHub skill metadata."},
+		{Method: http.MethodGet, Path: "/api/skillhub/check-updates", Description: "Check installed SkillHub skills for updates."},
+		{Method: http.MethodPost, Path: "/api/skillhub/update", Description: "Update an installed SkillHub skill."},
+		{Method: http.MethodPost, Path: "/api/skillhub/rollback", Description: "Roll back an installed SkillHub skill to an archived version."},
+		{Method: http.MethodGet, Path: "/api/skillhub/versions", Description: "List archived versions for an installed SkillHub skill."},
+		{Method: http.MethodGet, Path: "/api/skillhub/policy", Description: "Read the SkillHub installation security policy."},
+		{Method: http.MethodPost, Path: "/api/skillhub/policy", Description: "Update the SkillHub installation security policy."},
+		{Method: http.MethodPut, Path: "/api/skillhub/policy", Description: "Update the SkillHub installation security policy."},
+		{Method: http.MethodGet, Path: "/api/skillhub/policy/check", Description: "Dry-run the SkillHub installation security policy for a skill."},
+		{Method: http.MethodGet, Path: "/api/skillhub/analytics", Description: "Return SkillHub marketplace and installation analytics."},
+	}
+}
+
+func Paths() []string {
+	return []string{
+		"/api/skillhub/search",
+		"/api/skillhub/install",
+		"/api/skillhub/installed",
+		"/api/skillhub/uninstall",
+		"/api/skillhub/trending",
+		"/api/skillhub/detail",
+		"/api/skillhub/check-updates",
+		"/api/skillhub/update",
+		"/api/skillhub/rollback",
+		"/api/skillhub/versions",
+		"/api/skillhub/policy",
+		"/api/skillhub/policy/check",
+		"/api/skillhub/analytics",
+	}
+}
+
 // handleSkillHubSearch combines local market and ClawHub remote search.
-func (g *Gateway) handleSkillHubSearch(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleSkillHubSearch(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	query := r.URL.Query().Get("q")
 	if query == "" {
@@ -30,11 +146,11 @@ func (g *Gateway) handleSkillHubSearch(w http.ResponseWriter, r *http.Request) {
 	var results []searchResult
 
 	// Search local market
-	if g.skillMarket != nil {
-		for _, s := range g.skillMarket.Search(query) {
+	if h.skillMarket != nil {
+		for _, s := range h.skillMarket.Search(query) {
 			installed := false
-			if g.skillInstaller != nil {
-				installed = g.skillInstaller.IsInstalled(s.Name)
+			if h.skillInstaller != nil {
+				installed = h.skillInstaller.IsInstalled(s.Name)
 			}
 			results = append(results, searchResult{
 				Name:        s.Name,
@@ -62,11 +178,11 @@ func (g *Gateway) handleSkillHubSearch(w http.ResponseWriter, r *http.Request) {
 		name     string
 	}
 	var hubs []hubEntry
-	if g.clawHub != nil && (source == "" || source == "clawhub") {
-		hubs = append(hubs, hubEntry{g.clawHub, "clawhub"})
+	if h.clawHub != nil && (source == "" || source == "clawhub") {
+		hubs = append(hubs, hubEntry{h.clawHub, "clawhub"})
 	}
-	if g.toriHub != nil && (source == "" || source == "torihub") {
-		hubs = append(hubs, hubEntry{g.toriHub, "torihub"})
+	if h.toriHub != nil && (source == "" || source == "torihub") {
+		hubs = append(hubs, hubEntry{h.toriHub, "torihub"})
 	}
 
 	for _, hub := range hubs {
@@ -76,8 +192,8 @@ func (g *Gateway) handleSkillHubSearch(w http.ResponseWriter, r *http.Request) {
 		}
 		for _, rs := range remote {
 			installed := false
-			if g.skillInstaller != nil {
-				installed = g.skillInstaller.IsInstalled(rs.Slug)
+			if h.skillInstaller != nil {
+				installed = h.skillInstaller.IsInstalled(rs.Slug)
 			}
 			results = append(results, searchResult{
 				Name:        rs.Name,
@@ -98,13 +214,13 @@ func (g *Gateway) handleSkillHubSearch(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleSkillHubInstall installs a skill from ClawHub through the 3-layer security audit.
-func (g *Gateway) handleSkillHubInstall(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleSkillHubInstall(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if r.Method != http.MethodPost {
 		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "POST required")
 		return
 	}
-	if g.skillInstaller == nil {
+	if h.skillInstaller == nil {
 		apperror.WriteCode(w, apperror.CodeInternal, "skill installer not configured")
 		return
 	}
@@ -117,7 +233,7 @@ func (g *Gateway) handleSkillHubInstall(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	report, err := g.skillInstaller.Install(r.Context(), req.Slug)
+	report, err := h.skillInstaller.Install(r.Context(), req.Slug)
 	if err != nil {
 		status := map[string]any{"error": err.Error()}
 		if report != nil {
@@ -136,24 +252,24 @@ func (g *Gateway) handleSkillHubInstall(w http.ResponseWriter, r *http.Request) 
 }
 
 // handleSkillHubInstalled returns all installed skills.
-func (g *Gateway) handleSkillHubInstalled(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleSkillHubInstalled(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	if g.skillInstaller == nil {
+	if h.skillInstaller == nil {
 		json.NewEncoder(w).Encode(map[string]any{"skills": []any{}, "count": 0})
 		return
 	}
-	installed := g.skillInstaller.Installed()
+	installed := h.skillInstaller.Installed()
 	json.NewEncoder(w).Encode(map[string]any{"skills": installed, "count": len(installed)})
 }
 
 // handleSkillHubUninstall removes an installed skill.
-func (g *Gateway) handleSkillHubUninstall(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleSkillHubUninstall(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if r.Method != http.MethodDelete && r.Method != http.MethodPost {
 		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "DELETE or POST required")
 		return
 	}
-	if g.skillInstaller == nil {
+	if h.skillInstaller == nil {
 		apperror.WriteCode(w, apperror.CodeInternal, "skill installer not configured")
 		return
 	}
@@ -166,7 +282,7 @@ func (g *Gateway) handleSkillHubUninstall(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if err := g.skillInstaller.Uninstall(req.Slug); err != nil {
+	if err := h.skillInstaller.Uninstall(req.Slug); err != nil {
 		apperror.WriteCode(w, apperror.CodeBadRequest, err.Error())
 		return
 	}
@@ -174,7 +290,7 @@ func (g *Gateway) handleSkillHubUninstall(w http.ResponseWriter, r *http.Request
 }
 
 // handleSkillHubTrending returns trending skills from all configured hubs.
-func (g *Gateway) handleSkillHubTrending(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleSkillHubTrending(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	limit := 20
@@ -201,11 +317,11 @@ func (g *Gateway) handleSkillHubTrending(w http.ResponseWriter, r *http.Request)
 		name     string
 	}
 	var hubs []hubEntry
-	if g.clawHub != nil && (source == "" || source == "clawhub") {
-		hubs = append(hubs, hubEntry{g.clawHub, "clawhub"})
+	if h.clawHub != nil && (source == "" || source == "clawhub") {
+		hubs = append(hubs, hubEntry{h.clawHub, "clawhub"})
 	}
-	if g.toriHub != nil && (source == "" || source == "torihub") {
-		hubs = append(hubs, hubEntry{g.toriHub, "torihub"})
+	if h.toriHub != nil && (source == "" || source == "torihub") {
+		hubs = append(hubs, hubEntry{h.toriHub, "torihub"})
 	}
 
 	cursor := r.URL.Query().Get("cursor")
@@ -223,8 +339,8 @@ func (g *Gateway) handleSkillHubTrending(w http.ResponseWriter, r *http.Request)
 			}
 			for _, s := range result.Skills {
 				installed := false
-				if g.skillInstaller != nil {
-					installed = g.skillInstaller.IsInstalled(s.Slug)
+				if h.skillInstaller != nil {
+					installed = h.skillInstaller.IsInstalled(s.Slug)
 				}
 				all = append(all, trendingItem{
 					Name:        s.Name,
@@ -245,8 +361,8 @@ func (g *Gateway) handleSkillHubTrending(w http.ResponseWriter, r *http.Request)
 		}
 		for _, s := range trending {
 			installed := false
-			if g.skillInstaller != nil {
-				installed = g.skillInstaller.IsInstalled(s.Slug)
+			if h.skillInstaller != nil {
+				installed = h.skillInstaller.IsInstalled(s.Slug)
 			}
 			all = append(all, trendingItem{
 				Name:        s.Name,
@@ -271,7 +387,7 @@ func (g *Gateway) handleSkillHubTrending(w http.ResponseWriter, r *http.Request)
 }
 
 // handleSkillHubDetail returns comprehensive info for a single skill.
-func (g *Gateway) handleSkillHubDetail(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleSkillHubDetail(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	slug := r.URL.Query().Get("slug")
 	if slug == "" {
@@ -305,8 +421,8 @@ func (g *Gateway) handleSkillHubDetail(w http.ResponseWriter, r *http.Request) {
 	resp.Slug = slug
 
 	// Check installed status
-	if g.skillInstaller != nil {
-		if inst, ok := g.skillInstaller.GetInstalled(slug); ok {
+	if h.skillInstaller != nil {
+		if inst, ok := h.skillInstaller.GetInstalled(slug); ok {
 			resp.Installed = true
 			resp.Name = inst.Name
 			resp.Description = inst.Description
@@ -316,18 +432,18 @@ func (g *Gateway) handleSkillHubDetail(w http.ResponseWriter, r *http.Request) {
 			resp.SecurityScore = inst.SecurityScore
 			resp.InstalledAt = inst.InstalledAt.Format("2006-01-02T15:04:05Z")
 			resp.UpdatedAt = inst.UpdatedAt.Format("2006-01-02T15:04:05Z")
-			if content, err := g.skillInstaller.GetSkillContent(slug); err == nil {
+			if content, err := h.skillInstaller.GetSkillContent(slug); err == nil {
 				resp.Content = content
 			}
-			if report, err := g.skillInstaller.GetAuditReport(slug); err == nil {
+			if report, err := h.skillInstaller.GetAuditReport(slug); err == nil {
 				resp.AuditReport = report
 			}
 		}
 	}
 
 	// Enrich from local market if available
-	if g.skillMarket != nil {
-		if meta, ok := g.skillMarket.Get(slug); ok {
+	if h.skillMarket != nil {
+		if meta, ok := h.skillMarket.Get(slug); ok {
 			if resp.Name == "" {
 				resp.Name = meta.Name
 			}
@@ -343,8 +459,8 @@ func (g *Gateway) handleSkillHubDetail(w http.ResponseWriter, r *http.Request) {
 
 	// Try remote fetch if not enough local info
 	if resp.Name == "" {
-		if g.clawHub != nil {
-			if remote, err := g.clawHub.Fetch(slug); err == nil {
+		if h.clawHub != nil {
+			if remote, err := h.clawHub.Fetch(slug); err == nil {
 				resp.Name = remote.Name
 				resp.Description = remote.Description
 				resp.Version = remote.Version
@@ -354,8 +470,8 @@ func (g *Gateway) handleSkillHubDetail(w http.ResponseWriter, r *http.Request) {
 				resp.Permissions = remote.Permissions
 			}
 		}
-		if resp.Name == "" && g.toriHub != nil {
-			if remote, err := g.toriHub.Fetch(slug); err == nil {
+		if resp.Name == "" && h.toriHub != nil {
+			if remote, err := h.toriHub.Fetch(slug); err == nil {
 				resp.Name = remote.Name
 				resp.Description = remote.Description
 				resp.Version = remote.Version
@@ -375,13 +491,13 @@ func (g *Gateway) handleSkillHubDetail(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleSkillHubCheckUpdates checks all installed skills for available updates.
-func (g *Gateway) handleSkillHubCheckUpdates(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleSkillHubCheckUpdates(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	if g.skillInstaller == nil {
+	if h.skillInstaller == nil {
 		json.NewEncoder(w).Encode(map[string]any{"updates": []any{}})
 		return
 	}
-	updates := g.skillInstaller.CheckAllUpdates(r.Context())
+	updates := h.skillInstaller.CheckAllUpdates(r.Context())
 	if updates == nil {
 		updates = []skillmarket.UpdateInfo{}
 	}
@@ -389,9 +505,9 @@ func (g *Gateway) handleSkillHubCheckUpdates(w http.ResponseWriter, r *http.Requ
 }
 
 // handleSkillHubUpdate re-installs a skill from the remote hub (latest version).
-func (g *Gateway) handleSkillHubUpdate(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleSkillHubUpdate(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	if g.skillInstaller == nil {
+	if h.skillInstaller == nil {
 		apperror.WriteCode(w, apperror.CodeInternal, "installer not configured")
 		return
 	}
@@ -402,7 +518,7 @@ func (g *Gateway) handleSkillHubUpdate(w http.ResponseWriter, r *http.Request) {
 		apperror.WriteCode(w, apperror.CodeBadRequest, "slug required")
 		return
 	}
-	report, err := g.skillInstaller.Update(r.Context(), body.Slug)
+	report, err := h.skillInstaller.Update(r.Context(), body.Slug)
 	if err != nil {
 		apperror.WriteCode(w, apperror.CodeInternal, err.Error())
 		return
@@ -411,9 +527,9 @@ func (g *Gateway) handleSkillHubUpdate(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleSkillHubRollback restores a previously archived version.
-func (g *Gateway) handleSkillHubRollback(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleSkillHubRollback(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	if g.skillInstaller == nil {
+	if h.skillInstaller == nil {
 		apperror.WriteCode(w, apperror.CodeInternal, "installer not configured")
 		return
 	}
@@ -425,7 +541,7 @@ func (g *Gateway) handleSkillHubRollback(w http.ResponseWriter, r *http.Request)
 		apperror.WriteCode(w, apperror.CodeBadRequest, "slug and version required")
 		return
 	}
-	if err := g.skillInstaller.Rollback(body.Slug, body.Version); err != nil {
+	if err := h.skillInstaller.Rollback(body.Slug, body.Version); err != nil {
 		apperror.WriteCode(w, apperror.CodeInternal, err.Error())
 		return
 	}
@@ -433,9 +549,9 @@ func (g *Gateway) handleSkillHubRollback(w http.ResponseWriter, r *http.Request)
 }
 
 // handleSkillHubVersions lists archived versions for a skill.
-func (g *Gateway) handleSkillHubVersions(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleSkillHubVersions(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	if g.skillInstaller == nil {
+	if h.skillInstaller == nil {
 		apperror.WriteCode(w, apperror.CodeInternal, "installer not configured")
 		return
 	}
@@ -444,7 +560,7 @@ func (g *Gateway) handleSkillHubVersions(w http.ResponseWriter, r *http.Request)
 		apperror.WriteCode(w, apperror.CodeBadRequest, "slug required")
 		return
 	}
-	versions, err := g.skillInstaller.ListVersions(slug)
+	versions, err := h.skillInstaller.ListVersions(slug)
 	if err != nil {
 		apperror.WriteCode(w, apperror.CodeInternal, err.Error())
 		return
@@ -453,23 +569,23 @@ func (g *Gateway) handleSkillHubVersions(w http.ResponseWriter, r *http.Request)
 }
 
 // handleSkillHubPolicy GET returns current policy, POST updates it.
-func (g *Gateway) handleSkillHubPolicy(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleSkillHubPolicy(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	if g.skillPolicy == nil {
+	if h.skillPolicy == nil {
 		apperror.WriteCode(w, apperror.CodeInternal, "security policy not configured")
 		return
 	}
 
 	switch r.Method {
 	case http.MethodGet:
-		json.NewEncoder(w).Encode(g.skillPolicy.Get())
+		json.NewEncoder(w).Encode(h.skillPolicy.Get())
 	case http.MethodPost, http.MethodPut:
 		var data skillmarket.PolicyData
 		if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
 			apperror.WriteCode(w, apperror.CodeBadRequest, "invalid policy data")
 			return
 		}
-		g.skillPolicy.Update(data)
+		h.skillPolicy.Update(data)
 		json.NewEncoder(w).Encode(map[string]any{"ok": true})
 	default:
 		apperror.WriteCode(w, apperror.CodeBadRequest, "GET or POST required")
@@ -477,9 +593,9 @@ func (g *Gateway) handleSkillHubPolicy(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleSkillHubPolicyCheck runs a dry-run policy check for a skill slug.
-func (g *Gateway) handleSkillHubPolicyCheck(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleSkillHubPolicyCheck(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	if g.skillPolicy == nil {
+	if h.skillPolicy == nil {
 		json.NewEncoder(w).Encode(skillmarket.PolicyCheckResult{Allowed: true})
 		return
 	}
@@ -495,27 +611,27 @@ func (g *Gateway) handleSkillHubPolicyCheck(w http.ResponseWriter, r *http.Reque
 	var score int
 	var auditAvailable bool
 
-	if g.skillInstaller != nil {
-		if info, ok := g.skillInstaller.GetInstalled(slug); ok {
+	if h.skillInstaller != nil {
+		if info, ok := h.skillInstaller.GetInstalled(slug); ok {
 			author = ""
 			perms = info.Permissions
 			score = info.SecurityScore
 			auditAvailable = true
 		}
 	}
-	if g.clawHub != nil && author == "" {
-		if remote, err := g.clawHub.Fetch(slug); err == nil {
+	if h.clawHub != nil && author == "" {
+		if remote, err := h.clawHub.Fetch(slug); err == nil {
 			author = remote.Author
 			perms = remote.Permissions
 		}
 	}
 
-	result := g.skillPolicy.Check(slug, author, perms, score, auditAvailable)
+	result := h.skillPolicy.Check(slug, author, perms, score, auditAvailable)
 	json.NewEncoder(w).Encode(result)
 }
 
 // handleSkillHubAnalytics returns comprehensive marketplace analytics.
-func (g *Gateway) handleSkillHubAnalytics(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleSkillHubAnalytics(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	type skillSummary struct {
@@ -541,8 +657,8 @@ func (g *Gateway) handleSkillHubAnalytics(w http.ResponseWriter, r *http.Request
 	}
 
 	// Market stats
-	if g.skillMarket != nil {
-		stats := g.skillMarket.Stats()
+	if h.skillMarket != nil {
+		stats := h.skillMarket.Stats()
 		resp["total_skills"] = stats["total"]
 		resp["total_installs"] = stats["total_installs"]
 		if cats, ok := stats["categories"].(map[skillmarket.Category]int); ok {
@@ -554,7 +670,7 @@ func (g *Gateway) handleSkillHubAnalytics(w http.ResponseWriter, r *http.Request
 		}
 
 		// Top rated
-		topRated := g.skillMarket.TopRated(10)
+		topRated := h.skillMarket.TopRated(10)
 		var rated []skillSummary
 		for _, s := range topRated {
 			rated = append(rated, skillSummary{
@@ -565,7 +681,7 @@ func (g *Gateway) handleSkillHubAnalytics(w http.ResponseWriter, r *http.Request
 		resp["top_rated"] = rated
 
 		// Most popular
-		topPop := g.skillMarket.MostPopular(10)
+		topPop := h.skillMarket.MostPopular(10)
 		var popular []skillSummary
 		for _, s := range topPop {
 			popular = append(popular, skillSummary{
@@ -577,8 +693,8 @@ func (g *Gateway) handleSkillHubAnalytics(w http.ResponseWriter, r *http.Request
 	}
 
 	// Installed skill analytics
-	if g.skillInstaller != nil {
-		installed := g.skillInstaller.Installed()
+	if h.skillInstaller != nil {
+		installed := h.skillInstaller.Installed()
 		resp["installed_count"] = len(installed)
 
 		var totalScore int

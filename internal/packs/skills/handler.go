@@ -6,7 +6,7 @@
 // scan, dynamic, approve and reject all run natively here, talking to the skill
 // registry / metrics / file-scanner through narrow injected deps. No gateway
 // bridge remains. SkillHub (/api/skillhub/*) and the skill market (/v1/market/*)
-// keep their own gateway routes (ownership TBD per the migration plan).
+// live in their own native packs.
 package skillspack
 
 import (
