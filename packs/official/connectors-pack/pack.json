@@ -1,0 +1,77 @@
+{
+  "id": "yunque.pack.connectors",
+  "name": "Connectors (外部连接器)",
+  "version": "0.1.0",
+  "description": "外部服务连接器：浏览、连接、断开并执行 GitHub、Notion、Slack、Gmail 等连接器动作。默认预装，无独立页面，由设置/技能/任务等现有界面调用。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": [
+      "connectors.list",
+      "connectors.detail",
+      "connectors.connect",
+      "connectors.disconnect",
+      "connectors.execute"
+    ],
+    "routes": [
+      "/api/connectors",
+      "/api/connectors/detail",
+      "/api/connectors/connect",
+      "/api/connectors/disconnect",
+      "/api/connectors/execute"
+    ],
+    "permissions": [
+      "connectors:read",
+      "connectors:write",
+      "network:external"
+    ],
+    "routeSpecs": [
+      {
+        "method": "GET",
+        "path": "/api/connectors",
+        "description": "List available connector definitions and connection status."
+      },
+      {
+        "method": "GET",
+        "path": "/api/connectors/detail",
+        "description": "Read one connector definition and connection status."
+      },
+      {
+        "method": "POST",
+        "path": "/api/connectors/connect",
+        "description": "Connect a connector with an API key or token."
+      },
+      {
+        "method": "POST",
+        "path": "/api/connectors/disconnect",
+        "description": "Disconnect a connector and remove saved credentials."
+      },
+      {
+        "method": "POST",
+        "path": "/api/connectors/execute",
+        "description": "Execute one action on a connected connector."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [],
+    "assets": {
+      "type": "builtin"
+    }
+  },
+  "sdk": {
+    "typescript": "yunque-client/connectors"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "group": "integration",
+    "phase": "A3",
+    "preload": "true",
+    "note": "Default-preloaded integration pack: natively owns /api/connectors* through Pack Runtime. Existing settings/task/skill surfaces consume this API; connector skills remain registered from the connector registry."
+  },
+  "status": "beta"
+}

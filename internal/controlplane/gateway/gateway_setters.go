@@ -527,9 +527,6 @@ func (g *Gateway) SetToriTokenStore(ts *tori.TokenStore) { g.toriTokenStore = ts
 // SetConnectorRegistry sets the connector registry.
 func (g *Gateway) SetConnectorRegistry(reg *connectors.Registry) {
 	g.connectorReg = reg
-	if g.connectorAPIHandler != nil {
-		g.connectorAPIHandler.Registry = reg
-	}
 }
 
 // ConnectorRegistry returns the connector registry.

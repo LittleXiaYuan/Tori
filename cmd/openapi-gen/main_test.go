@@ -101,7 +101,7 @@ func TestExtractPathsScansGatewaySubpackages(t *testing.T) {
 	for _, p := range paths {
 		seen[p] = true
 	}
-	for _, want := range []string{"/api/connectors", "/api/notify/channels", "/v1/scheduler/jobs", "/v1/workflows"} {
+	for _, want := range []string{"/api/notify/channels", "/v1/scheduler/jobs", "/v1/workflows"} {
 		if !seen[want] {
 			t.Fatalf("expected recursive route scan to include %s", want)
 		}
@@ -119,6 +119,11 @@ func TestExtractPathsFromDirsScansPackRoutes(t *testing.T) {
 	seen := map[string]bool{}
 	for _, p := range paths {
 		seen[p] = true
+	}
+	for _, want := range []string{"/api/connectors"} {
+		if !seen[want] {
+			t.Fatalf("expected pack route scan to include %s", want)
+		}
 	}
 	for _, want := range []string{"/v1/state", "/v1/state/goals", "/v1/state/focus", "/v1/state/resources"} {
 		if !seen[want] {

@@ -5,32 +5,14 @@ import (
 	"testing"
 
 	"yunque-agent/internal/agentcore/session"
-	"yunque-agent/internal/connectors"
 )
 
-// These tests guard against a regression where the connector / fork
-// sub-package HTTP handlers were constructed in routes() with the gateway's
-// then-nil dependencies and never re-bound when the real dependencies were
-// injected via setters AFTER NewFromConfig. That left /v1/connectors/* and
-// /v1/fork/* permanently "not configured" even though the underlying
-// subsystems were wired and working. The fix stores the handlers on the Gateway
-// and late-binds their exported deps inside the setters. Cost moved to a native
-// pack and is covered by the migration pack tests.
-
-func TestSetConnectorRegistryLateBindsConnectorAPIHandler(t *testing.T) {
-	g, _ := newTestGateway()
-	if g.connectorAPIHandler == nil {
-		t.Fatal("connectorAPIHandler should be created during routes()")
-	}
-	if g.connectorAPIHandler.Registry != nil {
-		t.Fatalf("expected nil registry before SetConnectorRegistry, got %v", g.connectorAPIHandler.Registry)
-	}
-	reg := connectors.NewRegistry()
-	g.SetConnectorRegistry(reg)
-	if g.connectorAPIHandler.Registry != reg {
-		t.Fatal("SetConnectorRegistry did not late-bind connectorAPIHandler.Registry — /v1/connectors/* would stay 'not configured'")
-	}
-}
+// These tests guard against a regression where the fork sub-package HTTP
+// handler was constructed in routes() with the gateway's then-nil dependencies
+// and never re-bound when the real dependencies were injected via setters AFTER
+// NewFromConfig. That left /v1/fork/* permanently "not configured" even though
+// the underlying subsystem was wired and working. Cost and connector routes
+// moved to native packs and are covered by migration pack tests.
 
 func TestSetForkTreeAndPersisterLateBindForkAPIHandler(t *testing.T) {
 	g, _ := newTestGateway()

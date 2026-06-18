@@ -39,6 +39,7 @@ import (
 	reflectpkg "yunque-agent/internal/experimental/reflect"
 	iledger "yunque-agent/internal/ledger"
 	"yunque-agent/internal/observe"
+	connectorspack "yunque-agent/internal/packs/connectors"
 	controlplanepack "yunque-agent/internal/packs/controlplane"
 	costpack "yunque-agent/internal/packs/cost"
 	cronpack "yunque-agent/internal/packs/cron"
@@ -177,6 +178,9 @@ func initTaskEngine(
 	// Cost pack — owns /v1/cost/* natively, turning cost governance into a
 	// Pack-gated capability rather than a direct gateway sub-package.
 	_ = gw.RegisterModule(costpack.NewProvider(func() *costtrack.Tracker { return costTracker }))
+	// Connectors pack — owns /api/connectors* natively. The registry is wired
+	// later by initSkillRegistration, so the pack resolves it lazily per request.
+	_ = gw.RegisterModule(connectorspack.NewProvider(gw.ConnectorRegistry))
 
 	// Persona-modes pack — owns /v1/persona/mode* natively (de-shelled from the
 	// gateway monolith). Resolves the mode manager lazily, so order is moot.

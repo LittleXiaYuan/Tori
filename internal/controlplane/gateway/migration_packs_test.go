@@ -17,6 +17,7 @@ import (
 
 	"yunque-agent/internal/agentcore/costtrack"
 	"yunque-agent/internal/controlplane/tenant"
+	connectorspack "yunque-agent/internal/packs/connectors"
 	controlplanepack "yunque-agent/internal/packs/controlplane"
 	costpack "yunque-agent/internal/packs/cost"
 	cronpack "yunque-agent/internal/packs/cron"
@@ -62,6 +63,7 @@ var migrationPackPaths = map[string][]string{
 	},
 	// control-plane is an always-on core pack; its owned route set grows per
 	// migration slice, so derive it from the package to avoid drift.
+	connectorspack.PackID:   connectorspack.Paths(),
 	controlplanepack.PackID: controlplanepack.Paths,
 	costpack.PackID:         costpack.Paths(),
 	// Monolith route groups extracted into native packs (Tier 0 microkernel).
@@ -88,6 +90,7 @@ var migrationPackNames = map[string]string{
 	memorypack.PackID:       "Memory",
 	skillspack.PackID:       "Skills",
 	workpack.PackID:         "Work",
+	connectorspack.PackID:   "Connectors",
 	controlplanepack.PackID: "Control Plane",
 	costpack.PackID:         "Cost",
 	modespack.PackID:        "Persona Modes",
@@ -135,6 +138,7 @@ func registerMigrationPacks(gw *Gateway) {
 	gw.RegisterBackendPack(memorypack.NewWired(gw.MemoryManager(), gw.MemoryPipeline(), gw.MemoryOrchestrator, gw.TenantOf))
 	gw.RegisterBackendPack(skillspack.NewHandlerWithService(gw.SkillsRegistry(), gw.Metrics()))
 	gw.RegisterBackendPack(workpack.NewHandler(gw))
+	_ = gw.RegisterModule(connectorspack.NewProvider(gw.ConnectorRegistry))
 	gw.RegisterBackendPack(controlplanepack.NewHandler(gw))
 	_ = gw.RegisterModule(costpack.NewProvider(func() *costtrack.Tracker { return gw.costTracker }))
 	// Native monolith-extracted packs (mirror cmd/agent/init_task_engine.go).
@@ -192,6 +196,8 @@ func newTestGatewayWithMigrationPack(t *testing.T, packID string, status packrun
 		gw.RegisterBackendPack(skillspack.NewHandlerWithService(gw.SkillsRegistry(), gw.Metrics()))
 	case workpack.PackID:
 		gw.RegisterBackendPack(workpack.NewHandler(gw))
+	case connectorspack.PackID:
+		_ = gw.RegisterModule(connectorspack.New(nil))
 	case controlplanepack.PackID:
 		gw.RegisterBackendPack(controlplanepack.NewHandler(gw))
 	case costpack.PackID:
@@ -217,6 +223,7 @@ func TestMigrationPackRouteGating(t *testing.T) {
 		{"memory", memorypack.PackID, "/v1/memory/stats"},
 		{"skills", skillspack.PackID, "/v1/skills"},
 		{"work", workpack.PackID, "/v1/tasks"},
+		{"connectors", connectorspack.PackID, "/api/connectors"},
 		{"cost", costpack.PackID, "/v1/cost/summary"},
 		{"state", statepack.PackID, "/v1/state"},
 	}

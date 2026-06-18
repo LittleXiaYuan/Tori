@@ -62,7 +62,6 @@ import (
 	"yunque-agent/internal/apperror"
 	"yunque-agent/internal/cognikernel"
 	"yunque-agent/internal/connectors"
-	"yunque-agent/internal/controlplane/gateway/connectorapi"
 	"yunque-agent/internal/controlplane/gateway/forkapi"
 	"yunque-agent/internal/controlplane/gateway/gwshared"
 	"yunque-agent/internal/controlplane/gateway/notifyapi"
@@ -249,8 +248,7 @@ type Gateway struct {
 	// Sub-package API handlers retained so their dependencies (injected via
 	// setters AFTER NewFromConfig) can be late-bound. Without this they would
 	// keep the nil deps captured at routes() time and degrade permanently.
-	connectorAPIHandler *connectorapi.Handler
-	forkAPIHandler      *forkapi.Handler
+	forkAPIHandler *forkapi.Handler
 
 	// RBAC
 	rbacEnforcer   *rbac.Enforcer
@@ -752,9 +750,6 @@ func (g *Gateway) routes() {
 	g.registerOrchestratorRoutes() // orchestrator daemon control
 
 	// Extracted handler groups (sub-packages)
-	g.connectorAPIHandler = &connectorapi.Handler{Registry: g.connectorReg}
-	g.connectorAPIHandler.RegisterRoutes(g.mux, g.requireAuth)
-
 	(&notifyapi.Handler{
 		NotifierFunc: func() *notify.Notifier {
 			return g.notifier

@@ -701,6 +701,7 @@ func fallbackBuiltinPackManifestPaths() []string {
 	return []string{
 		"packs/official/backup-pack/pack.json",
 		"packs/official/cogni-kernel-pack/pack.json",
+		"packs/official/connectors-pack/pack.json",
 		"packs/official/cost-pack/pack.json",
 		"packs/official/inner-life-pack/pack.json",
 		"packs/official/night-school-pack/pack.json",

@@ -52,6 +52,23 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 		t.Fatalf("unexpected Browser Intent SDK import: %s", browserIntent.Manifest.SDK.TypeScript)
 	}
 
+	connectors, ok := registry.Get("yunque.pack.connectors")
+	if !ok {
+		t.Fatal("expected Connectors builtin pack to be installed")
+	}
+	if connectors.Status != packruntime.PackStatusEnabled {
+		t.Fatalf("expected Connectors default enabled, got %s", connectors.Status)
+	}
+	if connectors.Manifest.SDK.TypeScript != "yunque-client/connectors" {
+		t.Fatalf("unexpected Connectors SDK import: %s", connectors.Manifest.SDK.TypeScript)
+	}
+	if !hasRouteSpec(connectors.Manifest.Backend.RouteSpecs, "GET", "/api/connectors") {
+		t.Fatal("expected Connectors list routeSpec")
+	}
+	if !hasRouteSpec(connectors.Manifest.Backend.RouteSpecs, "POST", "/api/connectors/execute") {
+		t.Fatal("expected Connectors execute routeSpec")
+	}
+
 	cost, ok := registry.Get("yunque.pack.cost")
 	if !ok {
 		t.Fatal("expected Cost Governance builtin pack to be installed")
@@ -231,7 +248,7 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 	// Count reflects the current packs/official/ set (incl. the newer
 	// console/control-plane/knowledge/memory/skills/work/workspace packs and the
 	// cognitive-layer/state packs). Adjust if the builtin pack set changes.
-	if got := len(registry.List()); got != 28 {
+	if got := len(registry.List()); got != 29 {
 		t.Fatalf("expected idempotent builtin install, got %d packs", got)
 	}
 }
