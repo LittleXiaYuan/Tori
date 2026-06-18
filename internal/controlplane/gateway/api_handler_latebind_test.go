@@ -4,33 +4,18 @@ import (
 	"path/filepath"
 	"testing"
 
-	"yunque-agent/internal/agentcore/costtrack"
 	"yunque-agent/internal/agentcore/session"
 	"yunque-agent/internal/connectors"
 )
 
-// These tests guard against a regression where the cost / connector / fork
+// These tests guard against a regression where the connector / fork
 // sub-package HTTP handlers were constructed in routes() with the gateway's
 // then-nil dependencies and never re-bound when the real dependencies were
-// injected via setters AFTER NewFromConfig. That left /v1/cost/*,
-// /v1/connectors/* and /v1/fork/* permanently "not configured" even though the
-// underlying subsystems were wired and working. The fix stores the handlers on
-// the Gateway and late-binds their exported deps inside the setters.
-
-func TestSetCostTrackerLateBindsCostAPIHandler(t *testing.T) {
-	g, _ := newTestGateway()
-	if g.costAPIHandler == nil {
-		t.Fatal("costAPIHandler should be created during routes()")
-	}
-	if g.costAPIHandler.Tracker != nil {
-		t.Fatalf("expected nil tracker before SetCostTracker, got %v", g.costAPIHandler.Tracker)
-	}
-	tr := costtrack.New()
-	g.SetCostTracker(tr)
-	if g.costAPIHandler.Tracker != tr {
-		t.Fatal("SetCostTracker did not late-bind costAPIHandler.Tracker — /v1/cost/* would stay 'not configured'")
-	}
-}
+// injected via setters AFTER NewFromConfig. That left /v1/connectors/* and
+// /v1/fork/* permanently "not configured" even though the underlying
+// subsystems were wired and working. The fix stores the handlers on the Gateway
+// and late-binds their exported deps inside the setters. Cost moved to a native
+// pack and is covered by the migration pack tests.
 
 func TestSetConnectorRegistryLateBindsConnectorAPIHandler(t *testing.T) {
 	g, _ := newTestGateway()

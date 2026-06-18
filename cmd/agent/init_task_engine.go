@@ -40,6 +40,7 @@ import (
 	iledger "yunque-agent/internal/ledger"
 	"yunque-agent/internal/observe"
 	controlplanepack "yunque-agent/internal/packs/controlplane"
+	costpack "yunque-agent/internal/packs/cost"
 	cronpack "yunque-agent/internal/packs/cron"
 	documentspack "yunque-agent/internal/packs/documents"
 	emotionpack "yunque-agent/internal/packs/emotion"
@@ -173,6 +174,9 @@ func initTaskEngine(
 	// usage surfaces natively. Shipped default-enabled (an always-on core
 	// governance surface) so audit/trust stay available out of box.
 	_ = gw.RegisterModule(controlplanepack.NewHandler(gw))
+	// Cost pack — owns /v1/cost/* natively, turning cost governance into a
+	// Pack-gated capability rather than a direct gateway sub-package.
+	_ = gw.RegisterModule(costpack.NewProvider(func() *costtrack.Tracker { return costTracker }))
 
 	// Persona-modes pack — owns /v1/persona/mode* natively (de-shelled from the
 	// gateway monolith). Resolves the mode manager lazily, so order is moot.

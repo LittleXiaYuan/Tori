@@ -1,0 +1,89 @@
+{
+  "id": "yunque.pack.cost",
+  "name": "Cost Governance (成本治理)",
+  "version": "0.1.0",
+  "description": "模型与任务成本治理：汇总、预算、任务明细、历史与告警。默认预装的治理能力，无独立页面，由任务/设置等现有界面调用。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": [
+      "cost.summary",
+      "cost.budget",
+      "cost.task",
+      "cost.breakdown",
+      "cost.history",
+      "cost.alerts"
+    ],
+    "routes": [
+      "/v1/cost/summary",
+      "/v1/cost/budget",
+      "/v1/cost/task",
+      "/v1/cost/task/timeline",
+      "/v1/cost/breakdown",
+      "/v1/cost/history",
+      "/v1/cost/alerts"
+    ],
+    "permissions": [
+      "cost:read",
+      "cost:write"
+    ],
+    "routeSpecs": [
+      {
+        "method": "GET",
+        "path": "/v1/cost/summary",
+        "description": "Read aggregate model/task cost summary."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/cost/budget",
+        "description": "Set daily/monthly cost budgets."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/cost/task",
+        "description": "Read cost for one task."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/cost/task/timeline",
+        "description": "Read task cost timeline."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/cost/breakdown",
+        "description": "Read cost breakdown by channel, tier, runner or provider."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/cost/history",
+        "description": "Read paginated usage history."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/cost/alerts",
+        "description": "Read budget alerts and current spend."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [],
+    "assets": {
+      "type": "builtin"
+    }
+  },
+  "sdk": {
+    "typescript": "yunque-client/cost"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "group": "governance",
+    "phase": "A3",
+    "preload": "true",
+    "note": "Default-preloaded governance pack: natively owns /v1/cost/* through Pack Runtime. No standalone menu; existing task/settings surfaces consume this API."
+  },
+  "status": "beta"
+}

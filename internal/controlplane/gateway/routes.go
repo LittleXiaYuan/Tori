@@ -194,7 +194,7 @@ func (g *Gateway) registerGovernanceRoutes() {
 	// Governance routes (audit / trust / iterate / review / skillgrow / usage)
 	// migrated to the control-plane pack (internal/packs/controlplane), mounted
 	// via gw.RegisterModule(controlplanepack.NewHandler(gw)) in
-	// cmd/agent/init_task_engine.go. Cost routes live in the costapi sub-package.
+	// cmd/agent/init_task_engine.go. Cost routes are owned by the cost pack.
 }
 
 // ──────────────────────────────────────────────
@@ -294,6 +294,5 @@ func (g *Gateway) registerBrowserRoutes() {
 
 // Workflow routes moved to workflowapi sub-package.
 
-// LoRA routes are mounted as an optional Pack Runtime backend module
-// (internal/packs/lora). Cost routes are still registered via costapi in
-// gateway.go routes() — see the "Extracted handler groups" section.
+// LoRA and cost routes are mounted as Pack Runtime backend modules
+// (internal/packs/lora, internal/packs/cost).

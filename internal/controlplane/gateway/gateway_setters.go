@@ -170,14 +170,10 @@ func (g *Gateway) SetSkillGrowthPipeline(p skillgrowth.GapHandler) {
 // SetPersonaChain attaches a persona priority chain for session/conversation overrides.
 func (g *Gateway) SetPersonaChain(pc *persona.PriorityChain) { g.personaChain = pc }
 
-// SetCostTracker attaches a cost tracking module. It also late-binds the
-// already-registered /v1/cost/* handler, which was constructed with a nil
-// tracker during NewFromConfig (before this setter runs).
+// SetCostTracker attaches a cost tracking module. /v1/cost/* is mounted by the
+// cost pack once the task engine registers it with the wired tracker.
 func (g *Gateway) SetCostTracker(ct *costtrack.Tracker) {
 	g.costTracker = ct
-	if g.costAPIHandler != nil {
-		g.costAPIHandler.Tracker = ct
-	}
 }
 
 // SetForkTree attaches a conversation fork tree. Late-binds the /v1/fork/* handler.

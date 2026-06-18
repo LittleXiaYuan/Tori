@@ -606,13 +606,13 @@ func TestE2E_CostEndpoints(t *testing.T) {
 	gw, tm := newE2EGatewayFull(mock.URL)
 	tn := tm.Register("cost-org")
 
-	// Record some cost
-	ct := costtrack.New()
-	ct.RecordExt(costtrack.RecordOpts{
+	if gw.costTracker == nil {
+		t.Fatal("expected cost tracker to be wired")
+	}
+	gw.costTracker.RecordExt(costtrack.RecordOpts{
 		Model: "test-model", TokensIn: 100, TokensOut: 50,
 		SessionID: "s1", TenantID: "cost-org", TaskID: "t1", SkillName: "test-skill",
 	})
-	gw.SetCostTracker(ct)
 
 	// Get cost summary
 	req := authedRequest("GET", "/v1/cost/summary", "", tn.APIKey)
