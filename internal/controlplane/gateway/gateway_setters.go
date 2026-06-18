@@ -146,6 +146,9 @@ func (g *Gateway) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 // SetHeartbeat attaches a heartbeat service.
 func (g *Gateway) SetHeartbeat(hb *heartbeat.Service) { g.heartbeat = hb }
 
+// HeartbeatService exposes the autonomous heartbeat service to the heartbeat pack.
+func (g *Gateway) HeartbeatService() *heartbeat.Service { return g.heartbeat }
+
 // SetInbox attaches an inbox store.
 func (g *Gateway) SetInbox(ib *inbox.Store) { g.inbox = ib }
 

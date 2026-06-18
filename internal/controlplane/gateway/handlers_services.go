@@ -3,81 +3,12 @@ package gateway
 import (
 	"encoding/json"
 	"net/http"
-	"strconv"
 	"time"
 
 	"yunque-agent/internal/apperror"
 )
 
-//  from handlers_heartbeat.go 
-func (g *Gateway) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
-	if g.heartbeat == nil {
-		apperror.WriteCode(w, apperror.CodeInternal, "heartbeat not configured")
-		return
-	}
-	switch r.Method {
-	case http.MethodGet:
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{
-			"running": g.heartbeat.IsRunning(),
-		})
-	case http.MethodPut:
-		var req struct {
-			Enabled  *bool `json:"enabled"`
-			Interval *int  `json:"interval_minutes"`
-		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			apperror.WriteCode(w, apperror.CodeBadRequest, "invalid JSON body")
-			return
-		}
-		if req.Enabled != nil {
-			g.heartbeat.SetEnabled(r.Context(), *req.Enabled)
-		}
-		if req.Interval != nil && *req.Interval > 0 {
-			g.heartbeat.SetInterval(r.Context(), time.Duration(*req.Interval)*time.Minute)
-		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
-	default:
-		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET or PUT")
-	}
-}
-
-func (g *Gateway) handleHeartbeatTrigger(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "POST only")
-		return
-	}
-	if g.heartbeat == nil {
-		apperror.WriteCode(w, apperror.CodeInternal, "heartbeat not configured")
-		return
-	}
-	entry := g.heartbeat.Trigger(r.Context())
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(entry)
-}
-
-func (g *Gateway) handleHeartbeatLogs(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET only")
-		return
-	}
-	if g.heartbeat == nil {
-		apperror.WriteCode(w, apperror.CodeInternal, "heartbeat not configured")
-		return
-	}
-	limit := 20
-	if l := r.URL.Query().Get("limit"); l != "" {
-		if n, err := strconv.Atoi(l); err == nil && n > 0 {
-			limit = n
-		}
-	}
-	logs := g.heartbeat.Logs(limit)
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(logs)
-}
-
-//  from handlers_federation.go 
+// from handlers_federation.go
 func (g *Gateway) handleFedPeers(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if g.fedHub == nil {
@@ -99,7 +30,8 @@ func (g *Gateway) handleFedStats(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(g.fedHub.Stats())
 }
 
-//  from handlers_iterate.go 
+//	from handlers_iterate.go
+//
 // handleIterateProposals returns all proposals or just pending ones.
 func (g *Gateway) handleIterateProposals(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -212,12 +144,13 @@ func (g *Gateway) handleIterateStatus(w http.ResponseWriter, r *http.Request) {
 
 	pending := g.iterateEngine.Proposals()
 	json.NewEncoder(w).Encode(map[string]any{
-		"enabled":          g.iterateEngine.Enabled(),
+		"enabled":           g.iterateEngine.Enabled(),
 		"pending_proposals": len(pending),
 	})
 }
 
-//  from handlers_innovation.go 
+//	from handlers_innovation.go
+//
 // handleTrustScores returns all trust scores.
 func (g *Gateway) handleTrustScores(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")

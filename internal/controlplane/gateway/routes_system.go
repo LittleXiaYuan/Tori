@@ -129,10 +129,8 @@ func (g *Gateway) registerSystemRoutes() {
 	g.mux.HandleFunc("/v1/speech/stt/stream", g.requireAuth(g.handleSTTStream))
 	g.mux.HandleFunc("/v1/speech/voices", g.requireAuth(g.handleVoices))
 
-	// Heartbeat
-	g.mux.HandleFunc("/v1/heartbeat", g.requireAuth(g.handleHeartbeat))
-	g.mux.HandleFunc("/v1/heartbeat/trigger", g.requireAuth(g.handleHeartbeatTrigger))
-	g.mux.HandleFunc("/v1/heartbeat/logs", g.requireAuth(g.handleHeartbeatLogs))
+	// Heartbeat (/v1/heartbeat*) is owned by the heartbeat pack
+	// (internal/packs/heartbeat), mounted via gw.RegisterModule.
 
 	// Federation (legacy)
 	g.mux.HandleFunc("/v1/federation/peers", g.requireAuth(g.handleFedPeers))

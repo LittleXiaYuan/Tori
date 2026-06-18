@@ -1,0 +1,68 @@
+{
+  "id": "yunque.pack.heartbeat",
+  "name": "Heartbeat (自主心跳)",
+  "version": "0.1.0",
+  "description": "自主心跳服务：查看运行状态、调整开关/间隔、立即触发与查看执行日志。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": [
+      "heartbeat.status",
+      "heartbeat.configure",
+      "heartbeat.trigger",
+      "heartbeat.logs"
+    ],
+    "routes": [
+      "/v1/heartbeat",
+      "/v1/heartbeat/trigger",
+      "/v1/heartbeat/logs"
+    ],
+    "permissions": [
+      "heartbeat:read",
+      "heartbeat:write"
+    ],
+    "routeSpecs": [
+      {
+        "method": "GET",
+        "path": "/v1/heartbeat",
+        "description": "Read heartbeat running status."
+      },
+      {
+        "method": "PUT",
+        "path": "/v1/heartbeat",
+        "description": "Update heartbeat enabled state or interval."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/heartbeat/trigger",
+        "description": "Trigger one heartbeat run immediately."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/heartbeat/logs",
+        "description": "List recent heartbeat logs."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [],
+    "assets": {
+      "type": "builtin"
+    }
+  },
+  "sdk": {
+    "typescript": "yunque-client/heartbeat"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "group": "automation",
+    "phase": "A2",
+    "preload": "true",
+    "note": "Natively owns /v1/heartbeat, /v1/heartbeat/trigger and /v1/heartbeat/logs through the Pack Runtime gate."
+  },
+  "status": "beta"
+}

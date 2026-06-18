@@ -50,6 +50,7 @@ import (
 	filespack "yunque-agent/internal/packs/files"
 	forkspack "yunque-agent/internal/packs/forks"
 	graphpack "yunque-agent/internal/packs/graph"
+	heartbeatpack "yunque-agent/internal/packs/heartbeat"
 	idepack "yunque-agent/internal/packs/ide"
 	innerlifepack "yunque-agent/internal/packs/innerlife"
 	instructionspack "yunque-agent/internal/packs/instructions"
@@ -212,6 +213,9 @@ func initTaskEngine(
 	// Orchestrator pack — owns /v1/orchestrator/* natively. The daemon/launcher
 	// are wired later by initOrchestrator, so the pack resolves them lazily.
 	_ = gw.RegisterModule(orchestratorpack.New(gw))
+	// Heartbeat pack — owns /v1/heartbeat* natively via the autonomous heartbeat
+	// service wired before the task engine.
+	_ = gw.RegisterModule(heartbeatpack.New(gw))
 	// MCP Dispatch pack — owns /mcp/v1 plus worker-management routes natively.
 	// It keeps method-sensitive auth inside the pack: probe reads are open,
 	// JSON-RPC writes are authenticated through the host RequireAuth wrapper.
