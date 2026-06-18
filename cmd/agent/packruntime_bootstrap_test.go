@@ -52,6 +52,20 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 		t.Fatalf("unexpected Browser Intent SDK import: %s", browserIntent.Manifest.SDK.TypeScript)
 	}
 
+	computerUse, ok := registry.Get("yunque.pack.computer-use")
+	if !ok {
+		t.Fatal("expected Computer Use builtin pack to be installed")
+	}
+	if computerUse.Status != packruntime.PackStatusDisabled {
+		t.Fatalf("expected Computer Use default disabled, got %s", computerUse.Status)
+	}
+	if computerUse.Manifest.SDK.TypeScript != "yunque-client/computer-use" {
+		t.Fatalf("unexpected Computer Use SDK import: %s", computerUse.Manifest.SDK.TypeScript)
+	}
+	if !hasRouteSpec(computerUse.Manifest.Backend.RouteSpecs, "POST", "/v1/computer/intent/plan") {
+		t.Fatal("expected Computer Use intent plan routeSpec")
+	}
+
 	chaosProbe, ok := registry.Get("yunque.pack.chaos-probe")
 	if !ok {
 		t.Fatal("expected Chaos Probe builtin pack to be installed")
@@ -200,7 +214,7 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 	// Count reflects the current packs/official/ set (incl. the newer
 	// console/control-plane/knowledge/memory/skills/work/workspace packs and the
 	// cognitive-layer/state packs). Adjust if the builtin pack set changes.
-	if got := len(registry.List()); got != 26 {
+	if got := len(registry.List()); got != 27 {
 		t.Fatalf("expected idempotent builtin install, got %d packs", got)
 	}
 }

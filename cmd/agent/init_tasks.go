@@ -47,6 +47,7 @@ import (
 	browserintentpack "yunque-agent/internal/packs/browserintent"
 	chaosprobepack "yunque-agent/internal/packs/chaosprobe"
 	cognitivecanarypack "yunque-agent/internal/packs/cognitivecanary"
+	computerusepack "yunque-agent/internal/packs/computeruse"
 	guardrailfuzzerpack "yunque-agent/internal/packs/guardrailfuzzer"
 	lorapack "yunque-agent/internal/packs/lora"
 	memorytimetravelpack "yunque-agent/internal/packs/memorytimetravel"
@@ -208,8 +209,11 @@ func initTasks(app *agentrt.App) error {
 	gw.SetLoRAScheduler(loraScheduler)
 	gw.SetTrainingMetrics(trainingMetrics)
 	gw.SetEvolutionCoordinator(evolutionCoordinator)
-	// Browser Intent + LoRA migrated to the v2 Module lifecycle (Tier 0 microkernel).
+	// Browser Intent + Computer Use + LoRA migrated to the v2 Module lifecycle
+	// (Tier 0 microkernel). Computer Use is manifest-default-disabled: it exposes
+	// status/plan/read-only browser screenshot only when explicitly enabled.
 	_ = gw.RegisterModule(browserintentpack.NewHandler(gw))
+	_ = gw.RegisterModule(computerusepack.New(gw))
 	_ = gw.RegisterModule(lorapack.NewHandler(lorapack.Options{
 		Scheduler: loraScheduler,
 		Metrics:   trainingMetrics,
@@ -704,6 +708,7 @@ func fallbackBuiltinPackManifestPaths() []string {
 		"packs/official/micro-agent-pack/pack.json",
 		"packs/official/lora-pack/pack.json",
 		"packs/official/browser-intent-pack/pack.json",
+		"packs/official/computer-use-pack/pack.json",
 		"packs/official/chaos-probe-pack/pack.json",
 		"packs/official/cognitive-canary-pack/pack.json",
 		"packs/official/guardrail-fuzzer-pack/pack.json",

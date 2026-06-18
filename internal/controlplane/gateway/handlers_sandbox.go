@@ -183,19 +183,24 @@ func (g *Gateway) handleDesktopCreate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (g *Gateway) handleDesktopStatus(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, g.DesktopSandboxStatus(r.Context()))
+}
+
+// DesktopSandboxStatus exposes a read-only cloud desktop snapshot for packs
+// that need computer-use readiness without gaining create/destroy privileges.
+func (g *Gateway) DesktopSandboxStatus(ctx context.Context) map[string]any {
 	g.desktopMu.Lock()
 	ds := g.desktopSandbox
 	cr := g.cloudRunner
 	g.desktopMu.Unlock()
 
 	if ds == nil {
-		writeJSON(w, map[string]any{"ok": true, "running": false})
-		return
+		return map[string]any{"ok": true, "available": cr != nil, "running": false}
 	}
 
-	info := map[string]any{"ok": true, "running": true, "sandbox": ds}
+	info := map[string]any{"ok": true, "available": true, "running": true, "sandbox": ds}
 	if cr != nil {
-		status, err := cr.DesktopStatus(r.Context(), ds.ID)
+		status, err := cr.DesktopStatus(ctx, ds.ID)
 		if err != nil {
 			info["alive"] = false
 			info["error"] = err.Error()
@@ -204,7 +209,7 @@ func (g *Gateway) handleDesktopStatus(w http.ResponseWriter, r *http.Request) {
 			info["upstream"] = status
 		}
 	}
-	writeJSON(w, info)
+	return info
 }
 
 func (g *Gateway) handleDesktopDestroy(w http.ResponseWriter, r *http.Request) {

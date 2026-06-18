@@ -1,0 +1,87 @@
+{
+  "id": "yunque.pack.computer-use",
+  "name": "Computer Use Pack",
+  "version": "0.1.0",
+  "description": "电脑使用能力的安全闸门与执行计划包。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "disabled",
+  "backend": {
+    "capabilities": [
+      "computer.status",
+      "computer.intent.plan",
+      "computer.permission.gate_plan",
+      "computer.approval.gate_plan",
+      "computer.screenshot.browser"
+    ],
+    "routes": [
+      "/v1/computer/status",
+      "/v1/computer/intent/plan",
+      "/v1/computer/screenshot"
+    ],
+    "permissions": [
+      "computer:read",
+      "computer:control",
+      "computer:local-desktop",
+      "browser:read",
+      "browser:connect",
+      "sandbox:desktop"
+    ],
+    "routeSpecs": [
+      {
+        "method": "GET",
+        "path": "/v1/computer/status",
+        "description": "Read computer-use surface readiness for browser, desktop sandbox and local desktop."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/computer/intent/plan",
+        "description": "Build a non-destructive computer-use intent plan with permission and human-approval gates before any executor is wired."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/computer/screenshot",
+        "description": "Capture a read-only screenshot from the connected browser surface; local desktop control is not wired."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [
+      {
+        "key": "computer-use",
+        "label": "电脑使用",
+        "path": "/packs/computer-use",
+        "icon": "monitor-cog",
+        "order": 92
+      }
+    ],
+    "routes": [
+      {
+        "path": "/packs/computer-use",
+        "component": "computer/ComputerUsePackPage",
+        "title": "电脑使用"
+      }
+    ],
+    "assets": {
+      "type": "builtin",
+      "entry": "computer/ComputerUsePackPage"
+    }
+  },
+  "sdk": {
+    "typescript": "yunque-client/computer-use"
+  },
+  "update": {
+    "channel": "beta",
+    "rollback": true
+  },
+  "metadata": {
+    "blueprint": "docs/spec/computer-use-pack.md",
+    "stage": "permissioned-plan-before-executor",
+    "sync": "backend-registry-drives-frontend",
+    "descriptionStyle": "one-line-plus-three-examples",
+    "example1": "检查浏览器、云桌面、本机桌面的可用状态。",
+    "example2": "把自然语言目标转成需审批的电脑使用计划。",
+    "example3": "在浏览器连接器已连接时采集只读截图证据。"
+  },
+  "status": "alpha"
+}
