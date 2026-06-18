@@ -59,6 +59,7 @@ import (
 	modespack "yunque-agent/internal/packs/modes"
 	nightschoolpack "yunque-agent/internal/packs/nightschool"
 	notificationspack "yunque-agent/internal/packs/notifications"
+	orchestratorpack "yunque-agent/internal/packs/orchestrator"
 	reveriepack "yunque-agent/internal/packs/reverie"
 	schedulerpack "yunque-agent/internal/packs/scheduler"
 	skillspack "yunque-agent/internal/packs/skills"
@@ -193,6 +194,9 @@ func initTaskEngine(
 	// Forks pack — owns /v1/fork* natively. The fork tree/persister are wired by
 	// session auth init, so the pack resolves them lazily per request.
 	_ = gw.RegisterModule(forkspack.NewProvider(gw.ForkTree, gw.ForkPersister))
+	// Orchestrator pack — owns /v1/orchestrator/* natively. The daemon/launcher
+	// are wired later by initOrchestrator, so the pack resolves them lazily.
+	_ = gw.RegisterModule(orchestratorpack.New(gw))
 
 	// Persona-modes pack — owns /v1/persona/mode* natively (de-shelled from the
 	// gateway monolith). Resolves the mode manager lazily, so order is moot.

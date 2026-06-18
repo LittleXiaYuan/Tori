@@ -120,6 +120,23 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 		t.Fatal("expected Conversation Forks branch routeSpec")
 	}
 
+	orchestrator, ok := registry.Get("yunque.pack.orchestrator")
+	if !ok {
+		t.Fatal("expected IDE Work Orchestrator builtin pack to be installed")
+	}
+	if orchestrator.Status != packruntime.PackStatusEnabled {
+		t.Fatalf("expected IDE Work Orchestrator default enabled, got %s", orchestrator.Status)
+	}
+	if orchestrator.Manifest.SDK.TypeScript != "yunque-client/orchestrator" {
+		t.Fatalf("unexpected IDE Work Orchestrator SDK import: %s", orchestrator.Manifest.SDK.TypeScript)
+	}
+	if !hasRouteSpec(orchestrator.Manifest.Backend.RouteSpecs, "GET", "/v1/orchestrator/status") {
+		t.Fatal("expected IDE Work Orchestrator status routeSpec")
+	}
+	if !hasRouteSpec(orchestrator.Manifest.Backend.RouteSpecs, "PUT", "/v1/orchestrator/policy") {
+		t.Fatal("expected IDE Work Orchestrator policy update routeSpec")
+	}
+
 	cost, ok := registry.Get("yunque.pack.cost")
 	if !ok {
 		t.Fatal("expected Cost Governance builtin pack to be installed")
@@ -299,7 +316,7 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 	// Count reflects the current packs/official/ set (incl. the newer
 	// console/control-plane/knowledge/memory/skills/work/workspace packs and the
 	// cognitive-layer/state packs). Adjust if the builtin pack set changes.
-	if got := len(registry.List()); got != 32 {
+	if got := len(registry.List()); got != 33 {
 		t.Fatalf("expected idempotent builtin install, got %d packs", got)
 	}
 }

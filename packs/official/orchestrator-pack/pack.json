@@ -1,0 +1,110 @@
+{
+  "id": "yunque.pack.orchestrator",
+  "name": "IDE Work Orchestrator Pack",
+  "version": "0.1.0",
+  "description": "把任务分派给本地 IDE / 编码 worker 的编排能力包。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": [
+      "orchestrator.status",
+      "orchestrator.toggle",
+      "orchestrator.sessions",
+      "orchestrator.detect",
+      "orchestrator.adapters",
+      "orchestrator.events",
+      "orchestrator.policy"
+    ],
+    "routes": [
+      "/v1/orchestrator/status",
+      "/v1/orchestrator/toggle",
+      "/v1/orchestrator/sessions",
+      "/v1/orchestrator/detect",
+      "/v1/orchestrator/adapters/add",
+      "/v1/orchestrator/events",
+      "/v1/orchestrator/events/task",
+      "/v1/orchestrator/policy"
+    ],
+    "permissions": [
+      "tasks:read",
+      "orchestrator:read",
+      "orchestrator:write",
+      "host:ide-detect"
+    ],
+    "routeSpecs": [
+      {
+        "method": "GET",
+        "path": "/v1/orchestrator/status",
+        "description": "Read IDE/work orchestrator runtime status."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/orchestrator/toggle",
+        "description": "Start or stop the IDE/work orchestrator daemon."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/orchestrator/sessions",
+        "description": "List active orchestrator worker sessions."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/orchestrator/detect",
+        "description": "Detect locally available IDE worker adapters."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/orchestrator/adapters/add",
+        "description": "Register a custom IDE worker adapter."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/orchestrator/events",
+        "description": "List recent orchestrator events."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/orchestrator/events/task",
+        "description": "List orchestrator events for one task."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/orchestrator/policy",
+        "description": "Read the orchestrator automation policy."
+      },
+      {
+        "method": "PUT",
+        "path": "/v1/orchestrator/policy",
+        "description": "Update the orchestrator automation policy."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [
+      {
+        "key": "orchestrator",
+        "label": "任务编排",
+        "path": "/missions",
+        "icon": "workflow",
+        "order": 155
+      }
+    ]
+  },
+  "sdk": {
+    "typescript": "yunque-client/orchestrator"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "blueprint": "docs/spec/pack-runtime-blueprint.md",
+    "stage": "native-pack-route-migration",
+    "descriptionStyle": "one-line-plus-three-examples",
+    "example1": "查看本地 IDE worker 是否可用，以及当前编排 daemon 是否运行。",
+    "example2": "启动或停止任务自动分派，并查看任务相关事件时间线。",
+    "example3": "注册自定义 worker 适配器，让云雀把任务交给外部编码工具。"
+  },
+  "status": "stable"
+}

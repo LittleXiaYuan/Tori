@@ -82,8 +82,8 @@ func (g *Gateway) SetBaseContext(ctx context.Context) {
 	g.baseCtx = ctx
 }
 
-// baseContext returns the long-lived context for background daemons, never nil.
-func (g *Gateway) baseContext() context.Context {
+// BaseContext returns the long-lived context for background daemons, never nil.
+func (g *Gateway) BaseContext() context.Context {
 	if g.baseCtx != nil {
 		return g.baseCtx
 	}
@@ -210,6 +210,12 @@ func (g *Gateway) SetOrchDaemon(d *orchestrator.Daemon) { g.orchDaemon = d }
 
 // SetOrchLauncher attaches the worker launcher for adapter management.
 func (g *Gateway) SetOrchLauncher(l *orchestrator.Launcher) { g.orchLauncher = l }
+
+// OrchDaemon exposes the orchestration daemon to the orchestrator pack.
+func (g *Gateway) OrchDaemon() *orchestrator.Daemon { return g.orchDaemon }
+
+// OrchLauncher exposes the worker launcher to the orchestrator pack.
+func (g *Gateway) OrchLauncher() *orchestrator.Launcher { return g.orchLauncher }
 
 // SetZhGuard attaches the Chinese guardrail pipeline.
 func (g *Gateway) SetZhGuard(p *guardrails.Pipeline) { g.zhGuard = p }
