@@ -1,0 +1,63 @@
+{
+  "id": "yunque.pack.channels",
+  "name": "Channels (消息通道)",
+  "version": "0.1.0",
+  "description": "消息通道动作：给消息回应表情、发送原生贴纸，并查看已连接通道的群组。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": [
+      "channels.react",
+      "channels.stickers.send",
+      "channels.groups.read"
+    ],
+    "routes": [
+      "/v1/react",
+      "/v1/sticker/send",
+      "/v1/channels/groups"
+    ],
+    "permissions": [
+      "channels:read",
+      "channels:write",
+      "channels:send"
+    ],
+    "routeSpecs": [
+      {
+        "method": "POST",
+        "path": "/v1/react",
+        "description": "Add or clear an emoji reaction on a channel message."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/sticker/send",
+        "description": "Send a native sticker through a supported channel."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/channels/groups",
+        "description": "List groups, guilds, or rooms visible to configured channels."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [],
+    "assets": {
+      "type": "builtin"
+    }
+  },
+  "sdk": {
+    "typescript": "yunque-client/channels"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "group": "communication",
+    "phase": "A2",
+    "preload": "true",
+    "note": "Natively owns /v1/react, /v1/sticker/send and /v1/channels/groups through the Pack Runtime gate. Webhooks and core chat transport remain in the gateway."
+  },
+  "status": "beta"
+}

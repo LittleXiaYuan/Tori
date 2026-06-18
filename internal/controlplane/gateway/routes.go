@@ -69,12 +69,9 @@ func (g *Gateway) registerChatRoutes() {
 	// gw.RegisterModule in cmd/agent/init_task_engine.go. The CRUD + reorder
 	// logic lives in that pack natively; the gateway no longer hosts these routes.
 
-	// React & Sticker
-	g.mux.HandleFunc("/v1/react", g.requireAuth(g.handleReact))
-	g.mux.HandleFunc("/v1/sticker/send", g.requireAuth(g.handleSendSticker))
-
-	// Channel Groups
-	g.mux.HandleFunc("/v1/channels/groups", g.requireAuth(g.handleChannelGroups))
+	// Channel actions (/v1/react, /v1/sticker/send, /v1/channels/groups) are
+	// owned by the channels pack (internal/packs/channels), mounted via
+	// gw.RegisterModule. The gateway no longer hosts these routes.
 
 	// Inbox routes migrated to the control-plane pack (internal/packs/controlplane).
 

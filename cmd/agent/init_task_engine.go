@@ -39,6 +39,7 @@ import (
 	reflectpkg "yunque-agent/internal/experimental/reflect"
 	iledger "yunque-agent/internal/ledger"
 	"yunque-agent/internal/observe"
+	channelspack "yunque-agent/internal/packs/channels"
 	connectorspack "yunque-agent/internal/packs/connectors"
 	controlplanepack "yunque-agent/internal/packs/controlplane"
 	costpack "yunque-agent/internal/packs/cost"
@@ -172,6 +173,9 @@ func initTaskEngine(
 	// De-shelled /v1/skills/scan rescans data/skills via the gateway file loader.
 	skillsPack.SetScan(gw.ScanSkills)
 	_ = gw.RegisterModule(skillsPack)
+	// Channels pack — owns channel reactions, native sticker sending and group
+	// discovery through the shared channel registry.
+	_ = gw.RegisterModule(channelspack.New(gw))
 
 	// Work pack — owns the task (/v1/tasks/*) + project (/v1/projects/*)
 	// surfaces natively. Workflows remain in the workflowapi sub-package.

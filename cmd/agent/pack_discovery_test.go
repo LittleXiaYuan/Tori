@@ -17,6 +17,7 @@ func TestDiscoverBuiltinPackManifestPaths(t *testing.T) {
 
 	want := []string{
 		"packs/official/backup-pack/pack.json",
+		"packs/official/channels-pack/pack.json",
 		"packs/official/connectors-pack/pack.json",
 		"packs/official/control-plane-pack/pack.json",
 		"packs/official/cost-pack/pack.json",

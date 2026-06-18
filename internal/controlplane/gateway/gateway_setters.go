@@ -483,6 +483,9 @@ func (g *Gateway) TriggerRuntime() *trigger.Runtime { return g.triggerRT }
 // SetChannelRegistry attaches the channel registry for react/sticker operations.
 func (g *Gateway) SetChannelRegistry(cr *channel.Registry) { g.channelReg = cr }
 
+// ChannelRegistry exposes the messaging channel registry to the channels pack.
+func (g *Gateway) ChannelRegistry() *channel.Registry { return g.channelReg }
+
 // SetPreAckEmojis configures the emoji list for pre-ack reactions on incoming messages.
 func (g *Gateway) SetPreAckEmojis(emojis []string) { g.preAckEmojis = emojis }
 
