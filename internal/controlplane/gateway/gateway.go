@@ -64,7 +64,6 @@ import (
 	"yunque-agent/internal/connectors"
 	"yunque-agent/internal/controlplane/gateway/forkapi"
 	"yunque-agent/internal/controlplane/gateway/gwshared"
-	"yunque-agent/internal/controlplane/gateway/notifyapi"
 	"yunque-agent/internal/controlplane/gateway/schedulerapi"
 	"yunque-agent/internal/controlplane/gateway/workflowapi"
 	"yunque-agent/internal/controlplane/models"
@@ -750,12 +749,6 @@ func (g *Gateway) routes() {
 	g.registerOrchestratorRoutes() // orchestrator daemon control
 
 	// Extracted handler groups (sub-packages)
-	(&notifyapi.Handler{
-		NotifierFunc: func() *notify.Notifier {
-			return g.notifier
-		},
-	}).RegisterRoutes(g.mux, g.requireAuth)
-
 	// Workflow handler is created here but its /v1/workflows* routes are mounted
 	// by the work pack (internal/packs/work) so workflow lives in the task
 	// platform rather than as a detached sub-package. Late-binding setters

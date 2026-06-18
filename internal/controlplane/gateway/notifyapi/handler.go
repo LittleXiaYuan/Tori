@@ -11,6 +11,14 @@ import (
 	"yunque-agent/internal/controlplane/gateway/gwshared"
 )
 
+// Route declares one notification HTTP route.
+type Route struct {
+	Method      string
+	Path        string
+	Description string
+	Handler     http.HandlerFunc
+}
+
 // Handler serves notification channel management HTTP endpoints.
 type Handler struct {
 	Notifier     *notify.Notifier
@@ -24,14 +32,25 @@ func (h *Handler) notifier() *notify.Notifier {
 	return h.Notifier
 }
 
+// RouteSpecs returns the notification surface without mounting it. Pack Runtime
+// uses this to own route registration while preserving the existing handler
+// implementation.
+func (h *Handler) RouteSpecs() []Route {
+	return []Route{
+		{Method: http.MethodGet, Path: "/api/notify/channels", Description: "List configured notification channels.", Handler: h.handleChannels},
+		{Method: http.MethodPost, Path: "/api/notify/add", Description: "Add a notification channel.", Handler: h.handleAdd},
+		{Method: http.MethodPost, Path: "/api/notify/remove", Description: "Remove a notification channel.", Handler: h.handleRemove},
+		{Method: http.MethodPost, Path: "/api/notify/toggle", Description: "Enable or disable a notification channel.", Handler: h.handleToggle},
+		{Method: http.MethodPost, Path: "/api/notify/test", Description: "Send a test notification to one channel.", Handler: h.handleTest},
+		{Method: http.MethodPost, Path: "/api/notify/share", Description: "Share a task/session result through one notification channel.", Handler: h.handleShare},
+	}
+}
+
 // RegisterRoutes mounts all /api/notify/* endpoints.
 func (h *Handler) RegisterRoutes(mux *http.ServeMux, auth gwshared.AuthFunc) {
-	mux.HandleFunc("/api/notify/channels", auth(h.handleChannels))
-	mux.HandleFunc("/api/notify/add", auth(h.handleAdd))
-	mux.HandleFunc("/api/notify/remove", auth(h.handleRemove))
-	mux.HandleFunc("/api/notify/toggle", auth(h.handleToggle))
-	mux.HandleFunc("/api/notify/test", auth(h.handleTest))
-	mux.HandleFunc("/api/notify/share", auth(h.handleShare))
+	for _, route := range h.RouteSpecs() {
+		mux.HandleFunc(route.Path, auth(route.Handler))
+	}
 }
 
 func (h *Handler) handleChannels(w http.ResponseWriter, r *http.Request) {

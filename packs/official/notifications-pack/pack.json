@@ -1,0 +1,84 @@
+{
+  "id": "yunque.pack.notifications",
+  "name": "Notifications (通知与协作)",
+  "version": "0.1.0",
+  "description": "通知渠道与协作分享：管理 webhook/钉钉/飞书/企业微信等渠道，并把任务或产物分享到指定渠道。默认预装，无独立页面，由任务、聊天与设置等现有界面调用。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": [
+      "notifications.channels",
+      "notifications.add",
+      "notifications.remove",
+      "notifications.toggle",
+      "notifications.test",
+      "notifications.share"
+    ],
+    "routes": [
+      "/api/notify/channels",
+      "/api/notify/add",
+      "/api/notify/remove",
+      "/api/notify/toggle",
+      "/api/notify/test",
+      "/api/notify/share"
+    ],
+    "permissions": [
+      "notifications:read",
+      "notifications:write",
+      "network:external"
+    ],
+    "routeSpecs": [
+      {
+        "method": "GET",
+        "path": "/api/notify/channels",
+        "description": "List configured notification channels."
+      },
+      {
+        "method": "POST",
+        "path": "/api/notify/add",
+        "description": "Add a notification channel."
+      },
+      {
+        "method": "POST",
+        "path": "/api/notify/remove",
+        "description": "Remove a notification channel."
+      },
+      {
+        "method": "POST",
+        "path": "/api/notify/toggle",
+        "description": "Enable or disable a notification channel."
+      },
+      {
+        "method": "POST",
+        "path": "/api/notify/test",
+        "description": "Send a test notification to one channel."
+      },
+      {
+        "method": "POST",
+        "path": "/api/notify/share",
+        "description": "Share a task/session result through one notification channel."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [],
+    "assets": {
+      "type": "builtin"
+    }
+  },
+  "sdk": {
+    "typescript": "yunque-client/notifications"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "group": "collaboration",
+    "phase": "A3",
+    "preload": "true",
+    "note": "Default-preloaded collaboration pack: natively owns /api/notify/* through Pack Runtime. Existing chat/task/settings surfaces consume this API."
+  },
+  "status": "beta"
+}

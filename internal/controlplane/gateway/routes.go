@@ -282,8 +282,9 @@ func (g *Gateway) registerBrowserRoutes() {
 	// Gateway because it is attached when SetBrowserHub wires a concrete hub.
 }
 
-// Notify routes are registered via notifyapi in gateway.go routes().
-// Connector routes are owned by the connectors pack (internal/packs/connectors).
+// Notification routes are owned by the notifications pack
+// (internal/packs/notifications). Connector routes are owned by the connectors
+// pack (internal/packs/connectors).
 
 // IDE routes (/v1/ide/*) are owned by the IDE pack (internal/packs/ide),
 // mounted via gw.RegisterModule in cmd/agent/init_task_engine.go.

@@ -69,6 +69,23 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 		t.Fatal("expected Connectors execute routeSpec")
 	}
 
+	notifications, ok := registry.Get("yunque.pack.notifications")
+	if !ok {
+		t.Fatal("expected Notifications builtin pack to be installed")
+	}
+	if notifications.Status != packruntime.PackStatusEnabled {
+		t.Fatalf("expected Notifications default enabled, got %s", notifications.Status)
+	}
+	if notifications.Manifest.SDK.TypeScript != "yunque-client/notifications" {
+		t.Fatalf("unexpected Notifications SDK import: %s", notifications.Manifest.SDK.TypeScript)
+	}
+	if !hasRouteSpec(notifications.Manifest.Backend.RouteSpecs, "GET", "/api/notify/channels") {
+		t.Fatal("expected Notifications channels routeSpec")
+	}
+	if !hasRouteSpec(notifications.Manifest.Backend.RouteSpecs, "POST", "/api/notify/share") {
+		t.Fatal("expected Notifications share routeSpec")
+	}
+
 	cost, ok := registry.Get("yunque.pack.cost")
 	if !ok {
 		t.Fatal("expected Cost Governance builtin pack to be installed")
@@ -248,7 +265,7 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 	// Count reflects the current packs/official/ set (incl. the newer
 	// console/control-plane/knowledge/memory/skills/work/workspace packs and the
 	// cognitive-layer/state packs). Adjust if the builtin pack set changes.
-	if got := len(registry.List()); got != 29 {
+	if got := len(registry.List()); got != 30 {
 		t.Fatalf("expected idempotent builtin install, got %d packs", got)
 	}
 }

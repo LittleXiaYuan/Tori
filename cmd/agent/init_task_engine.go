@@ -57,6 +57,7 @@ import (
 	missionspack "yunque-agent/internal/packs/missions"
 	modespack "yunque-agent/internal/packs/modes"
 	nightschoolpack "yunque-agent/internal/packs/nightschool"
+	notificationspack "yunque-agent/internal/packs/notifications"
 	reveriepack "yunque-agent/internal/packs/reverie"
 	skillspack "yunque-agent/internal/packs/skills"
 	statepack "yunque-agent/internal/packs/state"
@@ -181,6 +182,9 @@ func initTaskEngine(
 	// Connectors pack — owns /api/connectors* natively. The registry is wired
 	// later by initSkillRegistration, so the pack resolves it lazily per request.
 	_ = gw.RegisterModule(connectorspack.NewProvider(gw.ConnectorRegistry))
+	// Notifications pack — owns /api/notify/* natively. The notifier is wired
+	// by initTasks, so the pack resolves it lazily per request.
+	_ = gw.RegisterModule(notificationspack.NewProvider(gw.Notifier))
 
 	// Persona-modes pack — owns /v1/persona/mode* natively (de-shelled from the
 	// gateway monolith). Resolves the mode manager lazily, so order is moot.
