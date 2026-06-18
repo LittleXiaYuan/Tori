@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -646,6 +647,86 @@ func TestPackCapabilitiesExposeManifestCapabilityIndex(t *testing.T) {
 	}
 	if disabled.PackID != "yunque.pack.disabled-capability" || disabled.Enabled {
 		t.Fatalf("disabled capability should stay visible but disabled: %#v", disabled)
+	}
+}
+
+func TestPackCapabilityCogniProfileCompactsCapabilityContext(t *testing.T) {
+	registry, err := packruntime.NewRegistry(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewRegistry: %v", err)
+	}
+	_, err = registry.Install(packruntime.Manifest{
+		ID:           "yunque.pack.computer-profile",
+		Name:         "Computer Profile Pack",
+		Version:      "0.1.0",
+		Optional:     true,
+		DefaultState: "enabled",
+		Backend: packruntime.BackendManifest{
+			Capabilities: []string{"computer.use.plan"},
+			Routes:       []string{"/v1/computer/intent/plan"},
+			Permissions:  []string{"computer:plan", "browser:read"},
+		},
+		SDK: packruntime.SDKManifest{TypeScript: "yunque-client/computer-use"},
+	}, "test")
+	if err != nil {
+		t.Fatalf("Install computer profile: %v", err)
+	}
+	_, err = registry.Install(packruntime.Manifest{
+		ID:           "yunque.pack.disabled-memory-profile",
+		Name:         "Disabled Memory Profile Pack",
+		Version:      "0.1.0",
+		Optional:     true,
+		DefaultState: "disabled",
+		Backend: packruntime.BackendManifest{
+			Capabilities: []string{"memory.recall"},
+			Routes:       []string{"/v1/memory/search"},
+			Permissions:  []string{"memory:read"},
+		},
+		Frontend: packruntime.FrontendManifest{Menus: []packruntime.FrontendMenu{{Key: "memory", Label: "记忆", Path: "/memory"}}},
+	}, "test")
+	if err != nil {
+		t.Fatalf("Install memory profile: %v", err)
+	}
+	gw, tenants := newTestGatewayWithConfig(GatewayConfig{Packs: registry})
+	tenant := tenants.Register("pack-cogni-profile")
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/packs/capabilities/cogni-profile", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	var report packruntime.CapabilityCogniProfileReport
+	if err := json.NewDecoder(w.Body).Decode(&report); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if report.Count != 2 || len(report.Entries) != 2 {
+		t.Fatalf("unexpected profile count: %#v", report)
+	}
+	var computer, memory packruntime.CapabilityCogniProfileEntry
+	for _, entry := range report.Entries {
+		switch entry.Capability {
+		case "computer.use.plan":
+			computer = entry
+		case "memory.recall":
+			memory = entry
+		}
+	}
+	if computer.SourceType != "pack" || computer.SourceID != "yunque.pack.computer-profile" || computer.Action != "use" || computer.Risk != "high" {
+		t.Fatalf("unexpected computer profile: %#v", computer)
+	}
+	if computer.InvokeHint != "sdk:yunque-client/computer-use" || !strings.Contains(computer.TokenHint, "computer.use.plan via yunque.pack.computer-profile") {
+		t.Fatalf("computer profile should be compact and invokable: %#v", computer)
+	}
+	if !slices.Contains(computer.Constraints, "高风险能力需要用户授权，不能静默扩大权限") {
+		t.Fatalf("computer profile should carry high-risk constraint: %#v", computer.Constraints)
+	}
+	if memory.Action != "enable" || memory.Enabled || memory.Risk != "low" || memory.InvokeHint != "route:/v1/memory/search" {
+		t.Fatalf("unexpected memory profile: %#v", memory)
+	}
+	if !slices.Contains(memory.Constraints, "能力包未启用，使用前先引导启用") {
+		t.Fatalf("disabled profile should explain enablement constraint: %#v", memory.Constraints)
 	}
 }
 

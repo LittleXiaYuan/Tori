@@ -78,6 +78,33 @@ type CapabilityIndexReport struct {
 	Entries             []CapabilityIndexEntry `json:"entries"`
 }
 
+// CapabilityCogniProfileEntry is the low-token capability card Cogni can use to
+// decide whether it should expand the full Pack/Skill/MCP details. It is
+// derived from manifest state only and is intentionally read-only.
+type CapabilityCogniProfileEntry struct {
+	Capability    string   `json:"capability"`
+	SourceType    string   `json:"source_type"`
+	SourceID      string   `json:"source_id"`
+	SourceName    string   `json:"source_name"`
+	Enabled       bool     `json:"enabled"`
+	Action        string   `json:"action"`
+	Risk          string   `json:"risk"`
+	TokenHint     string   `json:"token_hint"`
+	UseWhen       []string `json:"use_when,omitempty"`
+	Constraints   []string `json:"constraints,omitempty"`
+	Permissions   []string `json:"permissions,omitempty"`
+	FrontendPaths []string `json:"frontend_paths,omitempty"`
+	InvokeHint    string   `json:"invoke_hint,omitempty"`
+}
+
+// CapabilityCogniProfileReport gives Cogni a compact map of installed Pack
+// capabilities without exposing full manifests or long tool instructions.
+type CapabilityCogniProfileReport struct {
+	GeneratedAt time.Time                     `json:"generated_at"`
+	Entries     []CapabilityCogniProfileEntry `json:"entries"`
+	Count       int                           `json:"count"`
+}
+
 // CapabilityResolveReport is returned by /v1/packs/capabilities/resolve.
 // It keeps capability lookup side-effect free while giving external shells,
 // operators, and runtime gates a concrete next action: use an enabled pack,
@@ -330,8 +357,8 @@ func AsModule(m BackendModule) Module {
 // legacyModule wraps a v1 BackendModule as a v2 Module.
 type legacyModule struct{ inner BackendModule }
 
-func (l legacyModule) PackID() string             { return l.inner.PackID() }
-func (l legacyModule) Init(Host) error            { return nil }
-func (l legacyModule) Routes() []BackendRoute     { return l.inner.Routes() }
+func (l legacyModule) PackID() string              { return l.inner.PackID() }
+func (l legacyModule) Init(Host) error             { return nil }
+func (l legacyModule) Routes() []BackendRoute      { return l.inner.Routes() }
 func (l legacyModule) Start(context.Context) error { return nil }
 func (l legacyModule) Stop(context.Context) error  { return nil }

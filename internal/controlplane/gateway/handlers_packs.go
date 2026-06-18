@@ -88,6 +88,7 @@ func (g *Gateway) registerPackRoutes() {
 	g.mux.HandleFunc("/v1/packs/capabilities/prepare", g.requireAuth(g.handlePackCapabilityPrepare))
 	g.mux.HandleFunc("/v1/packs/capabilities/gate", g.requireAuth(g.handlePackCapabilityGate))
 	g.mux.HandleFunc("/v1/packs/capabilities/resolve", g.requireAuth(g.handlePackCapabilityResolve))
+	g.mux.HandleFunc("/v1/packs/capabilities/cogni-profile", g.requireAuth(g.handlePackCapabilityCogniProfile))
 	g.mux.HandleFunc("/v1/packs/capabilities", g.requireAuth(g.handlePackCapabilities))
 	g.mux.HandleFunc("/v1/packs/backend-modules", g.requireAuth(g.handlePackBackendModules))
 	g.mux.HandleFunc("/v1/packs/backend-route-audit", g.requireAuth(g.handlePackBackendRouteAudit))
@@ -858,6 +859,14 @@ func (g *Gateway) handlePackCapabilities(w http.ResponseWriter, r *http.Request)
 	writeJSON(w, g.packCapabilityIndexReport())
 }
 
+func (g *Gateway) handlePackCapabilityCogniProfile(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSONStatus(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+		return
+	}
+	writeJSON(w, g.packCapabilityCogniProfileReport())
+}
+
 func (g *Gateway) handlePackCapabilityResolve(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeJSONStatus(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
@@ -962,6 +971,114 @@ func (g *Gateway) packCapabilityIndexReport() packruntime.CapabilityIndexReport 
 		return strings.Compare(a.PackID, b.PackID)
 	})
 	return report
+}
+
+func (g *Gateway) packCapabilityCogniProfileReport() packruntime.CapabilityCogniProfileReport {
+	index := g.packCapabilityIndexReport()
+	report := packruntime.CapabilityCogniProfileReport{
+		GeneratedAt: index.GeneratedAt,
+		Entries:     []packruntime.CapabilityCogniProfileEntry{},
+	}
+	for _, entry := range index.Entries {
+		profile := packCapabilityCogniProfileEntry(entry)
+		report.Entries = append(report.Entries, profile)
+	}
+	report.Count = len(report.Entries)
+	return report
+}
+
+func packCapabilityCogniProfileEntry(entry packruntime.CapabilityIndexEntry) packruntime.CapabilityCogniProfileEntry {
+	risk := packCapabilityCogniRisk(entry.Permissions)
+	action := "enable"
+	if entry.Enabled {
+		action = "use"
+	}
+	constraints := packCapabilityCogniConstraints(entry, risk)
+	return packruntime.CapabilityCogniProfileEntry{
+		Capability:    entry.Capability,
+		SourceType:    "pack",
+		SourceID:      entry.PackID,
+		SourceName:    entry.PackName,
+		Enabled:       entry.Enabled,
+		Action:        action,
+		Risk:          risk,
+		TokenHint:     packCapabilityTokenHint(entry),
+		UseWhen:       packCapabilityUseWhen(entry),
+		Constraints:   constraints,
+		Permissions:   append([]string(nil), entry.Permissions...),
+		FrontendPaths: append([]string(nil), entry.FrontendPaths...),
+		InvokeHint:    packCapabilityInvokeHint(entry),
+	}
+}
+
+func packCapabilityCogniRisk(permissions []string) string {
+	joined := strings.ToLower(strings.Join(permissions, " "))
+	switch {
+	case strings.Contains(joined, "computer") || strings.Contains(joined, "desktop") || strings.Contains(joined, "browser:write") || strings.Contains(joined, "wasm:execute"):
+		return "high"
+	case strings.Contains(joined, "write") || strings.Contains(joined, "delete") || strings.Contains(joined, "network") || strings.Contains(joined, "download") || strings.Contains(joined, "admin"):
+		return "medium"
+	default:
+		return "low"
+	}
+}
+
+func packCapabilityTokenHint(entry packruntime.CapabilityIndexEntry) string {
+	parts := []string{entry.Capability, "via", entry.PackID}
+	if entry.Enabled {
+		parts = append(parts, "enabled")
+	} else {
+		parts = append(parts, "disabled")
+	}
+	if len(entry.Permissions) > 0 {
+		parts = append(parts, "perms="+strings.Join(entry.Permissions, ","))
+	}
+	return strings.Join(parts, " ")
+}
+
+func packCapabilityUseWhen(entry packruntime.CapabilityIndexEntry) []string {
+	capability := strings.ToLower(entry.Capability)
+	switch {
+	case strings.Contains(capability, "memory") || strings.Contains(capability, "recall") || strings.Contains(capability, "knowledge"):
+		return []string{"需要召回用户记忆、知识库或长期上下文时"}
+	case strings.Contains(capability, "browser"):
+		return []string{"需要读取、规划或检查浏览器页面时"}
+	case strings.Contains(capability, "computer"):
+		return []string{"需要生成电脑使用计划时；当前不代表可直接执行本机控制"}
+	case strings.Contains(capability, "workflow") || strings.Contains(capability, "task"):
+		return []string{"需要把用户目标转成任务、流程或可跟踪执行时"}
+	case strings.Contains(capability, "wasm"):
+		return []string{"需要加载隔离 WASM 能力或检查第三方执行器时"}
+	default:
+		return []string{"用户目标与该能力名称或能力包说明匹配时"}
+	}
+}
+
+func packCapabilityCogniConstraints(entry packruntime.CapabilityIndexEntry, risk string) []string {
+	constraints := []string{"按需展开完整能力说明，不要把完整 manifest 放入模型上下文"}
+	if !entry.Enabled {
+		constraints = append(constraints, "能力包未启用，使用前先引导启用")
+	}
+	if risk == "high" {
+		constraints = append(constraints, "高风险能力需要用户授权，不能静默扩大权限")
+	}
+	if len(entry.Routes) > 0 {
+		constraints = append(constraints, "只能调用能力包声明并通过审计的 route")
+	}
+	return constraints
+}
+
+func packCapabilityInvokeHint(entry packruntime.CapabilityIndexEntry) string {
+	if entry.SDKTypeScript != "" {
+		return "sdk:" + entry.SDKTypeScript
+	}
+	if len(entry.Routes) > 0 {
+		return "route:" + entry.Routes[0]
+	}
+	if len(entry.FrontendPaths) > 0 {
+		return "ui:" + entry.FrontendPaths[0]
+	}
+	return "pack:" + entry.PackID
 }
 
 func (g *Gateway) packCapabilityPlanReport(capabilities []string) packruntime.CapabilityPlanReport {

@@ -169,6 +169,23 @@ describe("packs-client", () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ modules: [], count: 0 }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({
         generated_at: "2026-05-16T00:00:00Z",
+        count: 1,
+        entries: [{
+          capability: "backup.info",
+          source_type: "pack",
+          source_id: "yunque.pack.backup",
+          source_name: "Backup Pack",
+          enabled: true,
+          action: "use",
+          risk: "low",
+          token_hint: "backup.info via yunque.pack.backup enabled",
+          use_when: ["需要读取备份状态时"],
+          constraints: ["按需展开完整能力说明，不要把完整 manifest 放入模型上下文"],
+          invoke_hint: "sdk:yunque-client/backup",
+        }],
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        generated_at: "2026-05-16T00:00:00Z",
         packs: 0,
         enabled_packs: 0,
         mounted_modules: 0,
@@ -191,6 +208,7 @@ describe("packs-client", () => {
     const plan = await client.planCapabilities(["backup.info", "browser.intent"]);
     const prepare = await client.prepareCapabilities(["backup.info", "browser.intent"]);
     await client.backendModules();
+    const cogniProfile = await client.capabilityCogniProfile();
     const audit = await client.backendRouteAudit();
 
     expect(fetchSpy.mock.calls.map((call) => call[0])).toEqual([
@@ -203,6 +221,7 @@ describe("packs-client", () => {
       "/v1/packs/capabilities/plan?capability=backup.info&capability=browser.intent",
       "/v1/packs/capabilities/prepare?capability=backup.info&capability=browser.intent",
       "/v1/packs/backend-modules",
+      "/v1/packs/capabilities/cogni-profile",
       "/v1/packs/backend-route-audit",
     ]);
     expect(catalog.sources).toEqual(["packs/official", "packs/private"]);
@@ -233,6 +252,9 @@ describe("packs-client", () => {
     expect(summary.prepare?.step_count).toBe(1);
     expect(summary.steps[0]?.action).toBe("download");
     expect(summary.catalog_source_reports[1]?.ok).toBe(false);
+    expect(cogniProfile.entries[0]?.token_hint).toContain("backup.info");
+    expect(cogniProfile.entries[0]?.source_type).toBe("pack");
+    expect(cogniProfile.entries[0]?.invoke_hint).toBe("sdk:yunque-client/backup");
     expect(audit.ok_routes).toBe(0);
   });
 
