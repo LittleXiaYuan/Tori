@@ -33,7 +33,7 @@ var routePattern = regexp.MustCompile(`mux\.HandleFunc\(\s*"([^"]+)"`)
 // `mux.HandleFunc(rt.Path, ...)`. After pack-ification the literal path lives
 // only on the struct field (e.g. the work pack's workflow surface at
 // /v1/workflows*), so scanning for `mux.HandleFunc("...")` alone would miss it.
-// Combined with shouldInclude, this only picks up real /v1·/api·/webhook routes.
+// Combined with shouldInclude, this only picks up real /v1·/api·/mcp·/webhook routes.
 var routeSpecPattern = regexp.MustCompile(`\bPath\s*:\s*"([^"]+)"`)
 
 // routeBuilderPattern matches the compact helper style used by many first-party
@@ -147,7 +147,7 @@ func main() {
 
 // shouldInclude decides whether a registered path is a real JSON API endpoint
 // worth documenting in OpenAPI. We skip the catch-all UI route, static asset
-// prefixes, and any path that doesn't begin with /api, /v1, /webhook, or /healthz.
+// prefixes, and any path that doesn't begin with /api, /v1, /mcp, /webhook, or /healthz.
 func shouldInclude(p string) bool {
 	if p == "" || p == "/" {
 		return false
@@ -155,6 +155,7 @@ func shouldInclude(p string) bool {
 	switch {
 	case strings.HasPrefix(p, "/v1/"),
 		strings.HasPrefix(p, "/api/"),
+		strings.HasPrefix(p, "/mcp/"),
 		strings.HasPrefix(p, "/webhook/"),
 		p == "/healthz":
 		return true

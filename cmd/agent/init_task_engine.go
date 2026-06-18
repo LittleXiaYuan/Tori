@@ -53,6 +53,7 @@ import (
 	innerlifepack "yunque-agent/internal/packs/innerlife"
 	instructionspack "yunque-agent/internal/packs/instructions"
 	knowledgepack "yunque-agent/internal/packs/knowledge"
+	mcpdispatchpack "yunque-agent/internal/packs/mcpdispatch"
 	memorypack "yunque-agent/internal/packs/memory"
 	microagentpack "yunque-agent/internal/packs/microagent"
 	missionspack "yunque-agent/internal/packs/missions"
@@ -197,6 +198,10 @@ func initTaskEngine(
 	// Orchestrator pack — owns /v1/orchestrator/* natively. The daemon/launcher
 	// are wired later by initOrchestrator, so the pack resolves them lazily.
 	_ = gw.RegisterModule(orchestratorpack.New(gw))
+	// MCP Dispatch pack — owns /mcp/v1 plus worker-management routes natively.
+	// It keeps method-sensitive auth inside the pack: probe reads are open,
+	// JSON-RPC writes are authenticated through the host RequireAuth wrapper.
+	_ = gw.RegisterModule(mcpdispatchpack.New(gw))
 
 	// Persona-modes pack — owns /v1/persona/mode* natively (de-shelled from the
 	// gateway monolith). Resolves the mode manager lazily, so order is moot.

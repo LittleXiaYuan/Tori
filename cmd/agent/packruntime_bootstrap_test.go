@@ -137,6 +137,23 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 		t.Fatal("expected IDE Work Orchestrator policy update routeSpec")
 	}
 
+	mcpDispatch, ok := registry.Get("yunque.pack.mcp-dispatch")
+	if !ok {
+		t.Fatal("expected MCP Dispatch builtin pack to be installed")
+	}
+	if mcpDispatch.Status != packruntime.PackStatusEnabled {
+		t.Fatalf("expected MCP Dispatch default enabled, got %s", mcpDispatch.Status)
+	}
+	if mcpDispatch.Manifest.SDK.TypeScript != "yunque-client/mcp-dispatch" {
+		t.Fatalf("unexpected MCP Dispatch SDK import: %s", mcpDispatch.Manifest.SDK.TypeScript)
+	}
+	if !hasRouteSpec(mcpDispatch.Manifest.Backend.RouteSpecs, "POST", "/mcp/v1") {
+		t.Fatal("expected MCP Dispatch JSON-RPC routeSpec")
+	}
+	if !hasRouteSpec(mcpDispatch.Manifest.Backend.RouteSpecs, "GET", "/v1/workers") {
+		t.Fatal("expected MCP Dispatch worker list routeSpec")
+	}
+
 	cost, ok := registry.Get("yunque.pack.cost")
 	if !ok {
 		t.Fatal("expected Cost Governance builtin pack to be installed")
@@ -316,7 +333,7 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 	// Count reflects the current packs/official/ set (incl. the newer
 	// console/control-plane/knowledge/memory/skills/work/workspace packs and the
 	// cognitive-layer/state packs). Adjust if the builtin pack set changes.
-	if got := len(registry.List()); got != 33 {
+	if got := len(registry.List()); got != 34 {
 		t.Fatalf("expected idempotent builtin install, got %d packs", got)
 	}
 }

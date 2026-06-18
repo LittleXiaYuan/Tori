@@ -136,6 +136,13 @@ func (g *Gateway) RegisterBackendPack(module packruntime.BackendModule) {
 	g.registerBackendPack(module)
 }
 
+// RequireAuth exposes the host's normal tenant/JWT/API-key auth wrapper to
+// packs that need custom auth composition (for example method-sensitive MCP
+// dispatch where GET is a probe but POST must be authenticated).
+func (g *Gateway) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
+	return g.requireAuth(next)
+}
+
 // SetHeartbeat attaches a heartbeat service.
 func (g *Gateway) SetHeartbeat(hb *heartbeat.Service) { g.heartbeat = hb }
 
@@ -420,16 +427,9 @@ func (g *Gateway) SetSkillSuggester(s *memory.SkillSuggester) { g.skillSuggester
 // SetReverie attaches the Reverie system for API access.
 func (g *Gateway) SetReverie(r *planner.Reverie) { g.reverie = r }
 
-// SetTaskStore attaches the task persistence store. The MCP dispatch context
-// is also updated so get_pending_tasks / claim_task / report_progress /
-// submit_result / get_task_context see the same store without needing the
-// dispatch server to be rebuilt (registerMCPDispatchRoutes runs during
-// gateway.New, before this setter is invoked in cmd/agent/init_tasks.go).
+// SetTaskStore attaches the task persistence store.
 func (g *Gateway) SetTaskStore(s task.Store) {
 	g.taskStore = s
-	if g.mcpDispatchCtx != nil {
-		g.mcpDispatchCtx.TaskStore = s
-	}
 }
 
 // SetTaskRunner attaches the task execution engine.

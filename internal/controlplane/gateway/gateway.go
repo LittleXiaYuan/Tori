@@ -70,7 +70,6 @@ import (
 	"yunque-agent/internal/execution/sandbox"
 	"yunque-agent/internal/execution/scheduler"
 	reflectpkg "yunque-agent/internal/experimental/reflect"
-	mcpserver "yunque-agent/internal/mcp/server"
 	"yunque-agent/internal/observe"
 	"yunque-agent/internal/orchestrator"
 	"yunque-agent/internal/tori"
@@ -273,14 +272,6 @@ type Gateway struct {
 	documentParser knowledge.DocumentParser
 
 	notifier *notify.Notifier
-
-	// MCP Dispatch Server (work orchestration for external workers).
-	// mcpDispatchCtx is retained so late-bound dependencies (e.g. taskStore
-	// injected via SetTaskStore *after* gateway.New) can be pushed into the
-	// dispatch tools without recreating them — see SetTaskStore.
-	mcpDispatchServer *mcpserver.Server
-	workerRegistry    *mcpserver.WorkerRegistry
-	mcpDispatchCtx    *mcpserver.DispatchContext
 
 	// baseCtx is a long-lived context (the app lifecycle context) used to launch
 	// background daemons from request handlers so they outlive the HTTP request

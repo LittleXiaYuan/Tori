@@ -25,6 +25,7 @@ import (
 	forkspack "yunque-agent/internal/packs/forks"
 	idepack "yunque-agent/internal/packs/ide"
 	knowledgepack "yunque-agent/internal/packs/knowledge"
+	mcpdispatchpack "yunque-agent/internal/packs/mcpdispatch"
 	memorypack "yunque-agent/internal/packs/memory"
 	missionspack "yunque-agent/internal/packs/missions"
 	modespack "yunque-agent/internal/packs/modes"
@@ -71,6 +72,7 @@ var migrationPackPaths = map[string][]string{
 	controlplanepack.PackID:  controlplanepack.Paths,
 	costpack.PackID:          costpack.Paths(),
 	forkspack.PackID:         forkspack.Paths(),
+	mcpdispatchpack.PackID:   mcpdispatchpack.Paths(),
 	notificationspack.PackID: notificationspack.Paths(),
 	orchestratorpack.PackID:  orchestratorpack.Paths(),
 	schedulerpack.PackID:     schedulerpack.Paths(),
@@ -102,6 +104,7 @@ var migrationPackNames = map[string]string{
 	controlplanepack.PackID:  "Control Plane",
 	costpack.PackID:          "Cost",
 	forkspack.PackID:         "Forks",
+	mcpdispatchpack.PackID:   "MCP Dispatch",
 	notificationspack.PackID: "Notifications",
 	orchestratorpack.PackID:  "IDE Work Orchestrator",
 	schedulerpack.PackID:     "Scheduler",
@@ -154,6 +157,7 @@ func registerMigrationPacks(gw *Gateway) {
 	gw.RegisterBackendPack(controlplanepack.NewHandler(gw))
 	_ = gw.RegisterModule(costpack.NewProvider(func() *costtrack.Tracker { return gw.costTracker }))
 	_ = gw.RegisterModule(forkspack.NewProvider(gw.ForkTree, gw.ForkPersister))
+	_ = gw.RegisterModule(mcpdispatchpack.New(gw))
 	_ = gw.RegisterModule(notificationspack.NewProvider(gw.Notifier))
 	_ = gw.RegisterModule(orchestratorpack.New(gw))
 	_ = gw.RegisterModule(schedulerpack.NewProvider(gw.Scheduler))
@@ -220,6 +224,8 @@ func newTestGatewayWithMigrationPack(t *testing.T, packID string, status packrun
 		_ = gw.RegisterModule(costpack.New(nil))
 	case forkspack.PackID:
 		_ = gw.RegisterModule(forkspack.New(nil, nil))
+	case mcpdispatchpack.PackID:
+		_ = gw.RegisterModule(mcpdispatchpack.New(gw))
 	case notificationspack.PackID:
 		_ = gw.RegisterModule(notificationspack.New(nil))
 	case orchestratorpack.PackID:
@@ -250,6 +256,7 @@ func TestMigrationPackRouteGating(t *testing.T) {
 		{"connectors", connectorspack.PackID, "/api/connectors"},
 		{"cost", costpack.PackID, "/v1/cost/summary"},
 		{"forks", forkspack.PackID, "/v1/fork/list"},
+		{"mcp-dispatch", mcpdispatchpack.PackID, "/v1/workers"},
 		{"notifications", notificationspack.PackID, "/api/notify/channels"},
 		{"orchestrator", orchestratorpack.PackID, "/v1/orchestrator/status"},
 		{"scheduler", schedulerpack.PackID, "/v1/scheduler/jobs"},
@@ -277,5 +284,23 @@ func TestMigrationPackRouteGating(t *testing.T) {
 				t.Fatalf("%s disabled+authed: expected 404, got %d", tc.name, wD.Code)
 			}
 		})
+	}
+}
+
+func TestMCPDispatchPackKeepsMethodSensitiveAuth(t *testing.T) {
+	gw, _ := newTestGatewayWithMigrationPack(t, mcpdispatchpack.PackID, packruntime.PackStatusEnabled)
+
+	getReq := httptest.NewRequest(http.MethodGet, "/mcp/v1", nil)
+	getRec := httptest.NewRecorder()
+	gw.ServeHTTP(getRec, getReq)
+	if getRec.Code == http.StatusUnauthorized {
+		t.Fatal("MCP dispatch GET probe must stay unauthenticated")
+	}
+
+	postReq := httptest.NewRequest(http.MethodPost, "/mcp/v1", nil)
+	postRec := httptest.NewRecorder()
+	gw.ServeHTTP(postRec, postReq)
+	if postRec.Code != http.StatusUnauthorized {
+		t.Fatalf("MCP dispatch POST must require auth, got %d", postRec.Code)
 	}
 }

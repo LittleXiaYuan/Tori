@@ -705,6 +705,7 @@ func fallbackBuiltinPackManifestPaths() []string {
 		"packs/official/cost-pack/pack.json",
 		"packs/official/forks-pack/pack.json",
 		"packs/official/inner-life-pack/pack.json",
+		"packs/official/mcp-dispatch-pack/pack.json",
 		"packs/official/night-school-pack/pack.json",
 		"packs/official/experience-pack/pack.json",
 		"packs/official/world-model-pack/pack.json",

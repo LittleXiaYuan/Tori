@@ -1,0 +1,114 @@
+{
+  "id": "yunque.pack.mcp-dispatch",
+  "name": "MCP Dispatch Pack",
+  "version": "0.1.0",
+  "description": "连接外部编码 worker 的 MCP 分派能力包。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": [
+      "mcp.dispatch",
+      "workers.read",
+      "workers.manage",
+      "dispatch.queue",
+      "dispatch.enqueue"
+    ],
+    "routes": [
+      "/mcp/v1",
+      "/v1/workers",
+      "/v1/workers/detail",
+      "/v1/workers/remove",
+      "/v1/dispatch/queue",
+      "/v1/dispatch/enqueue",
+      "/v1/workers/config"
+    ],
+    "permissions": [
+      "mcp:dispatch",
+      "workers:read",
+      "workers:write",
+      "tasks:read",
+      "tasks:write"
+    ],
+    "routeSpecs": [
+      {
+        "method": "GET",
+        "path": "/mcp/v1",
+        "description": "Probe the MCP dispatch endpoint."
+      },
+      {
+        "method": "HEAD",
+        "path": "/mcp/v1",
+        "description": "Probe the MCP dispatch endpoint without a body."
+      },
+      {
+        "method": "OPTIONS",
+        "path": "/mcp/v1",
+        "description": "Probe MCP dispatch endpoint options."
+      },
+      {
+        "method": "POST",
+        "path": "/mcp/v1",
+        "description": "Send authenticated JSON-RPC MCP dispatch requests."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/workers",
+        "description": "List registered external workers."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/workers/detail",
+        "description": "Read one external worker."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/workers/remove",
+        "description": "Remove one external worker."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/dispatch/queue",
+        "description": "Read dispatch queue status."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/dispatch/enqueue",
+        "description": "Enqueue a task for external worker dispatch."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/workers/config",
+        "description": "Generate worker MCP client configuration."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [
+      {
+        "key": "mcp-dispatch",
+        "label": "外部 Worker",
+        "path": "/missions",
+        "icon": "network",
+        "order": 156
+      }
+    ]
+  },
+  "sdk": {
+    "typescript": "yunque-client/mcp-dispatch"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "blueprint": "docs/spec/pack-runtime-blueprint.md",
+    "stage": "native-pack-route-migration",
+    "auth": "MCP probe methods are passthrough; JSON-RPC POST composes host RequireAuth inside the pack.",
+    "descriptionStyle": "one-line-plus-three-examples",
+    "example1": "生成 Cursor / Claude Code / Windsurf 的 MCP 配置。",
+    "example2": "让外部 worker 注册、领取任务、回报进度与结果。",
+    "example3": "从任务系统读取可分派工作，作为云雀与外部 IDE 协作的桥。"
+  },
+  "status": "stable"
+}
