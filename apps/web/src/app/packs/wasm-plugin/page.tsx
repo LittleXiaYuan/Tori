@@ -12,9 +12,11 @@ import {
 } from "@heroui/react";
 import {
   AlertTriangle,
+  CheckCircle2,
   Cpu,
   Download,
   FileCode2,
+  LockKeyhole,
   PackageCheck,
   Play,
   Power,
@@ -56,6 +58,28 @@ function statusTone(status: WASMPluginStatus | null): {
     return { bg: "rgba(250,204,21,0.12)", fg: "#facc15" };
   return { bg: "rgba(239,68,68,0.12)", fg: "#ef4444" };
 }
+
+const userFacingSteps = [
+  {
+    title: "1. 先看能不能接入",
+    body: "校验插件清单、权限、模块 SHA-256 和 Host ABI 请求，先发现风险。",
+  },
+  {
+    title: "2. 再预演远程安装",
+    body: "对 packageUrl、签名、审批、下载缓存、验签和包结构逐段生成计划。",
+  },
+  {
+    title: "3. 最后留证据再放行",
+    body: "导出证据包，明确哪些记录只写在 pack-local，哪些还不能进入真实执行。",
+  },
+];
+
+const boundaryItems = [
+  "不会绕过审批直接安装远程包。",
+  "不会把未验签包解包到 plugin_dir。",
+  "不会在 Host ABI 强执行未就绪时放开特权函数。",
+  "不会把实验链路包装成稳定第三方插件市场。",
+];
 
 function sampleManifest(slug: string) {
   return JSON.stringify(
@@ -692,9 +716,109 @@ export default function WASMPluginPackPage() {
     <div className="page-root space-y-6 animate-fade-in-up">
       <PageHeader icon={<Cpu size={20} />} title="WASM 插件引擎" />
 
+      <Card className="section-card overflow-hidden p-0">
+        <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_340px]">
+          <div className="p-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <Chip
+                size="sm"
+                style={{
+                  background: "rgba(239,68,68,0.10)",
+                  color: "var(--yunque-danger)",
+                }}
+              >
+                高风险实验能力
+              </Chip>
+              <Chip size="sm" variant="soft">
+                远程安装先计划
+              </Chip>
+              <Chip size="sm" variant="soft">
+                沙箱执行先 dry-run
+              </Chip>
+            </div>
+            <div
+              className="mt-3 text-base font-semibold"
+              style={{ color: "var(--yunque-text)" }}
+            >
+              这个能力包现在能做什么
+            </div>
+            <div
+              className="mt-2 max-w-3xl text-sm leading-6"
+              style={{ color: "var(--yunque-text-secondary)" }}
+            >
+              它是第三方 WASM 能力进入云雀前的验收台：先检查插件清单、权限、
+              签名、包结构和 Host ABI 边界，再决定是否继续安装或执行。当前更适合开发者和
+              Pack 作者验证接入链路，不是给普通用户直接下载应用的商店页。
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              {userFacingSteps.map((item) => (
+                <div
+                  key={item.title}
+                  className="rounded-lg p-3"
+                  style={{
+                    background: "var(--yunque-bg-hover)",
+                    border: "1px solid var(--yunque-border)",
+                  }}
+                >
+                  <div
+                    className="text-sm font-medium"
+                    style={{ color: "var(--yunque-text)" }}
+                  >
+                    {item.title}
+                  </div>
+                  <div
+                    className="mt-2 text-xs leading-5"
+                    style={{ color: "var(--yunque-text-muted)" }}
+                  >
+                    {item.body}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div
+            className="p-5"
+            style={{
+              background: "rgba(239,68,68,0.06)",
+              borderLeft: "1px solid var(--yunque-border)",
+            }}
+          >
+            <div
+              className="mb-3 flex items-center gap-2 text-sm font-semibold"
+              style={{ color: "var(--yunque-text)" }}
+            >
+              <LockKeyhole size={16} style={{ color: "var(--yunque-danger)" }} />
+              当前不会做什么
+            </div>
+            <div className="space-y-2">
+              {boundaryItems.map((item) => (
+                <div
+                  key={item}
+                  className="flex gap-2 text-xs leading-5"
+                  style={{ color: "var(--yunque-text-secondary)" }}
+                >
+                  <CheckCircle2
+                    size={13}
+                    className="mt-0.5 shrink-0"
+                    style={{ color: "var(--yunque-success)" }}
+                  />
+                  <span>{item}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </Card>
+
       <Card className="section-card p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
+            <div
+              className="mb-3 text-sm font-semibold"
+              style={{ color: "var(--yunque-text)" }}
+            >
+              技术状态
+            </div>
             <div className="mb-1 flex items-center gap-2">
               <Chip size="sm" style={{ background: tone.bg, color: tone.fg }}>
                 {status?.abi_ready
@@ -804,8 +928,22 @@ export default function WASMPluginPackPage() {
                 {status?.pack_id || "yunque.pack.wasm-plugin"}
               </span>
             </div>
-            <div
-              className="text-sm"
+            <details
+              className="mt-3 rounded-lg p-3 text-sm"
+              style={{
+                background: "var(--yunque-bg-hover)",
+                border: "1px solid var(--yunque-border)",
+                color: "var(--yunque-text-muted)",
+              }}
+            >
+              <summary
+                className="cursor-pointer font-medium"
+                style={{ color: "var(--yunque-text)" }}
+              >
+                查看技术链路详情
+              </summary>
+              <div
+                className="mt-3 leading-6"
               style={{ color: "var(--yunque-text-muted)" }}
             >
               当前切片先把 WASM 插件注册、load/unload 生命周期、沙箱执行
@@ -833,7 +971,8 @@ export default function WASMPluginPackPage() {
               继续保持 remote_install_ready=false / installer_ready=false /
               installer_blocked_until_registration=true。 后续 install
               写回、插件注册、Host ABI 权限强执行和 TinyGo 示例会继续接入。
-            </div>
+              </div>
+            </details>
           </div>
           <Button size="sm" variant="ghost" onPress={load}>
             <RefreshCw size={14} />
