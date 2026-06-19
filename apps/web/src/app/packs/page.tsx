@@ -213,8 +213,11 @@ function privateSourceLabel(entry: PackCatalogEntry): string {
 
 function packStudioHref(manifest: PackManifest, options?: { packageUrl?: string; sha256?: string }): string {
   const readiness = packReadiness(manifest);
+  const delivery = packDeliveryProfile(manifest);
   const gap = readiness.missing.length > 0
     ? `重点补齐：${readiness.missing.join("、")}。`
+    : delivery.level === "plan_only"
+      ? "重点把实验/计划边界讲清楚：不要伪装成稳定执行能力，补齐真实结果、限制、验证和回滚说明。"
     : "继续打磨更具体的用户场景和入口反馈。";
   const goal = `让 ${manifest.name} 更像一个用户能直接理解和使用的能力包，${gap}补齐用途、入口、权限说明和可回滚改造建议。`;
   const params = new URLSearchParams({
@@ -243,10 +246,12 @@ function buildBatchReadinessPrompt(
       "不要自动应用改动。",
       "每个包先给独立 Patch Draft Request，再回到 Pack Studio 只读检查、准备工作区、预览 diff、运行审计、重新打包和复检 SHA。",
       "缺后端能力声明时，不要伪造能力；如果需要新增 routeSpecs、权限或源码测试，请明确列为待办。",
-      "实验能力不能包装成稳定承诺，高风险权限必须保留授权和回滚说明。",
+      "实验/计划型能力不能包装成稳定承诺，高风险权限必须保留授权和回滚说明。",
+      "如果交付状态是实验/计划，优先补真实结果位置、限制说明、验证步骤和后续转稳定的最小待办。",
     ],
     packs: items.map((item) => {
       const readiness = packReadiness(item.manifest);
+      const delivery = packDeliveryProfile(item.manifest);
       return {
         id: item.manifest.id,
         name: item.manifest.name,
@@ -255,6 +260,12 @@ function buildBatchReadinessPrompt(
         source: item.sourceLabel,
         missing: readiness.missing,
         readiness: readiness.label,
+        delivery: {
+          level: delivery.level,
+          label: delivery.label,
+          description: delivery.description,
+          next_step: delivery.nextStep,
+        },
         studio_url: packStudioHref(item.manifest, { packageUrl: item.packageUrl, sha256: item.sha256 }),
         package_url: item.packageUrl,
         sha256: item.sha256,
@@ -428,13 +439,21 @@ export default function PacksPageOptimized() {
         });
       }
     }
-    const order = { needs_entry: 0, needs_context: 1, complete: 2 } as const;
+    const readinessOrder = { needs_entry: 0, needs_context: 1, complete: 2 } as const;
+    const deliveryOrder = { needs_meat: 0, plan_only: 1, support: 2, ready: 3 } as const;
     return [...seen.values()]
-      .filter((item) => packReadiness(item.manifest).missing.length > 0)
+      .filter((item) => {
+        const readiness = packReadiness(item.manifest);
+        const delivery = packDeliveryProfile(item.manifest);
+        return readiness.missing.length > 0 || delivery.level === "needs_meat" || delivery.level === "plan_only";
+      })
       .sort((a, b) => {
         const ra = packReadiness(a.manifest);
         const rb = packReadiness(b.manifest);
-        return order[ra.level] - order[rb.level]
+        const da = packDeliveryProfile(a.manifest);
+        const db = packDeliveryProfile(b.manifest);
+        return deliveryOrder[da.level] - deliveryOrder[db.level]
+          || readinessOrder[ra.level] - readinessOrder[rb.level]
           || rb.missing.length - ra.missing.length
           || a.manifest.name.localeCompare(b.manifest.name);
       });
@@ -575,7 +594,7 @@ export default function PacksPageOptimized() {
   const copyBatchReadinessPrompt = async () => {
     if (readinessQueue.length === 0) return;
     await navigator.clipboard?.writeText(batchReadinessPrompt);
-    showToast("已复制批量补肉任务", "success");
+    showToast("已复制批量打磨任务", "success");
   };
 
   const run = async (label: string, op: () => Promise<unknown>, successMsg = "操作成功") => {
@@ -789,11 +808,11 @@ export default function PacksPageOptimized() {
               }}
             >
               <div className="flex items-center justify-between gap-2">
-                <span className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>优先补肉</span>
+                <span className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>优先打磨</span>
                 <span className="text-lg font-semibold" style={{ color: "var(--yunque-danger)" }}>{readinessQueueTotal}</span>
               </div>
               <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
-                从缺入口、缺说明的包开始，交给小羽逐包补用途、示例、入口和回滚说明。
+                从缺入口、实验计划和不易验证的包开始，交给小羽逐包补用途、结果、入口和回滚说明。
               </div>
             </button>
           </div>
@@ -817,7 +836,7 @@ export default function PacksPageOptimized() {
                   setSortMode("readiness");
                 }}
               >
-                查看补肉队列 <ArrowRight size={14} />
+                查看打磨队列 <ArrowRight size={14} />
               </Button>
             </a>
           </div>
@@ -898,7 +917,7 @@ export default function PacksPageOptimized() {
               <div>
                 <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>补肉优先队列</div>
                 <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
-                  按体检缺口自动挑出最需要小羽补用途、入口、示例或能力边界的能力包。当前第 {currentReadinessQueuePage} / {readinessQueuePageCount} 批，展示 {readinessQueue.length} 个，共 {readinessQueueTotal} 个待补肉。
+                  按体检缺口和交付状态自动挑出最需要小羽补用途、入口、示例、真实结果或能力边界的能力包。当前第 {currentReadinessQueuePage} / {readinessQueuePageCount} 批，展示 {readinessQueue.length} 个，共 {readinessQueueTotal} 个待打磨。
                 </div>
               </div>
               <Button size="sm" variant="outline" onPress={() => {
@@ -908,7 +927,7 @@ export default function PacksPageOptimized() {
                 只看需补入口
               </Button>
               <Button size="sm" variant="outline" onPress={copyBatchReadinessPrompt}>
-                复制批量补肉任务
+                复制批量打磨任务
               </Button>
               <Link href={batchReadinessStudioHref}>
                 <Button size="sm" variant="outline">
@@ -917,13 +936,18 @@ export default function PacksPageOptimized() {
               </Link>
               <Link href={batchReadinessChatHref}>
                 <Button size="sm" className="btn-accent">
-                  交给 Chat 批量补肉 <ArrowRight size={14} />
+                  交给 Chat 批量打磨 <ArrowRight size={14} />
                 </Button>
               </Link>
             </div>
             <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
               {readinessQueue.map((item) => {
                 const readiness = packReadiness(item.manifest);
+                const delivery = packDeliveryProfile(item.manifest);
+                const deliveryStyle = deliveryToneStyle(delivery.tone);
+                const queueReason = readiness.missing.length > 0
+                  ? `还缺：${readiness.missing.join("、")}`
+                  : `交付状态：${delivery.label}。${delivery.nextStep}`;
                 return (
                   <div key={item.manifest.id} className="rounded-md border p-3" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-surface)" }}>
                     <div className="flex items-start justify-between gap-2">
@@ -931,10 +955,13 @@ export default function PacksPageOptimized() {
                         <div className="truncate text-sm font-medium" style={{ color: "var(--yunque-text)" }}>{item.manifest.name}</div>
                         <div className="mt-1 truncate text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>{item.sourceLabel}</div>
                       </div>
-                      <Chip size="sm" color={readiness.level === "needs_entry" ? "danger" : "warning"}>{readiness.label}</Chip>
+                      <div className="flex shrink-0 flex-wrap justify-end gap-1">
+                        <Chip size="sm" color={readiness.level === "needs_entry" ? "danger" : readiness.level === "needs_context" ? "warning" : "success"}>{readiness.label}</Chip>
+                        <Chip size="sm" style={{ background: deliveryStyle.background, color: deliveryStyle.color }}>{delivery.label}</Chip>
+                      </div>
                     </div>
                     <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
-                      还缺：{readiness.missing.join("、")}
+                      {queueReason}
                     </div>
                     <div className="mt-2">
                       <Link href={packStudioHref(item.manifest, { packageUrl: item.packageUrl, sha256: item.sha256 })}>

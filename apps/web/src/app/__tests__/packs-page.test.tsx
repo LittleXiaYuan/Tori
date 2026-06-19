@@ -164,6 +164,25 @@ const alphaManifest = {
   status: "alpha",
 };
 
+const planOnlyManifest = {
+  ...filesManifest,
+  id: "yunque.pack.plan-only",
+  name: "Plan Only Pack",
+  status: "alpha",
+  description: "实验能力：当前只生成计划，不执行真实控制。",
+  metadata: {
+    ...filesManifest.metadata,
+    usability: "experimental",
+    primaryActionLabel: "查看计划",
+    primaryActionPath: "/packs/plan-only",
+    usageSurface: "计划页、证据区和人工审批提示",
+    example1: "生成一个需要人工确认的执行计划。",
+    example2: "查看计划为什么还不能自动执行。",
+    example3: "导出证据和后续转稳定待办。",
+    limitation: "当前只生成计划，不执行真实控制。",
+  },
+};
+
 describe("PacksPageOptimized", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -203,8 +222,8 @@ describe("PacksPageOptimized", () => {
     expect(screen.getByText("可直接使用")).toBeInTheDocument();
     expect(screen.getByText("基础能力")).toBeInTheDocument();
     expect(screen.getByText("实验中")).toBeInTheDocument();
-    expect(screen.getByText("优先补肉")).toBeInTheDocument();
-    expect(screen.getByText("从缺入口、缺说明的包开始，交给小羽逐包补用途、示例、入口和回滚说明。")).toBeInTheDocument();
+    expect(screen.getByText("优先打磨")).toBeInTheDocument();
+    expect(screen.getByText("从缺入口、实验计划和不易验证的包开始，交给小羽逐包补用途、结果、入口和回滚说明。")).toBeInTheDocument();
     expect(screen.getByText("交付状态分布")).toBeInTheDocument();
     expect(screen.getByText("可直接交付")).toBeInTheDocument();
     expect(screen.getAllByText("后台支撑").length).toBeGreaterThan(0);
@@ -369,15 +388,15 @@ describe("PacksPageOptimized", () => {
     expect(screen.getByText("补肉优先队列").closest("#readiness-queue")).not.toBeNull();
     expect(screen.getByText("能力包体检总览")).toBeInTheDocument();
     expect(screen.getByText("已体检 3 个能力包，按用途说明、用户能感知的位置、入口和后端能力声明判断是否需要补肉。")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /优先补肉2/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /优先打磨2/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /说明完整1/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /需补说明1/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /需补入口1/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /查看补肉队列/ })).toBeInTheDocument();
-    expect(screen.getByText("按体检缺口自动挑出最需要小羽补用途、入口、示例或能力边界的能力包。当前第 1 / 1 批，展示 2 个，共 2 个待补肉。")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /查看打磨队列/ })).toBeInTheDocument();
+    expect(screen.getByText("按体检缺口和交付状态自动挑出最需要小羽补用途、入口、示例、真实结果或能力边界的能力包。当前第 1 / 1 批，展示 2 个，共 2 个待打磨。")).toBeInTheDocument();
     expect(screen.getByText("还缺：使用示例、用户感知位置、打开/使用入口、后端能力声明")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "复制批量补肉任务" })).toBeInTheDocument();
-    const batchChatLink = screen.getByRole("link", { name: /交给 Chat 批量补肉/ });
+    expect(screen.getByRole("button", { name: "复制批量打磨任务" })).toBeInTheDocument();
+    const batchChatLink = screen.getByRole("link", { name: /交给 Chat 批量打磨/ });
     expect(batchChatLink).toHaveAttribute("href", expect.stringContaining("/chat?q="));
     const batchPrompt = new URL(batchChatLink.getAttribute("href")!, "http://localhost").searchParams.get("q") || "";
     expect(batchPrompt).toContain("yunque.pack_studio.batch_draft_request.v1");
@@ -386,6 +405,7 @@ describe("PacksPageOptimized", () => {
     expect(batchPrompt).toContain("不要自动应用改动");
     expect(batchPrompt).toContain("预览 diff");
     expect(batchPrompt).toContain("studio_url");
+    expect(batchPrompt).toContain("\"delivery\"");
     const batchStudioLink = screen.getByRole("link", { name: /导入 Studio 逐包处理/ });
     expect(batchStudioLink).toHaveAttribute("href", expect.stringContaining("/packs/studio?batch="));
     const batchStudioPrompt = new URL(batchStudioLink.getAttribute("href")!, "http://localhost").searchParams.get("batch") || "";
@@ -403,7 +423,7 @@ describe("PacksPageOptimized", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "清除体检" }));
 
-    fireEvent.click(screen.getByRole("button", { name: /优先补肉2/ }));
+    fireEvent.click(screen.getByRole("button", { name: /优先打磨2/ }));
 
     expect(screen.getAllByText("Needs Entry Pack").length).toBeGreaterThan(0);
     expect(screen.queryByText("Documents (文档生成)")).not.toBeInTheDocument();
@@ -444,7 +464,7 @@ describe("PacksPageOptimized", () => {
     expect(await screen.findByText("补肉优先队列")).toBeInTheDocument();
     const queue = screen.getByText("补肉优先队列").closest("#readiness-queue");
     expect(queue).not.toBeNull();
-    expect(screen.getByText("按体检缺口自动挑出最需要小羽补用途、入口、示例或能力边界的能力包。当前第 1 / 2 批，展示 6 个，共 8 个待补肉。")).toBeInTheDocument();
+    expect(screen.getByText("按体检缺口和交付状态自动挑出最需要小羽补用途、入口、示例、真实结果或能力边界的能力包。当前第 1 / 2 批，展示 6 个，共 8 个待打磨。")).toBeInTheDocument();
     expect(screen.getByText("补肉队列 · 第 1 / 2 页 · 共 8 个")).toBeInTheDocument();
     expect(within(queue as HTMLElement).getByText("Needs Entry Pack 1")).toBeInTheDocument();
     expect(within(queue as HTMLElement).getByText("Needs Entry Pack 6")).toBeInTheDocument();
@@ -462,7 +482,7 @@ describe("PacksPageOptimized", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "下一页" }));
 
-    expect(screen.getByText("按体检缺口自动挑出最需要小羽补用途、入口、示例或能力边界的能力包。当前第 2 / 2 批，展示 2 个，共 8 个待补肉。")).toBeInTheDocument();
+    expect(screen.getByText("按体检缺口和交付状态自动挑出最需要小羽补用途、入口、示例、真实结果或能力边界的能力包。当前第 2 / 2 批，展示 2 个，共 8 个待打磨。")).toBeInTheDocument();
     expect(within(queue as HTMLElement).getByText("Needs Entry Pack 7")).toBeInTheDocument();
     expect(within(queue as HTMLElement).getByText("Needs Entry Pack 8")).toBeInTheDocument();
     expect(within(queue as HTMLElement).queryByText("Needs Entry Pack 1")).not.toBeInTheDocument();
@@ -476,6 +496,30 @@ describe("PacksPageOptimized", () => {
     expect(secondBatch).toContain("\"total\": 8");
   });
 
+  it("puts complete experimental packs into the Xiaoyu polishing queue", async () => {
+    packsClientMock.installed.mockResolvedValueOnce({
+      packs: [
+        { manifest: documentsManifest, status: "enabled", updatedAt: "2026-06-19T00:00:00Z" },
+        { manifest: planOnlyManifest, status: "disabled", updatedAt: "2026-06-19T00:00:00Z" },
+      ],
+      count: 2,
+    });
+
+    render(<PacksPageOptimized />);
+
+    expect((await screen.findAllByText("Plan Only Pack")).length).toBeGreaterThan(0);
+    expect(screen.getByText("补肉优先队列")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /优先打磨1/ })).toBeInTheDocument();
+    expect(screen.getByText("交付状态：实验/计划。先保留限制说明；如果要变成主路径，下一轮补真实执行、结果查看和回滚证据。")).toBeInTheDocument();
+
+    const batchChatLink = screen.getByRole("link", { name: /交给 Chat 批量打磨/ });
+    const batchPrompt = new URL(batchChatLink.getAttribute("href")!, "http://localhost").searchParams.get("q") || "";
+    expect(batchPrompt).toContain("yunque.pack.plan-only");
+    expect(batchPrompt).toContain("\"level\": \"plan_only\"");
+    expect(batchPrompt).toContain("真实结果位置");
+    expect(batchPrompt).toContain("不能包装成稳定承诺");
+  });
+
   it("filters packs by stability so users can avoid experimental packs", async () => {
     packsClientMock.installed.mockResolvedValueOnce({
       packs: [
@@ -487,12 +531,12 @@ describe("PacksPageOptimized", () => {
 
     render(<PacksPageOptimized />);
 
-    expect(await screen.findByText("Alpha Pack")).toBeInTheDocument();
+    expect((await screen.findAllByText("Alpha Pack")).length).toBeGreaterThan(0);
     expect(screen.getByText("Documents (文档生成)")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /实验中1/ }));
 
-    expect(screen.getByText("Alpha Pack")).toBeInTheDocument();
+    expect(screen.getAllByText("Alpha Pack").length).toBeGreaterThan(0);
     expect(screen.queryByText("Documents (文档生成)")).not.toBeInTheDocument();
     expect(screen.getByText("类型：实验中")).toBeInTheDocument();
     expect(screen.getByText("稳定性：开发中")).toBeInTheDocument();
@@ -502,13 +546,13 @@ describe("PacksPageOptimized", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "开发中" }));
 
-    expect(screen.getByText("Alpha Pack")).toBeInTheDocument();
+    expect(screen.getAllByText("Alpha Pack").length).toBeGreaterThan(0);
     expect(screen.queryByText("Documents (文档生成)")).not.toBeInTheDocument();
     expect(screen.getByText("稳定性：开发中")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "清除稳定性" }));
 
-    expect(screen.getByText("Alpha Pack")).toBeInTheDocument();
+    expect(screen.getAllByText("Alpha Pack").length).toBeGreaterThan(0);
     expect(screen.getByText("Documents (文档生成)")).toBeInTheDocument();
   });
 
