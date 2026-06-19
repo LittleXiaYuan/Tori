@@ -1,0 +1,77 @@
+{
+  "id": "yunque.pack.tori",
+  "name": "Tori 账号绑定",
+  "version": "0.1.0",
+  "description": "Tori 账号绑定、连接状态、健康检查与用量查询能力。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": [
+      "tori.bind",
+      "tori.status",
+      "tori.unbind",
+      "tori.health",
+      "tori.usage"
+    ],
+    "routes": [
+      "/v1/tori/bind",
+      "/v1/tori/status",
+      "/v1/tori/unbind",
+      "/v1/tori/health",
+      "/v1/tori/usage"
+    ],
+    "permissions": [
+      "tori:read",
+      "tori:write",
+      "network:public"
+    ],
+    "routeSpecs": [
+      {
+        "method": "POST",
+        "path": "/v1/tori/bind",
+        "description": "Start the OAuth2 PKCE flow to bind a Tori account."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/tori/status",
+        "description": "Read the current Tori binding status."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/tori/unbind",
+        "description": "Remove the current Tori binding."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/tori/health",
+        "description": "Check the bound Tori instance health."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/tori/usage",
+        "description": "Fetch usage summary from the bound Tori instance."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [],
+    "assets": {
+      "type": "builtin"
+    }
+  },
+  "sdk": {
+    "typescript": "yunque-client/tori"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "group": "integration",
+    "phase": "A4",
+    "preload": "true",
+    "note": "Natively owns /v1/tori/* account binding routes through Pack Runtime while preserving OAuth, SSRF guard and health/usage semantics."
+  },
+  "status": "beta"
+}

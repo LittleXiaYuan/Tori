@@ -47,6 +47,7 @@ func TestDiscoverBuiltinPackManifestPaths(t *testing.T) {
 		"packs/official/cogni-console-pack/pack.json",
 		"packs/official/workspace-pack/pack.json",
 		"packs/official/subagents-pack/pack.json",
+		"packs/official/tori-pack/pack.json",
 		"packs/official/trace-pack/pack.json",
 	}
 	for _, w := range want {

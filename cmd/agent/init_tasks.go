@@ -738,6 +738,7 @@ func fallbackBuiltinPackManifestPaths() []string {
 		"packs/official/sbom-drift-pack/pack.json",
 		"packs/official/skill-anomaly-pack/pack.json",
 		"packs/official/subagents-pack/pack.json",
+		"packs/official/tori-pack/pack.json",
 		"packs/official/trace-pack/pack.json",
 		"packs/official/wasm-plugin-pack/pack.json",
 	}

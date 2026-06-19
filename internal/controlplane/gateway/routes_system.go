@@ -113,12 +113,8 @@ func (g *Gateway) registerSystemRoutes() {
 	g.mux.HandleFunc("/v1/config/reload", g.requireAuth(g.handleConfigReload))
 	g.mux.HandleFunc("/api/settings/detect-dirs", g.requireAuth(g.handleDetectDirs))
 
-	// Tori Integration (OAuth2 bind/unbind + health/usage)
-	g.mux.HandleFunc("/v1/tori/bind", g.requireAuth(g.handleToriBind))
-	g.mux.HandleFunc("/v1/tori/status", g.requireAuth(g.handleToriStatus))
-	g.mux.HandleFunc("/v1/tori/unbind", g.requireAuth(g.handleToriUnbind))
-	g.mux.HandleFunc("/v1/tori/health", g.requireAuth(g.handleToriHealth))
-	g.mux.HandleFunc("/v1/tori/usage", g.requireAuth(g.handleToriUsage))
+	// Tori integration (/v1/tori*) is owned by the Tori pack
+	// (internal/packs/tori), mounted via gw.RegisterModule.
 
 	// File upload
 	g.mux.HandleFunc("/v1/upload", g.requireAuth(g.handleFileUpload))

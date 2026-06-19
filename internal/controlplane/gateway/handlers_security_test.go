@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"yunque-agent/internal/agentcore/knowledge"
+	toripack "yunque-agent/internal/packs/tori"
 )
 
 // safeResolve and handleFileDownload security tests moved to the files pack
@@ -76,7 +77,7 @@ func TestValidateSSRFTargetRejectsPrivateTargets(t *testing.T) {
 // ── Test 12: Tori bind URL uses the shared SSRF guard ──
 
 func TestValidateToriURLRejectsMetadataTarget(t *testing.T) {
-	if _, err := validateToriURL("http://169.254.169.254/latest/meta-data/"); err == nil {
+	if _, err := toripack.ValidateToriURL("http://169.254.169.254/latest/meta-data/"); err == nil {
 		t.Fatal("expected metadata Tori URL to be rejected")
 	}
 }

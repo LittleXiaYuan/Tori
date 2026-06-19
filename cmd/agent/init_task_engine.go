@@ -80,6 +80,7 @@ import (
 	speechpack "yunque-agent/internal/packs/speech"
 	statepack "yunque-agent/internal/packs/state"
 	subagentspack "yunque-agent/internal/packs/subagents"
+	toripack "yunque-agent/internal/packs/tori"
 	tracepack "yunque-agent/internal/packs/trace"
 	triggerspack "yunque-agent/internal/packs/triggers"
 	workpack "yunque-agent/internal/packs/work"
@@ -292,6 +293,9 @@ func initTaskEngine(
 	// Trace pack — owns /v1/trace* natively while preserving user-safe summaries
 	// and raw audit mode through a narrow EventTrail accessor.
 	_ = gw.RegisterModule(tracepack.New(gw))
+	// Tori pack — owns /v1/tori/* natively. OAuth bind/unbind, status and
+	// health/usage calls keep the original SSRF guard and token-store semantics.
+	_ = gw.RegisterModule(toripack.New(gw))
 
 	// Inner Life pack — exposes the soul-layer outputs (curiosity / reflection /
 	// dreaming) over a read-only HTTP surface. Registered here because the

@@ -607,11 +607,28 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 		t.Fatal("expected Planner Recovery resume-plan routeSpec")
 	}
 
+	toriPack, ok := registry.Get("yunque.pack.tori")
+	if !ok {
+		t.Fatal("expected Tori builtin pack to be installed")
+	}
+	if toriPack.Status != packruntime.PackStatusEnabled {
+		t.Fatalf("expected Tori default enabled, got %s", toriPack.Status)
+	}
+	if toriPack.Manifest.SDK.TypeScript != "yunque-client/tori" {
+		t.Fatalf("unexpected Tori SDK import: %s", toriPack.Manifest.SDK.TypeScript)
+	}
+	if !hasRouteSpec(toriPack.Manifest.Backend.RouteSpecs, "POST", "/v1/tori/bind") {
+		t.Fatal("expected Tori bind routeSpec")
+	}
+	if !hasRouteSpec(toriPack.Manifest.Backend.RouteSpecs, "GET", "/v1/tori/status") {
+		t.Fatal("expected Tori status routeSpec")
+	}
+
 	ensureBuiltinPacks(registry)
 	// Count reflects the current packs/official/ set (incl. the newer
 	// console/control-plane/knowledge/memory/skills/work/workspace packs and the
 	// cognitive-layer/state packs). Adjust if the builtin pack set changes.
-	if got := len(registry.List()); got != 50 {
+	if got := len(registry.List()); got != 51 {
 		t.Fatalf("expected idempotent builtin install, got %d packs", got)
 	}
 }
