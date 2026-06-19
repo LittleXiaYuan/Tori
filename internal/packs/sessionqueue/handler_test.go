@@ -58,14 +58,27 @@ func TestQueueNilManagerPreservesEmptySummary(t *testing.T) {
 }
 
 func TestQueueListSnapshotAndCancel(t *testing.T) {
+	started := make(chan struct{})
+	release := make(chan struct{})
 	qm := session.NewQueueManager(func(ctx context.Context, entry *session.TaskEntry) (string, error) {
+		if entry.ID == "task-1" {
+			close(started)
+			<-release
+		}
 		return "ok", nil
 	}, 10)
-	defer qm.Shutdown()
+	defer func() {
+		close(release)
+		qm.Shutdown()
+	}()
 
 	if err := qm.Enqueue(&session.TaskEntry{ID: "task-1", SessionID: "session-a", Prompt: "do it"}); err != nil {
 		t.Fatalf("enqueue: %v", err)
 	}
+	if err := qm.Enqueue(&session.TaskEntry{ID: "task-2", SessionID: "session-a", Prompt: "do it next"}); err != nil {
+		t.Fatalf("enqueue second task: %v", err)
+	}
+	<-started
 	h := NewProvider(func() *session.QueueManager { return qm })
 
 	listRec := httptest.NewRecorder()
@@ -92,12 +105,13 @@ func TestQueueListSnapshotAndCancel(t *testing.T) {
 	if err := json.Unmarshal(snapshotRec.Body.Bytes(), &snapshotBody); err != nil {
 		t.Fatalf("decode snapshot: %v", err)
 	}
-	if snapshotBody.SessionID != "session-a" || len(snapshotBody.Tasks) != 1 || snapshotBody.Tasks[0].ID != "task-1" {
+	if snapshotBody.SessionID != "session-a" || len(snapshotBody.Tasks) != 2 ||
+		snapshotBody.Tasks[0].ID != "task-1" || snapshotBody.Tasks[1].ID != "task-2" {
 		t.Fatalf("unexpected snapshot: %#v", snapshotBody)
 	}
 
 	cancelRec := httptest.NewRecorder()
-	h.Cancel(cancelRec, httptest.NewRequest(http.MethodPost, "/v1/sessions/queue/cancel", strings.NewReader(`{"session_id":"session-a","task_id":"task-1"}`)))
+	h.Cancel(cancelRec, httptest.NewRequest(http.MethodPost, "/v1/sessions/queue/cancel", strings.NewReader(`{"session_id":"session-a","task_id":"task-2"}`)))
 	if cancelRec.Code != http.StatusOK {
 		t.Fatalf("cancel status=%d body=%s", cancelRec.Code, cancelRec.Body.String())
 	}
