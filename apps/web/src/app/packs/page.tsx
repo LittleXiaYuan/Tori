@@ -63,7 +63,8 @@ type KindFilter = "all" | "actionable" | "infrastructure" | "experimental";
 type InstallFilter = "all" | "installed" | "enabled" | "disabled" | "available";
 type RiskFilter = "all" | "low" | "medium" | "high";
 type SourceFilter = "all" | "installed" | "official" | "private";
-type SortMode = "name" | "kind" | "risk" | "status";
+type ReadinessFilter = "all" | "complete" | "needs_context" | "needs_entry";
+type SortMode = "name" | "kind" | "risk" | "readiness" | "status";
 
 const KIND_FILTER_LABELS: Record<KindFilter, string> = {
   all: "全部类型",
@@ -90,10 +91,17 @@ const SOURCE_FILTER_LABELS: Record<SourceFilter, string> = {
   official: "官方源",
   private: "私有源",
 };
+const READINESS_FILTER_LABELS: Record<ReadinessFilter, string> = {
+  all: "全部体检",
+  complete: "说明完整",
+  needs_context: "需补说明",
+  needs_entry: "需补入口",
+};
 const SORT_MODE_LABELS: Record<SortMode, string> = {
   name: "按名称",
   kind: "按类型",
   risk: "按风险",
+  readiness: "按体检",
   status: "按阶段",
 };
 
@@ -168,11 +176,13 @@ function packSearchText(manifest: PackManifest): string {
 function sortPacks<T>(items: T[], manifestOf: (item: T) => PackManifest, sortMode: SortMode): T[] {
   const riskOrder = { high: 0, medium: 1, low: 2 } as const;
   const kindOrder = { actionable: 0, infrastructure: 1, experimental: 2, documented: 3 } as const;
+  const readinessOrder = { needs_entry: 0, needs_context: 1, complete: 2 } as const;
   return [...items].sort((a, b) => {
     const ma = manifestOf(a);
     const mb = manifestOf(b);
     if (sortMode === "risk") return riskOrder[riskProfileForPack(ma).level] - riskOrder[riskProfileForPack(mb).level] || ma.name.localeCompare(mb.name);
     if (sortMode === "kind") return kindOrder[packUsability(ma).kind] - kindOrder[packUsability(mb).kind] || ma.name.localeCompare(mb.name);
+    if (sortMode === "readiness") return readinessOrder[packReadiness(ma).level] - readinessOrder[packReadiness(mb).level] || ma.name.localeCompare(mb.name);
     if (sortMode === "status") return String(ma.status || "").localeCompare(String(mb.status || "")) || ma.name.localeCompare(mb.name);
     return ma.name.localeCompare(mb.name);
   });
@@ -258,6 +268,7 @@ export default function PacksPageOptimized() {
   const [installFilter, setInstallFilter] = useState<InstallFilter>("all");
   const [riskFilter, setRiskFilter] = useState<RiskFilter>("all");
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
+  const [readinessFilter, setReadinessFilter] = useState<ReadinessFilter>("all");
   const [sortMode, setSortMode] = useState<SortMode>("name");
   const [installedPage, setInstalledPage] = useState(1);
   const [releasePage, setReleasePage] = useState(1);
@@ -285,6 +296,7 @@ export default function PacksPageOptimized() {
   const matchesFilters = (manifest: PackManifest, options?: { installedStatus?: string; source: SourceFilter }) => {
     const usability = packUsability(manifest);
     const risk = riskProfileForPack(manifest);
+    const readiness = packReadiness(manifest);
     if (normalizedQuery && !packSearchText(manifest).includes(normalizedQuery)) return false;
     if (kindFilter !== "all") {
       if (kindFilter === "infrastructure") {
@@ -295,6 +307,7 @@ export default function PacksPageOptimized() {
     }
     if (riskFilter !== "all" && risk.level !== riskFilter) return false;
     if (sourceFilter !== "all" && options?.source !== sourceFilter) return false;
+    if (readinessFilter !== "all" && readiness.level !== readinessFilter) return false;
     if (installFilter === "installed" && !options?.installedStatus) return false;
     if (installFilter === "enabled" && options?.installedStatus !== "enabled") return false;
     if (installFilter === "disabled" && options?.installedStatus !== "disabled") return false;
@@ -307,7 +320,7 @@ export default function PacksPageOptimized() {
       (pack) => pack.manifest,
       sortMode,
     ),
-    [packs, normalizedQuery, kindFilter, installFilter, riskFilter, sourceFilter, sortMode],
+    [packs, normalizedQuery, kindFilter, installFilter, riskFilter, sourceFilter, readinessFilter, sortMode],
   );
   const filteredReleaseEntries = useMemo(
     () => sortPacks(
@@ -315,7 +328,7 @@ export default function PacksPageOptimized() {
       (entry) => entry.manifest,
       sortMode,
     ),
-    [releaseEntries, normalizedQuery, kindFilter, installFilter, riskFilter, sourceFilter, sortMode],
+    [releaseEntries, normalizedQuery, kindFilter, installFilter, riskFilter, sourceFilter, readinessFilter, sortMode],
   );
   const filteredPrivateCatalogEntries = useMemo(
     () => sortPacks(
@@ -323,7 +336,7 @@ export default function PacksPageOptimized() {
       (entry) => entry.manifest,
       sortMode,
     ),
-    [privateCatalogEntries, normalizedQuery, kindFilter, installFilter, riskFilter, sourceFilter, sortMode],
+    [privateCatalogEntries, normalizedQuery, kindFilter, installFilter, riskFilter, sourceFilter, readinessFilter, sortMode],
   );
   const totalMatches = filteredInstalledPacks.length + filteredReleaseEntries.length + filteredPrivateCatalogEntries.length;
   const installedPageCount = pageCountFor(filteredInstalledPacks.length);
@@ -340,7 +353,7 @@ export default function PacksPageOptimized() {
     setInstalledPage(1);
     setReleasePage(1);
     setPrivatePage(1);
-  }, [normalizedQuery, kindFilter, installFilter, riskFilter, sourceFilter, sortMode]);
+  }, [normalizedQuery, kindFilter, installFilter, riskFilter, sourceFilter, readinessFilter, sortMode]);
 
   const refreshAll = async () => {
     await Promise.all([refresh(), refreshCatalog(), refreshReleaseCatalog()]);
@@ -434,6 +447,12 @@ export default function PacksPageOptimized() {
       label: `来源：${SOURCE_FILTER_LABELS[sourceFilter]}`,
       clearLabel: "清除来源",
       clear: () => setSourceFilter("all"),
+    }] : []),
+    ...(readinessFilter !== "all" ? [{
+      key: "readiness",
+      label: `体检：${READINESS_FILTER_LABELS[readinessFilter]}`,
+      clearLabel: "清除体检",
+      clear: () => setReadinessFilter("all"),
     }] : []),
     ...(sortMode !== "name" ? [{
       key: "sort",
@@ -549,13 +568,14 @@ export default function PacksPageOptimized() {
                 setInstallFilter("all");
                 setRiskFilter("all");
                 setSourceFilter("all");
+                setReadinessFilter("all");
                 setSortMode("name");
               }}
             >
               <Search size={14} /> 重置
             </Button>
           </div>
-          <div className="mt-3 grid gap-3 xl:grid-cols-5">
+          <div className="mt-3 grid gap-3 xl:grid-cols-6">
             {renderFilterGroup("类型", [
               ["all", "全部"],
               ["actionable", "可用"],
@@ -581,10 +601,17 @@ export default function PacksPageOptimized() {
               ["official", "官方"],
               ["private", "私有"],
             ], sourceFilter, (value) => setSourceFilter(value as SourceFilter))}
+            {renderFilterGroup("体检", [
+              ["all", "全部"],
+              ["complete", "完整"],
+              ["needs_context", "补说明"],
+              ["needs_entry", "补入口"],
+            ], readinessFilter, (value) => setReadinessFilter(value as ReadinessFilter))}
             {renderFilterGroup("排序", [
               ["name", "名称"],
               ["kind", "类型"],
               ["risk", "风险"],
+              ["readiness", "体检"],
               ["status", "阶段"],
             ], sortMode, (value) => setSortMode(value as SortMode))}
           </div>

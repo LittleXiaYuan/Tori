@@ -110,6 +110,16 @@ const makePack = (index: number) => ({
   updatedAt: "2026-06-19T00:00:00Z",
 });
 
+const needsContextManifest = {
+  ...documentsManifest,
+  id: "yunque.pack.needs-context",
+  name: "Needs Context Pack",
+  metadata: {
+    ...documentsManifest.metadata,
+    usageSurface: "",
+  },
+};
+
 describe("PacksPageOptimized", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -227,6 +237,33 @@ describe("PacksPageOptimized", () => {
       .find((link) => link.getAttribute("href")?.includes("yunque.pack.remote-docs"));
     expect(remoteStudioLink).toHaveAttribute("href", expect.stringContaining("packageUrl=https%3A%2F%2Fexample.com%2Fdocs.yqpack"));
     expect(remoteStudioLink).toHaveAttribute("href", expect.stringContaining("sha256=abc"));
+  });
+
+  it("filters packs by readiness so unclear packs can be sent to Xiaoyu first", async () => {
+    packsClientMock.installed.mockResolvedValueOnce({
+      packs: [
+        { manifest: documentsManifest, status: "enabled", updatedAt: "2026-06-19T00:00:00Z" },
+        { manifest: needsContextManifest, status: "disabled", updatedAt: "2026-06-19T00:00:00Z" },
+      ],
+      count: 2,
+    });
+
+    render(<PacksPageOptimized />);
+
+    expect(await screen.findByText("Needs Context Pack")).toBeInTheDocument();
+    expect(screen.getByText("Documents (文档生成)")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "补说明" }));
+
+    expect(screen.getByText("Needs Context Pack")).toBeInTheDocument();
+    expect(screen.queryByText("Documents (文档生成)")).not.toBeInTheDocument();
+    expect(screen.getByText("体检：需补说明")).toBeInTheDocument();
+    expect(screen.getByText("可用性体检：还缺 用户感知位置。可以交给小羽优化补齐用途、入口或使用说明。")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "清除体检" }));
+
+    expect(screen.getByText("Needs Context Pack")).toBeInTheDocument();
+    expect(screen.getByText("Documents (文档生成)")).toBeInTheDocument();
   });
 
   it("paginates installed packs so a large pack set stays scannable", async () => {
