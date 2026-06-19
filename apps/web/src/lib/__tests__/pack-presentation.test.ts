@@ -59,6 +59,24 @@ describe("pack-presentation", () => {
     expect(packUsageExplanation(manifest).join(" ")).toContain("不执行本机控制");
   });
 
+  it("marks financial trading permissions as high risk", () => {
+    const manifest: PackManifest = {
+      id: "trading",
+      name: "量化交易",
+      version: "0.1.0",
+      backend: {
+        capabilities: ["trading.signal.analyze", "trading.order.propose"],
+        permissions: ["network:read", "approval:required", "finance:trade:propose"],
+      },
+    };
+
+    expect(riskProfileForPack(manifest)).toMatchObject({
+      level: "high",
+      label: "需要授权",
+      requiresAuthorization: true,
+    });
+  });
+
   it("detects iframe bundle and wasm surfaces", () => {
     const manifest: PackManifest = {
       id: "yunque.pack.dlc-demo",

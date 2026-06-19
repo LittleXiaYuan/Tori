@@ -284,6 +284,7 @@ export function riskProfileForPack(manifest: PackManifest): PackRiskProfile {
   const highRisk =
     HIGH_RISK_PACK_IDS.has(manifest.id) ||
     groups.includes("computer") ||
+    permissions.some((permission) => /(finance|financial|trade|trading|broker|order)/i.test(permission)) ||
     (groups.includes("browser") && groups.includes("write")) ||
     (flags.hasWasm && permissions.some((permission) => /(execute|write|download|remote|network)/i.test(permission)));
 

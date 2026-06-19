@@ -12,6 +12,49 @@
     "stock"
   ],
   "icon": "📈",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "disabled",
+  "backend": {
+    "capabilities": [
+      "trading.quote.read",
+      "trading.portfolio.read",
+      "trading.signal.analyze",
+      "trading.order.propose",
+      "trading.risk.observe",
+      "trading.backtest.plan"
+    ],
+    "permissions": [
+      "network:read",
+      "market:data:read",
+      "portfolio:read",
+      "approval:required",
+      "finance:trade:propose"
+    ]
+  },
+  "frontend": {
+    "menus": [],
+    "routes": [],
+    "assets": {
+      "type": "builtin"
+    }
+  },
+  "update": {
+    "channel": "alpha",
+    "rollback": true
+  },
+  "metadata": {
+    "sync": "backend-registry-drives-frontend",
+    "usability": "experimental",
+    "primaryActionLabel": "模拟分析交易信号",
+    "primaryActionPath": "/chat?q=%E5%B8%AE%E6%88%91%E7%94%A8%E9%87%8F%E5%8C%96%E4%BA%A4%E6%98%93%E5%8C%85%E5%88%86%E6%9E%90%20000001.SZ%20%E7%9A%84%E6%A8%A1%E6%8B%9F%E4%BA%A4%E6%98%93%E4%BF%A1%E5%8F%B7%EF%BC%8C%E5%B9%B6%E8%AF%B4%E6%98%8E%E9%A3%8E%E9%99%A9",
+    "usageSurface": "Chat 模拟交易分析、审批队列、交易经验沉淀与风险提示",
+    "limitation": "当前只适合模拟分析、行情查询和需审批的交易建议；不要把它当作自动实盘交易能力。",
+    "descriptionStyle": "one-line-plus-three-examples",
+    "example1": "在 Chat 里输入股票代码，让云雀生成模拟交易信号和风险解释。",
+    "example2": "查看模拟持仓、现金、仓位限制和风控拦截原因。",
+    "example3": "交易建议必须经过审批；高风险或真实资金操作不应自动执行。"
+  },
   "capabilities": {
     "realtime_data": true,
     "order_execution": true,
@@ -188,5 +231,5 @@
       "default_risk_level": "high"
     }
   },
-  "status": "stable"
+  "status": "alpha"
 }
