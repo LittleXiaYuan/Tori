@@ -808,6 +808,9 @@ func (g *Gateway) SetCogniCostTracker(ct *cogni.CostTracker) { g.cogniCostTracke
 // SetCogniBus attaches the bidding router for POST /v1/cognis/route.
 func (g *Gateway) SetCogniBus(b *cogni.CogniBus) { g.cogniBus = b }
 
+// CogniBus exposes the bidding router to the Cogni Kernel pack.
+func (g *Gateway) CogniBus() *cogni.CogniBus { return g.cogniBus }
+
 // SetNLConfigTranslator attaches the natural-language config translator.
 func (g *Gateway) SetNLConfigTranslator(t *cogni.NLConfigTranslator) { g.nlConfigTranslator = t }
 

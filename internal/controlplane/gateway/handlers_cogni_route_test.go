@@ -8,10 +8,12 @@ import (
 	"testing"
 
 	"yunque-agent/pkg/cogni"
+	"yunque-agent/pkg/packruntime"
 )
 
 func TestCogniRoute_RanksBids(t *testing.T) {
-	gw := &Gateway{}
+	gw, tm := newTestGatewayWithCogniKernelPack(t, packruntime.PackStatusEnabled)
+	tenant := tm.Register("cogni-route")
 	reg := cogni.NewRegistry()
 	gw.SetCogniRegistry(reg, t.TempDir())
 
@@ -34,8 +36,9 @@ func TestCogniRoute_RanksBids(t *testing.T) {
 
 	body, _ := json.Marshal(map[string]any{"message": "please review my code"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/cognis/route", bytes.NewReader(body))
+	req.Header.Set("X-API-Key", tenant.APIKey)
 	w := httptest.NewRecorder()
-	gw.handleCognis(w, req)
+	gw.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
@@ -50,26 +53,30 @@ func TestCogniRoute_RanksBids(t *testing.T) {
 }
 
 func TestCogniRoute_RequiresMessage(t *testing.T) {
-	gw := &Gateway{}
+	gw, tm := newTestGatewayWithCogniKernelPack(t, packruntime.PackStatusEnabled)
+	tenant := tm.Register("cogni-route")
 	gw.SetCogniRegistry(cogni.NewRegistry(), t.TempDir())
 	gw.SetCogniBus(cogni.NewCogniBus(cogni.NewEvaluator(), cogni.DefaultBusConfig()))
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/cognis/route", bytes.NewReader([]byte(`{}`)))
+	req.Header.Set("X-API-Key", tenant.APIKey)
 	w := httptest.NewRecorder()
-	gw.handleCognis(w, req)
+	gw.ServeHTTP(w, req)
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400", w.Code)
 	}
 }
 
 func TestCogniRoute_BusNotConfigured(t *testing.T) {
-	gw := &Gateway{}
+	gw, tm := newTestGatewayWithCogniKernelPack(t, packruntime.PackStatusEnabled)
+	tenant := tm.Register("cogni-route")
 	gw.SetCogniRegistry(cogni.NewRegistry(), t.TempDir())
 
 	body, _ := json.Marshal(map[string]any{"message": "hello"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/cognis/route", bytes.NewReader(body))
+	req.Header.Set("X-API-Key", tenant.APIKey)
 	w := httptest.NewRecorder()
-	gw.handleCognis(w, req)
+	gw.ServeHTTP(w, req)
 	if w.Code != http.StatusInternalServerError {
 		t.Fatalf("status = %d, want 500", w.Code)
 	}

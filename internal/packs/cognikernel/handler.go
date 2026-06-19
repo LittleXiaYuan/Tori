@@ -7,6 +7,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"yunque-agent/internal/apperror"
+	"yunque-agent/pkg/cogni"
 	"yunque-agent/pkg/packruntime"
 )
 
@@ -15,6 +17,7 @@ const PackID = "yunque.pack.cogni-kernel"
 const (
 	CollectionRoute       = "/v1/cognis"
 	SubResourceRoute      = "/v1/cognis/"
+	RouteDecisionRoute    = "/v1/cognis/route"
 	RuntimePackStateRoute = "/v1/cognis/runtime/pack-state"
 )
 
@@ -28,6 +31,10 @@ type API interface {
 
 type RuntimeStateReporter interface {
 	CogniKernelRuntimeState() RuntimeStateReport
+}
+
+type BusProvider interface {
+	CogniBus() *cogni.CogniBus
 }
 
 type RuntimeStateReport struct {
@@ -68,12 +75,25 @@ func NewHandler(api API) *Handler {
 }
 
 func NewHandlerWithRuntimeState(api API, reporter RuntimeStateReporter) *Handler {
+	var busProvider BusProvider
+	if inferred, ok := api.(BusProvider); ok {
+		busProvider = inferred
+	}
+	return NewHandlerWithDeps(api, reporter, busProvider)
+}
+
+func NewHandlerWithDeps(api API, reporter RuntimeStateReporter, busProvider BusProvider) *Handler {
 	if reporter == nil {
 		if inferred, ok := api.(RuntimeStateReporter); ok {
 			reporter = inferred
 		}
 	}
-	return &Handler{router: NewRouter(api, reporter)}
+	if busProvider == nil {
+		if inferred, ok := api.(BusProvider); ok {
+			busProvider = inferred
+		}
+	}
+	return &Handler{router: NewRouterWithBus(api, reporter, busProvider)}
 }
 
 // compile-time assertion: Cogni Kernel is a v2 capability Module (Tier 0 microkernel).
@@ -105,20 +125,39 @@ func (h *Handler) Stop(ctx context.Context) error {
 // pack-state as a first-class pack route and delegates declaration operations to
 // the supplied API adapter.
 type Router struct {
-	api      API
-	reporter RuntimeStateReporter
+	api         API
+	reporter    RuntimeStateReporter
+	busProvider BusProvider
 }
 
 func NewRouter(api API, reporter RuntimeStateReporter) *Router {
-	return &Router{api: api, reporter: reporter}
+	return NewRouterWithBus(api, reporter, nil)
+}
+
+func NewRouterWithBus(api API, reporter RuntimeStateReporter, busProvider BusProvider) *Router {
+	if busProvider == nil {
+		if inferred, ok := api.(BusProvider); ok {
+			busProvider = inferred
+		}
+	}
+	return &Router{api: api, reporter: reporter, busProvider: busProvider}
 }
 
 func (r *Router) Routes() []packruntime.BackendRoute {
-	return []packruntime.BackendRoute{
+	routes := []packruntime.BackendRoute{
 		{Methods: []string{http.MethodGet, http.MethodPost}, Path: CollectionRoute, Handler: r.ServeCogniKernel},
 		{Methods: []string{http.MethodGet, http.MethodPost, http.MethodDelete}, Path: SubResourceRoute, Handler: r.ServeCogniKernel},
+		{Methods: []string{http.MethodPost}, Path: RouteDecisionRoute, Handler: r.HandleRouteDecision},
 		{Methods: []string{http.MethodGet}, Path: RuntimePackStateRoute, Handler: r.HandleRuntimePackState},
 	}
+	for _, route := range delegatedRouteSpecs() {
+		routes = append(routes, packruntime.BackendRoute{
+			Methods: route.methods,
+			Path:    route.path,
+			Handler: r.ServeCogniKernel,
+		})
+	}
+	return routes
 }
 
 func (r *Router) RuntimeRoutes() []packruntime.BackendRoute {
@@ -136,6 +175,40 @@ func (r *Router) ServeCogniKernel(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	r.api.ServeCogniKernel(w, req)
+}
+
+func (r *Router) HandleRouteDecision(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "POST only")
+		return
+	}
+	if r == nil || r.busProvider == nil || r.busProvider.CogniBus() == nil {
+		apperror.WriteCode(w, apperror.CodeInternal, "cogni bus not configured")
+		return
+	}
+
+	var body struct {
+		Message  string   `json:"message"`
+		TenantID string   `json:"tenant_id"`
+		Channel  string   `json:"channel"`
+		Tags     []string `json:"tags"`
+	}
+	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+		apperror.WriteCode(w, apperror.CodeBadRequest, err.Error())
+		return
+	}
+	if body.Message == "" {
+		apperror.WriteCode(w, apperror.CodeMissingField, "message is required")
+		return
+	}
+
+	result := r.busProvider.CogniBus().Route(req.Context(), cogni.Session{
+		Message:  body.Message,
+		TenantID: body.TenantID,
+		Channel:  body.Channel,
+		Tags:     body.Tags,
+	})
+	writeJSON(w, result)
 }
 
 func (r *Router) HandleRuntimePackState(w http.ResponseWriter, req *http.Request) {
@@ -157,6 +230,33 @@ func RuntimeRouteSpecs() []packruntime.BackendRouteSpec {
 	return []packruntime.BackendRouteSpec{
 		{Method: http.MethodGet, Path: "/v1/cognis/runtime/pack-state", Description: "Read live Cogni runtime-loop and pack-state gate status."},
 	}
+}
+
+type delegatedRouteSpec struct {
+	path    string
+	methods []string
+}
+
+func delegatedRouteSpecs() []delegatedRouteSpec {
+	seen := map[string]int{}
+	var out []delegatedRouteSpec
+	for _, spec := range RouteSpecs() {
+		switch spec.Path {
+		case CollectionRoute, SubResourceRoute, RouteDecisionRoute, RuntimePackStateRoute:
+			continue
+		}
+		method := spec.Method
+		if method == "" {
+			continue
+		}
+		if idx, ok := seen[spec.Path]; ok {
+			out[idx].methods = append(out[idx].methods, method)
+			continue
+		}
+		seen[spec.Path] = len(out)
+		out = append(out, delegatedRouteSpec{path: spec.Path, methods: []string{method}})
+	}
+	return out
 }
 
 func RouteSpecs() []packruntime.BackendRouteSpec {

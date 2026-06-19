@@ -1,11 +1,14 @@
 package cognikernelpack
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"yunque-agent/pkg/cogni"
 )
 
 type fakeCogniAPI struct {
@@ -20,6 +23,12 @@ func (api *fakeCogniAPI) ServeCogniKernel(w http.ResponseWriter, r *http.Request
 }
 
 type fakeRuntimeReporter struct{}
+
+type fakeBusProvider struct {
+	bus *cogni.CogniBus
+}
+
+func (p fakeBusProvider) CogniBus() *cogni.CogniBus { return p.bus }
 
 func (fakeRuntimeReporter) CogniKernelRuntimeState() RuntimeStateReport {
 	return RuntimeStateReport{
@@ -54,8 +63,8 @@ func TestCogniKernelHandlerRoutesExposeSurface(t *testing.T) {
 	}
 
 	routes := handler.Routes()
-	if len(routes) != 3 {
-		t.Fatalf("expected 3 Cogni Kernel routes, got %d", len(routes))
+	if len(routes) <= 4 {
+		t.Fatalf("expected delegated Cogni Kernel sub-resource routes, got %d", len(routes))
 	}
 	if routes[0].Path != CollectionRoute {
 		t.Fatalf("collection route path = %q", routes[0].Path)
@@ -63,8 +72,28 @@ func TestCogniKernelHandlerRoutesExposeSurface(t *testing.T) {
 	if routes[1].Path != SubResourceRoute {
 		t.Fatalf("sub-resource route path = %q", routes[1].Path)
 	}
-	if routes[2].Path != RuntimePackStateRoute {
-		t.Fatalf("runtime state route path = %q", routes[2].Path)
+	if routes[2].Path != RouteDecisionRoute {
+		t.Fatalf("route decision path = %q", routes[2].Path)
+	}
+	if routes[3].Path != RuntimePackStateRoute {
+		t.Fatalf("runtime state route path = %q", routes[3].Path)
+	}
+	mounted := map[string]map[string]bool{}
+	for _, route := range routes {
+		if mounted[route.Path] == nil {
+			mounted[route.Path] = map[string]bool{}
+		}
+		for _, method := range route.Methods {
+			mounted[route.Path][method] = true
+		}
+		if route.Method != "" {
+			mounted[route.Path][route.Method] = true
+		}
+	}
+	for _, spec := range RouteSpecs() {
+		if !mounted[spec.Path][spec.Method] {
+			t.Fatalf("routeSpec %s %s not mounted by Routes()", spec.Method, spec.Path)
+		}
 	}
 
 	req := httptest.NewRequest(http.MethodGet, CollectionRoute, nil)
@@ -133,6 +162,69 @@ func TestCogniKernelRouterOwnsRuntimeStateBeforeAPIDelegation(t *testing.T) {
 	router.ServeCogniKernel(w, req)
 	if w.Code != http.StatusNoContent || api.called != 1 {
 		t.Fatalf("sub-resource route should delegate to API adapter, status=%d called=%d", w.Code, api.called)
+	}
+}
+
+func TestCogniKernelRouterOwnsRouteDecision(t *testing.T) {
+	api := &fakeCogniAPI{}
+	bus := cogni.NewCogniBus(cogni.NewEvaluator(), cogni.DefaultBusConfig())
+	bus.Register(&cogni.Declaration{
+		ID: "reviewer",
+		Activation: cogni.ActivationRules{
+			Keywords: []string{"review"},
+			MinScore: 0.2,
+		},
+	})
+	bus.Register(&cogni.Declaration{
+		ID: "translator",
+		Activation: cogni.ActivationRules{
+			Keywords: []string{"translate"},
+			MinScore: 0.2,
+		},
+	})
+	router := NewRouterWithBus(api, fakeRuntimeReporter{}, fakeBusProvider{bus: bus})
+
+	body, _ := json.Marshal(map[string]any{"message": "please review my code"})
+	req := httptest.NewRequest(http.MethodPost, RouteDecisionRoute, bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	router.HandleRouteDecision(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	if api.called != 0 {
+		t.Fatalf("route decision should not delegate to API adapter, called=%d", api.called)
+	}
+	var result cogni.RouteResult
+	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(result.SelectedIDs) != 1 || result.SelectedIDs[0] != "reviewer" {
+		t.Fatalf("expected reviewer to win, got %v (bids=%v)", result.SelectedIDs, result.AllBids)
+	}
+}
+
+func TestCogniKernelRouterRouteDecisionRequiresMessage(t *testing.T) {
+	bus := cogni.NewCogniBus(cogni.NewEvaluator(), cogni.DefaultBusConfig())
+	router := NewRouterWithBus(&fakeCogniAPI{}, fakeRuntimeReporter{}, fakeBusProvider{bus: bus})
+
+	req := httptest.NewRequest(http.MethodPost, RouteDecisionRoute, bytes.NewReader([]byte(`{}`)))
+	w := httptest.NewRecorder()
+	router.HandleRouteDecision(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestCogniKernelRouterRouteDecisionRequiresBus(t *testing.T) {
+	router := NewRouterWithBus(&fakeCogniAPI{}, fakeRuntimeReporter{}, nil)
+
+	body, _ := json.Marshal(map[string]any{"message": "hello"})
+	req := httptest.NewRequest(http.MethodPost, RouteDecisionRoute, bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	router.HandleRouteDecision(w, req)
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
 	}
 }
 

@@ -174,15 +174,8 @@ func newTestGatewayWithCogniKernelPackAndReporter(t *testing.T, status packrunti
 		Optional:     true,
 		DefaultState: "enabled",
 		Backend: packruntime.BackendManifest{
-			Routes: []string{"/v1/cognis", "/v1/cognis/", "/v1/cognis/runtime/pack-state"},
-			RouteSpecs: []packruntime.BackendRouteSpec{
-				{Method: http.MethodGet, Path: "/v1/cognis"},
-				{Method: http.MethodPost, Path: "/v1/cognis"},
-				{Method: http.MethodGet, Path: "/v1/cognis/"},
-				{Method: http.MethodPost, Path: "/v1/cognis/"},
-				{Method: http.MethodDelete, Path: "/v1/cognis/"},
-				{Method: http.MethodGet, Path: "/v1/cognis/runtime/pack-state"},
-			},
+			Routes:     cognikernelpack.Paths(),
+			RouteSpecs: cognikernelpack.RouteSpecs(),
 		},
 		Frontend: packruntime.FrontendManifest{Menus: []packruntime.FrontendMenu{{Key: "cognis", Label: "智体内核", Path: "/packs/cognis"}}},
 		SDK:      packruntime.SDKManifest{TypeScript: "yunque-client/cognis"},
