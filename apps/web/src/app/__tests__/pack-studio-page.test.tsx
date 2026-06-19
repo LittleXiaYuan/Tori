@@ -124,8 +124,22 @@ describe("PackStudioPage", () => {
     const task = screen.getByLabelText("小羽改包任务") as HTMLTextAreaElement;
     expect(task.value).toContain("用户目标：增加一个可查看运行结果的界面");
     expect(task.value).toContain("POST /v1/wasm-plugin/run");
+    expect(task.value).toContain("可改文件候选：");
+    expect(task.value).toContain("diff 预览草案：");
     expect(task.value).toContain("不要直接扩大权限或绕过签名");
+    expect(task.value).toContain("重新打包与回滚：");
     expect(task.value).toContain("go test ./internal/packs/wasmplugin ./internal/controlplane/gateway -run WASM -count=1");
+
+    const diffPreview = screen.getByLabelText("改包 diff 预览") as HTMLTextAreaElement;
+    expect(diffPreview.value).toContain("diff --git a/packs/official/wasm-plugin-pack/pack.json");
+    expect(diffPreview.value).toContain("\"description\": \"增加一个可查看运行结果的界面\"");
+    expect(screen.getByText("packs/official/wasm-plugin-pack/pack.json")).toBeInTheDocument();
+    expect(screen.getByText("internal/packs/wasmplugin/")).toBeInTheDocument();
+    expect(screen.getByText("审计测试")).toBeInTheDocument();
+    expect(screen.getByText("重新打包")).toBeInTheDocument();
+    expect(screen.getByText("回滚策略")).toBeInTheDocument();
+    expect(screen.getByText("go run ./cmd/yunque-plugin pack packs\\official\\wasm-plugin-pack --out dist\\packs\\wasm-plugin-0.1.0.yqpack")).toBeInTheDocument();
+    expect(screen.getByText("新包作为 fork/local 版本安装；验证失败时禁用新版本并回滚上一版本。")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "复制任务" }));
 

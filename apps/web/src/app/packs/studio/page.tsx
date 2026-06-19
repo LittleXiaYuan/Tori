@@ -3,7 +3,19 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Button, Card, Chip, Input, Label, Spinner, TextArea, TextField } from "@heroui/react";
-import { ArrowRight, Boxes, Copy, FileSearch, RefreshCw, ShieldCheck, Sparkles, Wrench } from "lucide-react";
+import {
+  ArrowRight,
+  Boxes,
+  ClipboardCheck,
+  Copy,
+  FileSearch,
+  PackageCheck,
+  RefreshCw,
+  RotateCcw,
+  ShieldCheck,
+  Sparkles,
+  Wrench,
+} from "lucide-react";
 import PageHeader from "@/components/page-header";
 import { showToast } from "@/components/toast-provider";
 import { createYunqueSDKClientOptions } from "@/lib/sdk-client";
@@ -26,6 +38,26 @@ type PackCandidate = {
   installed: boolean;
 };
 
+type StudioAnalysis = {
+  editable: string[];
+  guarded: string[];
+  tests: string[];
+  warnings: string[];
+  editableFiles: string[];
+  diffPreview: string;
+  auditSteps: string[];
+  packageSteps: string[];
+  rollbackSteps: string[];
+};
+
+function packSlug(manifest: PackManifest): string {
+  return manifest.id.replace(/^yunque\.pack\./, "");
+}
+
+function goPackDir(manifest: PackManifest): string {
+  return packSlug(manifest).replace(/-/g, "");
+}
+
 function packPaths(manifest: PackManifest): string[] {
   return Array.from(new Set([
     ...(manifest.frontend?.menus || []).map((menu) => menu.path),
@@ -45,12 +77,51 @@ function sourceLabel(candidate: PackCandidate): string {
   return "源内可安装";
 }
 
-function buildStudioAnalysis(manifest: PackManifest): {
-  editable: string[];
-  guarded: string[];
-  tests: string[];
-  warnings: string[];
-} {
+function buildEditableFiles(manifest: PackManifest): string[] {
+  const slug = packSlug(manifest);
+  const routes = packPaths(manifest);
+  const files = [
+    `packs/official/${slug}-pack/pack.json`,
+  ];
+  for (const route of routes) {
+    const match = route.match(/^\/packs\/([^/?#]+)/);
+    if (match?.[1]) files.push(`apps/web/src/app/packs/${match[1]}/page.tsx`);
+  }
+  if ((manifest.backend?.routeSpecs || []).length > 0 || (manifest.backend?.routes || []).length > 0) {
+    files.push(`internal/packs/${goPackDir(manifest)}/`);
+  }
+  files.push(`apps/web/src/app/__tests__/${slug}-pack-page.test.tsx`);
+  return Array.from(new Set(files));
+}
+
+function buildDiffPreview(manifest: PackManifest, goal: string): string {
+  const slug = packSlug(manifest);
+  const currentDescription = manifest.description || "未填写用途说明";
+  const safeGoal = goal.trim() || "让这个能力包更有用、更可感知，并补齐用户入口、结果反馈和限制说明。";
+  const primaryPath = packUsability(manifest).primaryActionPath || packPaths(manifest)[0] || "/chat";
+  return [
+    `diff --git a/packs/official/${slug}-pack/pack.json b/packs/official/${slug}-pack/pack.json`,
+    "--- a/packs/official/" + slug + "-pack/pack.json",
+    "+++ b/packs/official/" + slug + "-pack/pack.json",
+    "@@ metadata @@",
+    `- \"description\": \"${currentDescription}\"`,
+    `+ \"description\": \"${safeGoal}\"`,
+    `+ \"metadata.primaryActionLabel\": \"打开并验证 ${manifest.name} 的结果\"`,
+    `+ \"metadata.primaryActionPath\": \"${primaryPath}\"`,
+    "+ \"metadata.example1\": \"从 Chat 说明目标，让云雀调用该能力并返回可查看结果。\"",
+    "+ \"metadata.example2\": \"在能力界面查看执行状态、产物、限制与下一步操作。\"",
+    "+ \"metadata.limitation\": \"改包前必须经过 diff 预览、测试和重新打包，不直接修改已安装版本。\"",
+    "",
+    `diff --git a/apps/web/src/app/packs/${slug}/page.tsx b/apps/web/src/app/packs/${slug}/page.tsx`,
+    "--- a/apps/web/src/app/packs/" + slug + "/page.tsx",
+    "+++ b/apps/web/src/app/packs/" + slug + "/page.tsx",
+    "@@ user-facing surface @@",
+    "+ 增加结果区、权限说明、失败提示和回到 Chat/任务中心的入口。",
+    "+ 对 WASM/iframe/后端能力保留沙箱、授权和 route 边界说明。",
+  ].join("\n");
+}
+
+function buildStudioAnalysis(manifest: PackManifest, goal = ""): StudioAnalysis {
   const flags = packFeatureFlags(manifest);
   const risk = riskProfileForPack(manifest);
   const usability = packUsability(manifest);
@@ -89,7 +160,25 @@ function buildStudioAnalysis(manifest: PackManifest): {
   if (usability.kind === "experimental") warnings.push("这个包仍是实验能力，改造时不要把它包装成稳定承诺。");
   if (permissions.length === 0) warnings.push("manifest 未声明权限，若新增能力必须先补权限与风险说明。");
 
-  return { editable, guarded, tests, warnings };
+  const editableFiles = buildEditableFiles(manifest);
+  const diffPreview = buildDiffPreview(manifest, goal);
+  const auditSteps = [
+    "只读展开 yqpack 或源码目录，确认 pack.json、frontend、backend、sdk 文件是否齐全。",
+    "检查 diff 是否扩大权限、改变签名信任、绕过 routeSpecs 或隐藏高风险动作。",
+    "按建议门禁运行测试，并记录失败原因和回滚建议。",
+  ];
+  const packageSteps = [
+    `node scripts\\release-pack.mjs --pack packs\\official\\${packSlug(manifest)}-pack --dry-run`,
+    `go run ./cmd/yunque-plugin pack packs\\official\\${packSlug(manifest)}-pack --out dist\\packs\\${packSlug(manifest)}-${manifest.version}.yqpack`,
+    "重新计算 sha256/sizeBytes，刷新 catalog/release 元数据后再安装。",
+  ];
+  const rollbackSteps = [
+    "保留原始 yqpack、原始 pack.json 和 installed registry 里的 previousVersion。",
+    "新包作为 fork/local 版本安装；验证失败时禁用新版本并回滚上一版本。",
+    "如果涉及高风险权限，回滚后重新跑 backend-route-audit 和 Pack 可用性审计。",
+  ];
+
+  return { editable, guarded, tests, warnings, editableFiles, diffPreview, auditSteps, packageSteps, rollbackSteps };
 }
 
 function buildXiaoyuPrompt(manifest: PackManifest, goal: string): string {
@@ -98,7 +187,7 @@ function buildXiaoyuPrompt(manifest: PackManifest, goal: string): string {
   const flags = packFeatureFlags(manifest);
   const permissions = manifest.backend?.permissions || [];
   const capabilities = manifest.backend?.capabilities || [];
-  const analysis = buildStudioAnalysis(manifest);
+  const analysis = buildStudioAnalysis(manifest, goal);
   return [
     `请以“小羽改包”的方式改造能力包 ${manifest.name} (${manifest.id}) v${manifest.version}。`,
     "",
@@ -121,8 +210,23 @@ function buildXiaoyuPrompt(manifest: PackManifest, goal: string): string {
     "本包建议优先改：",
     ...analysis.editable.map((item) => `- ${item}`),
     "",
+    "可改文件候选：",
+    ...analysis.editableFiles.map((item) => `- ${item}`),
+    "",
+    "diff 预览草案：",
+    "```diff",
+    analysis.diffPreview,
+    "```",
+    "",
     "必须遵守：",
     ...analysis.guarded.map((item) => `- ${item}`),
+    "",
+    "审计步骤：",
+    ...analysis.auditSteps.map((item) => `- ${item}`),
+    "",
+    "重新打包与回滚：",
+    ...analysis.packageSteps.map((item) => `- ${item}`),
+    ...analysis.rollbackSteps.map((item) => `- ${item}`),
     "",
     "建议门禁：",
     ...analysis.tests.map((item) => `- ${item}`),
@@ -162,7 +266,7 @@ export default function PackStudioPage() {
     [candidates, selectedId],
   );
   const manifest = selected?.manifest;
-  const analysis = manifest ? buildStudioAnalysis(manifest) : null;
+  const analysis = manifest ? buildStudioAnalysis(manifest, goal) : null;
   const prompt = manifest ? buildXiaoyuPrompt(manifest, goal) : "";
   const chatHref = `/chat?q=${encodeURIComponent(prompt)}`;
 
@@ -315,16 +419,72 @@ export default function PackStudioPage() {
             </Card>
 
             <Card className="section-card p-4">
-              <div className="text-sm font-semibold mb-3" style={{ color: "var(--yunque-text)" }}>建议门禁</div>
-              <div className="space-y-1">
-                {analysis.tests.map((command) => (
-                  <div key={command} className="rounded px-2 py-1 font-mono text-xs" style={{ background: "var(--yunque-bg-hover)", color: "var(--yunque-text-secondary)" }}>
-                    {command}
+              <div className="flex items-center gap-2 mb-3">
+                <ClipboardCheck size={16} style={{ color: "var(--yunque-primary)" }} />
+                <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>diff 预览</div>
+              </div>
+              <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_260px]">
+                <TextArea aria-label="改包 diff 预览" value={analysis.diffPreview} readOnly rows={15} className="font-mono text-xs" />
+                <div className="space-y-3">
+                  <div>
+                    <div className="text-xs font-medium mb-2" style={{ color: "var(--yunque-text)" }}>可改文件候选</div>
+                    <div className="space-y-1">
+                      {analysis.editableFiles.map((file) => (
+                        <div key={file} className="rounded px-2 py-1 font-mono text-[11px]" style={{ background: "var(--yunque-bg-hover)", color: "var(--yunque-text-secondary)" }}>
+                          {file}
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                ))}
+                  <div className="text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
+                    这是预览，不会写入文件。真正改包必须在用户确认 diff 后执行，并重新跑审计与打包。
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="section-card p-4">
+              <div className="text-sm font-semibold mb-3" style={{ color: "var(--yunque-text)" }}>建议门禁</div>
+              <div className="grid gap-3 lg:grid-cols-3">
+                <div>
+                  <div className="mb-2 flex items-center gap-2 text-xs font-medium" style={{ color: "var(--yunque-text)" }}>
+                    <ClipboardCheck size={13} /> 审计测试
+                  </div>
+                  <div className="space-y-1">
+                    {[...analysis.auditSteps, ...analysis.tests].map((command) => (
+                      <div key={command} className="rounded px-2 py-1 text-xs" style={{ background: "var(--yunque-bg-hover)", color: "var(--yunque-text-secondary)" }}>
+                        {command}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div className="mb-2 flex items-center gap-2 text-xs font-medium" style={{ color: "var(--yunque-text)" }}>
+                    <PackageCheck size={13} /> 重新打包
+                  </div>
+                  <div className="space-y-1">
+                    {analysis.packageSteps.map((command) => (
+                      <div key={command} className="rounded px-2 py-1 font-mono text-[11px]" style={{ background: "var(--yunque-bg-hover)", color: "var(--yunque-text-secondary)" }}>
+                        {command}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div className="mb-2 flex items-center gap-2 text-xs font-medium" style={{ color: "var(--yunque-text)" }}>
+                    <RotateCcw size={13} /> 回滚策略
+                  </div>
+                  <div className="space-y-1">
+                    {analysis.rollbackSteps.map((step) => (
+                      <div key={step} className="rounded px-2 py-1 text-xs" style={{ background: "var(--yunque-bg-hover)", color: "var(--yunque-text-secondary)" }}>
+                        {step}
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
               <div className="mt-3 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
-                第一阶段只生成方案和任务，不直接改已安装包。真正写入、重新打包、安装 fork 版本和回滚会在后续闭环接入。
+                当前仍是安全规划模式：生成 diff、审计、打包和回滚计划，不直接修改已安装包。
               </div>
             </Card>
           </>
