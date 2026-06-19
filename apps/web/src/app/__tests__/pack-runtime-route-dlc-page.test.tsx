@@ -68,8 +68,16 @@ describe("PackRuntimeRouteClientPage DLC route", () => {
   it("explains iframe-bundle DLC boundaries before rendering the sandbox host", async () => {
     render(<PackRuntimeRouteClientPage />);
 
+    expect(await screen.findByText("这个能力包能帮你做什么")).toBeInTheDocument();
+    expect(screen.getByText("可直接使用")).toBeInTheDocument();
+    expect(screen.getByText("需补说明")).toBeInTheDocument();
+    expect(screen.getByText("还没有写清使用示例，可以交给小羽补齐。")).toBeInTheDocument();
+    expect(screen.getByText(/还缺：使用示例、用户感知位置/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /问云雀怎么用/ })).toHaveAttribute("href", expect.stringContaining("/chat?q="));
+    expect(screen.getByRole("link", { name: /权限与详情/ })).toHaveAttribute("href", "/packs/detail?id=yunque.pack.dlc-demo");
+    expect(screen.getByRole("link", { name: /交给小羽补齐/ })).toHaveAttribute("href", expect.stringContaining("/packs/studio?packId=yunque.pack.dlc-demo"));
     expect(await screen.findByText("这个能力界面来自能力包本身")).toBeInTheDocument();
-    expect(screen.getByText("独立界面包")).toBeInTheDocument();
+    expect(screen.getAllByText("独立界面包").length).toBeGreaterThan(0);
     expect(screen.getByText("iframe 沙箱")).toBeInTheDocument();
     expect(screen.getByText("按声明路由调用")).toBeInTheDocument();
     expect(screen.getByText(/随能力包一起下载的 DLC\/iframe 前端/)).toBeInTheDocument();

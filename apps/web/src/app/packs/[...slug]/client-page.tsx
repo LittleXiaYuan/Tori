@@ -3,14 +3,16 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { Card, Chip, Spinner } from "@heroui/react";
-import { Boxes, ExternalLink, PackageOpen, Route, ShieldCheck, TerminalSquare } from "lucide-react";
+import { Button, Card, Chip, Spinner } from "@heroui/react";
+import { Boxes, ExternalLink, MessageSquare, PackageOpen, Route, ShieldCheck, TerminalSquare, Wrench } from "lucide-react";
 import PageHeader from "@/components/page-header";
 import { formatErrorMessage } from "@/lib/error-utils";
 import type { InstalledPack } from "@/lib/pack-types";
 import { buildPackSdkEntrypoints, fetchEnabledPacks, findPackRouteBinding, formatBackendRouteSpec, packSdkImportSnippet } from "@/lib/pack-sync";
 import { PackDlcHost } from "@/lib/pack-dlc-host";
 import { eventPathsFromPermissions } from "@/lib/pack-bridge";
+import { chatPromptHref } from "@/lib/pack-action-links";
+import { packExamples, packFeatureFlags, packReadiness, packUsability, riskProfileForPack } from "@/lib/pack-presentation";
 
 const dlcBoundaryItems = [
   "iframe 没有宿主 token，不能读取云雀本地登录态。",
@@ -82,6 +84,23 @@ export default function PackRuntimeRouteClientPage() {
   const entries = match.sdk.length > 0 ? match.sdk : buildPackSdkEntrypoints(pack);
   const assets = match.assets;
   const isIframeBundle = assets?.type === "iframe-bundle";
+  const usability = packUsability(manifest);
+  const readiness = packReadiness(manifest);
+  const risk = riskProfileForPack(manifest);
+  const flags = packFeatureFlags(manifest);
+  const examples = packExamples(manifest, 3);
+  const usagePrompt = [
+    `我正在使用云雀能力包：${manifest.name} (${manifest.id})。`,
+    `请告诉我它现在能帮我做什么、适合放在哪个工作流里、我可以怎么下第一条指令。`,
+    `能力包说明：${manifest.description || "暂无说明"}`,
+    `可用性：${usability.label}；${usability.description}`,
+    readiness.missing.length > 0 ? `当前还缺：${readiness.missing.join("、")}` : "当前体检：说明基本完整",
+    usability.limitation ? `当前限制：${usability.limitation}` : "",
+    examples.length > 0 ? `已有示例：${examples.join(" / ")}` : "",
+    "请不要夸大实验能力；如果它只是后台支撑能力，请告诉我应该从 Chat、任务、记忆、知识或能力包详情哪里感知它。",
+  ].filter(Boolean).join("\n");
+  const studioGoal = `让 ${manifest.name} 更像一个用户能直接理解和使用的能力包，补齐用途、入口、示例、权限边界和回滚说明。`;
+  const studioHref = `/packs/studio?packId=${encodeURIComponent(manifest.id)}&goal=${encodeURIComponent(studioGoal)}`;
 
   return (
     <div className="page-root space-y-5 animate-fade-in-up">
@@ -93,6 +112,70 @@ export default function PackRuntimeRouteClientPage() {
           : "这是由后端 enabled pack registry 同步出来的通用 Pack 页面。专属页面尚未随前端包加载时，先展示 manifest、资源入口和 SDK 调用面。"}
         actions={<Link href="/packs" className="inline-flex items-center rounded-xl px-4 py-2 text-sm" style={{ border: "1px solid var(--yunque-border)", color: "var(--yunque-text)" }}>管理能力包</Link>}
       />
+
+      <Card className="section-card p-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0 max-w-3xl">
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <Chip size="sm" color={usability.kind === "experimental" ? "warning" : usability.kind === "actionable" ? "success" : "default"}>
+                {usability.label}
+              </Chip>
+              <Chip size="sm" color={readiness.level === "complete" ? "success" : readiness.level === "needs_context" ? "warning" : "danger"}>
+                {readiness.label}
+              </Chip>
+              <Chip size="sm" color={risk.level === "high" ? "danger" : risk.level === "medium" ? "warning" : "success"}>
+                {risk.label}
+              </Chip>
+              {flags.isIframeBundle && <Chip size="sm" variant="soft">独立界面包</Chip>}
+              {flags.hasWasm && <Chip size="sm" variant="soft">WASM</Chip>}
+            </div>
+            <div className="text-base font-semibold" style={{ color: "var(--yunque-text)" }}>这个能力包能帮你做什么</div>
+            <div className="mt-2 text-sm leading-6" style={{ color: "var(--yunque-text-secondary)" }}>
+              {manifest.description || usability.description}
+            </div>
+            <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
+              {usability.description}
+              {usability.limitation ? ` 当前限制：${usability.limitation}` : ""}
+            </div>
+            <div className="mt-3 grid gap-2 md:grid-cols-3">
+              {(examples.length > 0 ? examples : ["还没有写清使用示例，可以交给小羽补齐。"]).map((example) => (
+                <div key={example} className="rounded-lg px-3 py-2 text-xs leading-5" style={{ background: "var(--yunque-bg-hover)", color: "var(--yunque-text-secondary)" }}>
+                  {example}
+                </div>
+              ))}
+            </div>
+            {readiness.missing.length > 0 && (
+              <div className="mt-3 rounded-lg px-3 py-2 text-xs leading-5" style={{ background: "rgba(245,158,11,0.10)", color: "var(--yunque-warning)" }}>
+                还缺：{readiness.missing.join("、")}。这不会阻止启用，但会让用户更难判断它该怎么用。
+              </div>
+            )}
+          </div>
+          <div className="flex w-full flex-wrap gap-2 lg:w-auto lg:max-w-xs">
+            {usability.primaryActionPath && usability.primaryActionPath !== pathname && (
+              <Link href={usability.primaryActionPath}>
+                <Button size="sm" className="btn-accent">
+                  <ExternalLink size={13} /> 打开入口
+                </Button>
+              </Link>
+            )}
+            <Link href={chatPromptHref(usagePrompt)}>
+              <Button size="sm" variant="outline">
+                <MessageSquare size={13} /> 问云雀怎么用
+              </Button>
+            </Link>
+            <Link href={`/packs/detail?id=${encodeURIComponent(manifest.id)}`}>
+              <Button size="sm" variant="outline">
+                <ShieldCheck size={13} /> 权限与详情
+              </Button>
+            </Link>
+            <Link href={studioHref}>
+              <Button size="sm" variant="ghost">
+                <Wrench size={13} /> 交给小羽补齐
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </Card>
 
       {isIframeBundle && (
         <Card className="section-card overflow-hidden p-0">
