@@ -30,6 +30,7 @@ import {
   type InstalledPack,
   type PackCatalogEntry,
   type PackManifest,
+  type PackReleaseCatalogEntry,
 } from "yunque-client/packs";
 import { createYunqueSDKClientOptions } from "@/lib/sdk-client";
 import { formatErrorMessage } from "@/lib/error-utils";
@@ -45,8 +46,10 @@ import {
   riskProfileForPack,
 } from "@/lib/pack-presentation";
 import { chatPromptHref } from "@/lib/pack-action-links";
+import { resolvePackReleaseSources } from "@/lib/pack-release-sources";
 
 const packsClient = createPacksClient(createYunqueSDKClientOptions());
+const PACK_RELEASE_SOURCES = resolvePackReleaseSources();
 
 type DetailState = {
   manifest: PackManifest;
@@ -54,6 +57,7 @@ type DetailState = {
   enabled: boolean;
   installedPack?: InstalledPack;
   catalogEntry?: PackCatalogEntry;
+  releaseEntry?: PackReleaseCatalogEntry;
 };
 
 function statusTone(status: string): { label: string; color: string; bg: string } {
@@ -102,13 +106,15 @@ export default function PackDetailClientPage() {
     }
     try {
       setLoading(true);
-      const [installedRes, catalogRes] = await Promise.all([
+      const [installedRes, catalogRes, releaseRes] = await Promise.all([
         packsClient.installed(),
         packsClient.catalog(),
+        packsClient.releaseCatalog(PACK_RELEASE_SOURCES.map((source) => source.url)),
       ]);
       const installedPack = installedRes.packs.find((p) => p.manifest.id === id);
       const catalogEntry = catalogRes.entries.find((e) => e.manifest.id === id);
-      const manifest = installedPack?.manifest || catalogEntry?.manifest;
+      const releaseEntry = releaseRes.entries.find((e) => e.manifest.id === id);
+      const manifest = installedPack?.manifest || catalogEntry?.manifest || releaseEntry?.manifest;
       if (!manifest) {
         setError(`未找到能力包：${id}`);
         setState(null);
@@ -120,6 +126,7 @@ export default function PackDetailClientPage() {
         enabled: installedPack?.status === "enabled",
         installedPack,
         catalogEntry,
+        releaseEntry,
       });
       setError(null);
     } catch (e) {
@@ -178,7 +185,7 @@ export default function PackDetailClientPage() {
     );
   }
 
-  const { manifest, installed, enabled, installedPack, catalogEntry } = state;
+  const { manifest, installed, enabled, installedPack, catalogEntry, releaseEntry } = state;
   const tone = statusTone(installedPack?.status || "not-installed");
   const packBadge = packStatusBadge(manifest.status);
   const caps = manifest.backend?.capabilities || [];
@@ -213,11 +220,12 @@ export default function PackDetailClientPage() {
   const studioHref = `/packs/studio?packId=${encodeURIComponent(manifest.id)}&goal=${encodeURIComponent(studioGoal)}`;
 
   const installFromCatalog = () => {
-    if (!catalogEntry) {
+    const installEntry = catalogEntry || (releaseEntry ? { ...releaseEntry, source: releaseEntry.release_url } : undefined);
+    if (!installEntry) {
       showToast("此能力包没有可用的安装源", "error");
       return;
     }
-    const request = entryInstallRequest(catalogEntry);
+    const request = entryInstallRequest(installEntry);
     if (!request) {
       showToast("此能力包没有可用的安装源", "error");
       return;
@@ -265,7 +273,7 @@ export default function PackDetailClientPage() {
 
         {/* 主操作区 */}
         <div className="flex items-center gap-2 mt-4">
-          {!installed && catalogEntry && (
+          {!installed && (catalogEntry || releaseEntry) && (
             <Button className="btn-accent" isDisabled={busy === "install"} onPress={installFromCatalog}>
               <Download size={14} /> 安装
             </Button>
