@@ -79,6 +79,26 @@ function packPrimaryPath(manifest: PackManifest): string | undefined {
   return packUsability(manifest).primaryActionPath || manifest.frontend?.menus?.[0]?.path || manifest.frontend?.routes?.[0]?.path;
 }
 
+function buildManifestDraftContent(manifest: PackManifest, goal: string): string {
+  const draft = JSON.parse(JSON.stringify(manifest)) as PackManifest;
+  const safeGoal = goal.trim() || "让这个能力包更像一个用户能直接理解和使用的功能，而不是只看到存在。";
+  const primaryPath = packPrimaryPath(manifest) || "/chat";
+  const metadata = { ...(draft.metadata || {}) };
+
+  draft.description = safeGoal;
+  metadata.descriptionStyle ||= "one-line-plus-three-examples";
+  metadata.primaryActionLabel ||= `打开并验证 ${manifest.name}`;
+  metadata.primaryActionPath ||= primaryPath;
+  metadata.example1 ||= "从 Chat 说明目标，让云雀调用该能力并返回可查看结果。";
+  metadata.example2 ||= "在能力界面查看执行状态、产物、限制与下一步操作。";
+  metadata.example3 ||= "完成后把结果保存到记忆或知识，方便下次复用。";
+  metadata.limitation ||= "改包前必须经过 diff 预览、内置审计和重新打包，不直接修改已安装版本。";
+  metadata.studioGoal = safeGoal;
+  draft.metadata = metadata;
+
+  return `${JSON.stringify(draft, null, 2)}\n`;
+}
+
 function sourceLabel(candidate: PackCandidate): string {
   if (candidate.installed && candidate.enabled) return "已启用";
   if (candidate.installed) return "已安装";
@@ -415,6 +435,18 @@ export default function PackStudioPage() {
     } finally {
       setPatching(false);
     }
+  };
+
+  const fillManifestDraft = () => {
+    if (!workspaceReport) return;
+    const manifestFile = workspaceReport.editable_files.find((file) => file.replace(/\\/g, "/").endsWith("/pack.json"))
+      || workspaceReport.editable_files.find((file) => file.replace(/\\/g, "/").endsWith("pack.json"))
+      || workspaceReport.editable_files[0]
+      || "";
+    setPatchFile(manifestFile);
+    setPatchContent(buildManifestDraftContent(workspaceReport.manifest, goal));
+    setPatchReport(null);
+    showToast("已生成 pack.json 草稿，请先预览 diff 再应用", "success");
   };
 
   const auditWorkspace = async () => {
@@ -776,7 +808,13 @@ export default function PackStudioPage() {
                         <Label>新的文件内容</Label>
                       </TextArea>
                     </div>
+                    <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+                      草稿只会填入工作区改动框；真正写入仍需先预览 diff，并在应用后运行内置审计。
+                    </div>
                     <div className="mt-3 flex flex-wrap gap-2">
+                      <Button variant="outline" onPress={fillManifestDraft}>
+                        <Sparkles size={14} /> 生成 manifest 草稿
+                      </Button>
                       <Button variant="outline" onPress={() => submitPatch(false)} isDisabled={patching}>
                         {patching ? <Spinner size="sm" /> : <FileSearch size={14} />} 预览 diff
                       </Button>
