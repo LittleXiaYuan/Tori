@@ -12,6 +12,14 @@ import { buildPackSdkEntrypoints, fetchEnabledPacks, findPackRouteBinding, forma
 import { PackDlcHost } from "@/lib/pack-dlc-host";
 import { eventPathsFromPermissions } from "@/lib/pack-bridge";
 
+const dlcBoundaryItems = [
+  "iframe 没有宿主 token，不能读取云雀本地登录态。",
+  "沙箱只允许脚本运行，不开放同源、弹窗或本机桌面能力。",
+  "backend.call 只能访问该能力包 manifest 声明的后端路由。",
+  "nav.push 只能跳转到该能力包声明的前端路径。",
+  "越权 bridge 调用会被拒绝并写入审计线索。",
+];
+
 export default function PackRuntimeRouteClientPage() {
   const pathname = usePathname() || "/packs";
   const [packs, setPacks] = useState<InstalledPack[]>([]);
@@ -87,14 +95,54 @@ export default function PackRuntimeRouteClientPage() {
       />
 
       {isIframeBundle && (
-        <PackDlcHost
-          packId={manifest.id}
-          entry={assets?.entry}
-          title={match.title || manifest.name}
-          allowedRoutes={(manifest.backend?.routeSpecs || []).map((r) => ({ method: r.method, path: r.path }))}
-          allowedNavPaths={(manifest.frontend?.routes || []).map((r) => r.path)}
-          allowedEventPaths={eventPathsFromPermissions(manifest.backend?.permissions)}
-        />
+        <Card className="section-card overflow-hidden p-0">
+          <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_320px]">
+            <div className="p-5">
+              <div className="flex flex-wrap items-center gap-2">
+                <Chip size="sm" style={{ background: "rgba(56,189,248,0.12)", color: "#38bdf8" }}>
+                  独立界面包
+                </Chip>
+                <Chip size="sm" variant="soft">iframe 沙箱</Chip>
+                <Chip size="sm" variant="soft">按声明路由调用</Chip>
+              </div>
+              <div className="mt-3 text-base font-semibold" style={{ color: "var(--yunque-text)" }}>
+                这个能力界面来自能力包本身
+              </div>
+              <div className="mt-2 max-w-3xl text-sm leading-6" style={{ color: "var(--yunque-text-secondary)" }}>
+                它不是写死在云雀主前端里的页面，而是随能力包一起下载的 DLC/iframe 前端。
+                启用后，云雀只负责加载沙箱、注入主题和转发白名单内的 bridge 调用；界面内容、交互和升级都由该能力包提供。
+              </div>
+              {manifest.metadata?.limitation && (
+                <div className="mt-3 rounded-lg p-3 text-xs leading-5" style={{ background: "rgba(245,158,11,0.10)", color: "var(--yunque-warning)" }}>
+                  {manifest.metadata.limitation}
+                </div>
+              )}
+            </div>
+            <div className="p-5" style={{ background: "rgba(34,197,94,0.06)", borderLeft: "1px solid var(--yunque-border)" }}>
+              <div className="mb-3 flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
+                <ShieldCheck size={16} style={{ color: "var(--yunque-success)" }} />
+                沙箱边界
+              </div>
+              <div className="space-y-2">
+                {dlcBoundaryItems.map((item) => (
+                  <div key={item} className="text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
+                    {item}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="px-5 pb-5">
+            <PackDlcHost
+              packId={manifest.id}
+              entry={assets?.entry}
+              title={match.title || manifest.name}
+              allowedRoutes={(manifest.backend?.routeSpecs || []).map((r) => ({ method: r.method, path: r.path }))}
+              allowedNavPaths={(manifest.frontend?.routes || []).map((r) => r.path)}
+              allowedEventPaths={eventPathsFromPermissions(manifest.backend?.permissions)}
+            />
+          </div>
+        </Card>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
