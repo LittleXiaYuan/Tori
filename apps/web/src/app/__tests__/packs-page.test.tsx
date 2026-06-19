@@ -2,6 +2,14 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import PacksPageOptimized from "../packs/page";
 
+const navigationMock = vi.hoisted(() => ({
+  query: "",
+}));
+
+vi.mock("next/navigation", () => ({
+  useSearchParams: () => new URLSearchParams(navigationMock.query),
+}));
+
 const packsClientMock = vi.hoisted(() => ({
   installed: vi.fn(),
   catalog: vi.fn(),
@@ -186,6 +194,7 @@ const planOnlyManifest = {
 describe("PacksPageOptimized", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    navigationMock.query = "";
     packsClientMock.installed.mockResolvedValue({
       packs: [
         { manifest: documentsManifest, status: "enabled", updatedAt: "2026-06-19T00:00:00Z" },
@@ -278,6 +287,16 @@ describe("PacksPageOptimized", () => {
 
     expect(screen.getByText("Documents (文档生成)")).toBeInTheDocument();
     expect(screen.getByText("Files (产物文件)")).toBeInTheDocument();
+  });
+
+  it("focuses a pack from the URL query when returning from Studio", async () => {
+    navigationMock.query = "q=yunque.pack.files";
+
+    render(<PacksPageOptimized />);
+
+    expect(await screen.findByText("Files (产物文件)")).toBeInTheDocument();
+    expect((screen.getByLabelText("搜索能力包") as HTMLInputElement).value).toBe("yunque.pack.files");
+    expect(screen.queryByText("Documents (文档生成)")).not.toBeInTheDocument();
   });
 
   it("filters source and install state without hiding official release cards", async () => {

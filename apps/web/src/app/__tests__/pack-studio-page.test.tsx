@@ -970,7 +970,7 @@ describe("PackStudioPage", () => {
     expect(screen.getByText("新 yqpack 不会自动上传或启用；先本地复检，再安装验证，最后更新发布源并回能力包中心刷新。")).toBeInTheDocument();
     expect(screen.getAllByText("上传 package_path 并保留 SHA256：" + "d".repeat(64)).length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText("更新 catalog/release 后回 /packs 刷新官方源/私有源。").length).toBeGreaterThanOrEqual(2);
-    expect(screen.getAllByRole("link", { name: /回能力包中心/ }).some((link) => link.getAttribute("href") === "/packs")).toBe(true);
+    expect(screen.getAllByRole("link", { name: /回能力包中心/ }).some((link) => link.getAttribute("href") === "/packs?q=yunque.pack.wasm-plugin")).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "复制新包信息" }));
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith(`package=C:\\yunque\\packs\\studio\\yunque.pack.wasm-plugin-0.1.0-studio.yqpack\nsha256=${"d".repeat(64)}`);
     expect(screen.getAllByText("下一步：复检新包 SHA").length).toBeGreaterThan(0);
@@ -1001,7 +1001,7 @@ describe("PackStudioPage", () => {
     expect(screen.getAllByText("已安装").length).toBeGreaterThan(0);
     expect(screen.getByRole("link", { name: /打开入口/ })).toHaveAttribute("href", "/packs/wasm-plugin");
     expect(screen.getByRole("link", { name: /查看权限与来源/ })).toHaveAttribute("href", "/packs/detail?id=yunque.pack.wasm-plugin");
-    expect(screen.getByRole("link", { name: /回中心管理/ })).toHaveAttribute("href", "/packs");
+    expect(screen.getByRole("link", { name: /回中心管理/ })).toHaveAttribute("href", "/packs?q=yunque.pack.wasm-plugin");
     expect(screen.getAllByText("下一步：确认权限后启用或回滚").length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole("button", { name: "启用" }));

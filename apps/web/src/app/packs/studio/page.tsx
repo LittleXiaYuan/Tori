@@ -203,6 +203,10 @@ function packPrimaryPath(manifest: PackManifest): string | undefined {
   return packUsability(manifest).primaryActionPath || manifest.frontend?.menus?.[0]?.path || manifest.frontend?.routes?.[0]?.path;
 }
 
+function packCenterFocusHref(packId?: string): string {
+  return packId ? `/packs?q=${encodeURIComponent(packId)}` : "/packs";
+}
+
 function buildManifestDraftContent(manifest: PackManifest, goal: string, readinessGaps: string[] = []): string {
   const draft = JSON.parse(JSON.stringify(manifest)) as PackManifest;
   const safeGoal = goal.trim() || "让这个能力包更像一个用户能直接理解和使用的功能，而不是只看到存在。";
@@ -1458,7 +1462,7 @@ export default function PackStudioPage() {
                     <FileSearch size={13} /> 查看详情
                   </Button>
                 </Link>
-                <Link href="/packs">
+                <Link href={packCenterFocusHref(manifest.id)}>
                   <Button size="sm" variant="ghost">
                     <ArrowRight size={13} /> 回能力包中心
                   </Button>
@@ -1857,7 +1861,7 @@ export default function PackStudioPage() {
                 <Copy size={13} /> 复制新包信息
               </Button>
             )}
-            <Link href="/packs">
+            <Link href={packCenterFocusHref(manifest?.id)}>
               <Button size="sm" variant="ghost">
                 回能力包中心 <ArrowRight size={13} />
               </Button>
@@ -2473,7 +2477,7 @@ export default function PackStudioPage() {
                               <Button size="sm" variant="ghost" onPress={copyDeliverySummary}>
                                 <Copy size={13} /> 复制发布交接摘要
                               </Button>
-                              <Link href="/packs">
+                              <Link href={packCenterFocusHref(manifest?.id)}>
                                 <Button size="sm" variant="outline">
                                   回能力包中心 <ArrowRight size={13} />
                                 </Button>
@@ -2544,7 +2548,7 @@ export default function PackStudioPage() {
                               <Link href={`/packs/detail?id=${encodeURIComponent(installedRepack.manifest.id)}`}>
                                 <Button size="sm" variant="ghost">查看权限与来源 <ArrowRight size={14} /></Button>
                               </Link>
-                              <Link href="/packs">
+                              <Link href={packCenterFocusHref(installedRepack.manifest.id)}>
                                 <Button size="sm" variant="ghost">回中心管理 <ArrowRight size={14} /></Button>
                               </Link>
                             </div>

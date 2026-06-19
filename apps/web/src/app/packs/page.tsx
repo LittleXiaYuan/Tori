@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Button, Card, Chip, Input, Label, Spinner, TextField } from "@heroui/react";
 import {
   ArrowRight,
@@ -379,6 +380,7 @@ function renderPagination(
 }
 
 export default function PacksPageOptimized() {
+  const searchParams = useSearchParams();
   const navigationPrefs = useNavigationPreferences();
   const { data, loading, refresh } = useApiData(async () => packsClient.installed(), { packs: [], count: 0 });
   const { data: catalog, loading: catalogLoading, refresh: refreshCatalog } = useApiData(
@@ -404,6 +406,7 @@ export default function PacksPageOptimized() {
   const [releasePage, setReleasePage] = useState(1);
   const [privatePage, setPrivatePage] = useState(1);
   const [readinessQueuePage, setReadinessQueuePage] = useState(1);
+  const searchFocus = searchParams.get("q")?.trim() || searchParams.get("packId")?.trim() || "";
 
   const packs = data?.packs || [];
   const catalogEntries = catalog?.entries || [];
@@ -576,6 +579,10 @@ export default function PacksPageOptimized() {
   );
   const batchReadinessChatHref = readinessQueue.length > 0 ? `/chat?q=${encodeURIComponent(batchReadinessPrompt)}` : "";
   const batchReadinessStudioHref = readinessQueue.length > 0 ? `/packs/studio?batch=${encodeURIComponent(batchReadinessPrompt)}` : "";
+
+  useEffect(() => {
+    if (searchFocus) setQuery(searchFocus);
+  }, [searchFocus]);
 
   useEffect(() => {
     setInstalledPage(1);
