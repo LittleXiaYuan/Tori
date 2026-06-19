@@ -561,6 +561,17 @@ describe("PackStudioPage", () => {
     });
     expect(screen.getAllByText((_, element) => /本页状态：\s*只读已检查/.test(element?.textContent || "")).length).toBeGreaterThan(0);
     expect(screen.getAllByText("只读已检查").length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getAllByRole("button", { name: "载入本页" })[1]);
+
+    expect(screen.getByText("当前能力包：Documents")).toBeInTheDocument();
+    expect(screen.getByText("当前处理：Documents")).toBeInTheDocument();
+    expect((screen.getByLabelText("这次想补强什么") as HTMLInputElement).value).toBe("批量把这些能力包补齐用途和入口。");
+    expect((screen.getByLabelText("OSS / Release URL") as HTMLInputElement).value).toBe("");
+    expect((screen.getByLabelText("SHA256") as HTMLInputElement).value).toBe("");
+    expect(screen.queryByText("已同步检查结果")).not.toBeInTheDocument();
+    expect(screen.getAllByText((_, element) => /本页状态：\s*本页已载入/.test(element?.textContent || "")).length).toBeGreaterThan(0);
+    expect(screen.getByRole("link", { name: /查看详情/ })).toHaveAttribute("href", "/packs/detail?id=yunque.pack.documents");
   });
 
   it("keeps Studio candidate selection searchable and paginated", async () => {

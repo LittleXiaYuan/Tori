@@ -740,13 +740,13 @@ export default function PackStudioPage() {
     if (selected.sha256 && !packageSHA.trim()) setPackageSHA(selected.sha256);
   }, [packagePath, packageSHA, packageUrl, selected]);
 
-  const selectCandidate = (candidate: PackCandidate) => {
-    setSelectedId(candidate.manifest.id);
-    setPackagePath("");
-    setPackageUrl(candidate.packageUrl || "");
-    setPackageSHA(candidate.sha256 || "");
+  const clearPackWorkState = () => {
     setInspectReport(null);
     setWorkspaceReport(null);
+    setPatchFile("");
+    setPatchContent("");
+    setImportedPatchPlanText("");
+    setImportedPatchDraftText("");
     setPatchReport(null);
     setAuditReport(null);
     setRepackReport(null);
@@ -754,23 +754,34 @@ export default function PackStudioPage() {
     setInstalledRepack(null);
   };
 
+  const selectCandidate = (candidate: PackCandidate) => {
+    setSelectedId(candidate.manifest.id);
+    setPackagePath("");
+    setPackageUrl(candidate.packageUrl || "");
+    setPackageSHA(candidate.sha256 || "");
+    clearPackWorkState();
+  };
+
   const selectBatchPack = (pack: { id: string; name: string; studioUrl: string; packageUrl: string; sha256: string }) => {
     const candidate = candidates.find((item) => item.manifest.id === pack.id);
     if (candidate) selectCandidate(candidate);
+    else clearPackWorkState();
     if (pack.packageUrl) {
       setPackagePath("");
       setPackageUrl(pack.packageUrl);
     }
     if (pack.sha256) setPackageSHA(pack.sha256);
+    let nextGoal = importedBatchRequest?.goal || DEFAULT_STUDIO_GOAL;
     if (pack.studioUrl) {
       try {
         const url = new URL(pack.studioUrl, window.location.origin);
         const linkedGoal = url.searchParams.get("goal");
-        if (linkedGoal) setGoal(linkedGoal);
+        if (linkedGoal) nextGoal = linkedGoal;
       } catch {
         // Keep the pasted batch visible even if a generated URL is malformed.
       }
     }
+    setGoal(nextGoal);
   };
 
   const contextCandidate = useMemo<PackCandidate | undefined>(() => {
@@ -833,6 +844,7 @@ export default function PackStudioPage() {
     setPackagePath("");
     setPackageUrl(firstPack.packageUrl || candidate?.packageUrl || "");
     setPackageSHA(firstPack.sha256 || candidate?.sha256 || "");
+    clearPackWorkState();
     if (firstPack.studioUrl) {
       try {
         const url = new URL(firstPack.studioUrl, window.location.origin);
