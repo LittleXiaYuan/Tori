@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"yunque-agent/internal/agentcore/notify"
-	"yunque-agent/internal/controlplane/gateway/gwshared"
 )
 
 // Route declares one notification HTTP route.
@@ -33,8 +32,7 @@ func (h *Handler) notifier() *notify.Notifier {
 }
 
 // RouteSpecs returns the notification surface without mounting it. Pack Runtime
-// uses this to own route registration while preserving the existing handler
-// implementation.
+// uses this to own route registration.
 func (h *Handler) RouteSpecs() []Route {
 	return []Route{
 		{Method: http.MethodGet, Path: "/api/notify/channels", Description: "List configured notification channels.", Handler: h.handleChannels},
@@ -46,17 +44,10 @@ func (h *Handler) RouteSpecs() []Route {
 	}
 }
 
-// RegisterRoutes mounts all /api/notify/* endpoints.
-func (h *Handler) RegisterRoutes(mux *http.ServeMux, auth gwshared.AuthFunc) {
-	for _, route := range h.RouteSpecs() {
-		mux.HandleFunc(route.Path, auth(route.Handler))
-	}
-}
-
 func (h *Handler) handleChannels(w http.ResponseWriter, r *http.Request) {
 	notifier := h.notifier()
 	if notifier == nil {
-		gwshared.WriteJSON(w, map[string]any{"channels": []any{}})
+		writeJSON(w, map[string]any{"channels": []any{}})
 		return
 	}
 	channels := notifier.ListChannels()
@@ -70,41 +61,41 @@ func (h *Handler) handleChannels(w http.ResponseWriter, r *http.Request) {
 			"url":     maskURL(ch.URL),
 		})
 	}
-	gwshared.WriteJSON(w, map[string]any{"channels": safe})
+	writeJSON(w, map[string]any{"channels": safe})
 }
 
 func (h *Handler) handleAdd(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		gwshared.WriteJSONStatus(w, http.StatusMethodNotAllowed, map[string]any{"error": "POST required"})
+		writeJSONStatus(w, http.StatusMethodNotAllowed, map[string]any{"error": "POST required"})
 		return
 	}
 	notifier := h.notifier()
 	if notifier == nil {
-		gwshared.WriteJSONStatus(w, http.StatusServiceUnavailable, map[string]any{"error": "notifier not available"})
+		writeJSONStatus(w, http.StatusServiceUnavailable, map[string]any{"error": "notifier not available"})
 		return
 	}
 	var ch notify.Channel
 	if err := json.NewDecoder(r.Body).Decode(&ch); err != nil {
-		gwshared.WriteJSONStatus(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 		return
 	}
 	if ch.ID == "" || ch.Type == "" || ch.Name == "" {
-		gwshared.WriteJSONStatus(w, http.StatusBadRequest, map[string]any{"error": "id, type, and name are required"})
+		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": "id, type, and name are required"})
 		return
 	}
 	ch.Enabled = true
 	notifier.AddChannel(&ch)
-	gwshared.WriteJSON(w, map[string]any{"ok": true})
+	writeJSON(w, map[string]any{"ok": true})
 }
 
 func (h *Handler) handleRemove(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		gwshared.WriteJSONStatus(w, http.StatusMethodNotAllowed, map[string]any{"error": "POST required"})
+		writeJSONStatus(w, http.StatusMethodNotAllowed, map[string]any{"error": "POST required"})
 		return
 	}
 	notifier := h.notifier()
 	if notifier == nil {
-		gwshared.WriteJSONStatus(w, http.StatusServiceUnavailable, map[string]any{"error": "notifier not available"})
+		writeJSONStatus(w, http.StatusServiceUnavailable, map[string]any{"error": "notifier not available"})
 		return
 	}
 	id := r.URL.Query().Get("id")
@@ -116,21 +107,21 @@ func (h *Handler) handleRemove(w http.ResponseWriter, r *http.Request) {
 		id = body.ID
 	}
 	if id == "" {
-		gwshared.WriteJSONStatus(w, http.StatusBadRequest, map[string]any{"error": "id required"})
+		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": "id required"})
 		return
 	}
 	notifier.RemoveChannel(id)
-	gwshared.WriteJSON(w, map[string]any{"ok": true})
+	writeJSON(w, map[string]any{"ok": true})
 }
 
 func (h *Handler) handleToggle(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		gwshared.WriteJSONStatus(w, http.StatusMethodNotAllowed, map[string]any{"error": "POST required"})
+		writeJSONStatus(w, http.StatusMethodNotAllowed, map[string]any{"error": "POST required"})
 		return
 	}
 	notifier := h.notifier()
 	if notifier == nil {
-		gwshared.WriteJSONStatus(w, http.StatusServiceUnavailable, map[string]any{"error": "notifier not available"})
+		writeJSONStatus(w, http.StatusServiceUnavailable, map[string]any{"error": "notifier not available"})
 		return
 	}
 	var body struct {
@@ -138,39 +129,39 @@ func (h *Handler) handleToggle(w http.ResponseWriter, r *http.Request) {
 		Enabled bool   `json:"enabled"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		gwshared.WriteJSONStatus(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 		return
 	}
 	ch := notifier.GetChannel(body.ID)
 	if ch == nil {
-		gwshared.WriteJSONStatus(w, http.StatusNotFound, map[string]any{"error": "channel not found"})
+		writeJSONStatus(w, http.StatusNotFound, map[string]any{"error": "channel not found"})
 		return
 	}
 	ch.Enabled = body.Enabled
 	notifier.UpdateChannel(ch)
-	gwshared.WriteJSON(w, map[string]any{"ok": true})
+	writeJSON(w, map[string]any{"ok": true})
 }
 
 func (h *Handler) handleTest(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		gwshared.WriteJSONStatus(w, http.StatusMethodNotAllowed, map[string]any{"error": "POST required"})
+		writeJSONStatus(w, http.StatusMethodNotAllowed, map[string]any{"error": "POST required"})
 		return
 	}
 	notifier := h.notifier()
 	if notifier == nil {
-		gwshared.WriteJSONStatus(w, http.StatusServiceUnavailable, map[string]any{"error": "notifier not available"})
+		writeJSONStatus(w, http.StatusServiceUnavailable, map[string]any{"error": "notifier not available"})
 		return
 	}
 	var body struct {
 		ID string `json:"id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		gwshared.WriteJSONStatus(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 		return
 	}
 	ch := notifier.GetChannel(body.ID)
 	if ch == nil {
-		gwshared.WriteJSONStatus(w, http.StatusNotFound, map[string]any{"error": "channel not found"})
+		writeJSONStatus(w, http.StatusNotFound, map[string]any{"error": "channel not found"})
 		return
 	}
 	event := notify.Event{
@@ -179,20 +170,20 @@ func (h *Handler) handleTest(w http.ResponseWriter, r *http.Request) {
 		Message: "这是一条来自云雀AI的测试通知。如果你看到这条消息，说明通知渠道配置成功。",
 	}
 	if err := notifier.SendToChannel(r.Context(), body.ID, event); err != nil {
-		gwshared.WriteJSONStatus(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 		return
 	}
-	gwshared.WriteJSON(w, map[string]any{"ok": true})
+	writeJSON(w, map[string]any{"ok": true})
 }
 
 func (h *Handler) handleShare(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		gwshared.WriteJSONStatus(w, http.StatusMethodNotAllowed, map[string]any{"error": "POST required"})
+		writeJSONStatus(w, http.StatusMethodNotAllowed, map[string]any{"error": "POST required"})
 		return
 	}
 	notifier := h.notifier()
 	if notifier == nil {
-		gwshared.WriteJSONStatus(w, http.StatusServiceUnavailable, map[string]any{"error": "notifier not available"})
+		writeJSONStatus(w, http.StatusServiceUnavailable, map[string]any{"error": "notifier not available"})
 		return
 	}
 	var body struct {
@@ -209,7 +200,7 @@ func (h *Handler) handleShare(w http.ResponseWriter, r *http.Request) {
 		} `json:"files"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		gwshared.WriteJSONStatus(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 		return
 	}
 	body.ChannelID = strings.TrimSpace(body.ChannelID)
@@ -221,25 +212,25 @@ func (h *Handler) handleShare(w http.ResponseWriter, r *http.Request) {
 		body.SessionID = body.TaskID
 	}
 	if body.ChannelID == "" {
-		gwshared.WriteJSONStatus(w, http.StatusBadRequest, map[string]any{"error": "channel_id required"})
+		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": "channel_id required"})
 		return
 	}
 	if body.Title == "" {
 		body.Title = "云雀协作同步"
 	}
 	if body.Message == "" && len(body.Files) == 0 {
-		gwshared.WriteJSONStatus(w, http.StatusBadRequest, map[string]any{"error": "message or files required"})
+		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": "message or files required"})
 		return
 	}
 	ch := notifier.GetChannel(body.ChannelID)
 	if ch == nil {
-		gwshared.WriteJSONStatus(w, http.StatusNotFound, map[string]any{"error": "channel not found"})
+		writeJSONStatus(w, http.StatusNotFound, map[string]any{"error": "channel not found"})
 		return
 	}
 
 	binding, err := notifier.CreateShareBinding(ch, body.SessionID, body.TaskID, body.Title)
 	if err != nil {
-		gwshared.WriteJSONStatus(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 		return
 	}
 	message := formatShareMessage(body.Message, body.URL, body.Files, binding.Code)
@@ -251,10 +242,10 @@ func (h *Handler) handleShare(w http.ResponseWriter, r *http.Request) {
 		URL:     body.URL,
 	}
 	if err := notifier.SendToChannel(r.Context(), body.ChannelID, event); err != nil {
-		gwshared.WriteJSONStatus(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 		return
 	}
-	gwshared.WriteJSON(w, map[string]any{
+	writeJSON(w, map[string]any{
 		"ok":      true,
 		"sent_at": time.Now().Format(time.RFC3339),
 		"share": map[string]any{
@@ -343,4 +334,15 @@ func maskURL(u string) string {
 		return u
 	}
 	return u[:20] + "..."
+}
+
+func writeJSON(w http.ResponseWriter, value any) {
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(value)
+}
+
+func writeJSONStatus(w http.ResponseWriter, status int, value any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(value)
 }

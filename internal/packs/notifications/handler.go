@@ -5,15 +5,15 @@ import (
 	"sync/atomic"
 
 	"yunque-agent/internal/agentcore/notify"
-	"yunque-agent/internal/controlplane/gateway/notifyapi"
+	"yunque-agent/internal/packs/notifications/notifyapi"
 	"yunque-agent/pkg/packruntime"
 )
 
 const PackID = "yunque.pack.notifications"
 
 // Handler exposes notification channels and sharing as a native capability pack.
-// notifyapi remains the business implementation; Pack Runtime owns lifecycle,
-// enablement and method gates.
+// Pack Runtime owns lifecycle, enablement and method gates, while notifyapi
+// contains the pack-local business HTTP implementation.
 type Handler struct {
 	api     *notifyapi.Handler
 	host    packruntime.Host

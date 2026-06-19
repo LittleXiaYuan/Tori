@@ -5,15 +5,15 @@ import (
 	"sync/atomic"
 
 	"yunque-agent/internal/connectors"
-	"yunque-agent/internal/controlplane/gateway/connectorapi"
+	"yunque-agent/internal/packs/connectors/connectorapi"
 	"yunque-agent/pkg/packruntime"
 )
 
 const PackID = "yunque.pack.connectors"
 
-// Handler exposes external connectors as a native capability pack. The
-// connectorapi package remains the business implementation; Pack Runtime owns
-// lifecycle, enablement and method gates.
+// Handler exposes external connectors as a native capability pack. Pack Runtime
+// owns lifecycle, enablement and method gates, while connectorapi contains the
+// pack-local business HTTP implementation.
 type Handler struct {
 	api     *connectorapi.Handler
 	host    packruntime.Host

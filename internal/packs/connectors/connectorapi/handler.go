@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"yunque-agent/internal/connectors"
-	"yunque-agent/internal/controlplane/gateway/gwshared"
 )
 
 // Route declares one connector HTTP route.
@@ -32,13 +31,6 @@ func (h *Handler) RouteSpecs() []Route {
 		{Method: http.MethodPost, Path: "/api/connectors/connect", Description: "Connect a connector with an API key or token.", Handler: h.handleConnect},
 		{Method: http.MethodPost, Path: "/api/connectors/disconnect", Description: "Disconnect a connector and remove saved credentials.", Handler: h.handleDisconnect},
 		{Method: http.MethodPost, Path: "/api/connectors/execute", Description: "Execute one action on a connected connector.", Handler: h.handleExecute},
-	}
-}
-
-// RegisterRoutes mounts all /api/connectors/* endpoints.
-func (h *Handler) RegisterRoutes(mux *http.ServeMux, auth gwshared.AuthFunc) {
-	for _, route := range h.RouteSpecs() {
-		mux.HandleFunc(route.Path, auth(route.Handler))
 	}
 }
 
@@ -71,7 +63,7 @@ func (h *Handler) handleList(w http.ResponseWriter, r *http.Request) {
 	}
 	registry := h.registry()
 	if registry == nil {
-		gwshared.WriteJSON(w, map[string]any{"connectors": []any{}, "error": "connector system not initialized"})
+		writeJSON(w, map[string]any{"connectors": []any{}, "error": "connector system not initialized"})
 		return
 	}
 
@@ -94,7 +86,7 @@ func (h *Handler) handleList(w http.ResponseWriter, r *http.Request) {
 			ActionCount: len(d.Actions),
 		})
 	}
-	gwshared.WriteJSON(w, map[string]any{"connectors": views})
+	writeJSON(w, map[string]any{"connectors": views})
 }
 
 func (h *Handler) handleDetail(w http.ResponseWriter, r *http.Request) {
@@ -104,21 +96,21 @@ func (h *Handler) handleDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	registry := h.registry()
 	if registry == nil {
-		gwshared.WriteJSONStatus(w, 500, map[string]any{"error": "not initialized"})
+		writeJSONStatus(w, 500, map[string]any{"error": "not initialized"})
 		return
 	}
 	connID := r.URL.Query().Get("id")
 	if connID == "" {
-		gwshared.WriteJSONStatus(w, 400, map[string]any{"error": "id parameter required"})
+		writeJSONStatus(w, 400, map[string]any{"error": "id parameter required"})
 		return
 	}
 	def := registry.GetDef(connID)
 	if def == nil {
-		gwshared.WriteJSONStatus(w, 404, map[string]any{"error": "connector not found"})
+		writeJSONStatus(w, 404, map[string]any{"error": "connector not found"})
 		return
 	}
 	inst := registry.GetInstance(connID)
-	gwshared.WriteJSON(w, map[string]any{
+	writeJSON(w, map[string]any{
 		"connector": def,
 		"supported": registry.HasHandler(connID),
 		"status":    string(inst.Status),
@@ -134,7 +126,7 @@ func (h *Handler) handleConnect(w http.ResponseWriter, r *http.Request) {
 	}
 	registry := h.registry()
 	if registry == nil {
-		gwshared.WriteJSONStatus(w, 500, map[string]any{"error": "not initialized"})
+		writeJSONStatus(w, 500, map[string]any{"error": "not initialized"})
 		return
 	}
 	var req struct {
@@ -143,11 +135,11 @@ func (h *Handler) handleConnect(w http.ResponseWriter, r *http.Request) {
 		APIKey      string `json:"api_key"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		gwshared.WriteJSONStatus(w, 400, map[string]any{"error": "invalid request body"})
+		writeJSONStatus(w, 400, map[string]any{"error": "invalid request body"})
 		return
 	}
 	if req.ConnectorID == "" {
-		gwshared.WriteJSONStatus(w, 400, map[string]any{"error": "connector_id required"})
+		writeJSONStatus(w, 400, map[string]any{"error": "connector_id required"})
 		return
 	}
 	key := req.Token
@@ -155,15 +147,15 @@ func (h *Handler) handleConnect(w http.ResponseWriter, r *http.Request) {
 		key = req.APIKey
 	}
 	if key == "" {
-		gwshared.WriteJSONStatus(w, 400, map[string]any{"error": "token or api_key required"})
+		writeJSONStatus(w, 400, map[string]any{"error": "token or api_key required"})
 		return
 	}
 	if err := registry.ConnectWithKey(r.Context(), req.ConnectorID, key); err != nil {
-		gwshared.WriteJSONStatus(w, 400, map[string]any{"error": err.Error()})
+		writeJSONStatus(w, 400, map[string]any{"error": err.Error()})
 		return
 	}
 	inst := registry.GetInstance(req.ConnectorID)
-	gwshared.WriteJSON(w, map[string]any{
+	writeJSON(w, map[string]any{
 		"ok":        true,
 		"status":    string(inst.Status),
 		"user_info": inst.UserInfo,
@@ -177,21 +169,21 @@ func (h *Handler) handleDisconnect(w http.ResponseWriter, r *http.Request) {
 	}
 	registry := h.registry()
 	if registry == nil {
-		gwshared.WriteJSONStatus(w, 500, map[string]any{"error": "not initialized"})
+		writeJSONStatus(w, 500, map[string]any{"error": "not initialized"})
 		return
 	}
 	var req struct {
 		ConnectorID string `json:"connector_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		gwshared.WriteJSONStatus(w, 400, map[string]any{"error": "invalid request body"})
+		writeJSONStatus(w, 400, map[string]any{"error": "invalid request body"})
 		return
 	}
 	if err := registry.Disconnect(r.Context(), req.ConnectorID); err != nil {
-		gwshared.WriteJSONStatus(w, 400, map[string]any{"error": err.Error()})
+		writeJSONStatus(w, 400, map[string]any{"error": err.Error()})
 		return
 	}
-	gwshared.WriteJSON(w, map[string]any{"ok": true})
+	writeJSON(w, map[string]any{"ok": true})
 }
 
 func (h *Handler) handleExecute(w http.ResponseWriter, r *http.Request) {
@@ -201,7 +193,7 @@ func (h *Handler) handleExecute(w http.ResponseWriter, r *http.Request) {
 	}
 	registry := h.registry()
 	if registry == nil {
-		gwshared.WriteJSONStatus(w, 500, map[string]any{"error": "not initialized"})
+		writeJSONStatus(w, 500, map[string]any{"error": "not initialized"})
 		return
 	}
 	var req struct {
@@ -210,13 +202,24 @@ func (h *Handler) handleExecute(w http.ResponseWriter, r *http.Request) {
 		Params      map[string]any `json:"params"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		gwshared.WriteJSONStatus(w, 400, map[string]any{"error": "invalid request body"})
+		writeJSONStatus(w, 400, map[string]any{"error": "invalid request body"})
 		return
 	}
 	result, err := registry.Execute(r.Context(), req.ConnectorID, req.ActionID, req.Params)
 	if err != nil {
-		gwshared.WriteJSONStatus(w, 400, map[string]any{"error": err.Error()})
+		writeJSONStatus(w, 400, map[string]any{"error": err.Error()})
 		return
 	}
-	gwshared.WriteJSON(w, map[string]any{"ok": true, "result": result})
+	writeJSON(w, map[string]any{"ok": true, "result": result})
+}
+
+func writeJSON(w http.ResponseWriter, value any) {
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(value)
+}
+
+func writeJSONStatus(w http.ResponseWriter, status int, value any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(value)
 }
