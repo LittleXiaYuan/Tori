@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Button, Card, Spinner, Chip } from "@heroui/react";
-import { Sparkles, Compass, Brain, MoonStar, AlertTriangle, Send } from "lucide-react";
+import { Sparkles, Compass, Brain, MoonStar, AlertTriangle, Send, ClipboardList, RefreshCw } from "lucide-react";
 import PageHeader from "@/components/page-header";
 import { formatErrorMessage } from "@/lib/error-utils";
 import { chatPromptHref } from "@/lib/pack-action-links";
@@ -14,6 +14,21 @@ import {
 } from "@/lib/inner-life-pack-client";
 
 const innerLife = createInnerLifePackClient();
+
+const useCaseCards = [
+  {
+    title: "把好奇心变成任务",
+    desc: "看到一个待探索问题后，可以直接让云雀继续调研、拆成任务，或沉淀到知识库。",
+  },
+  {
+    title: "把反思变成改进",
+    desc: "反思记录用于回看一次对话哪里做得好、哪里卡住，再把经验写进下一次提示。",
+  },
+  {
+    title: "把夜游变成缺口清单",
+    desc: "夜间周期会汇总事实、想法和技能缺口，适合第二天挑选值得补的能力。",
+  },
+];
 
 function formatTimestamp(iso: string): string {
   if (!iso) return "—";
@@ -70,13 +85,14 @@ function ColumnHeader({
   );
 }
 
-function EmptyState({ text }: { text: string }) {
+function EmptyState({ text, action }: { text: string; action?: React.ReactNode }) {
   return (
     <div
       className="text-xs px-3 py-6 text-center rounded-md"
       style={{ color: "var(--yunque-text-muted)", background: "rgba(255,255,255,0.02)" }}
     >
-      {text}
+      <div>{text}</div>
+      {action ? <div className="mt-3 flex justify-center">{action}</div> : null}
     </div>
   );
 }
@@ -90,7 +106,16 @@ function CuriosityColumn({ items, loading }: { items: CuriosityQuestion[]; loadi
           <Spinner size="sm" /> 加载中…
         </div>
       ) : items.length === 0 ? (
-        <EmptyState text="目前没有待探索的问题。空闲时段会自动生成。" />
+        <EmptyState
+          text="目前没有待探索的问题。你也可以先从一个开放问题开始，让云雀帮你生成探索方向。"
+          action={(
+            <Link href={chatPromptHref("帮我基于当前工作内容生成 3 个值得探索的问题，并说明每个问题能带来什么行动价值。")}>
+              <Button size="sm" variant="ghost">
+                <Send size={13} /> 生成探索问题
+              </Button>
+            </Link>
+          )}
+        />
       ) : (
         <div className="space-y-2">
           {items.map((q, idx) => (
@@ -137,7 +162,16 @@ function ReflectionColumn({ items, loading }: { items: TimelineEntry[]; loading:
           <Spinner size="sm" /> 加载中…
         </div>
       ) : items.length === 0 ? (
-        <EmptyState text="还没有反思记录。每次对话结束后会自动生成。" />
+        <EmptyState
+          text="还没有反思记录。完成一次对话或任务后，这里会显示可复用经验。"
+          action={(
+            <Link href={chatPromptHref("请回顾我们最近一次任务，把做得好的地方、卡住的地方和下一次改进建议整理成经验。")}>
+              <Button size="sm" variant="ghost">
+                <Send size={13} /> 生成一次复盘
+              </Button>
+            </Link>
+          )}
+        />
       ) : (
         <div className="space-y-2">
           {items.map((e) => {
@@ -186,7 +220,16 @@ function DreamingColumn({ items, loading }: { items: TimelineEntry[]; loading: b
           <Spinner size="sm" /> 加载中…
         </div>
       ) : items.length === 0 ? (
-        <EmptyState text="还没有夜游记录。02:00–05:00 期间会自动运行。" />
+        <EmptyState
+          text="还没有夜游记录。夜间周期会自动运行；也可以先让云雀列出当前能力缺口。"
+          action={(
+            <Link href={chatPromptHref("请基于当前任务和记忆，列出云雀最值得补齐的 5 个能力缺口，并给出优先级。")}>
+              <Button size="sm" variant="ghost">
+                <ClipboardList size={13} /> 查看能力缺口
+              </Button>
+            </Link>
+          )}
+        />
       ) : (
         <div className="space-y-2">
           {items.map((e) => {
@@ -250,10 +293,50 @@ export default function InnerLifePackPage() {
 
   return (
     <div className="page-root space-y-6 animate-fade-in-up">
-      <PageHeader icon={<Sparkles size={20} />} title="内在生活" />
+      <PageHeader
+        icon={<Sparkles size={20} />}
+        title="内在生活"
+        description="把云雀的好奇心、反思和夜间学习变成可继续探索的任务线索。"
+        actions={(
+          <Button variant="ghost" onPress={refresh}>
+            <RefreshCw size={14} /> 刷新
+          </Button>
+        )}
+      />
 
-      <Card className="section-card p-4 text-sm" style={{ color: "var(--yunque-text-muted)" }}>
-        在这里查看 Agent 的内心活动：好奇心想去探索的问题、每次对话后的自我反思，以及夜间梦境周期发现的事实与技能缺口。
+      <Card className="section-card overflow-hidden p-0">
+        <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_260px]">
+          <div className="p-5">
+            <div className="mb-4">
+              <div className="text-base font-semibold" style={{ color: "var(--yunque-text)" }}>这个能力包有什么用</div>
+              <div className="mt-2 max-w-3xl text-sm leading-6" style={{ color: "var(--yunque-text-secondary)" }}>
+                它不是给你看“云雀在想什么”而已，而是把空闲探索、任务复盘和夜间学习整理成下一步可执行线索。
+              </div>
+            </div>
+            <div className="grid gap-3 md:grid-cols-3">
+              {useCaseCards.map((item) => (
+                <div key={item.title} className="rounded-lg p-3" style={{ background: "var(--yunque-bg-hover)", border: "1px solid var(--yunque-border)" }}>
+                  <div className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>{item.title}</div>
+                  <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>{item.desc}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-2 p-5 lg:grid-cols-1" style={{ background: "rgba(59,130,246,0.05)", borderLeft: "1px solid var(--yunque-border)" }}>
+            <div>
+              <div className="text-2xl font-semibold" style={{ color: "var(--yunque-text)" }}>{pendingQuestions.length}</div>
+              <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>待探索问题</div>
+            </div>
+            <div>
+              <div className="text-2xl font-semibold" style={{ color: "var(--yunque-text)" }}>{reflections.length}</div>
+              <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>反思记录</div>
+            </div>
+            <div>
+              <div className="text-2xl font-semibold" style={{ color: "var(--yunque-text)" }}>{dreams.length}</div>
+              <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>夜游记录</div>
+            </div>
+          </div>
+        </div>
       </Card>
 
       {error ? (
