@@ -321,6 +321,7 @@ describe("PackStudioPage", () => {
     expect(screen.getByText("当前包：WASM 能力包")).toBeInTheDocument();
     expect(screen.getByText("0/8 已完成")).toBeInTheDocument();
     expect(screen.getAllByText("下一步：填写路径/URL 后点击只读检查").length).toBeGreaterThan(0);
+    expect(screen.getByRole("link", { name: /跳到当前操作/ })).toHaveAttribute("href", "#yqpack-check");
     expect(screen.getByText("已从能力包中心接入这个 yqpack")).toBeInTheDocument();
     expect(screen.getByText("不用回到商店手动找包；先在这里做只读检查，再进入工作区、diff 预览、审计和重新打包。这一步只校验 SHA、manifest 与文件分类，不会安装、启用或改动本地能力包。")).toBeInTheDocument();
     expect(screen.getByText("URL: https://oss.example.com/wasm-plugin.yqpack")).toBeInTheDocument();
@@ -497,6 +498,7 @@ describe("PackStudioPage", () => {
     });
     expect(screen.getByText("当前处理：WASM 能力包")).toBeInTheDocument();
     expect(screen.getAllByText((_, element) => /本页状态：\s*本页已载入/.test(element?.textContent || "")).length).toBeGreaterThan(0);
+    expect(screen.getByRole("link", { name: /跳到下一步/ })).toHaveAttribute("href", "#yqpack-check");
     expect(screen.getByText("补：使用示例")).toBeInTheDocument();
     expect(screen.getAllByText("补：用户感知位置")).toHaveLength(2);
     expect(screen.getAllByText("待载入").length).toBeGreaterThan(0);
@@ -652,6 +654,7 @@ describe("PackStudioPage", () => {
     expect(screen.getByText("回滚路径已记录")).toBeInTheDocument();
     expect(screen.getAllByText("Plan / Draft").length).toBeGreaterThan(0);
     expect(screen.getAllByText("下一步：载入草稿或交给小羽生成 Draft").length).toBeGreaterThan(0);
+    expect(screen.getByRole("link", { name: /跳到当前操作/ })).toHaveAttribute("href", "#draft-queue");
 
     expect(screen.getByText("小羽改造草稿队列")).toBeInTheDocument();
     expect(screen.getByText("从 Chat 导入 Patch Plan").closest("#import-plan")).not.toBeNull();

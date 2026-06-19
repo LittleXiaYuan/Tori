@@ -90,6 +90,7 @@ type StudioWorkflowStep = {
   state: "done" | "active" | "blocked" | "pending";
   detail: string;
   action: string;
+  targetId: string;
 };
 
 function workflowStateLabel(state: StudioWorkflowStep["state"]): string {
@@ -868,6 +869,7 @@ export default function PackStudioPage() {
         state: inspectReport ? "done" : "active",
         detail: inspectReport ? `${inspectReport.entry_count} 个文件 · ${inspectReport.editable_count} 可改` : "先检查 yqpack 内容和 SHA，不安装、不启用。",
         action: inspectReport ? "可继续准备工作区" : "填写路径/URL 后点击只读检查",
+        targetId: "yqpack-check",
       },
       {
         key: "workspace",
@@ -875,6 +877,7 @@ export default function PackStudioPage() {
         state: workspaceReport ? "done" : inspectReport?.sha256_match ? "active" : "pending",
         detail: workspaceReport ? workspaceReport.workspace_id : "创建可编辑副本，避免直接改已安装包。",
         action: workspaceReport ? "可生成或导入草稿" : "SHA 匹配后准备工作区",
+        targetId: "yqpack-check",
       },
       {
         key: "draft",
@@ -882,6 +885,7 @@ export default function PackStudioPage() {
         state: hasPreparedDraft ? "done" : workspaceReport ? "active" : "pending",
         detail: hasPreparedDraft ? "已有草稿内容，仍需先看 diff。" : hasDraftQueue ? "已有候选队列，尚未载入单文件草稿。" : "让小羽给计划，或从候选里载入单文件草稿。",
         action: hasPreparedDraft ? "点击预览 diff" : hasDraftQueue ? "载入草稿或交给小羽生成 Draft" : "导入 Plan、导入 Draft，或载入草稿",
+        targetId: workspaceReport ? "draft-queue" : "yqpack-check",
       },
       {
         key: "diff",
@@ -889,6 +893,7 @@ export default function PackStudioPage() {
         state: hasAppliedPatch ? "done" : patchReport ? "active" : hasPreparedDraft ? "active" : "pending",
         detail: patchReport ? (patchReport.applied ? "改动已写入工作区副本。" : "已有 diff 预览，尚未写入。") : "先预览，再由用户确认应用。",
         action: hasAppliedPatch ? "运行内置审计" : patchReport ? "确认后应用到工作区" : "预览 diff",
+        targetId: "studio-workflow",
       },
       {
         key: "audit",
@@ -896,6 +901,7 @@ export default function PackStudioPage() {
         state: auditBlocked ? "blocked" : auditPassed ? "done" : hasAppliedPatch ? "active" : "pending",
         detail: auditReport ? `${auditReport.change_count} 个改动 · 风险 ${auditReport.risk_level}` : "检查越权文件、不可改内容和高风险权限。",
         action: auditBlocked ? "按审计提示回退或改小范围" : auditPassed ? "可以重新打包" : "运行内置审计",
+        targetId: "studio-workflow",
       },
       {
         key: "repack",
@@ -903,6 +909,7 @@ export default function PackStudioPage() {
         state: repackReady ? "done" : auditBlocked ? "blocked" : auditPassed ? "active" : "pending",
         detail: repackReady ? `${repackReport?.size_bytes.toLocaleString()} bytes` : "生成新的 yqpack，不覆盖原包。",
         action: repackReady ? "复检新包 SHA" : auditBlocked ? "审计阻断时不能继续打包" : "重新打包",
+        targetId: "studio-workflow",
       },
       {
         key: "install",
@@ -910,6 +917,7 @@ export default function PackStudioPage() {
         state: installed ? "done" : reinspectPassed ? "active" : repackReady ? "active" : "pending",
         detail: installed ? "新包已进入本地能力包列表。" : reinspectPassed ? "SHA 已匹配，可显式安装。" : "安装前必须复检新 yqpack。",
         action: installed ? "确认权限后启用或回滚" : reinspectPassed ? "安装新包" : "复检新包",
+        targetId: "studio-workflow",
       },
       {
         key: "enable",
@@ -917,6 +925,7 @@ export default function PackStudioPage() {
         state: enabled ? "done" : installed ? "active" : "pending",
         detail: enabled ? "新能力已启用，保留禁用和回滚路径。" : "启用仍需用户明确确认。",
         action: enabled ? "打开入口或查看详情" : installed ? "启用、禁用或回滚" : "安装后再处理启用",
+        targetId: installed ? "studio-workflow" : "yqpack-check",
       },
     ];
   }, [
@@ -1464,7 +1473,12 @@ export default function PackStudioPage() {
                     当前处理：{batchActivePack?.name || batchActivePack?.id || "尚未载入队列中的能力包"}
                   </div>
                   <div className="rounded px-2 py-2 text-[11px]" style={{ background: "var(--yunque-surface)", color: "var(--yunque-text-secondary)" }}>
-                    下一步：{currentWorkflowStep?.action || "先载入一个能力包"}
+                    <div>下一步：{currentWorkflowStep?.action || "先载入一个能力包"}</div>
+                    {currentWorkflowStep?.targetId && (
+                      <a href={`#${currentWorkflowStep.targetId}`} className="mt-2 inline-flex items-center gap-1 font-medium" style={{ color: "var(--yunque-accent)" }}>
+                        跳到下一步 <ArrowRight size={12} />
+                      </a>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1563,6 +1577,11 @@ export default function PackStudioPage() {
               <div className="mt-2 text-[11px] leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
                 下一步：{currentWorkflowStep?.action || "先选择能力包"}
               </div>
+              {currentWorkflowStep?.targetId && (
+                <a href={`#${currentWorkflowStep.targetId}`} className="mt-3 inline-flex items-center gap-1 text-[11px] font-medium" style={{ color: "var(--yunque-accent)" }}>
+                  跳到当前操作 <ArrowRight size={12} />
+                </a>
+              )}
             </div>
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
               {workflowSteps.map((step, index) => (
@@ -1807,7 +1826,7 @@ export default function PackStudioPage() {
                   <div className="mt-3 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
                     工作区是可编辑副本，不会启用能力包；安装新 yqpack 前仍需重新检查、测试和确认回滚路径。
                   </div>
-                  <div className="mt-4 rounded-md border p-3" style={{ borderColor: "var(--yunque-border)" }}>
+                  <div id="studio-workflow" className="mt-4 scroll-mt-24 rounded-md border p-3" style={{ borderColor: "var(--yunque-border)" }}>
                     <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                       <div>
                         <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>改包工作流状态</div>
