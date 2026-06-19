@@ -53,6 +53,7 @@ import (
 	graphpack "yunque-agent/internal/packs/graph"
 	heartbeatpack "yunque-agent/internal/packs/heartbeat"
 	idepack "yunque-agent/internal/packs/ide"
+	identitypack "yunque-agent/internal/packs/identity"
 	innerlifepack "yunque-agent/internal/packs/innerlife"
 	instructionspack "yunque-agent/internal/packs/instructions"
 	knowledgepack "yunque-agent/internal/packs/knowledge"
@@ -265,6 +266,9 @@ func initTaskEngine(
 	// (de-shelled from the memory-routes grab-bag). Reads the knowledge graph via
 	// the existing MemoryPipeline() host accessor.
 	_ = gw.RegisterModule(graphpack.New(gw))
+	// Identity pack — owns /v1/identity/* natively and resolves the cross-channel
+	// identity resolver lazily through a narrow host accessor.
+	_ = gw.RegisterModule(identitypack.New(gw))
 
 	// Inner Life pack — exposes the soul-layer outputs (curiosity / reflection /
 	// dreaming) over a read-only HTTP surface. Registered here because the

@@ -164,6 +164,9 @@ func (g *Gateway) SetSmartRouter(r *router.Router) { g.smartRouter = r }
 // SetIdentityResolver attaches a cross-channel identity resolver.
 func (g *Gateway) SetIdentityResolver(ir *identity.Resolver) { g.identityRes = ir }
 
+// IdentityResolver exposes the cross-channel identity resolver to the identity pack.
+func (g *Gateway) IdentityResolver() *identity.Resolver { return g.identityRes }
+
 // SetHealer attaches a self-healing plugin generator.
 func (g *Gateway) SetHealer(h *selfheal.Healer) { g.healer = h }
 

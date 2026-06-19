@@ -1,0 +1,55 @@
+{
+  "id": "yunque.pack.identity",
+  "name": "Identity (统一身份)",
+  "version": "0.1.0",
+  "description": "统一身份解析：把不同渠道的用户身份合并为同一个用户画像，并查看当前已识别的身份列表。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": [
+      "identity.resolve",
+      "identity.profiles.read"
+    ],
+    "routes": [
+      "/v1/identity/resolve",
+      "/v1/identity/profiles"
+    ],
+    "permissions": [
+      "identity:read",
+      "identity:write"
+    ],
+    "routeSpecs": [
+      {
+        "method": "POST",
+        "path": "/v1/identity/resolve",
+        "description": "Resolve or create a unified identity profile for a channel user."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/identity/profiles",
+        "description": "List unified identity profiles known to the resolver."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [],
+    "assets": {
+      "type": "builtin"
+    }
+  },
+  "sdk": {
+    "typescript": "yunque-client/identity"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "group": "memory",
+    "phase": "A3",
+    "preload": "true",
+    "note": "Natively owns /v1/identity/resolve and /v1/identity/profiles through the Pack Runtime gate. It reads the identity resolver through a narrow host accessor."
+  },
+  "status": "beta"
+}

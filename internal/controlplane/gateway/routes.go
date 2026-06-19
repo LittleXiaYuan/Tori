@@ -99,9 +99,8 @@ func (g *Gateway) registerMemoryRoutes() {
 	// that pack natively (reading the memory pipeline's graph); the gateway no
 	// longer hosts these routes.
 
-	// Identity
-	g.mux.HandleFunc("/v1/identity/resolve", g.requireAuth(g.handleIdentityResolve))
-	g.mux.HandleFunc("/v1/identity/profiles", g.requireAuth(g.handleIdentityProfiles))
+	// Identity (/v1/identity/*) is owned by the identity pack
+	// (internal/packs/identity), mounted via gw.RegisterModule.
 
 	// Embeddings
 	g.mux.HandleFunc("/v1/embeddings", g.requireAuth(g.handleEmbeddings))

@@ -27,6 +27,7 @@ import (
 	forkspack "yunque-agent/internal/packs/forks"
 	heartbeatpack "yunque-agent/internal/packs/heartbeat"
 	idepack "yunque-agent/internal/packs/ide"
+	identitypack "yunque-agent/internal/packs/identity"
 	knowledgepack "yunque-agent/internal/packs/knowledge"
 	marketpack "yunque-agent/internal/packs/market"
 	mcpdispatchpack "yunque-agent/internal/packs/mcpdispatch"
@@ -83,6 +84,7 @@ var migrationPackPaths = map[string][]string{
 	federationpack.PackID:    federationpack.Paths(),
 	forkspack.PackID:         forkspack.Paths(),
 	heartbeatpack.PackID:     heartbeatpack.Paths(),
+	identitypack.PackID:      identitypack.Paths(),
 	marketpack.PackID:        marketpack.Paths(),
 	mcpdispatchpack.PackID:   mcpdispatchpack.Paths(),
 	modulespack.PackID:       modulespack.Paths(),
@@ -123,6 +125,7 @@ var migrationPackNames = map[string]string{
 	federationpack.PackID:    "Federation",
 	forkspack.PackID:         "Forks",
 	heartbeatpack.PackID:     "Heartbeat",
+	identitypack.PackID:      "Identity",
 	marketpack.PackID:        "Skill Market",
 	mcpdispatchpack.PackID:   "MCP Dispatch",
 	modulespack.PackID:       "Runtime Modules",
@@ -184,6 +187,7 @@ func registerMigrationPacks(gw *Gateway) {
 	_ = gw.RegisterModule(federationpack.New(gw))
 	_ = gw.RegisterModule(forkspack.NewProvider(gw.ForkTree, gw.ForkPersister))
 	_ = gw.RegisterModule(heartbeatpack.New(gw))
+	_ = gw.RegisterModule(identitypack.New(gw))
 	_ = gw.RegisterModule(marketpack.New(gw))
 	_ = gw.RegisterModule(mcpdispatchpack.New(gw))
 	_ = gw.RegisterModule(modulespack.New(gw))
@@ -262,6 +266,8 @@ func newTestGatewayWithMigrationPack(t *testing.T, packID string, status packrun
 		_ = gw.RegisterModule(forkspack.New(nil, nil))
 	case heartbeatpack.PackID:
 		_ = gw.RegisterModule(heartbeatpack.New(nil))
+	case identitypack.PackID:
+		_ = gw.RegisterModule(identitypack.New(gw))
 	case marketpack.PackID:
 		_ = gw.RegisterModule(marketpack.New(nil))
 	case mcpdispatchpack.PackID:
@@ -307,6 +313,7 @@ func TestMigrationPackRouteGating(t *testing.T) {
 		{"federation", federationpack.PackID, "/v1/federation/peers"},
 		{"forks", forkspack.PackID, "/v1/fork/list"},
 		{"heartbeat", heartbeatpack.PackID, "/v1/heartbeat"},
+		{"identity", identitypack.PackID, "/v1/identity/profiles"},
 		{"market", marketpack.PackID, "/v1/market/search"},
 		{"mcp-dispatch", mcpdispatchpack.PackID, "/v1/workers"},
 		{"modules", modulespack.PackID, "/v1/modules"},

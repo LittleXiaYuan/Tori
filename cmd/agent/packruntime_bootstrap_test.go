@@ -225,6 +225,23 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 		t.Fatal("expected Runtime Modules list routeSpec")
 	}
 
+	identityPack, ok := registry.Get("yunque.pack.identity")
+	if !ok {
+		t.Fatal("expected Identity builtin pack to be installed")
+	}
+	if identityPack.Status != packruntime.PackStatusEnabled {
+		t.Fatalf("expected Identity default enabled, got %s", identityPack.Status)
+	}
+	if identityPack.Manifest.SDK.TypeScript != "yunque-client/identity" {
+		t.Fatalf("unexpected Identity SDK import: %s", identityPack.Manifest.SDK.TypeScript)
+	}
+	if !hasRouteSpec(identityPack.Manifest.Backend.RouteSpecs, "POST", "/v1/identity/resolve") {
+		t.Fatal("expected Identity resolve routeSpec")
+	}
+	if !hasRouteSpec(identityPack.Manifest.Backend.RouteSpecs, "GET", "/v1/identity/profiles") {
+		t.Fatal("expected Identity profiles routeSpec")
+	}
+
 	forks, ok := registry.Get("yunque.pack.forks")
 	if !ok {
 		t.Fatal("expected Conversation Forks builtin pack to be installed")
@@ -475,7 +492,7 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 	// Count reflects the current packs/official/ set (incl. the newer
 	// console/control-plane/knowledge/memory/skills/work/workspace packs and the
 	// cognitive-layer/state packs). Adjust if the builtin pack set changes.
-	if got := len(registry.List()); got != 42 {
+	if got := len(registry.List()); got != 43 {
 		t.Fatalf("expected idempotent builtin install, got %d packs", got)
 	}
 }

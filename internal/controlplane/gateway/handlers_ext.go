@@ -362,40 +362,6 @@ func verifyFeishuRequest(h http.Header, body []byte) error {
 	return nil
 }
 
-// --- Identity API ---
-
-func (g *Gateway) handleIdentityResolve(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	if g.identityRes == nil {
-		json.NewEncoder(w).Encode(map[string]string{"error": "identity resolver not configured"})
-		return
-	}
-	if r.Method != http.MethodPost {
-		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "POST required")
-		return
-	}
-	var req struct {
-		Channel     string `json:"channel"`
-		UserID      string `json:"user_id"`
-		DisplayName string `json:"display_name"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		apperror.WriteCode(w, apperror.CodeBadRequest, "invalid request")
-		return
-	}
-	profile := g.identityRes.Resolve(req.Channel, req.UserID, req.DisplayName)
-	json.NewEncoder(w).Encode(profile)
-}
-
-func (g *Gateway) handleIdentityProfiles(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	if g.identityRes == nil {
-		json.NewEncoder(w).Encode(map[string]any{"profiles": []any{}})
-		return
-	}
-	json.NewEncoder(w).Encode(map[string]any{"profiles": g.identityRes.All()})
-}
-
 // --- Cost Tracking API ---
 
 // --- Embeddings API ---
