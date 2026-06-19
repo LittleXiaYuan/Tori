@@ -6,6 +6,7 @@ import {
   entryInstallRequest,
   formatPackInstallError,
   groupPackPermissions,
+  packPermissionSummary,
   packDeliveryProfile,
   packInstallChecklist,
   packFeatureFlags,
@@ -66,6 +67,20 @@ describe("pack-presentation", () => {
       { key: "rollback", tone: "warning" },
     ]);
     expect(packInstallChecklist(manifest)[2].detail).toContain("不执行本机桌面控制");
+    expect(packPermissionSummary(manifest)).toBe("权限：电脑使用、浏览器；需要授权后使用");
+  });
+
+  it("summarizes low-risk packs without raw permission jargon", () => {
+    const manifest: PackManifest = {
+      id: "yunque.pack.simple",
+      name: "Simple",
+      version: "0.1.0",
+      backend: {
+        permissions: [],
+      },
+    };
+
+    expect(packPermissionSummary(manifest)).toBe("权限：未声明额外权限；低风险");
   });
 
   it("marks financial trading permissions as high risk", () => {

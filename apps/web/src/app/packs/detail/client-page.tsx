@@ -43,6 +43,7 @@ import {
   packInstallChecklist,
   packDeliveryProfile,
   packFeatureFlags,
+  packPermissionSummary,
   packReadiness,
   packUsageExplanation,
   packUsability,
@@ -283,6 +284,7 @@ export default function PackDetailClientPage() {
   const sdkLanguages = Object.entries(sdk).filter(([, v]) => typeof v === "string" && v.trim());
   const permissionGroups = groupPackPermissions(permissions);
   const risk = riskProfileForPack(manifest);
+  const permissionSummary = packPermissionSummary(manifest);
   const featureFlags = packFeatureFlags(manifest);
   const surfaceLabels = capabilitySurfaceLabels(manifest);
   const usageExplanation = packUsageExplanation(manifest);
@@ -687,6 +689,9 @@ export default function PackDetailClientPage() {
               }}>
                 {risk.label}
               </Chip>
+              <div className="text-xs mt-2 font-medium" style={{ color: risk.requiresAuthorization ? "var(--yunque-warning)" : "var(--yunque-text-secondary)" }}>
+                {permissionSummary}
+              </div>
               <div className="text-xs mt-2" style={{ color: "var(--yunque-text-muted)" }}>{risk.description}</div>
               <div className="text-xs mt-2" style={{ color: "var(--yunque-text-muted)" }}>
                 不会做什么：启用能力包不会自动泄露 API Key，不会绕过云雀的权限声明，也不会获得未声明 route 的调用能力。

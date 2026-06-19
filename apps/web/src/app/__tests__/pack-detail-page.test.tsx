@@ -94,6 +94,7 @@ describe("PackDetailClientPage", () => {
     expect(screen.getByText("能力边界")).toBeInTheDocument();
     expect(screen.getAllByText(/不会自动泄露 API Key/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/此包未声明版本回滚/).length).toBeGreaterThan(0);
+    expect(screen.getByText("权限：记忆/知识；启用前建议确认")).toBeInTheDocument();
 
     const chatLink = screen.getByRole("link", { name: /问云雀怎么用/ });
     expect(chatLink).toHaveAttribute("href", expect.stringContaining("/chat?q="));
@@ -159,6 +160,7 @@ describe("PackDetailClientPage", () => {
     expect(screen.getByText("4 KB")).toBeInTheDocument();
     expect(screen.getByText(/来源：官方发布源 · example.com/)).toBeInTheDocument();
     expect(screen.getByText(/安装前可先在 Studio 只读检查包内容、SHA 与 manifest/)).toBeInTheDocument();
+    expect(screen.getByText("权限：记忆/知识；启用前建议确认")).toBeInTheDocument();
 
     const sourceStudioLink = screen.getByRole("link", { name: /先在 Studio 只读检查/ });
     expect(sourceStudioLink).toHaveAttribute("href", expect.stringContaining("/packs/studio?"));

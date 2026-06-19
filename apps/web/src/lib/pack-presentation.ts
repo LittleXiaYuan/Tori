@@ -349,6 +349,15 @@ export function groupPackPermissions(permissions: readonly string[] = []): PackP
   return [...grouped.values()].filter((group) => group.permissions.length > 0);
 }
 
+export function packPermissionSummary(manifest: PackManifest): string {
+  const groups = groupPackPermissions(manifest.backend?.permissions || []);
+  const risk = riskProfileForPack(manifest);
+  const permissionText = groups.length > 0
+    ? `权限：${groups.map((group) => group.label).join("、")}`
+    : "权限：未声明额外权限";
+  return `${permissionText}；${risk.requiresAuthorization ? "需要授权后使用" : risk.level === "medium" ? "启用前建议确认" : "低风险"}`;
+}
+
 export function riskProfileForPack(manifest: PackManifest): PackRiskProfile {
   const permissions = manifest.backend?.permissions || [];
   const groups = groupPackPermissions(permissions).map((group) => group.key);
