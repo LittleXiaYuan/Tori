@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Button, Card, Chip, Input, Label, Spinner, TextArea, TextField } from "@heroui/react";
@@ -666,7 +666,7 @@ export default function PackStudioPage() {
   const [packagePath, setPackagePath] = useState(() => searchParams.get("packagePath") || "");
   const [packageUrl, setPackageUrl] = useState(() => searchParams.get("packageUrl") || "");
   const [packageSHA, setPackageSHA] = useState(() => searchParams.get("sha256") || "");
-  const prefilledPackageSource = Boolean(searchParams.get("packagePath") || searchParams.get("packageUrl") || searchParams.get("sha256"));
+  const hasPackageSource = Boolean(packagePath.trim() || packageUrl.trim() || packageSHA.trim());
   const [inspecting, setInspecting] = useState(false);
   const [inspectReport, setInspectReport] = useState<YqpackInspectReport | null>(null);
   const [preparingWorkspace, setPreparingWorkspace] = useState(false);
@@ -692,6 +692,31 @@ export default function PackStudioPage() {
     () => candidates.find((item) => item.manifest.id === selectedId) || candidates[0],
     [candidates, selectedId],
   );
+
+  useEffect(() => {
+    if (!selected || selected.source !== "release") return;
+    if (selected.packageUrl && !packageUrl.trim()) setPackageUrl(selected.packageUrl);
+    if (selected.sha256 && !packageSHA.trim()) setPackageSHA(selected.sha256);
+  }, [packageSHA, packageUrl, selected]);
+
+  const selectCandidate = (candidate: PackCandidate) => {
+    setSelectedId(candidate.manifest.id);
+    if (candidate.source === "release") {
+      if (candidate.packageUrl) {
+        setPackagePath("");
+        setPackageUrl(candidate.packageUrl);
+      }
+      if (candidate.sha256) setPackageSHA(candidate.sha256);
+    }
+    setInspectReport(null);
+    setWorkspaceReport(null);
+    setPatchReport(null);
+    setAuditReport(null);
+    setRepackReport(null);
+    setReinspectReport(null);
+    setInstalledRepack(null);
+  };
+
   const manifest = selected?.manifest;
   const readiness = manifest ? packReadiness(manifest) : null;
   const { data: studioPlan, refresh: refreshStudioPlan } = useApiData(async () => {
@@ -1164,7 +1189,7 @@ export default function PackStudioPage() {
                   <button
                     key={candidate.manifest.id}
                     type="button"
-                    onClick={() => setSelectedId(candidate.manifest.id)}
+                    onClick={() => selectCandidate(candidate)}
                     className="rounded-md border p-3 text-left transition-colors"
                     style={{
                       borderColor: active ? "var(--yunque-accent)" : "var(--yunque-border)",
@@ -1302,7 +1327,7 @@ export default function PackStudioPage() {
                   <Input placeholder="可选" />
                 </TextField>
               </div>
-              {prefilledPackageSource && !inspectReport && (
+              {hasPackageSource && !inspectReport && (
                 <div className="mt-3 flex flex-col gap-3 rounded-md border p-3 text-xs md:flex-row md:items-start md:justify-between" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-bg-hover)", color: "var(--yunque-text-secondary)" }}>
                   <div className="flex min-w-0 gap-2">
                     <ShieldCheck size={15} style={{ color: "var(--yunque-primary)", flex: "0 0 auto" }} />

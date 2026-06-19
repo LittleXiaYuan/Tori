@@ -371,14 +371,17 @@ describe("PackStudioPage", () => {
     navigationMock.query = new URLSearchParams({
       packId: "yunque.pack.wasm-plugin",
       goal: "补一个结果面板",
-      packageUrl: "https://oss.example.com/wasm-plugin.yqpack",
-      sha256: "9".repeat(64),
     }).toString();
 
     render(<PackStudioPage />);
 
     expect((await screen.findAllByText("WASM 能力包")).length).toBeGreaterThan(0);
     expect(screen.getByText("官方源")).toBeInTheDocument();
+    await waitFor(() => {
+      expect((screen.getByLabelText("OSS / Release URL") as HTMLInputElement).value).toBe("https://oss.example.com/wasm-plugin.yqpack");
+      expect((screen.getByLabelText("SHA256") as HTMLInputElement).value).toBe("9".repeat(64));
+    });
+    expect(screen.getByText("已从能力包中心接入这个 yqpack")).toBeInTheDocument();
     await waitFor(() => {
       expect(packsClientMock.studioPlan).toHaveBeenCalledWith({
         packId: "yunque.pack.wasm-plugin",
