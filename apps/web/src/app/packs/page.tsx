@@ -142,6 +142,17 @@ function sourceName(url: string): string {
   }
 }
 
+function releaseSourceLabel(entry: PackReleaseCatalogEntry): string {
+  const configured = PACK_RELEASE_SOURCES.find((source) => source.url === entry.release_url);
+  return configured?.label || `官方源 · ${sourceName(entry.release_url)}`;
+}
+
+function privateSourceLabel(entry: PackCatalogEntry): string {
+  const source = [entry.source, entry.manifest_url, entry.manifest_path, entry.package_url]
+    .find((value): value is string => typeof value === "string" && value.trim().length > 0);
+  return source ? `私有源 · ${sourceName(source)}` : "私有源";
+}
+
 function packStudioHref(manifest: PackManifest, options?: { packageUrl?: string; sha256?: string }): string {
   const readiness = packReadiness(manifest);
   const gap = readiness.missing.length > 0
@@ -689,6 +700,8 @@ export default function PacksPageOptimized() {
                 {pagedReleaseEntries.map((entry) => renderInstallableCard(entry.manifest, {
                   key: entry.package_url,
                   source: entry.release_tag || sourceName(entry.release_url),
+                  sourceLabel: releaseSourceLabel(entry),
+                  sourceDetail: entry.package_url || entry.release_url,
                   size: formatBytes(entry.size_bytes),
                   action: catalogActionForEntry(entry),
                   busyKey: `install:${entry.package_url}`,
@@ -762,6 +775,8 @@ export default function PacksPageOptimized() {
                 {pagedPrivateCatalogEntries.map((entry) => renderInstallableCard(entry.manifest, {
                   key: entry.manifest.id,
                   source: [entry.source, entry.manifest_path, entry.manifest_url, entry.package_url].find((value): value is string => typeof value === "string"),
+                  sourceLabel: privateSourceLabel(entry),
+                  sourceDetail: [entry.package_url, entry.manifest_url, entry.manifest_path, entry.source].find((value): value is string => typeof value === "string"),
                   action: catalogActionForEntry(entry),
                   busyKey: `install:${entry.manifest.id}`,
                   onInstall: () => installCatalogEntry(entry),
@@ -867,7 +882,7 @@ export default function PacksPageOptimized() {
 
   function renderInstallableCard(
     manifest: PackManifest,
-    options: { key: string; source?: string; size?: string; action: ReturnType<typeof catalogActionForEntry>; busyKey: string; onInstall: () => void; packageUrl?: string; sha256?: string },
+    options: { key: string; source?: string; sourceLabel?: string; sourceDetail?: string; size?: string; action: ReturnType<typeof catalogActionForEntry>; busyKey: string; onInstall: () => void; packageUrl?: string; sha256?: string },
   ) {
     const badge = packStatusBadge(manifest.status);
     const risk = riskProfileForPack(manifest);
@@ -962,6 +977,15 @@ export default function PacksPageOptimized() {
         {readiness.missing.length > 0 && (
           <div className="mb-3 rounded-md p-3 text-xs" style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.18)", color: "var(--yunque-text-secondary)" }}>
             可用性体检：还缺 {readiness.missing.join("、")}。可以交给小羽优化补齐用途、入口或使用说明。
+          </div>
+        )}
+
+        {(options.sourceLabel || options.source) && (
+          <div className="mb-3 rounded-md p-3 text-xs" style={{ background: "var(--yunque-bg-hover)", border: "1px solid var(--yunque-border)", color: "var(--yunque-text-secondary)" }}>
+            <div className="font-medium" style={{ color: "var(--yunque-text)" }}>来源：{options.sourceLabel || options.source}</div>
+            {options.sourceDetail && (
+              <div className="mt-1 break-all font-mono text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>{options.sourceDetail}</div>
+            )}
           </div>
         )}
 

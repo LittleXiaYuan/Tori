@@ -240,10 +240,51 @@ describe("PacksPageOptimized", () => {
     expect(screen.getByText(/官方源 1/)).toBeInTheDocument();
     expect(screen.getByText("状态：可安装")).toBeInTheDocument();
     expect(screen.getByText("来源：官方源")).toBeInTheDocument();
+    expect(screen.getByText("来源：官方源 · example.com")).toBeInTheDocument();
+    expect(screen.getByText("https://example.com/docs.yqpack")).toBeInTheDocument();
     const remoteStudioLink = screen.getAllByRole("link", { name: /小羽优化/ })
       .find((link) => link.getAttribute("href")?.includes("yunque.pack.remote-docs"));
     expect(remoteStudioLink).toHaveAttribute("href", expect.stringContaining("packageUrl=https%3A%2F%2Fexample.com%2Fdocs.yqpack"));
     expect(remoteStudioLink).toHaveAttribute("href", expect.stringContaining("sha256=abc"));
+  });
+
+  it("shows private catalog source origin on installable cards", async () => {
+    packsClientMock.catalog.mockResolvedValueOnce({
+      generated_at: "2026-06-19T00:00:00Z",
+      sources: ["https://oss.example.com/yunque/private/catalog.json"],
+      source_reports: [{
+        source: "https://oss.example.com/yunque/private/catalog.json",
+        ok: true,
+        manifest_count: 1,
+        matched_entries: 1,
+      }],
+      count: 1,
+      installed: 0,
+      enabled: 0,
+      downloadable: 1,
+      capabilities: 1,
+      entries: [{
+        source: "https://oss.example.com/yunque/private/catalog.json",
+        manifest_url: "https://oss.example.com/yunque/private/private-pack.json",
+        package_url: "https://oss.example.com/yunque/private/private-pack.yqpack",
+        sha256: "def",
+        downloadable: true,
+        installed: false,
+        enabled: false,
+        manifest: {
+          ...filesManifest,
+          id: "yunque.pack.private-files",
+          name: "Private Files Pack",
+        },
+      }],
+    });
+
+    render(<PacksPageOptimized />);
+
+    expect(await screen.findByText("Private Files Pack")).toBeInTheDocument();
+    expect(screen.getByText("源可用")).toBeInTheDocument();
+    expect(screen.getByText("来源：私有源 · oss.example.com")).toBeInTheDocument();
+    expect(screen.getByText("https://oss.example.com/yunque/private/private-pack.yqpack")).toBeInTheDocument();
   });
 
   it("filters packs by readiness so unclear packs can be sent to Xiaoyu first", async () => {
