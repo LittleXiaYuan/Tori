@@ -8,6 +8,7 @@ const packsClientMock = vi.hoisted(() => ({
   studioPlan: vi.fn(),
   studioInspect: vi.fn(),
   studioWorkspace: vi.fn(),
+  studioPatch: vi.fn(),
 }));
 
 const toastMock = vi.hoisted(() => vi.fn());
@@ -214,6 +215,19 @@ describe("PackStudioPage", () => {
       next_steps: ["让小羽只修改 editable_files 中的文件，先给 diff 预览。"],
       warnings: [],
     });
+    packsClientMock.studioPatch.mockImplementation(({ apply }: { apply?: boolean }) => Promise.resolve({
+      generated_at: "2026-06-19T00:00:00Z",
+      workspace_path: "C:\\yunque\\packs\\studio\\yunque.pack.wasm-plugin-0.1.0-aaaaaaaaaaaa",
+      file_path: "C:\\yunque\\packs\\studio\\pack.json",
+      relative_path: "pack.json",
+      applied: Boolean(apply),
+      reason: "增加一个可查看运行结果的界面",
+      old_sha256: "b".repeat(64),
+      new_sha256: "c".repeat(64),
+      diff_preview: "diff --git a/pack.json b/pack.json\n+  \"description\": \"更清楚\"",
+      warnings: [],
+      next_steps: ["运行 audit_commands"],
+    }));
   });
 
   it("turns real pack metadata into a guarded Xiaoyu modification task", async () => {
@@ -293,6 +307,27 @@ describe("PackStudioPage", () => {
     expect(screen.getByText("go run ./cmd/yunque-plugin pack C:\\yunque\\packs\\studio\\yunque.pack.wasm-plugin-0.1.0-aaaaaaaaaaaa --out dist\\packs\\yunque.pack.wasm-plugin-0.1.0-studio.yqpack")).toBeInTheDocument();
     expect(screen.getByText("新包安装后若验证失败，执行 /v1/packs/disable 禁用新包。")).toBeInTheDocument();
     expect(screen.getByText("工作区是可编辑副本，不会启用能力包；安装新 yqpack 前仍需重新检查、测试和确认回滚路径。")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("新的文件内容"), { target: { value: "{\n  \"description\": \"更清楚\"\n}" } });
+    fireEvent.click(screen.getByRole("button", { name: "预览 diff" }));
+    await waitFor(() => {
+      expect(packsClientMock.studioPatch).toHaveBeenCalledWith({
+        workspacePath: "C:\\yunque\\packs\\studio\\yunque.pack.wasm-plugin-0.1.0-aaaaaaaaaaaa",
+        filePath: "C:\\yunque\\packs\\studio\\pack.json",
+        content: "{\n  \"description\": \"更清楚\"\n}",
+        reason: "增加一个可查看运行结果的界面",
+        apply: false,
+      });
+    });
+    const workspaceDiffPreview = await screen.findByLabelText("工作区 diff 预览") as HTMLTextAreaElement;
+    expect(workspaceDiffPreview.value).toContain("\"description\": \"更清楚\"");
+    expect(screen.getByText("仅预览")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "应用到工作区" }));
+    await waitFor(() => {
+      expect(packsClientMock.studioPatch).toHaveBeenCalledWith(expect.objectContaining({ apply: true }));
+    });
+    expect(await screen.findByText("已应用")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "复制任务" }));
 

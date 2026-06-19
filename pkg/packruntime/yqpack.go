@@ -21,6 +21,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 // ManifestSigName is the detached signature file inside a .yqpack.
@@ -29,6 +30,15 @@ const ManifestSigName = "manifest.sig"
 // ManifestPubName is the publisher reference file inside a .yqpack. It does
 // NOT contain key bytes — only "<publisherID>:<publicKeyID>".
 const ManifestPubName = "manifest.pub"
+
+const packStudioWorkspaceMarkerSuffix = ".studio.json"
+
+type packStudioWorkspaceMarker struct {
+	Kind           string    `json:"kind"`
+	WorkspaceID    string    `json:"workspace_id"`
+	OriginalSHA256 string    `json:"original_sha256"`
+	CreatedAt      time.Time `json:"created_at"`
+}
 
 // zipEpoch is the fixed timestamp written to every entry. ZIP can't represent
 // times before 1980-01-01.
@@ -332,6 +342,10 @@ func (r *Registry) PrepareStudioWorkspaceFromYqpackBytes(data []byte, source str
 		_ = os.RemoveAll(workspacePath)
 		return PackStudioWorkspaceReport{}, fmt.Errorf("yqpack: extract studio workspace: %w", err)
 	}
+	if err := writePackStudioWorkspaceMarker(workspacePath, workspaceID, inspect.SHA256, r.now().UTC()); err != nil {
+		_ = os.RemoveAll(workspacePath)
+		return PackStudioWorkspaceReport{}, err
+	}
 	report := PackStudioWorkspaceReport{
 		GeneratedAt:      r.now().UTC(),
 		WorkspacePath:    workspacePath,
@@ -365,6 +379,122 @@ func (r *Registry) PrepareStudioWorkspaceFromYqpackBytes(data []byte, source str
 	sort.Strings(report.EditableFiles)
 	sort.Strings(report.GuardedFiles)
 	return report, nil
+}
+
+// PatchStudioWorkspaceFile previews or applies a whole-file text replacement
+// inside a prepared Pack Studio workspace. It refuses path traversal and
+// non-text/high-risk artifact files.
+func PatchStudioWorkspaceFile(req PackStudioPatchRequest) (PackStudioPatchReport, error) {
+	workspacePath := strings.TrimSpace(req.WorkspacePath)
+	filePath := strings.TrimSpace(req.FilePath)
+	if workspacePath == "" || filePath == "" {
+		return PackStudioPatchReport{}, fmt.Errorf("workspace_path and file_path are required")
+	}
+	workspaceAbs, err := filepath.Abs(workspacePath)
+	if err != nil {
+		return PackStudioPatchReport{}, fmt.Errorf("pack studio patch: workspace abs: %w", err)
+	}
+	if err := validatePackStudioWorkspace(workspaceAbs); err != nil {
+		return PackStudioPatchReport{}, err
+	}
+	targetAbs := filePath
+	if !filepath.IsAbs(targetAbs) {
+		targetAbs = filepath.Join(workspaceAbs, filepath.FromSlash(filePath))
+	}
+	targetAbs, err = filepath.Abs(targetAbs)
+	if err != nil {
+		return PackStudioPatchReport{}, fmt.Errorf("pack studio patch: file abs: %w", err)
+	}
+	rel, err := filepath.Rel(workspaceAbs, targetAbs)
+	if err != nil || rel == "." || strings.HasPrefix(rel, "..") || filepath.IsAbs(rel) {
+		return PackStudioPatchReport{}, fmt.Errorf("pack studio patch: file must stay inside workspace")
+	}
+	relSlash := filepath.ToSlash(rel)
+	if !isPackStudioEditablePath(relSlash) {
+		return PackStudioPatchReport{}, fmt.Errorf("pack studio patch: %s is not an editable text file", relSlash)
+	}
+	oldBytes, err := os.ReadFile(targetAbs)
+	if err != nil {
+		return PackStudioPatchReport{}, fmt.Errorf("pack studio patch: read %s: %w", targetAbs, err)
+	}
+	if !utf8.Valid(oldBytes) || !utf8.ValidString(req.Content) {
+		return PackStudioPatchReport{}, fmt.Errorf("pack studio patch: only utf-8 text files are supported")
+	}
+	oldContent := string(oldBytes)
+	diff := packStudioTextDiff(relSlash, oldContent, req.Content)
+	report := PackStudioPatchReport{
+		GeneratedAt:   time.Now().UTC(),
+		WorkspacePath: workspaceAbs,
+		FilePath:      targetAbs,
+		RelativePath:  relSlash,
+		Applied:       false,
+		Reason:        strings.TrimSpace(req.Reason),
+		OldSHA256:     hex.EncodeToString(sha256Sum(oldBytes)),
+		NewSHA256:     hex.EncodeToString(sha256Sum([]byte(req.Content))),
+		DiffPreview:   diff,
+		NextSteps: []string{
+			"确认 diff_preview 只包含预期变更。",
+			"运行 workspace 报告中的 audit_commands。",
+			"通过后执行 repack_commands 生成新的 yqpack。",
+			"安装前重新 inspect 新 yqpack 并保留回滚路径。",
+		},
+	}
+	if oldContent == req.Content {
+		report.Warnings = append(report.Warnings, "content is unchanged")
+	}
+	if req.Apply {
+		if err := os.WriteFile(targetAbs, []byte(req.Content), 0o644); err != nil {
+			return PackStudioPatchReport{}, fmt.Errorf("pack studio patch: write %s: %w", targetAbs, err)
+		}
+		report.Applied = true
+	}
+	return report, nil
+}
+
+func writePackStudioWorkspaceMarker(workspacePath, workspaceID, originalSHA256 string, createdAt time.Time) error {
+	marker := packStudioWorkspaceMarker{
+		Kind:           "yunque-pack-studio-workspace",
+		WorkspaceID:    strings.TrimSpace(workspaceID),
+		OriginalSHA256: strings.TrimSpace(originalSHA256),
+		CreatedAt:      createdAt.UTC(),
+	}
+	data, err := json.MarshalIndent(marker, "", "  ")
+	if err != nil {
+		return fmt.Errorf("yqpack: marshal studio workspace marker: %w", err)
+	}
+	if err := os.WriteFile(packStudioWorkspaceMarkerPath(workspacePath), append(data, '\n'), 0o644); err != nil {
+		return fmt.Errorf("yqpack: write studio workspace marker: %w", err)
+	}
+	return nil
+}
+
+func validatePackStudioWorkspace(workspacePath string) error {
+	info, err := os.Stat(workspacePath)
+	if err != nil {
+		return fmt.Errorf("pack studio patch: workspace not found: %w", err)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("pack studio patch: workspace_path must be a directory")
+	}
+	if _, err := os.Stat(filepath.Join(workspacePath, ManifestFileName)); err != nil {
+		return fmt.Errorf("pack studio patch: workspace is missing pack.json: %w", err)
+	}
+	data, err := os.ReadFile(packStudioWorkspaceMarkerPath(workspacePath))
+	if err != nil {
+		return fmt.Errorf("pack studio patch: workspace was not prepared by Pack Studio")
+	}
+	var marker packStudioWorkspaceMarker
+	if err := json.Unmarshal(data, &marker); err != nil {
+		return fmt.Errorf("pack studio patch: invalid workspace marker")
+	}
+	if marker.Kind != "yunque-pack-studio-workspace" || strings.TrimSpace(marker.WorkspaceID) == "" {
+		return fmt.Errorf("pack studio patch: invalid workspace marker")
+	}
+	return nil
+}
+
+func packStudioWorkspaceMarkerPath(workspacePath string) string {
+	return workspacePath + packStudioWorkspaceMarkerSuffix
 }
 
 // InspectYqpackBytes is the byte-oriented counterpart to InspectYqpackFile. It
@@ -530,6 +660,68 @@ func packStudioWorkspaceRollbackCommands(manifest Manifest) []string {
 		"如果该包已有 previousVersion，可再执行 /v1/packs/rollback 回到上一版本。",
 		fmt.Sprintf("重新打开能力包中心确认 %s 的入口、状态和权限说明。", manifest.ID),
 	}
+}
+
+func isPackStudioEditablePath(path string) bool {
+	lower := strings.ToLower(strings.TrimSpace(path))
+	if lower == "" || strings.Contains(lower, "..") {
+		return false
+	}
+	if lower == ManifestFileName || strings.HasSuffix(lower, ".md") || strings.HasSuffix(lower, ".txt") || strings.HasSuffix(lower, ".json") || strings.HasSuffix(lower, ".html") || strings.HasSuffix(lower, ".css") || strings.HasSuffix(lower, ".js") || strings.HasSuffix(lower, ".ts") || strings.HasSuffix(lower, ".tsx") || strings.HasSuffix(lower, ".go") || strings.HasSuffix(lower, ".py") || strings.HasSuffix(lower, ".yaml") || strings.HasSuffix(lower, ".yml") {
+		return true
+	}
+	return false
+}
+
+func packStudioTextDiff(path string, oldContent string, newContent string) string {
+	oldLines := strings.Split(strings.ReplaceAll(oldContent, "\r\n", "\n"), "\n")
+	newLines := strings.Split(strings.ReplaceAll(newContent, "\r\n", "\n"), "\n")
+	var b strings.Builder
+	b.WriteString("diff --git a/")
+	b.WriteString(path)
+	b.WriteString(" b/")
+	b.WriteString(path)
+	b.WriteString("\n--- a/")
+	b.WriteString(path)
+	b.WriteString("\n+++ b/")
+	b.WriteString(path)
+	b.WriteString("\n@@ whole-file @@\n")
+	limit := max(len(oldLines), len(newLines))
+	if limit > 160 {
+		limit = 160
+	}
+	for i := 0; i < limit; i++ {
+		var oldLine, newLine string
+		oldOK := i < len(oldLines)
+		newOK := i < len(newLines)
+		if oldOK {
+			oldLine = oldLines[i]
+		}
+		if newOK {
+			newLine = newLines[i]
+		}
+		switch {
+		case oldOK && newOK && oldLine == newLine:
+			b.WriteString(" ")
+			b.WriteString(oldLine)
+			b.WriteString("\n")
+		default:
+			if oldOK {
+				b.WriteString("-")
+				b.WriteString(oldLine)
+				b.WriteString("\n")
+			}
+			if newOK {
+				b.WriteString("+")
+				b.WriteString(newLine)
+				b.WriteString("\n")
+			}
+		}
+	}
+	if max(len(oldLines), len(newLines)) > limit {
+		b.WriteString("... diff truncated for preview ...\n")
+	}
+	return b.String()
 }
 
 func sha256Sum(data []byte) []byte {

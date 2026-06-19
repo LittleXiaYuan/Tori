@@ -1675,6 +1675,88 @@ func TestPackStudioWorkspacePreparesEditableCopyWithoutInstalling(t *testing.T) 
 	}
 }
 
+func TestPackStudioPatchPreviewsAndAppliesWorkspaceText(t *testing.T) {
+	workspace := t.TempDir()
+	manifestPath := filepath.Join(workspace, packruntime.ManifestFileName)
+	if err := os.WriteFile(manifestPath, []byte("{\n  \"id\": \"yunque.pack.patch-http\"\n}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	marker := `{"kind":"yunque-pack-studio-workspace","workspace_id":"patch-http-test","original_sha256":"` + strings.Repeat("a", 64) + `","created_at":"2026-06-19T00:00:00Z"}`
+	if err := os.WriteFile(workspace+".studio.json", []byte(marker), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gw, tenants := newTestGatewayWithConfig(GatewayConfig{})
+	tenant := tenants.Register("pack-studio-patch")
+
+	content := "{\n  \"id\": \"yunque.pack.patch-http\",\n  \"name\": \"Patch HTTP\"\n}\n"
+	body, _ := json.Marshal(packruntime.PackStudioPatchRequest{
+		WorkspacePath: workspace,
+		FilePath:      packruntime.ManifestFileName,
+		Content:       content,
+		Reason:        "补齐名称",
+		Apply:         false,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/v1/packs/studio/patch", bytes.NewReader(body))
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("preview status=%d body=%s", w.Code, w.Body.String())
+	}
+	var report packruntime.PackStudioPatchReport
+	if err := json.NewDecoder(w.Body).Decode(&report); err != nil {
+		t.Fatalf("decode preview: %v", err)
+	}
+	if report.Applied || !strings.Contains(report.DiffPreview, "+  \"name\": \"Patch HTTP\"") {
+		t.Fatalf("unexpected preview report: %#v", report)
+	}
+	data, err := os.ReadFile(manifestPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "Patch HTTP") {
+		t.Fatal("preview must not write file")
+	}
+
+	body, _ = json.Marshal(packruntime.PackStudioPatchRequest{
+		WorkspacePath: workspace,
+		FilePath:      manifestPath,
+		Content:       content,
+		Reason:        "补齐名称",
+		Apply:         true,
+	})
+	req = httptest.NewRequest(http.MethodPost, "/v1/packs/studio/patch", bytes.NewReader(body))
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("apply status=%d body=%s", w.Code, w.Body.String())
+	}
+	report = packruntime.PackStudioPatchReport{}
+	if err := json.NewDecoder(w.Body).Decode(&report); err != nil {
+		t.Fatalf("decode apply: %v", err)
+	}
+	if !report.Applied {
+		t.Fatalf("expected applied report: %#v", report)
+	}
+	data, err = os.ReadFile(manifestPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "Patch HTTP") {
+		t.Fatal("apply must write file")
+	}
+
+	body, _ = json.Marshal(packruntime.PackStudioPatchRequest{WorkspacePath: workspace, FilePath: "..\\escape.txt", Content: "x"})
+	req = httptest.NewRequest(http.MethodPost, "/v1/packs/studio/patch", bytes.NewReader(body))
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected traversal rejection, got status=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
 func TestPackRoutesTogglePackStatus(t *testing.T) {
 	registry, err := packruntime.NewRegistry(t.TempDir())
 	if err != nil {

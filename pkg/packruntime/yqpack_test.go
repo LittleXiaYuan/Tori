@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func minimalManifest(id, version string) Manifest {
@@ -228,6 +229,79 @@ func TestPrepareStudioWorkspaceFromYqpackDoesNotInstall(t *testing.T) {
 	}
 	if _, err := registry.PrepareStudioWorkspaceFromYqpack(pkgPath, strings.Repeat("0", 64), "bad sha"); err == nil {
 		t.Fatal("expected sha mismatch to block workspace preparation")
+	}
+}
+
+func TestPatchStudioWorkspaceFilePreviewsAndAppliesTextOnly(t *testing.T) {
+	workspace := t.TempDir()
+	manifestPath := filepath.Join(workspace, ManifestFileName)
+	if err := os.WriteFile(manifestPath, []byte("{\n  \"id\": \"yunque.pack.patch\"\n}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := writePackStudioWorkspaceMarker(workspace, "patch-test", strings.Repeat("a", 64), time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(workspace, "backend"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	wasmPath := filepath.Join(workspace, "backend", "plugin.wasm")
+	if err := os.WriteFile(wasmPath, []byte("wasm"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	nextContent := "{\n  \"id\": \"yunque.pack.patch\",\n  \"name\": \"Patch Pack\"\n}\n"
+	preview, err := PatchStudioWorkspaceFile(PackStudioPatchRequest{
+		WorkspacePath: workspace,
+		FilePath:      ManifestFileName,
+		Content:       nextContent,
+		Reason:        "补齐名称",
+		Apply:         false,
+	})
+	if err != nil {
+		t.Fatalf("preview patch: %v", err)
+	}
+	if preview.Applied || !strings.Contains(preview.DiffPreview, "+  \"name\": \"Patch Pack\"") {
+		t.Fatalf("unexpected preview: %#v", preview)
+	}
+	data, err := os.ReadFile(manifestPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "Patch Pack") {
+		t.Fatal("preview must not write file")
+	}
+	applied, err := PatchStudioWorkspaceFile(PackStudioPatchRequest{
+		WorkspacePath: workspace,
+		FilePath:      manifestPath,
+		Content:       nextContent,
+		Reason:        "补齐名称",
+		Apply:         true,
+	})
+	if err != nil {
+		t.Fatalf("apply patch: %v", err)
+	}
+	if !applied.Applied || applied.RelativePath != ManifestFileName {
+		t.Fatalf("unexpected applied report: %#v", applied)
+	}
+	data, err = os.ReadFile(manifestPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "Patch Pack") {
+		t.Fatal("apply should write file")
+	}
+	if _, err := PatchStudioWorkspaceFile(PackStudioPatchRequest{WorkspacePath: workspace, FilePath: "..\\escape.txt", Content: "x"}); err == nil {
+		t.Fatal("expected traversal to be rejected")
+	}
+	if _, err := PatchStudioWorkspaceFile(PackStudioPatchRequest{WorkspacePath: workspace, FilePath: wasmPath, Content: "x"}); err == nil {
+		t.Fatal("expected wasm patch to be rejected")
+	}
+
+	unmarkedWorkspace := t.TempDir()
+	if err := os.WriteFile(filepath.Join(unmarkedWorkspace, ManifestFileName), []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := PatchStudioWorkspaceFile(PackStudioPatchRequest{WorkspacePath: unmarkedWorkspace, FilePath: ManifestFileName, Content: "{}"}); err == nil {
+		t.Fatal("expected unmarked workspace to be rejected")
 	}
 }
 

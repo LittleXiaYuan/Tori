@@ -34,6 +34,17 @@ type PackStudioWorkspaceRequest struct {
 	Goal        string `json:"goal,omitempty"`
 }
 
+// PackStudioPatchRequest previews or applies a controlled text change inside a
+// prepared Pack Studio workspace. It uses whole-file content replacement to
+// avoid unsafe patch parser ambiguity.
+type PackStudioPatchRequest struct {
+	WorkspacePath string `json:"workspace_path"`
+	FilePath      string `json:"file_path"`
+	Content       string `json:"content"`
+	Reason        string `json:"reason,omitempty"`
+	Apply         bool   `json:"apply"`
+}
+
 // PackStudioPlanOptions carries host-derived state that is not part of a
 // manifest, such as whether the pack is already installed or enabled.
 type PackStudioPlanOptions struct {
@@ -124,6 +135,22 @@ type PackStudioWorkspaceReport struct {
 	RollbackCommands []string            `json:"rollback_commands"`
 	NextSteps        []string            `json:"next_steps"`
 	Warnings         []string            `json:"warnings,omitempty"`
+}
+
+// PackStudioPatchReport is the preview/apply result for one controlled
+// workspace text-file change.
+type PackStudioPatchReport struct {
+	GeneratedAt   time.Time `json:"generated_at"`
+	WorkspacePath string    `json:"workspace_path"`
+	FilePath      string    `json:"file_path"`
+	RelativePath  string    `json:"relative_path"`
+	Applied       bool      `json:"applied"`
+	Reason        string    `json:"reason,omitempty"`
+	OldSHA256     string    `json:"old_sha256,omitempty"`
+	NewSHA256     string    `json:"new_sha256"`
+	DiffPreview   string    `json:"diff_preview"`
+	Warnings      []string  `json:"warnings,omitempty"`
+	NextSteps     []string  `json:"next_steps"`
 }
 
 // BuildPackStudioPlan turns a manifest into a conservative, auditable

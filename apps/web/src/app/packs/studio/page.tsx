@@ -27,7 +27,7 @@ import {
   packUsability,
   riskProfileForPack,
 } from "@/lib/pack-presentation";
-import { createPacksClient, type PackManifest, type PackStudioPlanReport, type PackStudioWorkspaceReport, type YqpackInspectReport } from "yunque-client/packs";
+import { createPacksClient, type PackManifest, type PackStudioPatchReport, type PackStudioPlanReport, type PackStudioWorkspaceReport, type YqpackInspectReport } from "yunque-client/packs";
 
 const packsClient = createPacksClient(createYunqueSDKClientOptions());
 
@@ -286,6 +286,10 @@ export default function PackStudioPage() {
   const [inspectReport, setInspectReport] = useState<YqpackInspectReport | null>(null);
   const [preparingWorkspace, setPreparingWorkspace] = useState(false);
   const [workspaceReport, setWorkspaceReport] = useState<PackStudioWorkspaceReport | null>(null);
+  const [patchFile, setPatchFile] = useState("");
+  const [patchContent, setPatchContent] = useState("");
+  const [patching, setPatching] = useState(false);
+  const [patchReport, setPatchReport] = useState<PackStudioPatchReport | null>(null);
 
   const candidates = data?.packs || [];
   const selected = useMemo(
@@ -354,11 +358,38 @@ export default function PackStudioPage() {
         goal,
       });
       setWorkspaceReport(report);
+      setPatchFile(report.editable_files[0] || "");
+      setPatchContent("");
+      setPatchReport(null);
       showToast("已准备 Pack Studio 工作区", "success");
     } catch (error) {
       showToast(error instanceof Error ? error.message : "准备工作区失败", "error");
     } finally {
       setPreparingWorkspace(false);
+    }
+  };
+
+  const submitPatch = async (apply: boolean) => {
+    if (!workspaceReport) return;
+    if (!patchFile.trim()) {
+      showToast("请选择要修改的工作区文件", "warning");
+      return;
+    }
+    setPatching(true);
+    try {
+      const report = await packsClient.studioPatch({
+        workspacePath: workspaceReport.workspace_path,
+        filePath: patchFile,
+        content: patchContent,
+        reason: goal,
+        apply,
+      });
+      setPatchReport(report);
+      showToast(apply ? "已应用到工作区" : "已生成 diff 预览", "success");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "工作区改动失败", "error");
+    } finally {
+      setPatching(false);
     }
   };
 
@@ -608,6 +639,45 @@ export default function PackStudioPage() {
                   </div>
                   <div className="mt-3 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
                     工作区是可编辑副本，不会启用能力包；安装新 yqpack 前仍需重新检查、测试和确认回滚路径。
+                  </div>
+                  <div className="mt-4 rounded-md border p-3" style={{ borderColor: "var(--yunque-border)" }}>
+                    <div className="mb-3 text-xs font-medium" style={{ color: "var(--yunque-text)" }}>工作区改动预览</div>
+                    <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+                      <TextField value={patchFile} onChange={setPatchFile}>
+                        <Label>要修改的文件</Label>
+                        <Input placeholder={workspaceReport.editable_files[0] || "选择 editable_files 中的文件"} />
+                      </TextField>
+                      <TextArea
+                        aria-label="新的文件内容"
+                        value={patchContent}
+                        onChange={(event) => setPatchContent(event.target.value)}
+                        rows={5}
+                      >
+                        <Label>新的文件内容</Label>
+                      </TextArea>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button variant="outline" onPress={() => submitPatch(false)} isDisabled={patching}>
+                        {patching ? <Spinner size="sm" /> : <FileSearch size={14} />} 预览 diff
+                      </Button>
+                      <Button variant="outline" onPress={() => submitPatch(true)} isDisabled={patching}>
+                        {patching ? <Spinner size="sm" /> : <Wrench size={14} />} 应用到工作区
+                      </Button>
+                    </div>
+                    {patchReport && (
+                      <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
+                        <TextArea aria-label="工作区 diff 预览" value={patchReport.diff_preview} readOnly rows={10} className="font-mono text-xs" />
+                        <div className="space-y-2 text-xs" style={{ color: "var(--yunque-text-secondary)" }}>
+                          <Chip size="sm" color={patchReport.applied ? "success" : "warning"}>{patchReport.applied ? "已应用" : "仅预览"}</Chip>
+                          <div className="break-all font-mono">{patchReport.relative_path}</div>
+                          <div>旧 SHA：{patchReport.old_sha256 || "-"}</div>
+                          <div>新 SHA：{patchReport.new_sha256}</div>
+                          {(patchReport.warnings || []).map((warning) => (
+                            <div key={warning} style={{ color: "var(--yunque-warning)" }}>{warning}</div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
