@@ -44,6 +44,7 @@ export type PackStudioPatchDraft = {
   reason: string;
   riskLevel: string;
   gates: string[];
+  displayText: string;
 };
 
 type PackStudioPatchPlanCandidate = PackStudioPatchPlanSummary["candidates"][number];
@@ -71,9 +72,8 @@ function contentSummary(value: unknown): { length: number; hash: string } | unde
   return { length, hash };
 }
 
-function displayTextBeforePlan(text: string): string {
-  const marker = "下面是 Pack Studio 已准备好的 Patch Plan";
-  const beforeMarker = text.includes(marker) ? text.slice(0, text.indexOf(marker)) : text;
+function displayTextWithoutJsonBlocks(text: string, marker?: string): string {
+  const beforeMarker = marker && text.includes(marker) ? text.slice(0, text.indexOf(marker)) : text;
   return beforeMarker
     .replace(/```json[\s\S]*?```/g, "")
     .trim();
@@ -142,7 +142,7 @@ export function parsePackStudioPatchPlanPrompt(text?: string): PackStudioPatchPl
           originalSha256: stringValue(workspace.original_sha256),
         },
         candidates: parsedCandidates,
-        displayText: displayTextBeforePlan(text),
+        displayText: displayTextWithoutJsonBlocks(text, "下面是 Pack Studio 已准备好的 Patch Plan"),
       };
   }
   return null;
@@ -176,6 +176,7 @@ export function parsePackStudioPatchDraftPrompt(text?: string): PackStudioPatchD
       reason: stringValue(root.reason),
       riskLevel: stringValue(root.risk_level),
       gates: stringList(root.gates),
+      displayText: displayTextWithoutJsonBlocks(text),
     };
   }
   return null;

@@ -161,6 +161,75 @@ describe("ChatMessageList file preview", () => {
     expect(screen.queryByText(/yunque.pack_studio.patch_plan.v1/)).not.toBeInTheDocument();
   });
 
+  it("renders Pack Studio patch drafts without exposing full file content", () => {
+    const onCopy = vi.fn();
+    const draftMessage = [
+      "我已经准备好单文件草稿，先回 Studio 审一下。",
+      "",
+      "```json",
+      JSON.stringify({
+        kind: "yunque.pack_studio.patch_draft.v1",
+        pack: { id: "yunque.pack.wasm-plugin", name: "WASM 能力包", version: "0.1.0" },
+        goal: "增加结果界面",
+        workspace: {
+          id: "yunque.pack.wasm-plugin-0.1.0-aaaaaaaaaaaa",
+          path: "C:\\yunque\\packs\\studio\\yunque.pack.wasm-plugin-0.1.0-aaaaaaaaaaaa",
+          original_sha256: "a".repeat(64),
+        },
+        file_path: "C:\\yunque\\packs\\studio\\pack.json",
+        content: "{\n  \"description\": \"这段完整内容不应该直接展示在 Chat 气泡里\"\n}\n",
+        reason: "补强能力说明",
+        risk_level: "low",
+        gates: ["预览 diff", "内置审计"],
+      }, null, 2),
+      "```",
+    ].join("\n");
+
+    render(<ChatMessageList {...props({
+      onCopy,
+      messages: [{ role: "assistant", content: draftMessage, id: "a1" }],
+    })} />);
+
+    expect(screen.getByText("Pack Studio Patch Draft")).toBeInTheDocument();
+    expect(screen.getByText(/WASM 能力包/)).toBeInTheDocument();
+    expect(screen.getByText(/C:\\yunque\\packs\\studio\\pack\.json/)).toBeInTheDocument();
+    expect(screen.getByText("风险：low")).toBeInTheDocument();
+    expect(screen.getByText("预览 diff")).toBeInTheDocument();
+    expect(screen.getByText("内置审计")).toBeInTheDocument();
+    expect(screen.getByText(/原因：补强能力说明/)).toBeInTheDocument();
+    expect(screen.getByText("我已经准备好单文件草稿，先回 Studio 审一下。")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /回到 Studio/ })).toHaveAttribute("href", "/packs/studio");
+    expect(screen.queryByText(/yunque.pack_studio.patch_draft.v1/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/这段完整内容不应该直接展示/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("copy").closest("button")!);
+    expect(onCopy).toHaveBeenCalledTimes(1);
+    expect(onCopy.mock.calls[0][1]).toContain("Pack Studio Patch Draft");
+    expect(onCopy.mock.calls[0][1]).toContain("完整文件内容已隐藏");
+    expect(onCopy.mock.calls[0][1]).not.toContain("yunque.pack_studio.patch_draft.v1");
+    expect(onCopy.mock.calls[0][1]).not.toContain("这段完整内容不应该直接展示");
+  });
+
+  it("does not fall back to raw JSON when a structured Pack Studio user message has no prose", () => {
+    const rawPlanOnly = [
+      "```json",
+      JSON.stringify({
+        kind: "yunque.pack_studio.patch_plan.v1",
+        pack: { id: "yunque.pack.wasm-plugin", name: "WASM 能力包", version: "0.1.0" },
+        workspace: { id: "ws-1", path: "C:\\studio\\pack", original_sha256: "a".repeat(64) },
+        candidates: [],
+      }, null, 2),
+      "```",
+    ].join("\n");
+
+    render(<ChatMessageList {...props({
+      messages: [{ role: "user", content: rawPlanOnly, id: "u-raw" }],
+    })} />);
+
+    expect(screen.getByText("Pack Studio 改包任务")).toBeInTheDocument();
+    expect(screen.queryByText(/yunque.pack_studio.patch_plan.v1/)).not.toBeInTheDocument();
+  });
+
   it("renders persisted assistant message content without raw parser or runtime diagnostics", () => {
     const onCopy = vi.fn();
     render(<ChatMessageList {...props({

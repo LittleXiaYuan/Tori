@@ -21,7 +21,12 @@ import { browserActionLabel } from "@/lib/browser-action-labels";
 import type { ChatSharePayload, Message } from "@/lib/chat-types";
 import { collectGeneratedFiles } from "@/lib/chat-utils";
 import { formatErrorMessage } from "@/lib/error-utils";
-import { parsePackStudioPatchPlanPrompt, type PackStudioPatchPlanSummary } from "@/lib/pack-studio-chat";
+import {
+  parsePackStudioPatchDraftPrompt,
+  parsePackStudioPatchPlanPrompt,
+  type PackStudioPatchDraft,
+  type PackStudioPatchPlanSummary,
+} from "@/lib/pack-studio-chat";
 import type { BrowserBridgeState, BrowserSessionNotice } from "@/components/browser-session-card";
 
 export interface ChatMessageListProps {
@@ -104,6 +109,39 @@ function displayMessageContent(msg: Message): string {
   return displayChatText(msg.content);
 }
 
+function packStudioToolSummary(content: string): string | null {
+  const draft = parsePackStudioPatchDraftPrompt(content);
+  if (draft) {
+    return [
+      draft.displayText,
+      `Pack Studio Patch Draft: ${draft.pack.name || draft.pack.id} ${draft.pack.version || ""}`.trim(),
+      `文件：${draft.filePath}`,
+      `风险：${draft.riskLevel || "未标注"}`,
+      `内容长度：${draft.content.length.toLocaleString()} chars`,
+      draft.gates.length ? `门禁：${draft.gates.join(" / ")}` : "",
+      draft.reason ? `原因：${draft.reason}` : "",
+      "完整文件内容已隐藏；请回到 /packs/studio 导入后预览 diff、运行审计、重新打包。",
+    ].filter(Boolean).join("\n");
+  }
+  const plan = parsePackStudioPatchPlanPrompt(content);
+  if (plan) {
+    return [
+      plan.displayText,
+      `Pack Studio Patch Plan: ${plan.pack.name || plan.pack.id} ${plan.pack.version || ""}`.trim(),
+      `工作区：${plan.workspace.id || plan.workspace.path}`,
+      `候选改动：${plan.candidates.length}`,
+      "完整文件内容未包含在计划里；请回到 /packs/studio 载入候选并走 diff / audit / repack。",
+    ].filter(Boolean).join("\n");
+  }
+  return null;
+}
+
+function displayMessageContentForTools(msg: Message): string {
+  const structured = packStudioToolSummary(msg.content);
+  if (structured) return msg.role === "assistant" ? displayChatText(structured) : structured;
+  return displayMessageContent(msg);
+}
+
 function renderPackStudioPlan(plan: PackStudioPatchPlanSummary) {
   return (
     <div
@@ -156,6 +194,74 @@ function renderPackStudioPlan(plan: PackStudioPatchPlanSummary) {
   );
 }
 
+function renderPackStudioDraft(draft: PackStudioPatchDraft) {
+  return (
+    <div
+      className="mb-3 rounded-xl border p-3 text-xs"
+      style={{
+        background: "rgba(16,185,129,0.08)",
+        borderColor: "rgba(16,185,129,0.22)",
+        color: "var(--yunque-text)",
+      }}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 font-semibold">
+            <Wand2 size={14} style={{ color: "var(--yunque-success)" }} />
+            <span>Pack Studio Patch Draft</span>
+          </div>
+          <div className="mt-1 truncate" style={{ color: "var(--yunque-text-muted)" }}>
+            {draft.pack.name || draft.pack.id} · {draft.pack.version || "unknown"} · 单文件草稿
+          </div>
+        </div>
+        <a
+          href="/packs/studio"
+          className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1.5 text-[11px] font-medium"
+          style={{ background: "var(--yunque-success-muted)", color: "var(--yunque-success)" }}
+        >
+          回到 Studio <ArrowRight size={11} />
+        </a>
+      </div>
+      <div className="mt-2 break-all font-mono text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
+        文件：{draft.filePath}
+      </div>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {draft.riskLevel && <Chip size="sm" variant="soft">风险：{draft.riskLevel}</Chip>}
+        <Chip size="sm" variant="soft">{draft.content.length.toLocaleString()} chars</Chip>
+        {draft.gates.map((gate) => (
+          <Chip key={`draft:${gate}`} size="sm" variant="soft">{gate}</Chip>
+        ))}
+      </div>
+      {draft.reason && (
+        <div className="mt-2 leading-5" style={{ color: "var(--yunque-text-muted)" }}>
+          原因：{draft.reason}
+        </div>
+      )}
+      <div className="mt-2 leading-5" style={{ color: "var(--yunque-text-muted)" }}>
+        完整文件内容已隐藏。请把这条消息粘贴到 Studio 的 Patch Draft 导入区，确认工作区匹配后预览 diff、运行审计，再应用和重新打包。
+      </div>
+    </div>
+  );
+}
+
+function structuredPackStudioMessage(content: string) {
+  const draft = parsePackStudioPatchDraftPrompt(content);
+  if (draft) {
+    return {
+      card: renderPackStudioDraft(draft),
+      text: draft.displayText,
+    };
+  }
+  const plan = parsePackStudioPatchPlanPrompt(content);
+  if (plan) {
+    return {
+      card: renderPackStudioPlan(plan),
+      text: plan.displayText,
+    };
+  }
+  return null;
+}
+
 export function ChatMessageList({
   messages, streaming, chatMode, currentModel,
   copiedIdx, ttsPlaying, bridgeState, resumePromptForBrowser,
@@ -192,7 +298,7 @@ export function ChatMessageList({
 
   function shareMessagePayload(msg: Message): ChatSharePayload {
     const files = collectGeneratedFiles(msg.traceEvents);
-    const content = displayMessageContent(msg).trim();
+    const content = displayMessageContentForTools(msg).trim();
     return {
       title: files.length > 0 ? `云雀任务结果 · ${files.length} 个产物` : "云雀任务结果",
       message: content.length > 6000 ? `${content.slice(0, 6000)}\n\n...已截断` : content,
@@ -202,7 +308,7 @@ export function ChatMessageList({
 
   function shareFilePayload(msg: Message, file: { path: string; name: string; size?: number }): ChatSharePayload {
     const name = file.name || file.path.split("/").pop() || file.path;
-    const summary = displayMessageContent(msg).trim();
+    const summary = displayMessageContentForTools(msg).trim();
     return {
       title: `云雀产物：${name}`,
       message: summary ? `云雀生成了产物文件：${name}\n\n${summary.slice(0, 1200)}${summary.length > 1200 ? "\n\n...已截断" : ""}` : `云雀生成了产物文件：${name}`,
@@ -231,7 +337,7 @@ export function ChatMessageList({
 
   function dispatchToAIIDEPrompt(msg: Message, file?: { path: string; name: string; size?: number }) {
     const files = file ? [file] : collectGeneratedFiles(msg.traceEvents);
-    const content = displayMessageContent(msg).trim();
+    const content = displayMessageContentForTools(msg).trim();
     const context = content.length > 4000 ? `${content.slice(0, 4000)}\n\n...已截断` : content;
     const fileLines = files.length > 0
       ? files.map((f) => `- ${f.name || f.path}: ${f.path}${f.size ? ` (${f.size} bytes)` : ""}`).join("\n")
@@ -425,7 +531,7 @@ export function ChatMessageList({
             <div className="space-y-1">
               <button
                 type="button"
-                onClick={() => onPlayTTS(msg.id, msg.content)}
+                onClick={() => onPlayTTS(msg.id, displayMessageContentForTools(msg))}
                 className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs"
                 style={{ color: "var(--yunque-text)", background: "transparent" }}
               >
@@ -556,13 +662,24 @@ export function ChatMessageList({
                 </details>
               )}
               {msg.content ? (
-                msg.role === "assistant" ? <MarkdownRenderer content={displayMessageContent(msg)} /> : (() => {
-                  const studioPlan = parsePackStudioPatchPlanPrompt(msg.content);
-                  const userContent = studioPlan?.displayText || msg.content.replace(/\[(Uploaded file|File):\s*[^\]]+\]\s*/g, "").trim();
+                msg.role === "assistant" ? (() => {
+                  const structured = structuredPackStudioMessage(msg.content);
+                  if (!structured) return <MarkdownRenderer content={displayMessageContent(msg)} />;
                   return (
                     <>
-                      {studioPlan && renderPackStudioPlan(studioPlan)}
-                      {userContent || (msg.images?.length ? null : msg.content)}
+                      {structured.card}
+                      {structured.text && <MarkdownRenderer content={displayChatText(structured.text)} />}
+                    </>
+                  );
+                })() : (() => {
+                  const structured = structuredPackStudioMessage(msg.content);
+                  const userContent = structured
+                    ? structured.text
+                    : msg.content.replace(/\[(Uploaded file|File):\s*[^\]]+\]\s*/g, "").trim();
+                  return (
+                    <>
+                      {structured?.card}
+                      {userContent || (structured || msg.images?.length ? null : msg.content)}
                     </>
                   );
                 })()
@@ -826,7 +943,7 @@ export function ChatMessageList({
                 {msg.role === "assistant" && (
                   <>
                     <Tooltip delay={0}>
-                      <Button isIconOnly variant="ghost" size="sm" onPress={() => onCopy(msg.id, displayMessageContent(msg))}>
+                      <Button isIconOnly variant="ghost" size="sm" onPress={() => onCopy(msg.id, displayMessageContentForTools(msg))}>
                         {copiedIdx === msg.id ? <Check size={11} className="text-green-400" /> : <Copy size={11} />}
                       </Button>
                       <Tooltip.Content>{copiedIdx === msg.id ? t("chat.copied") : t("chat.copy")}</Tooltip.Content>
