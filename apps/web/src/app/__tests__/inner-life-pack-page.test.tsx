@@ -59,6 +59,8 @@ describe("InnerLifePackPage", () => {
     expect(screen.getByText("待探索问题")).toBeInTheDocument();
     expect(screen.getByText("反思记录")).toBeInTheDocument();
     expect(screen.getByText("夜游记录")).toBeInTheDocument();
+    expect(screen.getByText("当前边界")).toBeInTheDocument();
+    expect(screen.getByText("不会替你自动执行任务、发送消息或修改文件；它只整理可继续处理的线索。")).toBeInTheDocument();
   });
 
   it("keeps curiosity items connected to a concrete chat action", async () => {

@@ -31,6 +31,13 @@ const useCaseCards = [
   },
 ];
 
+const boundaryItems = [
+  "不会替你自动执行任务、发送消息或修改文件；它只整理可继续处理的线索。",
+  "不会把夜游记录当成事实结论，重要内容仍需要你在 Chat 或知识库里确认。",
+  "不会持续占用前台注意力；空闲探索、反思和夜游结果都可以稍后再看。",
+  "如果相关能力包停用，这里只显示已有记录或空态引导。",
+];
+
 function formatTimestamp(iso: string): string {
   if (!iso) return "—";
   try {
@@ -325,18 +332,26 @@ export default function InnerLifePackPage() {
               ))}
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-2 p-5 lg:grid-cols-1" style={{ background: "rgba(59,130,246,0.05)", borderLeft: "1px solid var(--yunque-border)" }}>
-            <div>
-              <div className="text-2xl font-semibold" style={{ color: "var(--yunque-text)" }}>{pendingQuestions.length}</div>
-              <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>待探索问题</div>
+          <div className="p-5" style={{ background: "rgba(59,130,246,0.05)", borderLeft: "1px solid var(--yunque-border)" }}>
+            <div className="grid grid-cols-3 gap-2 lg:grid-cols-1">
+              <div>
+                <div className="text-2xl font-semibold" style={{ color: "var(--yunque-text)" }}>{pendingQuestions.length}</div>
+                <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>待探索问题</div>
+              </div>
+              <div>
+                <div className="text-2xl font-semibold" style={{ color: "var(--yunque-text)" }}>{reflections.length}</div>
+                <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>反思记录</div>
+              </div>
+              <div>
+                <div className="text-2xl font-semibold" style={{ color: "var(--yunque-text)" }}>{dreams.length}</div>
+                <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>夜游记录</div>
+              </div>
             </div>
-            <div>
-              <div className="text-2xl font-semibold" style={{ color: "var(--yunque-text)" }}>{reflections.length}</div>
-              <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>反思记录</div>
-            </div>
-            <div>
-              <div className="text-2xl font-semibold" style={{ color: "var(--yunque-text)" }}>{dreams.length}</div>
-              <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>夜游记录</div>
+            <div className="mt-5 border-t pt-4" style={{ borderColor: "var(--yunque-border)" }}>
+              <div className="mb-2 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>当前边界</div>
+              <div className="space-y-2 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
+                {boundaryItems.map((item) => <div key={item}>{item}</div>)}
+              </div>
             </div>
           </div>
         </div>

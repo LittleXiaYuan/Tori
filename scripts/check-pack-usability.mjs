@@ -74,6 +74,7 @@ function auditPack({ manifestPath, manifest }) {
   const userVisible = entryPaths.length > 0 || metadata.usability === "actionable" || metadata.usability === "experimental";
   const hasConcretePage = entryPaths.some((entryPath) => appRouteExists(entryPath));
   const usesRuntimeHost = frontendAssetsType === "iframe-bundle" || routes.some((route) => String(route.component || "").includes("PackDlcHost"));
+  const dedicatedPageProof = readDedicatedPackPageProof(entryPaths);
   const hasActionableSurface = userVisible && examples.length >= 2 && (hasConcretePage || usesRuntimeHost);
   const isBackendSupportPack =
     backendApiCount > 0 &&
@@ -101,6 +102,27 @@ function auditPack({ manifestPath, manifest }) {
     issues.push({
       code: "missing-concrete-page",
       message: "entry path does not map to an app page or runtime host",
+      blocking: true,
+    });
+  }
+  if (dedicatedPageProof.needsProof && !dedicatedPageProof.hasUsefulnessCopy) {
+    issues.push({
+      code: "missing-dedicated-page-usefulness-copy",
+      message: "dedicated pack page should explain what the pack is useful for",
+      blocking: true,
+    });
+  }
+  if (dedicatedPageProof.needsProof && !dedicatedPageProof.hasActionCopy) {
+    issues.push({
+      code: "missing-dedicated-page-action-copy",
+      message: "dedicated pack page should give the user a visible action or next step",
+      blocking: true,
+    });
+  }
+  if (dedicatedPageProof.needsProof && !dedicatedPageProof.hasBoundaryCopy) {
+    issues.push({
+      code: "missing-dedicated-page-boundary-copy",
+      message: "dedicated pack page should state current limitations or safety boundaries",
       blocking: true,
     });
   }
@@ -244,11 +266,39 @@ function isActionableUserPack({ manifest, metadata, userVisible, hasConcretePage
 }
 
 function appRouteExists(routePath) {
+  return Boolean(appPagePath(routePath));
+}
+
+function appPagePath(routePath) {
   if (typeof routePath !== "string" || !routePath.startsWith("/")) return false;
   const pathname = stripQueryAndHash(routePath);
   const segments = pathname.split("/").filter(Boolean);
   const pagePath = join(appDir, ...segments, "page.tsx");
-  return existsSync(pagePath);
+  return existsSync(pagePath) ? pagePath : "";
+}
+
+function readDedicatedPackPageProof(entryPaths) {
+  const pagePaths = unique(entryPaths
+    .map((entryPath) => ({ entryPath, pagePath: appPagePath(entryPath) }))
+    .filter(({ entryPath, pagePath }) => pagePath && stripQueryAndHash(entryPath).startsWith("/packs/"))
+    .map(({ pagePath }) => pagePath));
+
+  if (pagePaths.length === 0) {
+    return {
+      needsProof: false,
+      hasUsefulnessCopy: true,
+      hasActionCopy: true,
+      hasBoundaryCopy: true,
+    };
+  }
+
+  const content = pagePaths.map((pagePath) => readFileSync(pagePath, "utf8")).join("\n");
+  return {
+    needsProof: true,
+    hasUsefulnessCopy: /这个能力包|能力包能做什么|现在适合做什么|现在能做什么|有什么用/.test(content),
+    hasActionCopy: /可以：|导出|导入|查看|生成|运行|打开|编辑|下载|上传|扫描|创建|审批|刷新|搜索|固定|启用|禁用|回滚|计划/.test(content),
+    hasBoundaryCopy: /当前不会做什么|当前边界|不会：|不会|限制|边界|实验|alpha|Beta 关闭|当前不执行|仅计划|只读/.test(content),
+  };
 }
 
 function stripQueryAndHash(routePath) {
