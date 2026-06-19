@@ -399,6 +399,23 @@ describe("PackStudioPage", () => {
     expect(linkedPatchPlan.candidates[1].file_path).toBe("C:\\yunque\\packs\\studio\\frontend\\index.html");
     expect(linkedPatchPlan.candidates[1].content_summary.length).toBeGreaterThan(100);
 
+    const importedChatMessage = [
+      "小羽整理好了 Pack Studio Patch Plan。",
+      "",
+      "```json",
+      JSON.stringify(patchPlan, null, 2),
+      "```",
+    ].join("\n");
+    fireEvent.change(screen.getByLabelText("导入 Patch Plan JSON"), { target: { value: importedChatMessage } });
+    expect(screen.getByText("2 个候选")).toBeInTheDocument();
+    expect(screen.getByText(/包：WASM 能力包/)).toBeInTheDocument();
+    expect(screen.getByText("摘要：" + patchPlan.candidates[1].content_summary.hash)).toBeInTheDocument();
+    const importButtons = screen.getAllByRole("button", { name: "填入文件" });
+    fireEvent.click(importButtons[1]);
+    expect(screen.getByDisplayValue("C:\\yunque\\packs\\studio\\frontend\\index.html")).toBeInTheDocument();
+    expect((screen.getByLabelText("新的文件内容") as HTMLTextAreaElement).value).toBe("");
+    expect(toastMock).toHaveBeenCalledWith("已填入 Patch Plan 目标文件；请补入新内容后再预览 diff", "success");
+
     const draftButtons = screen.getAllByRole("button", { name: "载入草稿" });
     fireEvent.click(draftButtons[0]);
     const manifestDraft = screen.getByLabelText("新的文件内容") as HTMLTextAreaElement;
@@ -496,5 +513,5 @@ describe("PackStudioPage", () => {
     await waitFor(() => {
       expect(toastMock).toHaveBeenCalledWith("已复制小羽改包任务", "success");
     });
-  });
+  }, 10000);
 });

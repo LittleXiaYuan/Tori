@@ -28,6 +28,7 @@ import {
   packUsability,
   riskProfileForPack,
 } from "@/lib/pack-presentation";
+import { parsePackStudioPatchPlanPrompt } from "@/lib/pack-studio-chat";
 import { createPacksClient, type InstalledPack, type PackManifest, type PackStudioAuditReport, type PackStudioPatchReport, type PackStudioPlanReport, type PackStudioRepackReport, type PackStudioWorkspaceReport, type YqpackInspectReport } from "yunque-client/packs";
 
 const packsClient = createPacksClient(createYunqueSDKClientOptions());
@@ -464,6 +465,7 @@ export default function PackStudioPage() {
   const [workspaceReport, setWorkspaceReport] = useState<PackStudioWorkspaceReport | null>(null);
   const [patchFile, setPatchFile] = useState("");
   const [patchContent, setPatchContent] = useState("");
+  const [importedPatchPlanText, setImportedPatchPlanText] = useState("");
   const [patching, setPatching] = useState(false);
   const [patchReport, setPatchReport] = useState<PackStudioPatchReport | null>(null);
   const [auditing, setAuditing] = useState(false);
@@ -504,6 +506,10 @@ export default function PackStudioPage() {
     [workspaceReport, draftCandidates, goal],
   );
   const patchPlanChatHref = patchPlan ? `/chat?q=${encodeURIComponent(buildPatchPlanPrompt(prompt, patchPlan))}` : "";
+  const importedPatchPlan = useMemo(
+    () => parsePackStudioPatchPlanPrompt(importedPatchPlanText),
+    [importedPatchPlanText],
+  );
 
   const copyPrompt = async () => {
     if (!prompt) return;
@@ -608,6 +614,13 @@ export default function PackStudioPage() {
     setPatchContent(candidate.content);
     setPatchReport(null);
     showToast(`已生成 ${candidate.label}，请先预览 diff 再应用`, "success");
+  };
+
+  const fillImportedPatchCandidate = (candidate: NonNullable<typeof importedPatchPlan>["candidates"][number]) => {
+    setPatchFile(candidate.filePath);
+    setPatchContent("");
+    setPatchReport(null);
+    showToast("已填入 Patch Plan 目标文件；请补入新内容后再预览 diff", "success");
   };
 
   const auditWorkspace = async () => {
@@ -978,6 +991,66 @@ export default function PackStudioPage() {
                     </div>
                     <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
                       草稿只会填入工作区改动框；真正写入仍需先预览 diff，并在应用后运行内置审计。
+                    </div>
+                    <div className="mt-3 rounded-md border p-3" style={{ borderColor: "var(--yunque-border)" }}>
+                      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>从 Chat 导入 Patch Plan</div>
+                          <div className="mt-1 text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
+                            粘贴小羽整理出的 Patch Plan，只解析工作区、候选文件、风险和门禁；不会自动应用内容。
+                          </div>
+                        </div>
+                        {importedPatchPlan && (
+                          <Chip size="sm" color="success">{importedPatchPlan.candidates.length} 个候选</Chip>
+                        )}
+                      </div>
+                      <TextArea
+                        aria-label="导入 Patch Plan JSON"
+                        value={importedPatchPlanText}
+                        onChange={(event) => setImportedPatchPlanText(event.target.value)}
+                        rows={4}
+                      >
+                        <Label>Patch Plan JSON 或 Chat 消息</Label>
+                      </TextArea>
+                      {importedPatchPlanText.trim() && !importedPatchPlan && (
+                        <div className="mt-2 rounded px-2 py-1 text-[11px]" style={{ background: "rgba(248,113,113,0.08)", color: "var(--yunque-danger)" }}>
+                          未识别到 yunque.pack_studio.patch_plan.v1。请粘贴完整 JSON fenced block 或原始 Chat 消息。
+                        </div>
+                      )}
+                      {importedPatchPlan && (
+                        <div className="mt-3 space-y-2">
+                          <div className="grid gap-2 text-[11px] lg:grid-cols-2" style={{ color: "var(--yunque-text-muted)" }}>
+                            <div className="rounded px-2 py-1" style={{ background: "var(--yunque-bg-hover)" }}>
+                              包：{importedPatchPlan.pack.name || importedPatchPlan.pack.id} · {importedPatchPlan.pack.version || "unknown"}
+                            </div>
+                            <div className="rounded px-2 py-1 font-mono" style={{ background: "var(--yunque-bg-hover)" }}>
+                              工作区：{importedPatchPlan.workspace.id || importedPatchPlan.workspace.path}
+                            </div>
+                          </div>
+                          <div className="grid gap-2 lg:grid-cols-2">
+                            {importedPatchPlan.candidates.map((candidate) => (
+                              <div key={`${candidate.key}:${candidate.filePath}`} className="rounded-md border p-2" style={{ borderColor: "var(--yunque-border)" }}>
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <span className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>{candidate.label || "候选改动"}</span>
+                                    {candidate.riskLevel && <Chip size="sm" variant="soft">风险：{candidate.riskLevel}</Chip>}
+                                    {candidate.contentSummary && <Chip size="sm" variant="soft">摘要：{candidate.contentSummary.hash}</Chip>}
+                                  </div>
+                                  <Button size="sm" variant="outline" onPress={() => fillImportedPatchCandidate(candidate)} isDisabled={!candidate.applyable}>
+                                    <FileSearch size={13} /> 填入文件
+                                  </Button>
+                                </div>
+                                <div className="mt-1 truncate font-mono text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>{candidate.filePath}</div>
+                                <div className="mt-2 flex flex-wrap gap-1">
+                                  {candidate.gates.map((gate) => (
+                                    <Chip key={`${candidate.key}:${gate}`} size="sm" variant="soft">{gate}</Chip>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                     {draftCandidates.length > 0 && (
                       <div className="mt-3 rounded-md p-2" style={{ background: "var(--yunque-bg-hover)" }}>
