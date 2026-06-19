@@ -490,8 +490,16 @@ describe("PackStudioPage", () => {
     expect(screen.getByText("逐包处理")).toBeInTheDocument();
     expect(screen.getByText("目标：批量把这些能力包补齐用途和入口。")).toBeInTheDocument();
     expect(screen.getByText("规则：不要自动应用改动。；回到 Pack Studio 预览 diff / 审计 / 重新打包。")).toBeInTheDocument();
+    expect(screen.getByText("批量处理进度")).toBeInTheDocument();
+    expect(screen.getByText("逐包载入、逐包检查、逐包重打包；Studio 不会把批量任务自动应用到多个能力包。")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getAllByText((_, element) => /批量进度：\s*1\s*\/\s*2/.test(element?.textContent || "")).length).toBeGreaterThan(0);
+    });
+    expect(screen.getByText("当前处理：WASM 能力包")).toBeInTheDocument();
+    expect(screen.getAllByText((_, element) => /本页状态：\s*本页已载入/.test(element?.textContent || "")).length).toBeGreaterThan(0);
     expect(screen.getByText("补：使用示例")).toBeInTheDocument();
     expect(screen.getAllByText("补：用户感知位置")).toHaveLength(2);
+    expect(screen.getAllByText("待载入").length).toBeGreaterThan(0);
     expect(screen.getByText("yqpack：https://oss.example.com/wasm-plugin.yqpack")).toBeInTheDocument();
     expect(screen.getByText(`SHA：${"9".repeat(64)}`)).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: /打开 Studio/ })[0]).toHaveAttribute("href", expect.stringContaining("packId=yunque.pack.wasm-plugin"));
@@ -502,6 +510,18 @@ describe("PackStudioPage", () => {
     expect((screen.getByLabelText("OSS / Release URL") as HTMLInputElement).value).toBe("https://oss.example.com/wasm-plugin.yqpack");
     expect((screen.getByLabelText("SHA256") as HTMLInputElement).value).toBe("9".repeat(64));
     expect(screen.getByText("已从能力包中心接入这个 yqpack")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "立即只读检查" }));
+    await waitFor(() => {
+      expect(packsClientMock.studioInspect).toHaveBeenCalledWith({
+        packagePath: undefined,
+        packageUrl: "https://oss.example.com/wasm-plugin.yqpack",
+        sha256: "9".repeat(64),
+        goal: "补齐 WASM 用途",
+      });
+    });
+    expect(screen.getAllByText((_, element) => /本页状态：\s*只读已检查/.test(element?.textContent || "")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("只读已检查").length).toBeGreaterThan(0);
   });
 
   it("keeps Studio candidate selection searchable and paginated", async () => {

@@ -804,6 +804,30 @@ export default function PackStudioPage() {
     () => parsePackStudioBatchDraftRequestPrompt(importedBatchText),
     [importedBatchText],
   );
+  useEffect(() => {
+    if (selectedId || !importedBatchRequest?.packs.length || candidates.length === 0) return;
+    const firstPack = importedBatchRequest.packs.find((pack) => candidates.some((candidate) => candidate.manifest.id === pack.id));
+    if (!firstPack) return;
+    const candidate = candidates.find((item) => item.manifest.id === firstPack.id);
+    setSelectedId(firstPack.id);
+    setPackagePath("");
+    setPackageUrl(firstPack.packageUrl || candidate?.packageUrl || "");
+    setPackageSHA(firstPack.sha256 || candidate?.sha256 || "");
+    if (firstPack.studioUrl) {
+      try {
+        const url = new URL(firstPack.studioUrl, window.location.origin);
+        const linkedGoal = url.searchParams.get("goal");
+        if (linkedGoal) setGoal(linkedGoal);
+      } catch {
+        // Keep the pasted batch request usable even if a generated URL is malformed.
+      }
+    }
+  }, [candidates, importedBatchRequest, selectedId]);
+  const batchActiveIndex = useMemo(
+    () => importedBatchRequest?.packs.findIndex((pack) => pack.id === manifest?.id) ?? -1,
+    [importedBatchRequest, manifest?.id],
+  );
+  const batchActivePack = batchActiveIndex >= 0 ? importedBatchRequest?.packs[batchActiveIndex] : undefined;
   const importedPatchPlan = useMemo(
     () => parsePackStudioPatchPlanPrompt(importedPatchPlanText),
     [importedPatchPlanText],
@@ -920,6 +944,21 @@ export default function PackStudioPage() {
     () => workflowSteps.filter((step) => step.state === "done").length,
     [workflowSteps],
   );
+  const batchActiveStage = useMemo(() => {
+    if (!batchActivePack) return "未载入";
+    if (installedRepack?.manifest.id === batchActivePack.id && installedRepack.status === "enabled") return "已启用";
+    if (installedRepack?.manifest.id === batchActivePack.id) return "已安装";
+    if (reinspectReport?.sha256_match) return "已复检";
+    if (repackReport) return "已重打包";
+    if (auditReport?.allowed === true) return "审计通过";
+    if (auditReport?.allowed === false) return "审计阻断";
+    if (patchReport?.applied) return "已应用 diff";
+    if (patchReport) return "已预览 diff";
+    if (patchContent.trim()) return "草稿已载入";
+    if (workspaceReport) return "工作区已准备";
+    if (inspectReport) return "只读已检查";
+    return "本页已载入";
+  }, [auditReport, batchActivePack, inspectReport, installedRepack, patchContent, patchReport, reinspectReport, repackReport, workspaceReport]);
   const releaseChecklist = useMemo(() => [
     {
       label: "原包已只读检查",
@@ -1403,18 +1442,53 @@ export default function PackStudioPage() {
                   规则：{importedBatchRequest.rules.slice(0, 2).join("；") || "不要自动应用改动，先回到 Studio 预览 diff / 审计 / 重新打包。"}
                 </div>
               </div>
+              <div className="rounded-md border p-3" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-bg-hover)" }}>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>批量处理进度</div>
+                    <div className="mt-1 text-[11px] leading-5" style={{ color: "var(--yunque-text-muted)" }}>
+                      逐包载入、逐包检查、逐包重打包；Studio 不会把批量任务自动应用到多个能力包。
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Chip size="sm" color={batchActiveIndex >= 0 ? "success" : "warning"}>
+                      批量进度：{batchActiveIndex >= 0 ? batchActiveIndex + 1 : 0} / {importedBatchRequest.packs.length}
+                    </Chip>
+                    <Chip size="sm" variant="soft">
+                      本页状态：{batchActiveStage}
+                    </Chip>
+                  </div>
+                </div>
+                <div className="mt-2 grid gap-2 md:grid-cols-2">
+                  <div className="rounded px-2 py-2 text-[11px]" style={{ background: "var(--yunque-surface)", color: "var(--yunque-text-secondary)" }}>
+                    当前处理：{batchActivePack?.name || batchActivePack?.id || "尚未载入队列中的能力包"}
+                  </div>
+                  <div className="rounded px-2 py-2 text-[11px]" style={{ background: "var(--yunque-surface)", color: "var(--yunque-text-secondary)" }}>
+                    下一步：{currentWorkflowStep?.action || "先载入一个能力包"}
+                  </div>
+                </div>
+              </div>
               <div className="grid gap-2 lg:grid-cols-2">
                 {importedBatchRequest.packs.map((pack) => {
                   const candidate = candidates.find((item) => item.manifest.id === pack.id);
                   const href = pack.studioUrl || `/packs/studio?packId=${encodeURIComponent(pack.id)}`;
+                  const active = pack.id === manifest?.id;
                   return (
-                    <div key={`${pack.id}:${pack.studioUrl}`} className="rounded-md border p-3" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-surface)" }}>
+                    <div
+                      key={`${pack.id}:${pack.studioUrl}`}
+                      className="rounded-md border p-3"
+                      style={{
+                        borderColor: active ? "var(--yunque-accent)" : "var(--yunque-border)",
+                        background: active ? "rgba(59,130,246,0.08)" : "var(--yunque-surface)",
+                      }}
+                    >
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div className="min-w-0">
                           <div className="truncate text-xs font-medium" style={{ color: "var(--yunque-text)" }}>{pack.name || pack.id}</div>
                           <div className="mt-1 truncate font-mono text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>{pack.id}</div>
                         </div>
                         <div className="flex flex-wrap gap-1">
+                          <Chip size="sm" color={active ? "success" : "default"}>{active ? batchActiveStage : "待载入"}</Chip>
                           {pack.readiness && <Chip size="sm" color={pack.readiness.includes("入口") ? "danger" : "warning"}>{pack.readiness}</Chip>}
                           <Chip size="sm" variant="soft">{pack.source || "来源未知"}</Chip>
                         </div>
