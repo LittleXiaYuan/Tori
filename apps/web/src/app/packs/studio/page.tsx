@@ -788,6 +788,7 @@ export default function PackStudioPage() {
   const analysis = studioPlan && studioPlan.packId === manifest?.id && studioPlan.goal === goal ? studioPlan : fallbackAnalysis;
   const prompt = manifest ? withReadinessPrompt(analysis?.prompt || buildXiaoyuPrompt(manifest, goal), manifest) : "";
   const chatHref = `/chat?q=${encodeURIComponent(prompt)}`;
+  const primaryPath = manifest ? packPrimaryPath(manifest) : undefined;
   const draftCandidates = useMemo(
     () => workspaceReport ? buildStudioDraftCandidates(workspaceReport, goal) : [],
     [workspaceReport, goal],
@@ -1318,6 +1319,54 @@ export default function PackStudioPage() {
       </div>
 
       <div className="flex-1 overflow-y-auto p-5 space-y-4">
+        {manifest && (
+          <Card className="section-card p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Sparkles size={16} style={{ color: "var(--yunque-accent)" }} />
+                  <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
+                    当前能力包：{manifest.name}
+                  </div>
+                  <Chip size="sm" variant="soft">{sourceLabel(selected)}</Chip>
+                  <Chip size="sm" style={{
+                    background: selected.enabled ? "rgba(34,197,94,0.10)" : selected.installed ? "rgba(245,158,11,0.12)" : "rgba(255,255,255,0.05)",
+                    color: selected.enabled ? "var(--yunque-success)" : selected.installed ? "var(--yunque-warning)" : "var(--yunque-text-muted)",
+                  }}>
+                    {selected.enabled ? "已启用" : selected.installed ? "已安装未启用" : "未安装"}
+                  </Chip>
+                  {hasPackageSource && <Chip size="sm" color="success">已带 yqpack 来源</Chip>}
+                </div>
+                <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
+                  先在这里做只读检查、工作区、diff、审计和重新打包；完成后回详情确认权限，或回能力包中心刷新入口与状态。
+                </div>
+                <div className="mt-2 text-[11px] font-mono break-all" style={{ color: "var(--yunque-text-muted)" }}>
+                  {manifest.id}
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Link href={`/packs/detail?id=${encodeURIComponent(manifest.id)}`}>
+                  <Button size="sm" variant="outline">
+                    <FileSearch size={13} /> 查看详情
+                  </Button>
+                </Link>
+                <Link href="/packs">
+                  <Button size="sm" variant="ghost">
+                    <ArrowRight size={13} /> 回能力包中心
+                  </Button>
+                </Link>
+                {primaryPath && (
+                  <Link href={primaryPath}>
+                    <Button size="sm" variant="ghost">
+                      <ExternalLink size={13} /> 打开能力入口
+                    </Button>
+                  </Link>
+                )}
+              </div>
+            </div>
+          </Card>
+        )}
+
         <Card className="section-card p-4">
           <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
             <div className="flex items-center gap-2">

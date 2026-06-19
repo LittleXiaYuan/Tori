@@ -316,6 +316,11 @@ describe("PackStudioPage", () => {
     expect((screen.getByLabelText("这次想补强什么") as HTMLInputElement).value).toBe("补一个结果面板");
     expect((screen.getByLabelText("OSS / Release URL") as HTMLInputElement).value).toBe("https://oss.example.com/wasm-plugin.yqpack");
     expect((screen.getByLabelText("SHA256") as HTMLInputElement).value).toBe("9".repeat(64));
+    expect(screen.getByText("当前能力包：WASM 能力包")).toBeInTheDocument();
+    expect(screen.getByText("已带 yqpack 来源")).toBeInTheDocument();
+    expect(screen.getByText("先在这里做只读检查、工作区、diff、审计和重新打包；完成后回详情确认权限，或回能力包中心刷新入口与状态。")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /查看详情/ })).toHaveAttribute("href", "/packs/detail?id=yunque.pack.wasm-plugin");
+    expect(screen.getByRole("link", { name: /打开能力入口/ })).toHaveAttribute("href", "/packs/wasm-plugin");
     expect(screen.getByText("改包流程导轨")).toBeInTheDocument();
     expect(screen.getByText("从只读检查到启用/回滚都在同一条路径里推进；小羽只生成计划和草稿，真正写入、打包、安装都需要你确认。")).toBeInTheDocument();
     expect(screen.getByText("当前包：WASM 能力包")).toBeInTheDocument();
@@ -388,6 +393,9 @@ describe("PackStudioPage", () => {
       expect((screen.getByLabelText("SHA256") as HTMLInputElement).value).toBe("9".repeat(64));
     });
     expect(screen.getByText("已从能力包中心接入这个 yqpack")).toBeInTheDocument();
+    expect(screen.getByText("当前能力包：WASM 能力包")).toBeInTheDocument();
+    expect(screen.getByText("已带 yqpack 来源")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /查看详情/ })).toHaveAttribute("href", "/packs/detail?id=yunque.pack.wasm-plugin");
     await waitFor(() => {
       expect(packsClientMock.studioPlan).toHaveBeenCalledWith({
         packId: "yunque.pack.wasm-plugin",
