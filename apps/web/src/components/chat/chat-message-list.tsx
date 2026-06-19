@@ -22,9 +22,11 @@ import type { ChatSharePayload, Message } from "@/lib/chat-types";
 import { collectGeneratedFiles } from "@/lib/chat-utils";
 import { formatErrorMessage } from "@/lib/error-utils";
 import {
+  parsePackStudioBatchDraftRequestPrompt,
   parsePackStudioPatchDraftRequestPrompt,
   parsePackStudioPatchDraftPrompt,
   parsePackStudioPatchPlanPrompt,
+  type PackStudioBatchDraftRequest,
   type PackStudioPatchDraft,
   type PackStudioPatchDraftRequest,
   type PackStudioPatchPlanSummary,
@@ -112,6 +114,22 @@ function displayMessageContent(msg: Message): string {
 }
 
 function packStudioToolSummary(content: string): string | null {
+  const batchRequest = parsePackStudioBatchDraftRequestPrompt(content);
+  if (batchRequest) {
+    const packLines = batchRequest.packs.slice(0, 5).map((pack, index) => {
+      const missing = pack.missing.length ? `缺口：${pack.missing.join(" / ")}` : "缺口：未标注";
+      return `${index + 1}. ${pack.name || pack.id} ${pack.version || ""} · ${pack.readiness || "待评估"} · ${missing}`.trim();
+    });
+    return [
+      batchRequest.displayText,
+      `Pack Studio 批量补肉任务: ${batchRequest.packs.length} 个能力包`,
+      batchRequest.goal ? `目标：${batchRequest.goal}` : "",
+      batchRequest.rules.length ? `规则：${batchRequest.rules.join(" / ")}` : "",
+      ...packLines,
+      batchRequest.packs.length > packLines.length ? `还有 ${batchRequest.packs.length - packLines.length} 个能力包未展开。` : "",
+      "请逐包生成 Draft Request；不要跳过 Studio 的 diff / audit / repack。",
+    ].filter(Boolean).join("\n");
+  }
   const request = parsePackStudioPatchDraftRequestPrompt(content);
   if (request) {
     return [
@@ -259,6 +277,87 @@ function renderPackStudioDraft(draft: PackStudioPatchDraft) {
   );
 }
 
+function renderPackStudioBatchDraftRequest(request: PackStudioBatchDraftRequest) {
+  return (
+    <div
+      className="mb-3 rounded-xl border p-3 text-xs"
+      style={{
+        background: "rgba(14,165,233,0.08)",
+        borderColor: "rgba(14,165,233,0.22)",
+        color: "var(--yunque-text)",
+      }}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 font-semibold">
+            <Sparkles size={14} style={{ color: "var(--yunque-accent)" }} />
+            <span>Pack Studio 批量补肉任务</span>
+          </div>
+          <div className="mt-1 truncate" style={{ color: "var(--yunque-text-muted)" }}>
+            {request.packs.length} 个能力包 · 小羽逐包生成 Draft Request
+          </div>
+        </div>
+        <a
+          href="/packs#readiness-queue"
+          className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1.5 text-[11px] font-medium"
+          style={{ background: "var(--yunque-accent-muted)", color: "var(--yunque-accent)" }}
+        >
+          返回队列 <ArrowRight size={11} />
+        </a>
+      </div>
+      {request.goal && (
+        <div className="mt-2 leading-5" style={{ color: "var(--yunque-text-muted)" }}>
+          目标：{request.goal}
+        </div>
+      )}
+      <div className="mt-2 grid gap-1.5">
+        {request.packs.slice(0, 3).map((pack) => (
+          <div key={pack.id || pack.name} className="rounded-lg px-2 py-1.5" style={{ background: "var(--yunque-bg-muted)" }}>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="min-w-0">
+                <div className="truncate font-medium">{pack.name || pack.id}</div>
+                <div className="mt-0.5 truncate font-mono text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
+                  {pack.id} · {pack.version || "unknown"} · {pack.source || "来源未标注"}
+                </div>
+              </div>
+              {pack.studioUrl && (
+                <a
+                  href={pack.studioUrl}
+                  className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium"
+                  style={{ background: "var(--yunque-accent-muted)", color: "var(--yunque-accent)" }}
+                >
+                  打开 Studio <ArrowRight size={10} />
+                </a>
+              )}
+            </div>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {pack.readiness && <Chip size="sm" variant="soft">{pack.readiness}</Chip>}
+              {pack.status && <Chip size="sm" variant="soft">稳定性：{pack.status}</Chip>}
+              {pack.missing.slice(0, 4).map((gap) => (
+                <Chip key={`${pack.id}:${gap}`} size="sm" variant="soft">{gap}</Chip>
+              ))}
+              {pack.missing.length > 4 && <Chip size="sm" variant="soft">+{pack.missing.length - 4}</Chip>}
+            </div>
+          </div>
+        ))}
+      </div>
+      {request.packs.length > 3 && (
+        <div className="mt-2 text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
+          还有 {request.packs.length - 3} 个能力包在批量请求里，复制后交给小羽逐包处理。
+        </div>
+      )}
+      {request.rules.length > 0 && (
+        <div className="mt-2 leading-5" style={{ color: "var(--yunque-text-muted)" }}>
+          规则：{request.rules.slice(0, 3).join("；")}
+        </div>
+      )}
+      <div className="mt-2 leading-5" style={{ color: "var(--yunque-text-muted)" }}>
+        这只是批量生成请求，不会自动应用改动。每个包都要回到 Studio 预览 diff、运行 audit、重新打包并复检 SHA 后再安装或回滚。
+      </div>
+    </div>
+  );
+}
+
 function renderPackStudioDraftRequest(request: PackStudioPatchDraftRequest) {
   return (
     <div
@@ -311,6 +410,13 @@ function renderPackStudioDraftRequest(request: PackStudioPatchDraftRequest) {
 }
 
 function structuredPackStudioMessage(content: string) {
+  const batchRequest = parsePackStudioBatchDraftRequestPrompt(content);
+  if (batchRequest) {
+    return {
+      card: renderPackStudioBatchDraftRequest(batchRequest),
+      text: batchRequest.displayText,
+    };
+  }
   const request = parsePackStudioPatchDraftRequestPrompt(content);
   if (request) {
     return {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   packStudioWorkspaceMatches,
+  parsePackStudioBatchDraftRequestPrompt,
   parsePackStudioPatchDraftRequestPrompt,
   parsePackStudioPatchDraftPrompt,
   parsePackStudioPatchPlanPrompt,
@@ -136,6 +137,54 @@ describe("parsePackStudioPatchDraftRequestPrompt", () => {
 
   it("requires a target file path", () => {
     expect(parsePackStudioPatchDraftRequestPrompt("```json\n{\"kind\":\"yunque.pack_studio.patch_draft_request.v1\"}\n```")).toBeNull();
+  });
+});
+
+describe("parsePackStudioBatchDraftRequestPrompt", () => {
+  it("extracts a batch draft request and hides the structured JSON from display text", () => {
+    const parsed = parsePackStudioBatchDraftRequestPrompt([
+      "请批量补肉这些能力包。",
+      "",
+      "```json",
+      JSON.stringify({
+        kind: "yunque.pack_studio.batch_draft_request.v1",
+        goal: "把看得到但不知道怎么用的能力包补成可打开、可验证、可回滚。",
+        rules: ["不要自动应用改动", "逐包生成 Draft Request"],
+        packs: [
+          {
+            id: "yunque.pack.needs-entry",
+            name: "Needs Entry Pack",
+            version: "0.1.0",
+            status: "beta",
+            source: "已安装",
+            missing: ["使用示例", "打开/使用入口"],
+            readiness: "需补入口",
+            studio_url: "/packs/studio?pack=yunque.pack.needs-entry",
+            package_url: "https://example.com/yunque.pack.needs-entry.yqpack",
+            sha256: "a".repeat(64),
+          },
+        ],
+      }, null, 2),
+      "```",
+    ].join("\n"));
+
+    expect(parsed?.goal).toContain("可打开");
+    expect(parsed?.rules).toEqual(["不要自动应用改动", "逐包生成 Draft Request"]);
+    expect(parsed?.packs[0]).toMatchObject({
+      id: "yunque.pack.needs-entry",
+      name: "Needs Entry Pack",
+      readiness: "需补入口",
+      studioUrl: "/packs/studio?pack=yunque.pack.needs-entry",
+      packageUrl: "https://example.com/yunque.pack.needs-entry.yqpack",
+    });
+    expect(parsed?.packs[0].missing).toEqual(["使用示例", "打开/使用入口"]);
+    expect(parsed?.displayText).toBe("请批量补肉这些能力包。");
+    expect(parsed?.displayText).not.toContain("yunque.pack_studio.batch_draft_request.v1");
+  });
+
+  it("requires the batch request kind and a packs array", () => {
+    expect(parsePackStudioBatchDraftRequestPrompt("```json\n{\"kind\":\"other\",\"packs\":[]}\n```")).toBeNull();
+    expect(parsePackStudioBatchDraftRequestPrompt("```json\n{\"kind\":\"yunque.pack_studio.batch_draft_request.v1\"}\n```")).toBeNull();
   });
 });
 

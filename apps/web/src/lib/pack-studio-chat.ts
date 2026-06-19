@@ -71,6 +71,24 @@ export type PackStudioPatchDraftRequest = {
   displayText: string;
 };
 
+export type PackStudioBatchDraftRequest = {
+  goal: string;
+  rules: string[];
+  packs: Array<{
+    id: string;
+    name: string;
+    version: string;
+    status: string;
+    source: string;
+    missing: string[];
+    readiness: string;
+    studioUrl: string;
+    packageUrl: string;
+    sha256: string;
+  }>;
+  displayText: string;
+};
+
 type PackStudioPatchPlanCandidate = PackStudioPatchPlanSummary["candidates"][number];
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -243,6 +261,37 @@ export function parsePackStudioPatchDraftRequestPrompt(text?: string): PackStudi
       starterContentLength: starterContent.length,
       expectedKind: stringValue(expectedOutput?.kind),
       displayText: displayTextWithoutJsonBlocks(text, "下面是 Pack Studio 的 Patch Draft Request"),
+    };
+  }
+  return null;
+}
+
+export function parsePackStudioBatchDraftRequestPrompt(text?: string): PackStudioBatchDraftRequest | null {
+  if (!text?.includes("yunque.pack_studio.batch_draft_request.v1")) return null;
+  for (const parsed of parseJsonBlocks(text)) {
+    const root = asRecord(parsed);
+    if (!root || root.kind !== "yunque.pack_studio.batch_draft_request.v1") continue;
+    const packs = Array.isArray(root.packs) ? root.packs : null;
+    if (!packs) continue;
+    return {
+      goal: stringValue(root.goal),
+      rules: stringList(root.rules),
+      packs: packs.map((item) => {
+        const pack = asRecord(item) || {};
+        return {
+          id: stringValue(pack.id),
+          name: stringValue(pack.name),
+          version: stringValue(pack.version),
+          status: stringValue(pack.status),
+          source: stringValue(pack.source),
+          missing: stringList(pack.missing),
+          readiness: stringValue(pack.readiness),
+          studioUrl: stringValue(pack.studio_url),
+          packageUrl: stringValue(pack.package_url),
+          sha256: stringValue(pack.sha256),
+        };
+      }).filter((pack) => pack.id || pack.name),
+      displayText: displayTextWithoutJsonBlocks(text),
     };
   }
   return null;

@@ -266,6 +266,72 @@ describe("ChatMessageList file preview", () => {
     expect(onCopy.mock.calls[0][1]).not.toContain("starter 内容不应该直接展示");
   });
 
+  it("renders Pack Studio batch draft requests as a guarded queue card", () => {
+    const onCopy = vi.fn();
+    const batchMessage = [
+      "请批量补肉这批能力包。",
+      "",
+      "```json",
+      JSON.stringify({
+        kind: "yunque.pack_studio.batch_draft_request.v1",
+        goal: "批量把这些能力包从“看得到但不知道怎么用”推进到用户能理解、能打开、能验证、能回滚的状态。",
+        rules: [
+          "不要自动应用改动。",
+          "每个包先给独立 Patch Draft Request，再回到 Pack Studio 只读检查、准备工作区、预览 diff、运行审计、重新打包和复检 SHA。",
+        ],
+        packs: [
+          {
+            id: "yunque.pack.needs-entry",
+            name: "Needs Entry Pack",
+            version: "0.1.0",
+            status: "beta",
+            source: "已安装",
+            missing: ["使用示例", "用户感知位置", "打开/使用入口", "后端能力声明"],
+            readiness: "需补入口",
+            studio_url: "/packs/studio?pack=yunque.pack.needs-entry",
+            package_url: "https://example.com/yunque.pack.needs-entry.yqpack",
+            sha256: "a".repeat(64),
+          },
+          {
+            id: "yunque.pack.experimental",
+            name: "Experimental Pack",
+            version: "0.2.0",
+            status: "experimental",
+            source: "官方源",
+            missing: ["使用示例"],
+            readiness: "需补说明",
+            studio_url: "/packs/studio?pack=yunque.pack.experimental",
+          },
+        ],
+      }, null, 2),
+      "```",
+    ].join("\n");
+
+    render(<ChatMessageList {...props({
+      onCopy,
+      messages: [{ role: "assistant", content: batchMessage, id: "a-batch" }],
+    })} />);
+
+    expect(screen.getByText("Pack Studio 批量补肉任务")).toBeInTheDocument();
+    expect(screen.getByText(/2 个能力包/)).toBeInTheDocument();
+    expect(screen.getByText("Needs Entry Pack")).toBeInTheDocument();
+    expect(screen.getByText("Experimental Pack")).toBeInTheDocument();
+    expect(screen.getByText("需补入口")).toBeInTheDocument();
+    expect(screen.getByText("打开/使用入口")).toBeInTheDocument();
+    expect(screen.getByText(/预览 diff、运行 audit、重新打包并复检 SHA/)).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: /打开 Studio/ })[0]).toHaveAttribute("href", "/packs/studio?pack=yunque.pack.needs-entry");
+    expect(screen.getByRole("link", { name: /返回队列/ })).toHaveAttribute("href", "/packs#readiness-queue");
+    expect(screen.getByText("请批量补肉这批能力包。")).toBeInTheDocument();
+    expect(screen.queryByText(/yunque.pack_studio.batch_draft_request.v1/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("copy").closest("button")!);
+    expect(onCopy).toHaveBeenCalledTimes(1);
+    expect(onCopy.mock.calls[0][1]).toContain("Pack Studio 批量补肉任务: 2 个能力包");
+    expect(onCopy.mock.calls[0][1]).toContain("Needs Entry Pack");
+    expect(onCopy.mock.calls[0][1]).toContain("请逐包生成 Draft Request");
+    expect(onCopy.mock.calls[0][1]).not.toContain("yunque.pack_studio.batch_draft_request.v1");
+  });
+
   it("does not fall back to raw JSON when a structured Pack Studio user message has no prose", () => {
     const rawPlanOnly = [
       "```json",
