@@ -102,7 +102,14 @@
     "group": "automation",
     "phase": "A4",
     "preload": "true",
-    "note": "Natively owns /v1/triggers* through Pack Runtime. It covers both legacy Runtime triggers and unified Manager triggers."
+    "note": "Natively owns /v1/triggers* through Pack Runtime. It covers both legacy Runtime triggers and unified Manager triggers.",
+    "usability": "infrastructure",
+    "primaryActionLabel": "查看工作流",
+    "primaryActionPath": "/workflows",
+    "usageSurface": "工作流、触发器与事件驱动自动化",
+    "example1": "创建或管理一个事件触发器。",
+    "example2": "发出测试事件，确认自动化是否会被触发。",
+    "example3": "查看触发器运行记录，定位失败原因。"
   },
   "status": "beta"
 }

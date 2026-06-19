@@ -188,7 +188,14 @@
     "group": "extensions",
     "stage": "native-pack-route-migration",
     "auth": "Pack Runtime controls enablement and method gates; plugin Bearer token permissions are checked inside the pack.",
-    "note": "Natively owns /v1/plugin-api/* so third-party plugins use the same hot-pluggable runtime surface as other capability packs."
+    "note": "Natively owns /v1/plugin-api/* so third-party plugins use the same hot-pluggable runtime surface as other capability packs.",
+    "usability": "infrastructure",
+    "primaryActionLabel": "查看插件",
+    "primaryActionPath": "/plugins",
+    "usageSurface": "插件页、第三方扩展与 SDK 桥",
+    "example1": "允许插件调用模型、私有记忆和知识检索能力。",
+    "example2": "让插件注册定时任务或扩展入口。",
+    "example3": "把第三方插件能力纳入统一权限和安全检查。"
   },
   "status": "beta"
 }

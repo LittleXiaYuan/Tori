@@ -64,7 +64,14 @@
     "group": "perception",
     "phase": "A3",
     "preload": "true",
-    "note": "Natively owns /v1/speech* through Pack Runtime. STT streaming reuses the kernel WebSocket origin policy."
+    "note": "Natively owns /v1/speech* through Pack Runtime. STT streaming reuses the kernel WebSocket origin policy.",
+    "usability": "infrastructure",
+    "primaryActionLabel": "回到对话",
+    "primaryActionPath": "/chat",
+    "usageSurface": "Chat 语音输入、朗读与插件语音能力",
+    "example1": "把音频转成文字后交给 Chat 处理。",
+    "example2": "把助手回复转换为语音朗读。",
+    "example3": "查看当前可用音色列表供插件或前端选择。"
   },
   "status": "beta"
 }

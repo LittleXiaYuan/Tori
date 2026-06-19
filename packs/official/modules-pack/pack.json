@@ -41,7 +41,14 @@
     "group": "runtime",
     "phase": "A3",
     "preload": "true",
-    "note": "Natively owns /v1/modules through the Pack Runtime gate and reads runtime module state via narrow host accessors."
+    "note": "Natively owns /v1/modules through the Pack Runtime gate and reads runtime module state via narrow host accessors.",
+    "usability": "infrastructure",
+    "primaryActionLabel": "查看工作台",
+    "primaryActionPath": "/dashboard",
+    "usageSurface": "工作台诊断、运行配置档与模块状态",
+    "example1": "查看当前运行配置档和已启用模块。",
+    "example2": "定位某个热插拔模块是否处于错误状态。",
+    "example3": "在排查问题时确认云雀底座当前加载了哪些能力。"
   },
   "status": "beta"
 }

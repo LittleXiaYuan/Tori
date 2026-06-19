@@ -49,7 +49,14 @@
     "group": "memory",
     "phase": "A3",
     "preload": "true",
-    "note": "Natively owns /v1/identity/resolve and /v1/identity/profiles through the Pack Runtime gate. It reads the identity resolver through a narrow host accessor."
+    "note": "Natively owns /v1/identity/resolve and /v1/identity/profiles through the Pack Runtime gate. It reads the identity resolver through a narrow host accessor.",
+    "usability": "infrastructure",
+    "primaryActionLabel": "打开设置",
+    "primaryActionPath": "/settings",
+    "usageSurface": "多渠道身份合并、用户画像与个性化上下文",
+    "example1": "把不同渠道的同一用户合并为统一身份。",
+    "example2": "查看当前已识别的用户身份列表。",
+    "example3": "让记忆和个性化上下文跟随统一身份而不是单一渠道。"
   },
   "status": "beta"
 }

@@ -95,7 +95,14 @@
     "group": "collaboration",
     "phase": "A3",
     "preload": "true",
-    "note": "Natively owns /v1/federation* through Pack Runtime. /v1/federation/receive keeps protocol-level authentication and is still Pack-gated."
+    "note": "Natively owns /v1/federation* through Pack Runtime. /v1/federation/receive keeps protocol-level authentication and is still Pack-gated.",
+    "usability": "infrastructure",
+    "primaryActionLabel": "查看工具与协作",
+    "primaryActionPath": "/tools",
+    "usageSurface": "工具页与跨实例能力委派",
+    "example1": "查看可协作的远端云雀实例和 OPP 能力。",
+    "example2": "把适合远端执行的任务委派给其他实例。",
+    "example3": "接收远端实例广播的能力和协作事件。"
   },
   "status": "beta"
 }

@@ -269,6 +269,7 @@ export function riskProfileForPack(manifest: PackManifest): PackRiskProfile {
 
 export function packUsageExplanation(manifest: PackManifest): string[] {
   const usability = packUsability(manifest);
+  const metadata = manifest.metadata || {};
   if (manifest.id === "yunque.pack.computer-use") {
     return [
       "启用后 Planner 可生成电脑使用计划。",
@@ -297,6 +298,9 @@ export function packUsageExplanation(manifest: PackManifest): string[] {
   }
   if (usability.primaryActionPath) {
     explanation.push(`${usability.primaryActionLabel || "主要入口"}：${usability.primaryActionPath}`);
+  }
+  if (typeof metadata.usageSurface === "string" && metadata.usageSurface.trim().length > 0) {
+    explanation.push(`用户能感知到的位置：${metadata.usageSurface}`);
   }
   if (usability.kind === "infrastructure") {
     explanation.push("它是后台支撑包，通常由对话、任务或其他页面自动调用。");

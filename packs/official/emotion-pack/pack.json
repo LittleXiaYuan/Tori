@@ -61,7 +61,14 @@
     "group": "cogni",
     "phase": "A4",
     "preload": "true",
-    "note": "Natively owns /v1/emotion/* through Pack Runtime. It exposes history and sticker-map access without changing Cogni decisions."
+    "note": "Natively owns /v1/emotion/* through Pack Runtime. It exposes history and sticker-map access without changing Cogni decisions.",
+    "usability": "infrastructure",
+    "primaryActionLabel": "查看记忆与状态",
+    "primaryActionPath": "/memory",
+    "usageSurface": "Chat、渠道消息与记忆页面的情绪上下文",
+    "example1": "查询一段时间内的情绪记录，理解互动趋势。",
+    "example2": "为不同渠道维护表情贴纸映射。",
+    "example3": "把情绪线索交给记忆和对话上下文使用。"
   },
   "status": "beta"
 }

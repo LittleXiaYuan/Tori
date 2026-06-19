@@ -78,7 +78,14 @@
     "group": "collaboration",
     "phase": "A3",
     "preload": "true",
-    "note": "Default-preloaded collaboration pack: natively owns /api/notify/* through Pack Runtime. Existing chat/task/settings surfaces consume this API."
+    "note": "Default-preloaded collaboration pack: natively owns /api/notify/* through Pack Runtime. Existing chat/task/settings surfaces consume this API.",
+    "usability": "infrastructure",
+    "primaryActionLabel": "管理通知渠道",
+    "primaryActionPath": "/settings/notifications",
+    "usageSurface": "通知设置、任务分享与协作提醒",
+    "example1": "配置 webhook、钉钉、飞书或企业微信通知渠道。",
+    "example2": "把任务结果或产物分享到指定协作渠道。",
+    "example3": "在任务失败或等待输入时收到可行动提醒。"
   },
   "status": "beta"
 }

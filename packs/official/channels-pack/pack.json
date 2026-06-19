@@ -57,7 +57,14 @@
     "group": "communication",
     "phase": "A2",
     "preload": "true",
-    "note": "Natively owns /v1/react, /v1/sticker/send and /v1/channels/groups through the Pack Runtime gate. Webhooks and core chat transport remain in the gateway."
+    "note": "Natively owns /v1/react, /v1/sticker/send and /v1/channels/groups through the Pack Runtime gate. Webhooks and core chat transport remain in the gateway.",
+    "usability": "infrastructure",
+    "primaryActionLabel": "查看消息收件箱",
+    "primaryActionPath": "/inbox",
+    "usageSurface": "Chat、Inbox 与外部渠道消息面板",
+    "example1": "在收件箱里查看已连接渠道的群组与会话。",
+    "example2": "在聊天或渠道消息里发送表情回应和原生贴纸。",
+    "example3": "让多渠道消息动作走统一权限和 Pack 启停控制。"
   },
   "status": "beta"
 }

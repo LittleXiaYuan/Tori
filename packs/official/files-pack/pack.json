@@ -56,7 +56,14 @@
     "group": "work",
     "phase": "A4",
     "preload": "true",
-    "note": "Natively owns /api/files* through Pack Runtime. It only resolves paths inside the configured output directory."
+    "note": "Natively owns /api/files* through Pack Runtime. It only resolves paths inside the configured output directory.",
+    "usability": "infrastructure",
+    "primaryActionLabel": "查看对话产物",
+    "primaryActionPath": "/chat",
+    "usageSurface": "Chat 产物区与任务结果页",
+    "example1": "在 Chat 里列出云雀生成的文件。",
+    "example2": "预览或下载任务输出的报告、表格和页面。",
+    "example3": "把产物继续交给云雀处理、分享或沉淀。"
   },
   "status": "beta"
 }

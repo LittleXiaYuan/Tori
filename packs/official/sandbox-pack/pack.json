@@ -81,7 +81,14 @@
     "risk": "high",
     "auth": "Pack Runtime controls enablement; exec/probe/create compose host RequireAuth+RequireAdmin inside the pack.",
     "computer_use_relation": "Computer Use reads cloud desktop status through the sandbox pack, but local desktop control remains outside this slice.",
-    "note": "Natively owns /v1/sandbox/* so high-risk command/cloud-desktop surfaces can be disabled as a capability pack."
+    "note": "Natively owns /v1/sandbox/* so high-risk command/cloud-desktop surfaces can be disabled as a capability pack.",
+    "usability": "infrastructure",
+    "primaryActionLabel": "查看工具",
+    "primaryActionPath": "/tools",
+    "usageSurface": "工具页、受控命令执行与云桌面沙箱",
+    "example1": "让高风险命令执行走受控沙箱边界。",
+    "example2": "查看云桌面或执行器是否可用。",
+    "example3": "通过 Pack 启停控制沙箱能力是否暴露给任务。"
   },
   "status": "beta"
 }

@@ -83,7 +83,14 @@
     "group": "governance",
     "phase": "A3",
     "preload": "true",
-    "note": "Default-preloaded governance pack: natively owns /v1/cost/* through Pack Runtime. No standalone menu; existing task/settings surfaces consume this API."
+    "note": "Default-preloaded governance pack: natively owns /v1/cost/* through Pack Runtime. No standalone menu; existing task/settings surfaces consume this API.",
+    "usability": "infrastructure",
+    "primaryActionLabel": "查看成本指标",
+    "primaryActionPath": "/metrics",
+    "usageSurface": "指标页、任务明细与模型用量治理",
+    "example1": "查看模型调用、任务执行和预算消耗的汇总指标。",
+    "example2": "定位某个任务或模型为什么成本突然升高。",
+    "example3": "用预算和告警信息判断是否需要调整模型配置。"
   },
   "status": "beta"
 }

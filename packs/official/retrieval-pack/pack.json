@@ -64,7 +64,14 @@
     "group": "knowledge",
     "phase": "A3",
     "preload": "true",
-    "note": "Natively owns /v1/embeddings and /v1/search* through the Pack Runtime gate. It reads configured search and embedding providers through narrow host accessors."
+    "note": "Natively owns /v1/embeddings and /v1/search* through the Pack Runtime gate. It reads configured search and embedding providers through narrow host accessors.",
+    "usability": "infrastructure",
+    "primaryActionLabel": "查看知识库",
+    "primaryActionPath": "/knowledge",
+    "usageSurface": "知识库、网页检索与向量召回",
+    "example1": "查看当前可用的嵌入模型。",
+    "example2": "通过已配置搜索源执行网页检索。",
+    "example3": "为知识库和任务上下文提供检索结果。"
   },
   "status": "beta"
 }

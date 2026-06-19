@@ -55,7 +55,14 @@
     "group": "cogni",
     "phase": "A4",
     "preload": "true",
-    "note": "Natively owns /v1/persona/mode* through Pack Runtime. Base persona CRUD remains in yunque.pack.persona."
+    "note": "Natively owns /v1/persona/mode* through Pack Runtime. Base persona CRUD remains in yunque.pack.persona.",
+    "usability": "infrastructure",
+    "primaryActionLabel": "回到对话",
+    "primaryActionPath": "/chat",
+    "usageSurface": "Chat 当前人格模式与会话上下文",
+    "example1": "查看当前会话正在使用的人格模式。",
+    "example2": "在不同任务场景间切换人格模式。",
+    "example3": "让 Persona 基础能力和模式切换可以分别启停。"
   },
   "status": "beta"
 }

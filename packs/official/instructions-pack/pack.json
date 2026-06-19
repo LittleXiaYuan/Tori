@@ -66,7 +66,14 @@
     "group": "memory",
     "phase": "A4",
     "preload": "true",
-    "note": "Natively owns /v1/instructions* through Pack Runtime. It stores user-facing instruction records through a narrow store accessor."
+    "note": "Natively owns /v1/instructions* through Pack Runtime. It stores user-facing instruction records through a narrow store accessor.",
+    "usability": "infrastructure",
+    "primaryActionLabel": "管理偏好设置",
+    "primaryActionPath": "/settings",
+    "usageSurface": "设置、记忆与 Chat 上下文",
+    "example1": "保存长期偏好、工作规则和输出格式要求。",
+    "example2": "调整指令优先级，避免旧规则覆盖新规则。",
+    "example3": "让 Chat 和任务执行自动带上关键工作约束。"
   },
   "status": "beta"
 }

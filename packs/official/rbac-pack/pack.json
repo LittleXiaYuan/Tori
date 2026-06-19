@@ -81,7 +81,14 @@
     "group": "governance",
     "phase": "A3",
     "preload": "true",
-    "note": "Natively owns /v1/rbac/* through Pack Runtime. Admin mutations use passthrough auth so the pack can preserve requireAuth+requireAdmin composition."
+    "note": "Natively owns /v1/rbac/* through Pack Runtime. Admin mutations use passthrough auth so the pack can preserve requireAuth+requireAdmin composition.",
+    "usability": "infrastructure",
+    "primaryActionLabel": "查看信任与权限",
+    "primaryActionPath": "/trust",
+    "usageSurface": "信任中心、管理员授权与权限检查",
+    "example1": "查看或创建角色并分配给指定主体。",
+    "example2": "撤销不再需要的角色，降低高风险能力暴露。",
+    "example3": "在启用管理能力前检查主体是否有对应权限。"
   },
   "status": "beta"
 }

@@ -37,8 +37,10 @@ for (const row of rows) {
     `visible=${row.userVisible}`,
     `paths=${row.entryPaths.length}`,
     `examples=${row.examples.length}`,
-    `api=${row.routeSpecCount}`,
+    `api=${row.backendApiCount}`,
     `page=${row.hasConcretePage}`,
+    `usability=${row.usability || "-"}`,
+    `primary=${row.primaryActionPath || "-"}`,
     `issues=${issues}`,
   ].join("\t"));
 }
@@ -66,9 +68,17 @@ function auditPack({ manifestPath, manifest }) {
     .filter((key) => /^example\d+$/.test(key))
     .map((key) => metadata[key])
     .filter((value) => typeof value === "string" && value.trim().length > 0);
+  const backendApiCount = routeSpecs.length + backendRoutes.length;
   const userVisible = entryPaths.length > 0 || metadata.usability === "actionable" || metadata.usability === "experimental";
   const hasConcretePage = entryPaths.some((entryPath) => appRouteExists(entryPath));
   const usesRuntimeHost = frontendAssetsType === "iframe-bundle" || routes.some((route) => String(route.component || "").includes("PackDlcHost"));
+  const hasActionableSurface = userVisible && examples.length >= 2 && (hasConcretePage || usesRuntimeHost);
+  const isBackendSupportPack =
+    backendApiCount > 0 &&
+    !hasActionableSurface &&
+    metadata.usability !== "actionable" &&
+    metadata.usability !== "experimental" &&
+    manifest.status !== "alpha";
   const issues = [];
 
   if (userVisible && examples.length < 2) {
@@ -99,6 +109,34 @@ function auditPack({ manifestPath, manifest }) {
       blocking: true,
     });
   }
+  if (isBackendSupportPack && metadata.usability !== "infrastructure") {
+    issues.push({
+      code: "missing-infrastructure-usability",
+      message: "backend support pack should declare metadata.usability=infrastructure",
+      blocking: true,
+    });
+  }
+  if (isBackendSupportPack && examples.length < 2) {
+    issues.push({
+      code: "missing-infrastructure-examples",
+      message: "backend support pack needs at least two examples of where users feel its effect",
+      blocking: true,
+    });
+  }
+  if (isBackendSupportPack && metadata.internalOnly !== "true" && !metadata.primaryActionPath) {
+    issues.push({
+      code: "missing-infrastructure-primary-path",
+      message: "backend support pack needs a primary action path to its consuming surface",
+      blocking: true,
+    });
+  }
+  if (isBackendSupportPack && metadata.internalOnly !== "true" && !metadata.primaryActionLabel) {
+    issues.push({
+      code: "missing-infrastructure-primary-label",
+      message: "backend support pack needs a user-readable primary action label",
+      blocking: true,
+    });
+  }
   if ((manifest.status === "alpha" || metadata.usability === "experimental") && !metadata.limitation) {
     issues.push({
       code: "missing-experimental-limitation",
@@ -113,10 +151,13 @@ function auditPack({ manifestPath, manifest }) {
     status: manifest.status || "",
     manifestPath: slash(relative(repoRoot, manifestPath)),
     grade: gradePack({ manifest, userVisible, examples, hasConcretePage, usesRuntimeHost, routeSpecs, backendRoutes, issues }),
+    usability: metadata.usability || "",
+    primaryActionPath: metadata.primaryActionPath || "",
     userVisible,
     entryPaths,
     examples,
     routeSpecCount: routeSpecs.length,
+    backendApiCount,
     hasConcretePage,
     usesRuntimeHost,
     issues,

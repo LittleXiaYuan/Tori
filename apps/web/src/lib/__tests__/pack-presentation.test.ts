@@ -182,6 +182,7 @@ describe("pack-presentation", () => {
         usability: "infrastructure",
         primaryActionLabel: "由任务和对话自动使用",
         primaryActionPath: "/missions",
+        usageSurface: "任务中心与 Chat 任务进度",
       },
     };
 
@@ -201,5 +202,6 @@ describe("pack-presentation", () => {
       label: "后台支撑",
       primaryActionPath: "/missions",
     });
+    expect(packUsageExplanation(infrastructure).join(" ")).toContain("任务中心与 Chat 任务进度");
   });
 });

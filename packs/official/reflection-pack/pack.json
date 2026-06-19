@@ -57,7 +57,14 @@
     "group": "cognition",
     "phase": "A2",
     "preload": "true",
-    "note": "Natively owns /v1/reflect/* through the Pack Runtime gate. Shares the canonical ReflectiveLoop and ExperienceStore; no separate menu because Chat/feedback/Cogni surfaces consume these APIs."
+    "note": "Natively owns /v1/reflect/* through the Pack Runtime gate. Shares the canonical ReflectiveLoop and ExperienceStore; no separate menu because Chat/feedback/Cogni surfaces consume these APIs.",
+    "usability": "infrastructure",
+    "primaryActionLabel": "查看记忆",
+    "primaryActionPath": "/memory",
+    "usageSurface": "记忆页、任务反馈与经验策略",
+    "example1": "把用户反馈记录成可查询经验。",
+    "example2": "从历史任务里沉淀可复用策略。",
+    "example3": "让后续任务避免重复犯同类错误。"
   },
   "status": "beta"
 }

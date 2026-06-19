@@ -71,7 +71,14 @@
     "group": "integration",
     "phase": "A4",
     "preload": "true",
-    "note": "Natively owns /v1/tori/* account binding routes through Pack Runtime while preserving OAuth, SSRF guard and health/usage semantics."
+    "note": "Natively owns /v1/tori/* account binding routes through Pack Runtime while preserving OAuth, SSRF guard and health/usage semantics.",
+    "usability": "infrastructure",
+    "primaryActionLabel": "配置模型与账号",
+    "primaryActionPath": "/setup",
+    "usageSurface": "首次配置、Tori 账号绑定与用量查询",
+    "example1": "绑定 Tori 账号并检查连接状态。",
+    "example2": "查询 Tori 服务健康和用量信息。",
+    "example3": "让首次配置知道当前是否可使用 Tori 中转。"
   },
   "status": "beta"
 }

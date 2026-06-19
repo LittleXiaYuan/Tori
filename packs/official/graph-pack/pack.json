@@ -82,7 +82,14 @@
     "group": "memory",
     "phase": "A4",
     "preload": "true",
-    "note": "Natively owns /v1/graph/* through Pack Runtime. It uses the memory pipeline graph through a narrow accessor."
+    "note": "Natively owns /v1/graph/* through Pack Runtime. It uses the memory pipeline graph through a narrow accessor.",
+    "usability": "infrastructure",
+    "primaryActionLabel": "查看知识库",
+    "primaryActionPath": "/knowledge",
+    "usageSurface": "知识库、记忆召回与图谱上下文",
+    "example1": "把实体和关系写入知识图谱。",
+    "example2": "在知识召回时补充人物、项目和事件之间的关系。",
+    "example3": "删除错误关系，避免后续任务继续引用。"
   },
   "status": "beta"
 }

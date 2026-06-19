@@ -136,7 +136,14 @@
     "group": "extensions",
     "phase": "A2",
     "preload": "true",
-    "note": "Natively owns /api/skillhub/* through the Pack Runtime gate. It keeps the original installer, audit, update, rollback and policy semantics while removing the direct gateway registrations."
+    "note": "Natively owns /api/skillhub/* through the Pack Runtime gate. It keeps the original installer, audit, update, rollback and policy semantics while removing the direct gateway registrations.",
+    "usability": "infrastructure",
+    "primaryActionLabel": "浏览技能",
+    "primaryActionPath": "/skills",
+    "usageSurface": "技能页、远程技能生态与安全策略检查",
+    "example1": "搜索远程技能并查看详情。",
+    "example2": "安装、更新或回滚一个技能包。",
+    "example3": "在启用前执行安全策略检查。"
   },
   "status": "beta"
 }

@@ -56,7 +56,14 @@
     "group": "automation",
     "phase": "A3",
     "preload": "true",
-    "note": "Default-preloaded automation pack: natively owns /v1/scheduler/* through Pack Runtime. Existing task/automation surfaces consume this API."
+    "note": "Default-preloaded automation pack: natively owns /v1/scheduler/* through Pack Runtime. Existing task/automation surfaces consume this API.",
+    "usability": "infrastructure",
+    "primaryActionLabel": "查看任务中心",
+    "primaryActionPath": "/missions",
+    "usageSurface": "任务中心、周期任务与自动化调度",
+    "example1": "查看当前已经注册的周期性任务。",
+    "example2": "为自动化任务添加新的调度规则。",
+    "example3": "移除不再需要的调度，避免重复执行。"
   },
   "status": "beta"
 }

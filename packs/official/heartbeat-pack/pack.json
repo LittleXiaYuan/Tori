@@ -62,7 +62,14 @@
     "group": "automation",
     "phase": "A2",
     "preload": "true",
-    "note": "Natively owns /v1/heartbeat, /v1/heartbeat/trigger and /v1/heartbeat/logs through the Pack Runtime gate."
+    "note": "Natively owns /v1/heartbeat, /v1/heartbeat/trigger and /v1/heartbeat/logs through the Pack Runtime gate.",
+    "usability": "infrastructure",
+    "primaryActionLabel": "查看工作台",
+    "primaryActionPath": "/dashboard",
+    "usageSurface": "工作台状态、自主运行与后台执行日志",
+    "example1": "查看自主心跳是否开启以及最近运行状态。",
+    "example2": "调整后台自发检查的间隔。",
+    "example3": "立即触发一次心跳来验证后台能力是否正常。"
   },
   "status": "beta"
 }

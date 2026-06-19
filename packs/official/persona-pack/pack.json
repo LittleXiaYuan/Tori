@@ -96,7 +96,14 @@
     "group": "cogni",
     "phase": "A3",
     "preload": "true",
-    "note": "Natively owns the base /v1/persona and persona preset surfaces through the Pack Runtime gate. /v1/persona/mode* stays in the persona-modes pack."
+    "note": "Natively owns the base /v1/persona and persona preset surfaces through the Pack Runtime gate. /v1/persona/mode* stays in the persona-modes pack.",
+    "usability": "infrastructure",
+    "primaryActionLabel": "打开设置",
+    "primaryActionPath": "/settings",
+    "usageSurface": "人格设定、提示词片段与 Chat 风格",
+    "example1": "管理云雀的基础身份和性格提示。",
+    "example2": "维护不同场景下可复用的人格技能片段。",
+    "example3": "让对话和任务输出保持稳定的口吻与工作习惯。"
   },
   "status": "beta"
 }

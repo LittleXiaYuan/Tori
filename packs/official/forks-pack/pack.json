@@ -68,7 +68,14 @@
     "group": "chat",
     "phase": "A3",
     "preload": "true",
-    "note": "Default-preloaded chat-history pack: natively owns /v1/fork* through Pack Runtime. Existing chat/session surfaces consume this API."
+    "note": "Default-preloaded chat-history pack: natively owns /v1/fork* through Pack Runtime. Existing chat/session surfaces consume this API.",
+    "usability": "infrastructure",
+    "primaryActionLabel": "回到对话",
+    "primaryActionPath": "/chat",
+    "usageSurface": "Chat 会话历史与分支对话",
+    "example1": "从某条消息位置创建新的对话分支。",
+    "example2": "查看一个会话下已有的分支并切换上下文。",
+    "example3": "删除不再需要的分支，保留主线对话清晰。"
   },
   "status": "beta"
 }

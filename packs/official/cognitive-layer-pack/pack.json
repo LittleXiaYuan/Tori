@@ -41,9 +41,13 @@
   "metadata": {
     "sync": "backend-registry-drives-runtime",
     "descriptionStyle": "one-line-plus-three-examples",
-    "example1": "关闭后云雀退化为干净的 planner+工具：只用工具，不记忆、不反思、不做梦。",
-    "example2": "开启后恢复完整的记忆/反思/做梦/自进化闭环（完整云雀）。",
-    "example3": "运行时一键热切，无需重启；人格/信任/安全护栏始终保留。"
+    "example1": "开启或关闭记忆、反思、做梦与自进化相关能力。",
+    "example2": "在 Cogni 页面确认认知层是否正在参与上下文召回。",
+    "example3": "把认知层作为后台能力交给对话和任务自动调用。",
+    "usability": "infrastructure",
+    "primaryActionLabel": "查看认知能力",
+    "primaryActionPath": "/cognis",
+    "usageSurface": "Cogni、记忆、反思与夜间学习状态"
   },
   "status": "beta"
 }

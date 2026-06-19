@@ -55,7 +55,14 @@
     "group": "extensions",
     "phase": "A2",
     "preload": "true",
-    "note": "Natively owns /v1/market/search, /v1/market/top and /v1/market/stats through the Pack Runtime gate. Remote SkillHub discovery/install/update is owned by yunque.pack.skillhub."
+    "note": "Natively owns /v1/market/search, /v1/market/top and /v1/market/stats through the Pack Runtime gate. Remote SkillHub discovery/install/update is owned by yunque.pack.skillhub.",
+    "usability": "infrastructure",
+    "primaryActionLabel": "浏览技能",
+    "primaryActionPath": "/skills",
+    "usageSurface": "技能页与本地技能市场",
+    "example1": "搜索本地可用技能并按热度或评分排序。",
+    "example2": "查看技能市场统计，判断哪些能力更常用。",
+    "example3": "为后续远程技能生态提供统一查询入口。"
   },
   "status": "beta"
 }

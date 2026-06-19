@@ -50,7 +50,14 @@
     "group": "developer",
     "phase": "A4",
     "preload": "true",
-    "note": "Natively owns /v1/ide/* through Pack Runtime. Review is LLM-backed and bounded by request-size limits in the pack handler."
+    "note": "Natively owns /v1/ide/* through Pack Runtime. Review is LLM-backed and bounded by request-size limits in the pack handler.",
+    "usability": "infrastructure",
+    "primaryActionLabel": "查看工具",
+    "primaryActionPath": "/tools",
+    "usageSurface": "IDE 插件、代码审查与任务编排",
+    "example1": "让编辑器插件查询云雀连接状态。",
+    "example2": "把代码审查请求交给云雀处理。",
+    "example3": "让任务编排知道当前是否有 IDE 能力可用。"
   },
   "status": "beta"
 }

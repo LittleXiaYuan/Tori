@@ -71,7 +71,14 @@
     "group": "integration",
     "phase": "A3",
     "preload": "true",
-    "note": "Default-preloaded integration pack: natively owns /api/connectors* through Pack Runtime. Existing settings/task/skill surfaces consume this API; connector skills remain registered from the connector registry."
+    "note": "Default-preloaded integration pack: natively owns /api/connectors* through Pack Runtime. Existing settings/task/skill surfaces consume this API; connector skills remain registered from the connector registry.",
+    "usability": "infrastructure",
+    "primaryActionLabel": "管理外部连接",
+    "primaryActionPath": "/settings/connectors",
+    "usageSurface": "设置、技能与任务执行中的外部服务连接",
+    "example1": "在连接器设置里接入 GitHub、Notion、Slack 或 Gmail。",
+    "example2": "让任务执行时调用已连接服务读取资料或写回结果。",
+    "example3": "断开不再使用的连接器并清理保存的凭据。"
   },
   "status": "beta"
 }

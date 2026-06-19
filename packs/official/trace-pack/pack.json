@@ -54,7 +54,14 @@
     "group": "ops",
     "phase": "A3",
     "preload": "true",
-    "note": "Natively owns /v1/trace/* through the Pack Runtime gate. It preserves the user-safe default trace view and raw audit mode."
+    "note": "Natively owns /v1/trace/* through the Pack Runtime gate. It preserves the user-safe default trace view and raw audit mode.",
+    "usability": "infrastructure",
+    "primaryActionLabel": "查看任务详情",
+    "primaryActionPath": "/task-detail",
+    "usageSurface": "任务详情、执行轨迹与审计回放",
+    "example1": "查看最近执行事件的用户可读摘要。",
+    "example2": "按任务查看规划、工具调用和产物生成轨迹。",
+    "example3": "用 trace id 回放一次执行过程来排查问题。"
   },
   "status": "beta"
 }

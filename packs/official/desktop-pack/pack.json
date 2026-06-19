@@ -61,7 +61,14 @@
     "group": "desktop",
     "phase": "A4",
     "preload": "true",
-    "note": "Natively owns local desktop shell controls through Pack Runtime. Non-Windows builds degrade gracefully through the desktop package stubs."
+    "note": "Natively owns local desktop shell controls through Pack Runtime. Non-Windows builds degrade gracefully through the desktop package stubs.",
+    "usability": "infrastructure",
+    "primaryActionLabel": "打开应用设置",
+    "primaryActionPath": "/settings",
+    "usageSurface": "桌面壳、控制台显示与开机启动设置",
+    "example1": "在桌面版里切换后端控制台窗口是否显示。",
+    "example2": "管理云雀是否随系统启动。",
+    "example3": "把桌面壳能力纳入能力包启停和权限说明。"
   },
   "status": "beta"
 }

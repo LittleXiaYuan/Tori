@@ -51,7 +51,14 @@
     "group": "work",
     "phase": "A4",
     "preload": "true",
-    "note": "Natively owns /v1/documents/* through Pack Runtime. It reaches document skills through a narrow SkillsRegistry accessor."
+    "note": "Natively owns /v1/documents/* through Pack Runtime. It reaches document skills through a narrow SkillsRegistry accessor.",
+    "usability": "infrastructure",
+    "primaryActionLabel": "去对话生成文档",
+    "primaryActionPath": "/chat",
+    "usageSurface": "Chat、任务产物与文档生成技能",
+    "example1": "在对话里要求云雀生成 docx、xlsx、html 或 pptx。",
+    "example2": "任务完成后在产物区预览或下载生成文件。",
+    "example3": "读取模板目录，让文档输出沿用固定格式。"
   },
   "status": "beta"
 }

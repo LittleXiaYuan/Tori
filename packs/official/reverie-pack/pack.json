@@ -98,7 +98,14 @@
     "group": "cogni",
     "phase": "A4",
     "preload": "true",
-    "note": "Natively owns /v1/reverie/* including dream status through Pack Runtime. Dream status is read-only and does not mutate Cogni decisions."
+    "note": "Natively owns /v1/reverie/* including dream status through Pack Runtime. Dream status is read-only and does not mutate Cogni decisions.",
+    "usability": "infrastructure",
+    "primaryActionLabel": "查看内在生活",
+    "primaryActionPath": "/packs/inner-life",
+    "usageSurface": "内在生活、离线梦境与自发思考日志",
+    "example1": "查看小羽的内在独白和离线梦境状态。",
+    "example2": "配置自发思考开关和节奏。",
+    "example3": "手动触发一次思考来观察后台循环是否工作。"
   },
   "status": "beta"
 }
