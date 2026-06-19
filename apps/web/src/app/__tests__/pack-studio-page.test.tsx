@@ -5,6 +5,7 @@ import PackStudioPage from "../packs/studio/page";
 const packsClientMock = vi.hoisted(() => ({
   installed: vi.fn(),
   catalog: vi.fn(),
+  releaseCatalog: vi.fn(),
   install: vi.fn(),
   enable: vi.fn(),
   disable: vi.fn(),
@@ -119,6 +120,12 @@ describe("PackStudioPage", () => {
       enabled: 1,
       downloadable: 0,
       capabilities: 0,
+      entries: [],
+    });
+    packsClientMock.releaseCatalog.mockResolvedValue({
+      generated_at: "2026-06-19T00:00:00Z",
+      releases: [],
+      count: 0,
       entries: [],
     });
     packsClientMock.studioPlan.mockImplementation(({ packId, goal }: { packId: string; goal: string }) => Promise.resolve({
@@ -309,8 +316,8 @@ describe("PackStudioPage", () => {
     expect((screen.getByLabelText("这次想补强什么") as HTMLInputElement).value).toBe("补一个结果面板");
     expect((screen.getByLabelText("OSS / Release URL") as HTMLInputElement).value).toBe("https://oss.example.com/wasm-plugin.yqpack");
     expect((screen.getByLabelText("SHA256") as HTMLInputElement).value).toBe("9".repeat(64));
-    expect(screen.getByText("已从能力包中心带入检查信息")).toBeInTheDocument();
-    expect(screen.getByText("可以直接只读检查远程包；这一步只校验 SHA、manifest 与文件分类，不会安装、启用或改动本地能力包。")).toBeInTheDocument();
+    expect(screen.getByText("已从能力包中心接入这个 yqpack")).toBeInTheDocument();
+    expect(screen.getByText("不用回到商店手动找包；先在这里做只读检查，再进入工作区、diff 预览、审计和重新打包。这一步只校验 SHA、manifest 与文件分类，不会安装、启用或改动本地能力包。")).toBeInTheDocument();
     expect(screen.getByText("URL: https://oss.example.com/wasm-plugin.yqpack")).toBeInTheDocument();
     expect(screen.getByText(`SHA256: ${"9".repeat(64)}`)).toBeInTheDocument();
 
@@ -324,6 +331,62 @@ describe("PackStudioPage", () => {
         goal: "补一个结果面板",
       });
     });
+  });
+
+  it("selects a release-only pack from official sources", async () => {
+    packsClientMock.installed.mockResolvedValueOnce({
+      packs: [{ manifest: documentsManifest, status: "disabled" }],
+      count: 1,
+    });
+    packsClientMock.catalog.mockResolvedValueOnce({
+      generated_at: "2026-06-19T00:00:00Z",
+      sources: [],
+      source_reports: [],
+      count: 0,
+      installed: 1,
+      enabled: 0,
+      downloadable: 0,
+      capabilities: 0,
+      entries: [],
+    });
+    packsClientMock.releaseCatalog.mockResolvedValueOnce({
+      generated_at: "2026-06-19T00:00:00Z",
+      releases: ["https://example.com/releases/tag/pack%2Fwasm-plugin%2Fv0.1.0"],
+      count: 1,
+      entries: [{
+        release_url: "https://example.com/releases/tag/pack%2Fwasm-plugin%2Fv0.1.0",
+        release_tag: "pack/wasm-plugin/v0.1.0",
+        package_url: "https://oss.example.com/wasm-plugin.yqpack",
+        package_name: "wasm-plugin.yqpack",
+        sha256: "9".repeat(64),
+        size_bytes: 4096,
+        installed: false,
+        enabled: false,
+        status: "disabled",
+        update_action: "install",
+        downloadable: true,
+        manifest: wasmManifest,
+      }],
+    });
+    navigationMock.query = new URLSearchParams({
+      packId: "yunque.pack.wasm-plugin",
+      goal: "补一个结果面板",
+      packageUrl: "https://oss.example.com/wasm-plugin.yqpack",
+      sha256: "9".repeat(64),
+    }).toString();
+
+    render(<PackStudioPage />);
+
+    expect((await screen.findAllByText("WASM 能力包")).length).toBeGreaterThan(0);
+    expect(screen.getByText("官方源")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(packsClientMock.studioPlan).toHaveBeenCalledWith({
+        packId: "yunque.pack.wasm-plugin",
+        goal: "补一个结果面板",
+      });
+    });
+    const task = screen.getByLabelText("小羽改包任务") as HTMLTextAreaElement;
+    expect(task.value).toContain("请以“小羽改包”的方式改造能力包 WASM 能力包");
   });
 
   it("turns real pack metadata into a guarded Xiaoyu modification task", async () => {

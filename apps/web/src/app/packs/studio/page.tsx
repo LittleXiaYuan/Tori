@@ -36,16 +36,20 @@ import {
   parsePackStudioPatchDraftPrompt,
   parsePackStudioPatchPlanPrompt,
 } from "@/lib/pack-studio-chat";
+import { resolvePackReleaseSources } from "@/lib/pack-release-sources";
 import { createPacksClient, type InstalledPack, type PackManifest, type PackStudioAuditReport, type PackStudioPatchReport, type PackStudioPlanReport, type PackStudioRepackReport, type PackStudioWorkspaceReport, type YqpackInspectReport } from "yunque-client/packs";
 
 const packsClient = createPacksClient(createYunqueSDKClientOptions());
+const PACK_RELEASE_SOURCES = resolvePackReleaseSources();
 const DEFAULT_STUDIO_GOAL = "让这个能力包更像一个用户能直接理解和使用的功能，而不是只看到存在。";
 
 type PackCandidate = {
   manifest: PackManifest;
-  source: "installed" | "catalog";
+  source: "installed" | "catalog" | "release";
   enabled: boolean;
   installed: boolean;
+  packageUrl?: string;
+  sha256?: string;
 };
 
 type StudioAnalysis = {
@@ -418,6 +422,8 @@ function buildPatchDraftRequestPrompt(prompt: string, workspace: PackStudioWorks
 function sourceLabel(candidate: PackCandidate): string {
   if (candidate.installed && candidate.enabled) return "已启用";
   if (candidate.installed) return "已安装";
+  if (candidate.source === "release") return "官方源";
+  if (candidate.source === "catalog") return "私有源";
   return "源内可安装";
 }
 
@@ -617,7 +623,11 @@ function mapStudioPlanReport(report: PackStudioPlanReport): StudioAnalysis {
 export default function PackStudioPage() {
   const searchParams = useSearchParams();
   const { data, loading, refresh } = useApiData(async () => {
-    const [installed, catalog] = await Promise.all([packsClient.installed(), packsClient.catalog()]);
+    const [installed, catalog, releaseCatalog] = await Promise.all([
+      packsClient.installed(),
+      packsClient.catalog(),
+      packsClient.releaseCatalog(PACK_RELEASE_SOURCES.map((source) => source.url)),
+    ]);
     const map = new Map<string, PackCandidate>();
     for (const pack of installed.packs || []) {
       map.set(pack.manifest.id, {
@@ -634,6 +644,18 @@ export default function PackStudioPage() {
           source: "catalog",
           enabled: Boolean(entry.enabled),
           installed: Boolean(entry.installed),
+        });
+      }
+    }
+    for (const entry of releaseCatalog.entries || []) {
+      if (!map.has(entry.manifest.id)) {
+        map.set(entry.manifest.id, {
+          manifest: entry.manifest,
+          source: "release",
+          enabled: Boolean(entry.enabled),
+          installed: Boolean(entry.installed),
+          packageUrl: entry.package_url,
+          sha256: entry.sha256,
         });
       }
     }
@@ -1285,8 +1307,8 @@ export default function PackStudioPage() {
                   <div className="flex min-w-0 gap-2">
                     <ShieldCheck size={15} style={{ color: "var(--yunque-primary)", flex: "0 0 auto" }} />
                     <div className="min-w-0">
-                      <div className="font-medium" style={{ color: "var(--yunque-text)" }}>已从能力包中心带入检查信息</div>
-                      <div className="mt-1">可以直接只读检查远程包；这一步只校验 SHA、manifest 与文件分类，不会安装、启用或改动本地能力包。</div>
+                      <div className="font-medium" style={{ color: "var(--yunque-text)" }}>已从能力包中心接入这个 yqpack</div>
+                      <div className="mt-1">不用回到商店手动找包；先在这里做只读检查，再进入工作区、diff 预览、审计和重新打包。这一步只校验 SHA、manifest 与文件分类，不会安装、启用或改动本地能力包。</div>
                       <div className="mt-2 space-y-1 font-mono text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
                         {packageUrl.trim() && <div className="break-all">URL: {packageUrl.trim()}</div>}
                         {packageSHA.trim() && <div className="break-all">SHA256: {packageSHA.trim()}</div>}
