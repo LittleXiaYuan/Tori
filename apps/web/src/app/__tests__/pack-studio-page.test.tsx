@@ -407,6 +407,7 @@ describe("PackStudioPage", () => {
       "```",
     ].join("\n");
     fireEvent.change(screen.getByLabelText("导入 Patch Plan JSON"), { target: { value: importedChatMessage } });
+    expect(screen.getByText("工作区匹配")).toBeInTheDocument();
     expect(screen.getByText("2 个候选")).toBeInTheDocument();
     expect(screen.getByText(/包：WASM 能力包/)).toBeInTheDocument();
     expect(screen.getByText("摘要：" + patchPlan.candidates[1].content_summary.hash)).toBeInTheDocument();
@@ -415,6 +416,22 @@ describe("PackStudioPage", () => {
     expect(screen.getByDisplayValue("C:\\yunque\\packs\\studio\\frontend\\index.html")).toBeInTheDocument();
     expect((screen.getByLabelText("新的文件内容") as HTMLTextAreaElement).value).toBe("");
     expect(toastMock).toHaveBeenCalledWith("已填入 Patch Plan 目标文件；请补入新内容后再预览 diff", "success");
+
+    const mismatchedPatchPlan = {
+      ...patchPlan,
+      workspace: {
+        ...patchPlan.workspace,
+        id: "other-workspace",
+        path: "C:\\other\\pack",
+        original_sha256: "f".repeat(64),
+      },
+    };
+    fireEvent.change(screen.getByLabelText("导入 Patch Plan JSON"), {
+      target: { value: `\`\`\`json\n${JSON.stringify(mismatchedPatchPlan, null, 2)}\n\`\`\`` },
+    });
+    expect(screen.getByText("工作区待确认")).toBeInTheDocument();
+    expect(screen.getByText(/工作区或原始 SHA 与当前工作区不一致/)).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "填入文件" })[0]).toBeDisabled();
 
     const draftButtons = screen.getAllByRole("button", { name: "载入草稿" });
     fireEvent.click(draftButtons[0]);

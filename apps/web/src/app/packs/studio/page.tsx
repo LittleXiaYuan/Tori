@@ -510,6 +510,15 @@ export default function PackStudioPage() {
     () => parsePackStudioPatchPlanPrompt(importedPatchPlanText),
     [importedPatchPlanText],
   );
+  const importedPatchPlanMatchesWorkspace = useMemo(() => {
+    if (!importedPatchPlan || !workspaceReport) return false;
+    const normalizePath = (value: string) => value.replace(/\\/g, "/").toLowerCase();
+    return (
+      importedPatchPlan.workspace.id === workspaceReport.workspace_id ||
+      normalizePath(importedPatchPlan.workspace.path) === normalizePath(workspaceReport.workspace_path) ||
+      (Boolean(importedPatchPlan.workspace.originalSha256) && importedPatchPlan.workspace.originalSha256 === workspaceReport.original_sha256)
+    );
+  }, [importedPatchPlan, workspaceReport]);
 
   const copyPrompt = async () => {
     if (!prompt) return;
@@ -617,6 +626,10 @@ export default function PackStudioPage() {
   };
 
   const fillImportedPatchCandidate = (candidate: NonNullable<typeof importedPatchPlan>["candidates"][number]) => {
+    if (!importedPatchPlanMatchesWorkspace) {
+      showToast("Patch Plan 与当前工作区不匹配，请重新从当前工作区生成", "warning");
+      return;
+    }
     setPatchFile(candidate.filePath);
     setPatchContent("");
     setPatchReport(null);
@@ -1001,7 +1014,12 @@ export default function PackStudioPage() {
                           </div>
                         </div>
                         {importedPatchPlan && (
-                          <Chip size="sm" color="success">{importedPatchPlan.candidates.length} 个候选</Chip>
+                          <div className="flex flex-wrap gap-2">
+                            <Chip size="sm" color={importedPatchPlanMatchesWorkspace ? "success" : "warning"}>
+                              {importedPatchPlanMatchesWorkspace ? "工作区匹配" : "工作区待确认"}
+                            </Chip>
+                            <Chip size="sm" color="success">{importedPatchPlan.candidates.length} 个候选</Chip>
+                          </div>
                         )}
                       </div>
                       <TextArea
@@ -1019,6 +1037,11 @@ export default function PackStudioPage() {
                       )}
                       {importedPatchPlan && (
                         <div className="mt-3 space-y-2">
+                          {!importedPatchPlanMatchesWorkspace && (
+                            <div className="rounded px-2 py-1 text-[11px]" style={{ background: "rgba(245,158,11,0.10)", color: "var(--yunque-warning)" }}>
+                              这个 Patch Plan 的工作区或原始 SHA 与当前工作区不一致。请回到当前工作区重新生成计划，或先确认你没有切换 yqpack。
+                            </div>
+                          )}
                           <div className="grid gap-2 text-[11px] lg:grid-cols-2" style={{ color: "var(--yunque-text-muted)" }}>
                             <div className="rounded px-2 py-1" style={{ background: "var(--yunque-bg-hover)" }}>
                               包：{importedPatchPlan.pack.name || importedPatchPlan.pack.id} · {importedPatchPlan.pack.version || "unknown"}
@@ -1036,7 +1059,7 @@ export default function PackStudioPage() {
                                     {candidate.riskLevel && <Chip size="sm" variant="soft">风险：{candidate.riskLevel}</Chip>}
                                     {candidate.contentSummary && <Chip size="sm" variant="soft">摘要：{candidate.contentSummary.hash}</Chip>}
                                   </div>
-                                  <Button size="sm" variant="outline" onPress={() => fillImportedPatchCandidate(candidate)} isDisabled={!candidate.applyable}>
+                                  <Button size="sm" variant="outline" onPress={() => fillImportedPatchCandidate(candidate)} isDisabled={!candidate.applyable || !importedPatchPlanMatchesWorkspace}>
                                     <FileSearch size={13} /> 填入文件
                                   </Button>
                                 </div>
