@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +13,66 @@ import (
 	"yunque-agent/pkg/cogni"
 	"yunque-agent/pkg/packruntime"
 )
+
+func TestCogniKernelPackServesWorkflowListAndRun(t *testing.T) {
+	gw, tm := newTestGatewayWithCogniKernelPack(t, packruntime.PackStatusEnabled)
+	tenant := tm.Register("cogni-workflow")
+
+	reg := cogni.NewRegistry()
+	if err := reg.Add(&cogni.Declaration{
+		ID:          "reviewer",
+		DisplayName: "Reviewer",
+		Workflows: []cogni.WorkflowDef{{
+			Name: "full_review",
+			Steps: []cogni.WorkflowStep{{
+				Name:   "summarize",
+				Skill:  "summarize",
+				Args:   map[string]any{"topic": "${input.topic}"},
+				Output: "summary",
+			}},
+		}},
+	}, "test"); err != nil {
+		t.Fatalf("add cogni declaration: %v", err)
+	}
+	gw.SetCogniRegistry(reg, t.TempDir())
+	gw.SetCogniWorkflowEngine(cogni.NewWorkflowEngine(func(ctx context.Context, skillName string, args map[string]any) (any, error) {
+		if skillName != "summarize" {
+			t.Fatalf("unexpected skill: %s", skillName)
+		}
+		return "summary:" + args["topic"].(string), nil
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/cognis/reviewer/workflows", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("workflow list status = %d, body = %s", w.Code, w.Body.String())
+	}
+	var list map[string]any
+	if err := json.NewDecoder(w.Body).Decode(&list); err != nil {
+		t.Fatalf("decode list: %v", err)
+	}
+	if list["count"].(float64) != 1 {
+		t.Fatalf("expected one workflow, got %#v", list)
+	}
+
+	body, _ := json.Marshal(map[string]any{"topic": "pack"})
+	req = httptest.NewRequest(http.MethodPost, "/v1/cognis/reviewer/workflow/full_review", bytes.NewReader(body))
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("workflow run status = %d, body = %s", w.Code, w.Body.String())
+	}
+	var result cogni.WorkflowResult
+	if err := json.NewDecoder(w.Body).Decode(&result); err != nil {
+		t.Fatalf("decode result: %v", err)
+	}
+	if !result.Success || result.Outputs["summary"] != "summary:pack" {
+		t.Fatalf("unexpected workflow result: %#v", result)
+	}
+}
 
 func TestCogniKernelPackServesExperienceRecordAndSummary(t *testing.T) {
 	gw, tm := newTestGatewayWithCogniKernelPack(t, packruntime.PackStatusEnabled)

@@ -767,6 +767,9 @@ func (g *Gateway) SetCogniRegistry(r *cogni.Registry, dir string) {
 	g.cogniDir = dir
 }
 
+// CogniRegistry exposes the Cogni declaration registry to the Cogni Kernel pack.
+func (g *Gateway) CogniRegistry() *cogni.Registry { return g.cogniRegistry }
+
 // SetCogniKernelRuntimeStateHandler attaches a read-only Pack Runtime state
 // reporter owned by the Cogni Kernel module. It is intentionally separate from
 // the broad /v1/cognis/ bridge route so Pack Runtime can keep a method-aware
@@ -785,6 +788,9 @@ func (g *Gateway) SetCogniSentinel(s *cogni.Sentinel) { g.cogniSentinel = s }
 
 // SetCogniWorkflowEngine attaches the workflow engine for /v1/cognis/{id}/workflows/*.
 func (g *Gateway) SetCogniWorkflowEngine(we *cogni.WorkflowEngine) { g.cogniWorkflowEngine = we }
+
+// CogniWorkflowEngine exposes the workflow engine to the Cogni Kernel pack.
+func (g *Gateway) CogniWorkflowEngine() *cogni.WorkflowEngine { return g.cogniWorkflowEngine }
 
 // SetCogniExperiences attaches the per-cogni experience stores.
 func (g *Gateway) SetCogniExperiences(m map[string]*cogni.ExperienceStore) { g.cogniExperiences = m }

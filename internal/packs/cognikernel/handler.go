@@ -54,11 +54,21 @@ type ExperienceProvider interface {
 	CogniExperiences() map[string]*cogni.ExperienceStore
 }
 
+type RegistryProvider interface {
+	CogniRegistry() *cogni.Registry
+}
+
+type WorkflowEngineProvider interface {
+	CogniWorkflowEngine() *cogni.WorkflowEngine
+}
+
 type Dependencies struct {
 	BusProvider         BusProvider
 	FederationProvider  FederationProvider
 	CostTrackerProvider CostTrackerProvider
 	ExperienceProvider  ExperienceProvider
+	RegistryProvider    RegistryProvider
+	WorkflowProvider    WorkflowEngineProvider
 }
 
 type RuntimeStateReport struct {
@@ -147,6 +157,8 @@ type Router struct {
 	federationProvider FederationProvider
 	costTracker        CostTrackerProvider
 	experienceProvider ExperienceProvider
+	registryProvider   RegistryProvider
+	workflowProvider   WorkflowEngineProvider
 }
 
 func NewRouter(api API, reporter RuntimeStateReporter) *Router {
@@ -166,6 +178,8 @@ func NewRouterWithDeps(api API, reporter RuntimeStateReporter, deps Dependencies
 		federationProvider: deps.FederationProvider,
 		costTracker:        deps.CostTrackerProvider,
 		experienceProvider: deps.ExperienceProvider,
+		registryProvider:   deps.RegistryProvider,
+		workflowProvider:   deps.WorkflowProvider,
 	}
 }
 
@@ -198,6 +212,9 @@ func (r *Router) RuntimeRoutes() []packruntime.BackendRoute {
 
 func (r *Router) ServeCogniKernel(w http.ResponseWriter, req *http.Request) {
 	if r.serveExperience(w, req) {
+		return
+	}
+	if r.serveWorkflow(w, req) {
 		return
 	}
 	if r == nil || r.api == nil {
@@ -472,6 +489,118 @@ func (r *Router) experienceStores() map[string]*cogni.ExperienceStore {
 	return r.experienceProvider.CogniExperiences()
 }
 
+func (r *Router) serveWorkflow(w http.ResponseWriter, req *http.Request) bool {
+	id, rest, ok := workflowRoute(req.URL.Path)
+	if !ok {
+		return false
+	}
+	switch {
+	case rest == "workflows":
+		r.HandleWorkflowsList(w, req, id)
+	case strings.HasPrefix(rest, "workflow/"):
+		r.HandleWorkflowRun(w, req, id, strings.TrimPrefix(rest, "workflow/"))
+	default:
+		return false
+	}
+	return true
+}
+
+func workflowRoute(path string) (id, rest string, ok bool) {
+	path = strings.TrimPrefix(path, SubResourceRoute)
+	path = strings.Trim(path, "/")
+	if path == "" {
+		return "", "", false
+	}
+	segs := strings.SplitN(path, "/", 2)
+	if len(segs) != 2 || segs[0] == "" {
+		return "", "", false
+	}
+	return segs[0], segs[1], segs[1] == "workflows" || strings.HasPrefix(segs[1], "workflow/")
+}
+
+func (r *Router) HandleWorkflowsList(w http.ResponseWriter, req *http.Request, id string) {
+	if req.Method != http.MethodGet {
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET only")
+		return
+	}
+	decl, ok := r.cogniDeclaration(id)
+	if !ok {
+		apperror.WriteCode(w, apperror.CodeNotFound, "cogni not found: "+id)
+		return
+	}
+	writeJSON(w, map[string]any{
+		"id":        id,
+		"workflows": decl.Workflows,
+		"count":     len(decl.Workflows),
+	})
+}
+
+func (r *Router) HandleWorkflowRun(w http.ResponseWriter, req *http.Request, id, workflowName string) {
+	if req.Method != http.MethodPost {
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "POST only")
+		return
+	}
+	engine := r.cogniWorkflowEngine()
+	if engine == nil {
+		apperror.WriteCode(w, apperror.CodeInternal, "workflow engine not configured")
+		return
+	}
+	decl, ok := r.cogniDeclaration(id)
+	if !ok {
+		apperror.WriteCode(w, apperror.CodeNotFound, "cogni not found: "+id)
+		return
+	}
+	workflowName = strings.Trim(workflowName, "/")
+	if workflowName == "" {
+		apperror.WriteCode(w, apperror.CodeBadRequest, "workflow name required: /v1/cognis/{id}/workflow/{name}")
+		return
+	}
+
+	var wf *cogni.WorkflowDef
+	for i := range decl.Workflows {
+		if decl.Workflows[i].Name == workflowName {
+			wf = &decl.Workflows[i]
+			break
+		}
+	}
+	if wf == nil {
+		apperror.WriteCode(w, apperror.CodeNotFound, "workflow not found: "+workflowName)
+		return
+	}
+
+	var input map[string]any
+	if req.Body != nil {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			apperror.WriteCode(w, apperror.CodeBadRequest, "invalid JSON body: "+err.Error())
+			return
+		}
+	}
+
+	writeJSON(w, engine.Run(req.Context(), *wf, input))
+}
+
+func (r *Router) cogniDeclaration(id string) (*cogni.Declaration, bool) {
+	registry := r.cogniRegistry()
+	if registry == nil {
+		return nil, false
+	}
+	return registry.Get(id)
+}
+
+func (r *Router) cogniRegistry() *cogni.Registry {
+	if r == nil || r.registryProvider == nil {
+		return nil
+	}
+	return r.registryProvider.CogniRegistry()
+}
+
+func (r *Router) cogniWorkflowEngine() *cogni.WorkflowEngine {
+	if r == nil || r.workflowProvider == nil {
+		return nil
+	}
+	return r.workflowProvider.CogniWorkflowEngine()
+}
+
 func (r *Router) cogniFederation() *cogni.CogniFederation {
 	if r == nil || r.federationProvider == nil {
 		return nil
@@ -548,6 +677,12 @@ func inferDependencies(api API) Dependencies {
 	if inferred, ok := api.(ExperienceProvider); ok {
 		deps.ExperienceProvider = inferred
 	}
+	if inferred, ok := api.(RegistryProvider); ok {
+		deps.RegistryProvider = inferred
+	}
+	if inferred, ok := api.(WorkflowEngineProvider); ok {
+		deps.WorkflowProvider = inferred
+	}
 	return deps
 }
 
@@ -563,6 +698,12 @@ func mergeDependencies(primary, fallback Dependencies) Dependencies {
 	}
 	if primary.ExperienceProvider == nil {
 		primary.ExperienceProvider = fallback.ExperienceProvider
+	}
+	if primary.RegistryProvider == nil {
+		primary.RegistryProvider = fallback.RegistryProvider
+	}
+	if primary.WorkflowProvider == nil {
+		primary.WorkflowProvider = fallback.WorkflowProvider
 	}
 	return primary
 }

@@ -2,6 +2,7 @@ package cognikernelpack
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -35,6 +36,8 @@ type fakeDependencyProvider struct {
 	federation  *cogni.CogniFederation
 	tracker     *cogni.CostTracker
 	experiences map[string]*cogni.ExperienceStore
+	registry    *cogni.Registry
+	workflow    *cogni.WorkflowEngine
 }
 
 func (p fakeDependencyProvider) CogniBus() *cogni.CogniBus { return p.bus }
@@ -46,6 +49,10 @@ func (p fakeDependencyProvider) CogniCostTracker() *cogni.CostTracker { return p
 func (p fakeDependencyProvider) CogniExperiences() map[string]*cogni.ExperienceStore {
 	return p.experiences
 }
+
+func (p fakeDependencyProvider) CogniRegistry() *cogni.Registry { return p.registry }
+
+func (p fakeDependencyProvider) CogniWorkflowEngine() *cogni.WorkflowEngine { return p.workflow }
 
 func (fakeRuntimeReporter) CogniKernelRuntimeState() RuntimeStateReport {
 	return RuntimeStateReport{
@@ -397,6 +404,96 @@ func TestCogniKernelRouterOwnsExperience(t *testing.T) {
 	}
 	if api.called != 0 {
 		t.Fatalf("experience routes should not delegate to API adapter, called=%d", api.called)
+	}
+}
+
+func TestCogniKernelRouterOwnsWorkflow(t *testing.T) {
+	api := &fakeCogniAPI{}
+	registry := cogni.NewRegistry()
+	if err := registry.Add(&cogni.Declaration{
+		ID: "reviewer",
+		Workflows: []cogni.WorkflowDef{{
+			Name: "full_review",
+			Steps: []cogni.WorkflowStep{{
+				Name:   "summarize",
+				Skill:  "summarize",
+				Args:   map[string]any{"topic": "${input.topic}"},
+				Output: "summary",
+			}},
+		}},
+	}, "test"); err != nil {
+		t.Fatalf("add cogni: %v", err)
+	}
+	engine := cogni.NewWorkflowEngine(func(ctx context.Context, skillName string, args map[string]any) (any, error) {
+		if skillName != "summarize" {
+			t.Fatalf("unexpected skill: %s", skillName)
+		}
+		return "summary:" + args["topic"].(string), nil
+	})
+	router := NewRouterWithDeps(api, fakeRuntimeReporter{}, Dependencies{
+		RegistryProvider: fakeDependencyProvider{registry: registry},
+		WorkflowProvider: fakeDependencyProvider{workflow: engine},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/cognis/reviewer/workflows", nil)
+	w := httptest.NewRecorder()
+	router.ServeCogniKernel(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("workflow list status=%d body=%s", w.Code, w.Body.String())
+	}
+	var list map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &list); err != nil {
+		t.Fatalf("decode list: %v", err)
+	}
+	if list["count"].(float64) != 1 {
+		t.Fatalf("expected one workflow, got %#v", list)
+	}
+
+	body, _ := json.Marshal(map[string]any{"topic": "pack"})
+	req = httptest.NewRequest(http.MethodPost, "/v1/cognis/reviewer/workflow/full_review", bytes.NewReader(body))
+	w = httptest.NewRecorder()
+	router.ServeCogniKernel(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("workflow run status=%d body=%s", w.Code, w.Body.String())
+	}
+	var result cogni.WorkflowResult
+	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
+		t.Fatalf("decode result: %v", err)
+	}
+	if !result.Success || result.Outputs["summary"] != "summary:pack" {
+		t.Fatalf("unexpected workflow result: %#v", result)
+	}
+	if api.called != 0 {
+		t.Fatalf("workflow routes should not delegate to API adapter, called=%d", api.called)
+	}
+}
+
+func TestCogniKernelRouterWorkflowErrors(t *testing.T) {
+	registry := cogni.NewRegistry()
+	if err := registry.Add(&cogni.Declaration{ID: "reviewer"}, "test"); err != nil {
+		t.Fatalf("add cogni: %v", err)
+	}
+	router := NewRouterWithDeps(&fakeCogniAPI{}, fakeRuntimeReporter{}, Dependencies{
+		RegistryProvider: fakeDependencyProvider{registry: registry},
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/cognis/reviewer/workflow/missing", bytes.NewReader([]byte(`{}`)))
+	w := httptest.NewRecorder()
+	router.ServeCogniKernel(w, req)
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("missing workflow engine status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	engine := cogni.NewWorkflowEngine(nil)
+	router = NewRouterWithDeps(&fakeCogniAPI{}, fakeRuntimeReporter{}, Dependencies{
+		RegistryProvider: fakeDependencyProvider{registry: registry},
+		WorkflowProvider: fakeDependencyProvider{workflow: engine},
+	})
+	req = httptest.NewRequest(http.MethodGet, "/v1/cognis/missing/workflows", nil)
+	w = httptest.NewRecorder()
+	router.ServeCogniKernel(w, req)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("missing cogni status=%d body=%s", w.Code, w.Body.String())
 	}
 }
 

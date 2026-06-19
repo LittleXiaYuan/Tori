@@ -88,10 +88,6 @@ func (g *Gateway) handleCognis(w http.ResponseWriter, r *http.Request) {
 			g.cogniHealthByID(w, r, id)
 		case len(segs) == 2 && segs[1] == "verify":
 			g.cogniVerifyByID(w, r, id)
-		case len(segs) == 2 && segs[1] == "workflows":
-			g.cogniWorkflowsList(w, r, id)
-		case len(segs) >= 2 && segs[1] == "workflow":
-			g.cogniWorkflowRun(w, r, id, segs)
 		case len(segs) == 2 && segs[1] == "evolve":
 			g.cogniEvolve(w, r, id)
 		case len(segs) == 2 && segs[1] == "evolution":
@@ -541,75 +537,6 @@ func (g *Gateway) cogniGenerate(w http.ResponseWriter, r *http.Request) {
 		"declaration": decl,
 		"saved":       body.AutoSave,
 	})
-}
-
-// ── Workflow handlers ──
-
-func (g *Gateway) cogniWorkflowsList(w http.ResponseWriter, r *http.Request, id string) {
-	if r.Method != http.MethodGet {
-		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET only")
-		return
-	}
-	decl, ok := g.cogniRegistry.Get(id)
-	if !ok {
-		apperror.WriteCode(w, apperror.CodeNotFound, "cogni not found: "+id)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{
-		"id":        id,
-		"workflows": decl.Workflows,
-		"count":     len(decl.Workflows),
-	})
-}
-
-func (g *Gateway) cogniWorkflowRun(w http.ResponseWriter, r *http.Request, id string, segs []string) {
-	if r.Method != http.MethodPost {
-		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "POST only")
-		return
-	}
-	if g.cogniWorkflowEngine == nil {
-		apperror.WriteCode(w, apperror.CodeInternal, "workflow engine not configured")
-		return
-	}
-	decl, ok := g.cogniRegistry.Get(id)
-	if !ok {
-		apperror.WriteCode(w, apperror.CodeNotFound, "cogni not found: "+id)
-		return
-	}
-
-	wfName := ""
-	if len(segs) >= 3 {
-		wfName = segs[2]
-	}
-	if wfName == "" {
-		apperror.WriteCode(w, apperror.CodeBadRequest, "workflow name required: /v1/cognis/{id}/workflow/{name}")
-		return
-	}
-
-	var wf *cogni.WorkflowDef
-	for i := range decl.Workflows {
-		if decl.Workflows[i].Name == wfName {
-			wf = &decl.Workflows[i]
-			break
-		}
-	}
-	if wf == nil {
-		apperror.WriteCode(w, apperror.CodeNotFound, "workflow not found: "+wfName)
-		return
-	}
-
-	var input map[string]any
-	if r.Body != nil {
-		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-			apperror.WriteCode(w, apperror.CodeBadRequest, "invalid JSON body: "+err.Error())
-			return
-		}
-	}
-
-	result := g.cogniWorkflowEngine.Run(r.Context(), *wf, input)
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(result)
 }
 
 // ── Experience handlers ──
