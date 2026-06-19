@@ -642,7 +642,7 @@ export default function PacksPageOptimized() {
         </div>
 
         {readinessQueue.length > 0 && (
-          <div className="mt-4 rounded-lg border p-4" style={{ borderColor: "rgba(245,158,11,0.22)", background: "rgba(245,158,11,0.07)" }}>
+          <div id="readiness-queue" className="mt-4 scroll-mt-24 rounded-lg border p-4" style={{ borderColor: "rgba(245,158,11,0.22)", background: "rgba(245,158,11,0.07)" }}>
             <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
               <div>
                 <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>补肉优先队列</div>

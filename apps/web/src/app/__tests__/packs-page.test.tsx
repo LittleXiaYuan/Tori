@@ -319,6 +319,7 @@ describe("PacksPageOptimized", () => {
     expect(screen.getAllByText("Needs Entry Pack").length).toBeGreaterThan(0);
     expect(screen.getByText("Documents (文档生成)")).toBeInTheDocument();
     expect(screen.getByText("补肉优先队列")).toBeInTheDocument();
+    expect(screen.getByText("补肉优先队列").closest("#readiness-queue")).not.toBeNull();
     expect(screen.getByText("按体检缺口自动挑出最需要小羽补用途、入口、示例或能力边界的能力包。")).toBeInTheDocument();
     expect(screen.getByText("还缺：使用示例、用户感知位置、打开/使用入口、后端能力声明")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "复制批量补肉任务" })).toBeInTheDocument();
