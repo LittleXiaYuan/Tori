@@ -149,6 +149,16 @@ function installSourceForPack(params: {
   return null;
 }
 
+type NextStep = {
+  key: string;
+  label: string;
+  detail: string;
+  href?: string;
+  actionLabel?: string;
+  action?: () => void;
+  disabled?: boolean;
+};
+
 export default function PackDetailClientPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -305,6 +315,75 @@ export default function PackDetailClientPage() {
   const enable = () => run("enable", () => packsClient.enable(manifest.id));
   const disable = () => run("disable", () => packsClient.disable(manifest.id));
   const rollback = () => run("rollback", () => packsClient.rollback(manifest.id));
+  const nextSteps: NextStep[] = !installed
+    ? [
+        {
+          key: "inspect",
+          label: "先做只读检查",
+          detail: installSource
+            ? "在 Studio 里检查 yqpack 来源、SHA、manifest、权限和入口，不会安装或改写本机能力。"
+            : "先确认这个能力包的 manifest、权限和入口是否完整；没有可用安装源时不要直接安装。",
+          href: studioHref,
+        },
+        {
+          key: "install",
+          label: "安装能力包",
+          detail: installSource
+            ? "确认来源可信后再安装；失败时会提示下载失败、SHA 不匹配、签名失败、manifest 不合法或平台不支持。"
+            : "当前没有可用安装源，请回能力包中心换官方源、私有源或本地高级安装。",
+          actionLabel: "安装能力包",
+          action: installSource ? installFromCatalog : undefined,
+          disabled: !installSource || busy === "install",
+        },
+        {
+          key: "after-install",
+          label: "安装后回中心启用",
+          detail: "安装成功后状态会刷新；回能力包中心或留在详情页启用，再打开入口或让云雀在 Chat/任务里调用它。",
+          href: "/packs",
+        },
+      ]
+    : !enabled
+      ? [
+          {
+            key: "review",
+            label: "确认权限与风险",
+            detail: "先看清它会读写什么、是否联网、是否涉及浏览器/电脑使用，以及能否禁用或回滚。",
+          },
+          {
+            key: "enable",
+            label: "启用能力包",
+            detail: "启用后云雀才会把它纳入可用能力；高风险能力仍需要具体动作授权。",
+            actionLabel: "启用能力包",
+            action: enable,
+            disabled: busy === "enable",
+          },
+          {
+            key: "open-later",
+            label: "启用后打开入口",
+            detail: openPath ? "如果它有界面入口，启用后可以直接打开；没有入口的包会在 Chat、任务、记忆或知识流程中被感知。" : "这个包没有独立界面入口，启用后主要由 Chat、任务、记忆或知识流程感知。",
+            href: openPath || "/packs",
+          },
+        ]
+      : [
+          {
+            key: "open",
+            label: openPath ? "打开能力入口" : "回能力包中心管理",
+            detail: openPath ? "进入它的界面开始使用；没有界面的后台能力，也可以从 Chat 或任务里自然调用。" : "这个包没有独立界面入口，可以回中心查看状态、禁用或继续管理。",
+            href: openPath || "/packs",
+          },
+          {
+            key: "manage",
+            label: "回中心管理和固定",
+            detail: "回能力包中心查看启用状态、入口提示、侧栏固定建议和可回滚信息。",
+            href: "/packs",
+          },
+          {
+            key: "improve",
+            label: "交给小羽补齐",
+            detail: "如果用户觉得它像空壳，可以让小羽只读检查 yqpack，再补用途、示例、权限边界和入口说明。",
+            href: studioHref,
+          },
+        ];
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">
@@ -372,6 +451,49 @@ export default function PackDetailClientPage() {
 
       {/* 可滚动内容 */}
       <div className="flex-1 overflow-y-auto p-5 space-y-4">
+        <Card className="section-card p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <ArrowRight size={16} style={{ color: "var(--yunque-accent)" }} />
+            <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
+              从这里继续
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {nextSteps.map((step, idx) => (
+              <div
+                key={step.key}
+                className="rounded-md border p-3 flex flex-col gap-2"
+                style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-bg-hover)" }}
+              >
+                <div className="flex items-center gap-2">
+                  <span
+                    className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-semibold"
+                    style={{ background: "rgba(59,130,246,0.12)", color: "var(--yunque-primary)" }}
+                  >
+                    {idx + 1}
+                  </span>
+                  <div className="text-xs font-semibold" style={{ color: "var(--yunque-text)" }}>{step.label}</div>
+                </div>
+                <div className="text-xs leading-5 flex-1" style={{ color: "var(--yunque-text-secondary)" }}>{step.detail}</div>
+                {step.href && (
+                  <Link href={step.href}>
+                    <Button size="sm" variant={idx === 0 && !enabled ? "outline" : "ghost"}>
+                      {step.key === "improve" ? <Sparkles size={14} /> : step.key === "open" ? <ExternalLink size={14} /> : <ArrowRight size={14} />}
+                      {step.label}
+                    </Button>
+                  </Link>
+                )}
+                {step.action && step.actionLabel && (
+                  <Button size="sm" className="btn-accent" isDisabled={step.disabled} onPress={step.action}>
+                    {step.key === "install" ? <Download size={14} /> : <Power size={14} />}
+                    {step.actionLabel}
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+        </Card>
+
         {/* 场景化能做什么 */}
         <Card className="section-card p-4">
           <div className="flex items-center gap-2 mb-3">

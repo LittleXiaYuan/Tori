@@ -80,6 +80,10 @@ describe("PackDetailClientPage", () => {
     render(<PackDetailClientPage />);
 
     expect(await screen.findByText("Needs Context Pack")).toBeInTheDocument();
+    expect(screen.getByText("从这里继续")).toBeInTheDocument();
+    expect(screen.getAllByText("打开能力入口").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("回中心管理和固定").length).toBeGreaterThan(0);
+    expect(screen.getByText(/如果用户觉得它像空壳/)).toBeInTheDocument();
     expect(screen.getByText("用户能拿它做什么")).toBeInTheDocument();
     expect(screen.getByText("能力包体检")).toBeInTheDocument();
     expect(screen.getByText(/还缺：使用示例/)).toBeInTheDocument();
@@ -98,6 +102,7 @@ describe("PackDetailClientPage", () => {
     expect(studioLinks.length).toBeGreaterThan(0);
     expect(studioLinks[0]).toHaveAttribute("href", expect.stringContaining("/packs/studio?packId=yunque.pack.needs-context"));
     expect(studioLinks[0]).toHaveAttribute("href", expect.stringContaining("goal="));
+    expect(screen.getByRole("link", { name: /打开能力入口/ })).toHaveAttribute("href", "/packs/needs-context");
   });
 
   it("loads release-only packs from official sources and installs the yqpack asset", async () => {
@@ -137,6 +142,11 @@ describe("PackDetailClientPage", () => {
     render(<PackDetailClientPage />);
 
     expect(await screen.findByText("Needs Context Pack")).toBeInTheDocument();
+    expect(screen.getByText("从这里继续")).toBeInTheDocument();
+    expect(screen.getAllByText("先做只读检查").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("安装能力包").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("安装后回中心启用").length).toBeGreaterThan(0);
+    expect(screen.getByText(/检查 yqpack 来源、SHA、manifest、权限和入口/)).toBeInTheDocument();
     expect(screen.getByText("来源与安装包")).toBeInTheDocument();
     expect(screen.getByText("官方发布源 · example.com")).toBeInTheDocument();
     expect(screen.getByText("https://example.com/needs-context.yqpack")).toBeInTheDocument();
