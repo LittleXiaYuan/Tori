@@ -27,7 +27,7 @@ import {
   packUsability,
   riskProfileForPack,
 } from "@/lib/pack-presentation";
-import { createPacksClient, type PackManifest, type PackStudioPatchReport, type PackStudioPlanReport, type PackStudioWorkspaceReport, type YqpackInspectReport } from "yunque-client/packs";
+import { createPacksClient, type PackManifest, type PackStudioPatchReport, type PackStudioPlanReport, type PackStudioRepackReport, type PackStudioWorkspaceReport, type YqpackInspectReport } from "yunque-client/packs";
 
 const packsClient = createPacksClient(createYunqueSDKClientOptions());
 
@@ -290,6 +290,8 @@ export default function PackStudioPage() {
   const [patchContent, setPatchContent] = useState("");
   const [patching, setPatching] = useState(false);
   const [patchReport, setPatchReport] = useState<PackStudioPatchReport | null>(null);
+  const [repacking, setRepacking] = useState(false);
+  const [repackReport, setRepackReport] = useState<PackStudioRepackReport | null>(null);
 
   const candidates = data?.packs || [];
   const selected = useMemo(
@@ -361,6 +363,7 @@ export default function PackStudioPage() {
       setPatchFile(report.editable_files[0] || "");
       setPatchContent("");
       setPatchReport(null);
+      setRepackReport(null);
       showToast("已准备 Pack Studio 工作区", "success");
     } catch (error) {
       showToast(error instanceof Error ? error.message : "准备工作区失败", "error");
@@ -385,11 +388,29 @@ export default function PackStudioPage() {
         apply,
       });
       setPatchReport(report);
+      if (apply) setRepackReport(null);
       showToast(apply ? "已应用到工作区" : "已生成 diff 预览", "success");
     } catch (error) {
       showToast(error instanceof Error ? error.message : "工作区改动失败", "error");
     } finally {
       setPatching(false);
+    }
+  };
+
+  const repackWorkspace = async () => {
+    if (!workspaceReport) return;
+    setRepacking(true);
+    try {
+      const report = await packsClient.studioRepack({
+        workspacePath: workspaceReport.workspace_path,
+        goal,
+      });
+      setRepackReport(report);
+      showToast("已生成新的 yqpack", "success");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "重新打包失败", "error");
+    } finally {
+      setRepacking(false);
     }
   };
 
@@ -663,6 +684,9 @@ export default function PackStudioPage() {
                       <Button variant="outline" onPress={() => submitPatch(true)} isDisabled={patching}>
                         {patching ? <Spinner size="sm" /> : <Wrench size={14} />} 应用到工作区
                       </Button>
+                      <Button variant="outline" onPress={repackWorkspace} isDisabled={repacking}>
+                        {repacking ? <Spinner size="sm" /> : <PackageCheck size={14} />} 重新打包
+                      </Button>
                     </div>
                     {patchReport && (
                       <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
@@ -674,6 +698,21 @@ export default function PackStudioPage() {
                           <div>新 SHA：{patchReport.new_sha256}</div>
                           {(patchReport.warnings || []).map((warning) => (
                             <div key={warning} style={{ color: "var(--yunque-warning)" }}>{warning}</div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {repackReport && (
+                      <div className="mt-3 rounded-md border p-3 text-xs" style={{ borderColor: "var(--yunque-border)", color: "var(--yunque-text-secondary)" }}>
+                        <div className="mb-2 flex flex-wrap items-center gap-2">
+                          <Chip size="sm" color="success">新 yqpack 已生成</Chip>
+                          <span>{repackReport.size_bytes.toLocaleString()} bytes</span>
+                        </div>
+                        <div className="break-all font-mono">{repackReport.package_path}</div>
+                        <div className="mt-1 break-all font-mono">SHA256：{repackReport.sha256}</div>
+                        <div className="mt-2 space-y-1">
+                          {repackReport.next_steps.map((step) => (
+                            <div key={step}>{step}</div>
                           ))}
                         </div>
                       </div>

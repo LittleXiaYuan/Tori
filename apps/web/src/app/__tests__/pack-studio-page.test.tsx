@@ -9,6 +9,7 @@ const packsClientMock = vi.hoisted(() => ({
   studioInspect: vi.fn(),
   studioWorkspace: vi.fn(),
   studioPatch: vi.fn(),
+  studioRepack: vi.fn(),
 }));
 
 const toastMock = vi.hoisted(() => vi.fn());
@@ -228,6 +229,17 @@ describe("PackStudioPage", () => {
       warnings: [],
       next_steps: ["运行 audit_commands"],
     }));
+    packsClientMock.studioRepack.mockResolvedValue({
+      generated_at: "2026-06-19T00:00:00Z",
+      workspace_path: "C:\\yunque\\packs\\studio\\yunque.pack.wasm-plugin-0.1.0-aaaaaaaaaaaa",
+      package_path: "C:\\yunque\\packs\\studio\\yunque.pack.wasm-plugin-0.1.0-studio.yqpack",
+      sha256: "d".repeat(64),
+      size_bytes: 4096,
+      manifest: wasmManifest,
+      inspect: { sha256_match: true } as never,
+      warnings: [],
+      next_steps: ["重新运行只读检查，确认新 yqpack 的 manifest、sha256 和文件分类。"],
+    });
   });
 
   it("turns real pack metadata into a guarded Xiaoyu modification task", async () => {
@@ -328,6 +340,17 @@ describe("PackStudioPage", () => {
       expect(packsClientMock.studioPatch).toHaveBeenCalledWith(expect.objectContaining({ apply: true }));
     });
     expect(await screen.findByText("已应用")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "重新打包" }));
+    await waitFor(() => {
+      expect(packsClientMock.studioRepack).toHaveBeenCalledWith({
+        workspacePath: "C:\\yunque\\packs\\studio\\yunque.pack.wasm-plugin-0.1.0-aaaaaaaaaaaa",
+        goal: "增加一个可查看运行结果的界面",
+      });
+    });
+    expect(await screen.findByText("新 yqpack 已生成")).toBeInTheDocument();
+    expect(screen.getByText("C:\\yunque\\packs\\studio\\yunque.pack.wasm-plugin-0.1.0-studio.yqpack")).toBeInTheDocument();
+    expect(screen.getByText("SHA256：" + "d".repeat(64))).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "复制任务" }));
 

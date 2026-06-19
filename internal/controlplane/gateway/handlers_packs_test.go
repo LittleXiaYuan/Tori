@@ -1501,7 +1501,11 @@ func TestPackStudioPlanCanUseCatalogOrRequestManifest(t *testing.T) {
 		Backend:      packruntime.BackendManifest{Capabilities: []string{"studio.catalog"}, Permissions: []string{"network:read"}},
 		Frontend:     packruntime.FrontendManifest{Menus: []packruntime.FrontendMenu{{Key: "studio-catalog", Label: "Studio Catalog", Path: "/packs/studio-catalog"}}},
 	})
-	gw, tenants := newTestGatewayWithConfig(GatewayConfig{})
+	registry, err := packruntime.NewRegistry(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewRegistry: %v", err)
+	}
+	gw, tenants := newTestGatewayWithConfig(GatewayConfig{Packs: registry})
 	gw.SetPackCatalogSources([]string{sourceDir})
 	tenant := tenants.Register("pack-studio-catalog")
 
@@ -1685,7 +1689,11 @@ func TestPackStudioPatchPreviewsAndAppliesWorkspaceText(t *testing.T) {
 	if err := os.WriteFile(workspace+".studio.json", []byte(marker), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	gw, tenants := newTestGatewayWithConfig(GatewayConfig{})
+	registry, err := packruntime.NewRegistry(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewRegistry: %v", err)
+	}
+	gw, tenants := newTestGatewayWithConfig(GatewayConfig{Packs: registry})
 	tenant := tenants.Register("pack-studio-patch")
 
 	content := "{\n  \"id\": \"yunque.pack.patch-http\",\n  \"name\": \"Patch HTTP\"\n}\n"
@@ -1754,6 +1762,55 @@ func TestPackStudioPatchPreviewsAndAppliesWorkspaceText(t *testing.T) {
 	gw.ServeHTTP(w, req)
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected traversal rejection, got status=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestPackStudioRepackBuildsYqpackWithoutInstalling(t *testing.T) {
+	workspace := t.TempDir()
+	manifest := packruntime.Manifest{
+		ID:           "yunque.pack.repack-http",
+		Name:         "Repack HTTP",
+		Version:      "0.1.0",
+		RequiresCore: ">=0.1.0",
+		Optional:     true,
+		DefaultState: "disabled",
+	}
+	if err := packruntime.SaveManifest(filepath.Join(workspace, packruntime.ManifestFileName), manifest); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(workspace, "README.md"), []byte("# Repack HTTP\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	marker := `{"kind":"yunque-pack-studio-workspace","workspace_id":"repack-http-test","original_sha256":"` + strings.Repeat("a", 64) + `","created_at":"2026-06-19T00:00:00Z"}`
+	if err := os.WriteFile(workspace+".studio.json", []byte(marker), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	registry, err := packruntime.NewRegistry(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewRegistry: %v", err)
+	}
+	gw, tenants := newTestGatewayWithConfig(GatewayConfig{Packs: registry})
+	tenant := tenants.Register("pack-studio-repack")
+	body, _ := json.Marshal(packruntime.PackStudioRepackRequest{
+		WorkspacePath: workspace,
+		Goal:          "补齐说明",
+	})
+	req := httptest.NewRequest(http.MethodPost, "/v1/packs/studio/repack", bytes.NewReader(body))
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("repack status=%d body=%s", w.Code, w.Body.String())
+	}
+	var report packruntime.PackStudioRepackReport
+	if err := json.NewDecoder(w.Body).Decode(&report); err != nil {
+		t.Fatalf("decode repack: %v", err)
+	}
+	if report.SHA256 == "" || report.SizeBytes == 0 || report.Manifest.ID != manifest.ID || !report.Inspect.SHA256Match {
+		t.Fatalf("unexpected repack report: %#v", report)
+	}
+	if _, ok := registry.Get(manifest.ID); ok {
+		t.Fatal("repack must not install pack")
 	}
 }
 

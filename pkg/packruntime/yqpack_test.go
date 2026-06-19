@@ -1,6 +1,8 @@
 package packruntime
 
 import (
+	"archive/zip"
+	"bytes"
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/hex"
@@ -302,6 +304,57 @@ func TestPatchStudioWorkspaceFilePreviewsAndAppliesTextOnly(t *testing.T) {
 	}
 	if _, err := PatchStudioWorkspaceFile(PackStudioPatchRequest{WorkspacePath: unmarkedWorkspace, FilePath: ManifestFileName, Content: "{}"}); err == nil {
 		t.Fatal("expected unmarked workspace to be rejected")
+	}
+}
+
+func TestRepackStudioWorkspaceBuildsInspectableYqpack(t *testing.T) {
+	workspace := t.TempDir()
+	manifest := minimalManifest("yunque.pack.repack", "0.1.0")
+	manifest.Name = "Repack Pack"
+	manifest.Description = "Studio repack"
+	if err := SaveManifest(filepath.Join(workspace, ManifestFileName), manifest); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(workspace, "README.md"), []byte("# Repack\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := writePackStudioWorkspaceMarker(workspace, "repack-test", strings.Repeat("a", 64), time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	report, err := RepackStudioWorkspace(PackStudioRepackRequest{
+		WorkspacePath: workspace,
+		Goal:          "补齐说明",
+	})
+	if err != nil {
+		t.Fatalf("repack workspace: %v", err)
+	}
+	if report.SHA256 == "" || report.SizeBytes == 0 || report.Manifest.ID != manifest.ID {
+		t.Fatalf("unexpected repack report: %#v", report)
+	}
+	if !strings.HasSuffix(report.PackagePath, "yunque.pack.repack-0.1.0-studio.yqpack") {
+		t.Fatalf("unexpected package path: %s", report.PackagePath)
+	}
+	if _, err := os.Stat(report.PackagePath); err != nil {
+		t.Fatalf("stat package: %v", err)
+	}
+	if report.Inspect.Manifest.ID != manifest.ID || !report.Inspect.SHA256Match {
+		t.Fatalf("unexpected inspect report: %#v", report.Inspect)
+	}
+	zipBytes, err := os.ReadFile(report.PackagePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	zr, err := zip.NewReader(bytes.NewReader(zipBytes), int64(len(zipBytes)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range zr.File {
+		if strings.Contains(f.Name, ".studio.json") {
+			t.Fatalf("studio marker must not be packaged: %s", f.Name)
+		}
+	}
+	if _, err := RepackStudioWorkspace(PackStudioRepackRequest{WorkspacePath: workspace, OutPath: "..\\escape.yqpack"}); err == nil {
+		t.Fatal("expected out_path outside studio parent to be rejected")
 	}
 }
 

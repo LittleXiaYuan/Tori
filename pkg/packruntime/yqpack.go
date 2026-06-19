@@ -451,6 +451,72 @@ func PatchStudioWorkspaceFile(req PackStudioPatchRequest) (PackStudioPatchReport
 	return report, nil
 }
 
+// RepackStudioWorkspace builds a new yqpack artifact from a prepared Pack
+// Studio workspace. It never installs or enables the package.
+func RepackStudioWorkspace(req PackStudioRepackRequest) (PackStudioRepackReport, error) {
+	workspacePath := strings.TrimSpace(req.WorkspacePath)
+	if workspacePath == "" {
+		return PackStudioRepackReport{}, fmt.Errorf("workspace_path is required")
+	}
+	workspaceAbs, err := filepath.Abs(workspacePath)
+	if err != nil {
+		return PackStudioRepackReport{}, fmt.Errorf("pack studio repack: workspace abs: %w", err)
+	}
+	if err := validatePackStudioWorkspace(workspaceAbs); err != nil {
+		return PackStudioRepackReport{}, err
+	}
+	manifest, err := LoadManifest(filepath.Join(workspaceAbs, ManifestFileName))
+	if err != nil {
+		return PackStudioRepackReport{}, fmt.Errorf("pack studio repack: load manifest: %w", err)
+	}
+	outPath := strings.TrimSpace(req.OutPath)
+	if outPath == "" {
+		outPath = filepath.Join(filepath.Dir(workspaceAbs), safeArtifactSegment(manifest.ID)+"-"+safeArtifactSegment(manifest.Version)+"-studio.yqpack")
+	} else if !filepath.IsAbs(outPath) {
+		outPath = filepath.Join(filepath.Dir(workspaceAbs), filepath.FromSlash(outPath))
+	}
+	outAbs, err := filepath.Abs(outPath)
+	if err != nil {
+		return PackStudioRepackReport{}, fmt.Errorf("pack studio repack: out abs: %w", err)
+	}
+	workspaceParent := filepath.Dir(workspaceAbs)
+	outParent := filepath.Dir(outAbs)
+	relOutParent, err := filepath.Rel(workspaceParent, outParent)
+	if err != nil || strings.HasPrefix(relOutParent, "..") || filepath.IsAbs(relOutParent) {
+		return PackStudioRepackReport{}, fmt.Errorf("pack studio repack: out_path must stay under the studio workspace directory")
+	}
+	if err := os.MkdirAll(outParent, 0o755); err != nil {
+		return PackStudioRepackReport{}, fmt.Errorf("pack studio repack: mkdir out dir: %w", err)
+	}
+	digest, err := PackToYqpack(workspaceAbs, outAbs)
+	if err != nil {
+		return PackStudioRepackReport{}, fmt.Errorf("pack studio repack: %w", err)
+	}
+	info, err := os.Stat(outAbs)
+	if err != nil {
+		return PackStudioRepackReport{}, fmt.Errorf("pack studio repack: stat output: %w", err)
+	}
+	inspect, err := InspectYqpackFile(outAbs, digest, req.Goal)
+	if err != nil {
+		return PackStudioRepackReport{}, fmt.Errorf("pack studio repack: inspect output: %w", err)
+	}
+	return PackStudioRepackReport{
+		GeneratedAt:   time.Now().UTC(),
+		WorkspacePath: workspaceAbs,
+		PackagePath:   outAbs,
+		SHA256:        digest,
+		SizeBytes:     info.Size(),
+		Manifest:      manifest,
+		Inspect:       inspect,
+		NextSteps: []string{
+			"重新运行只读检查，确认新 yqpack 的 manifest、sha256 和文件分类。",
+			"安装前跑 Pack Studio 工作区建议的 audit_commands。",
+			"确认回滚路径后，再通过能力包中心安装新 yqpack。",
+			"启用后先在测试会话验证入口、权限和 Cogni 调用说明。",
+		},
+	}, nil
+}
+
 func writePackStudioWorkspaceMarker(workspacePath, workspaceID, originalSHA256 string, createdAt time.Time) error {
 	marker := packStudioWorkspaceMarker{
 		Kind:           "yunque-pack-studio-workspace",

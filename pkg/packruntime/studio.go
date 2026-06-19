@@ -45,6 +45,14 @@ type PackStudioPatchRequest struct {
 	Apply         bool   `json:"apply"`
 }
 
+// PackStudioRepackRequest builds a new yqpack from a prepared Pack Studio
+// workspace. It does not install, enable, or execute the package.
+type PackStudioRepackRequest struct {
+	WorkspacePath string `json:"workspace_path"`
+	OutPath       string `json:"out_path,omitempty"`
+	Goal          string `json:"goal,omitempty"`
+}
+
 // PackStudioPlanOptions carries host-derived state that is not part of a
 // manifest, such as whether the pack is already installed or enabled.
 type PackStudioPlanOptions struct {
@@ -151,6 +159,20 @@ type PackStudioPatchReport struct {
 	DiffPreview   string    `json:"diff_preview"`
 	Warnings      []string  `json:"warnings,omitempty"`
 	NextSteps     []string  `json:"next_steps"`
+}
+
+// PackStudioRepackReport describes the newly built yqpack artifact and a
+// read-only inspection report for the artifact.
+type PackStudioRepackReport struct {
+	GeneratedAt   time.Time           `json:"generated_at"`
+	WorkspacePath string              `json:"workspace_path"`
+	PackagePath   string              `json:"package_path"`
+	SHA256        string              `json:"sha256"`
+	SizeBytes     int64               `json:"size_bytes"`
+	Manifest      Manifest            `json:"manifest"`
+	Inspect       YqpackInspectReport `json:"inspect"`
+	Warnings      []string            `json:"warnings,omitempty"`
+	NextSteps     []string            `json:"next_steps"`
 }
 
 // BuildPackStudioPlan turns a manifest into a conservative, auditable
