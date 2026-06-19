@@ -1,13 +1,10 @@
 package gateway
 
 import (
-	"encoding/json"
 	"net/http"
-	"path/filepath"
 	"strings"
 
 	"yunque-agent/internal/apperror"
-	"yunque-agent/pkg/cogni"
 )
 
 // handleCognis serves both /v1/cognis (collection) and /v1/cognis/ (with
@@ -50,7 +47,7 @@ func (g *Gateway) handleCognis(w http.ResponseWriter, r *http.Request) {
 	case path == "reload":
 		apperror.WriteCode(w, apperror.CodeNotFound, "cogni reload is owned by cogni-kernel pack")
 	case path == "generate":
-		g.cogniGenerate(w, r)
+		apperror.WriteCode(w, apperror.CodeNotFound, "cogni generate is owned by cogni-kernel pack")
 	case path == "export":
 		apperror.WriteCode(w, apperror.CodeNotFound, "cogni export is owned by cogni-kernel pack")
 	case path == "import":
@@ -87,58 +84,6 @@ func (g *Gateway) handleCognis(w http.ResponseWriter, r *http.Request) {
 // are extracted behind a standalone Cogni service in later reversible steps.
 func (g *Gateway) ServeCogniKernel(w http.ResponseWriter, r *http.Request) {
 	g.handleCognis(w, r)
-}
-
-// ── Self-Genesis handler ──
-
-func (g *Gateway) cogniGenerate(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "POST only")
-		return
-	}
-	if g.cogniGenesis == nil {
-		apperror.WriteCode(w, apperror.CodeInternal, "genesis engine not configured")
-		return
-	}
-
-	var body struct {
-		Description string `json:"description"`
-		AutoSave    bool   `json:"auto_save"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		apperror.WriteCode(w, apperror.CodeBadRequest, "invalid JSON: "+err.Error())
-		return
-	}
-	if strings.TrimSpace(body.Description) == "" {
-		apperror.WriteCode(w, apperror.CodeBadRequest, "description is required")
-		return
-	}
-
-	decl, err := g.cogniGenesis.Generate(r.Context(), body.Description)
-	if err != nil {
-		apperror.WriteCode(w, apperror.CodeInternal, "generation failed: "+err.Error())
-		return
-	}
-
-	if body.AutoSave && g.cogniRegistry != nil {
-		if err := g.cogniRegistry.Add(decl, "genesis"); err != nil {
-			apperror.WriteCode(w, apperror.CodeInternal, "save failed: "+err.Error())
-			return
-		}
-		// Persist to disk
-		if g.cogniDir != "" {
-			savePath := filepath.Join(g.cogniDir, decl.ID+".json")
-			_ = cogni.SaveDeclaration(decl, savePath)
-		}
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]any{
-		"status":      "ok",
-		"declaration": decl,
-		"saved":       body.AutoSave,
-	})
 }
 
 // ── Experience handlers ──

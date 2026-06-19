@@ -78,6 +78,10 @@ type DirectoryProvider interface {
 	CogniDirectory() string
 }
 
+type GenesisProvider interface {
+	CogniGenesis() *cogni.Genesis
+}
+
 type Dependencies struct {
 	BusProvider         BusProvider
 	FederationProvider  FederationProvider
@@ -88,6 +92,7 @@ type Dependencies struct {
 	TraceStoreProvider  TraceStoreProvider
 	SentinelProvider    SentinelProvider
 	DirectoryProvider   DirectoryProvider
+	GenesisProvider     GenesisProvider
 }
 
 type RuntimeStateReport struct {
@@ -181,6 +186,7 @@ type Router struct {
 	traceProvider      TraceStoreProvider
 	sentinelProvider   SentinelProvider
 	directoryProvider  DirectoryProvider
+	genesisProvider    GenesisProvider
 }
 
 func NewRouter(api API, reporter RuntimeStateReporter) *Router {
@@ -205,6 +211,7 @@ func NewRouterWithDeps(api API, reporter RuntimeStateReporter, deps Dependencies
 		traceProvider:      deps.TraceStoreProvider,
 		sentinelProvider:   deps.SentinelProvider,
 		directoryProvider:  deps.DirectoryProvider,
+		genesisProvider:    deps.GenesisProvider,
 	}
 }
 
@@ -224,6 +231,7 @@ func (r *Router) Routes() []packruntime.BackendRoute {
 		{Methods: []string{http.MethodGet, http.MethodPost}, Path: "/v1/cognis/verify", Handler: r.HandleVerifyAll},
 		{Methods: []string{http.MethodGet, http.MethodPost}, Path: "/v1/cognis/export", Handler: r.HandleExportBundle},
 		{Methods: []string{http.MethodPost}, Path: "/v1/cognis/import", Handler: r.HandleImportBundle},
+		{Methods: []string{http.MethodPost}, Path: "/v1/cognis/generate", Handler: r.HandleGenerate},
 		{Methods: []string{http.MethodPost}, Path: RouteDecisionRoute, Handler: r.HandleRouteDecision},
 		{Methods: []string{http.MethodGet}, Path: RuntimePackStateRoute, Handler: r.HandleRuntimePackState},
 	}
@@ -283,6 +291,10 @@ func (r *Router) serveRegistry(w http.ResponseWriter, req *http.Request) bool {
 	}
 	if path == "import" {
 		r.HandleImportBundle(w, req)
+		return true
+	}
+	if path == "generate" {
+		r.HandleGenerate(w, req)
 		return true
 	}
 
@@ -519,6 +531,64 @@ func (r *Router) persistImportedCognis(registry *cogni.Registry, summary cogni.I
 			slog.Warn("cogni: failed to save imported declaration", "id", id, "path", savePath, "err", err)
 		}
 	}
+}
+
+func (r *Router) HandleGenerate(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "POST only")
+		return
+	}
+	genesis := r.cogniGenesis()
+	if genesis == nil {
+		apperror.WriteCode(w, apperror.CodeInternal, "genesis engine not configured")
+		return
+	}
+
+	var body struct {
+		Description string `json:"description"`
+		AutoSave    bool   `json:"auto_save"`
+	}
+	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+		apperror.WriteCode(w, apperror.CodeBadRequest, "invalid JSON: "+err.Error())
+		return
+	}
+	if strings.TrimSpace(body.Description) == "" {
+		apperror.WriteCode(w, apperror.CodeBadRequest, "description is required")
+		return
+	}
+
+	decl, err := genesis.Generate(req.Context(), body.Description)
+	if err != nil {
+		apperror.WriteCode(w, apperror.CodeInternal, "generation failed: "+err.Error())
+		return
+	}
+	if body.AutoSave {
+		if err := r.saveGeneratedDeclaration(decl); err != nil {
+			apperror.WriteCode(w, apperror.CodeInternal, "save failed: "+err.Error())
+			return
+		}
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	writeJSON(w, map[string]any{
+		"status":      "ok",
+		"declaration": decl,
+		"saved":       body.AutoSave,
+	})
+}
+
+func (r *Router) saveGeneratedDeclaration(decl *cogni.Declaration) error {
+	registry := r.cogniRegistry()
+	if registry == nil {
+		return nil
+	}
+	if err := registry.Add(decl, "genesis"); err != nil {
+		return err
+	}
+	if dir := r.cogniDirectory(); dir != "" {
+		return cogni.SaveDeclaration(decl, filepath.Join(dir, decl.ID+".json"))
+	}
+	return nil
 }
 
 func (r *Router) HandleFederationStatus(w http.ResponseWriter, req *http.Request) {
@@ -1102,6 +1172,13 @@ func (r *Router) cogniDirectory() string {
 	return r.directoryProvider.CogniDirectory()
 }
 
+func (r *Router) cogniGenesis() *cogni.Genesis {
+	if r == nil || r.genesisProvider == nil {
+		return nil
+	}
+	return r.genesisProvider.CogniGenesis()
+}
+
 func (r *Router) cogniFederation() *cogni.CogniFederation {
 	if r == nil || r.federationProvider == nil {
 		return nil
@@ -1174,6 +1251,7 @@ func delegatedRouteSpecs() []delegatedRouteSpec {
 			"/v1/cognis/verify",
 			"/v1/cognis/export",
 			"/v1/cognis/import",
+			"/v1/cognis/generate",
 			RouteDecisionRoute,
 			RuntimePackStateRoute:
 			continue
@@ -1221,6 +1299,9 @@ func inferDependencies(api API) Dependencies {
 	if inferred, ok := api.(DirectoryProvider); ok {
 		deps.DirectoryProvider = inferred
 	}
+	if inferred, ok := api.(GenesisProvider); ok {
+		deps.GenesisProvider = inferred
+	}
 	return deps
 }
 
@@ -1251,6 +1332,9 @@ func mergeDependencies(primary, fallback Dependencies) Dependencies {
 	}
 	if primary.DirectoryProvider == nil {
 		primary.DirectoryProvider = fallback.DirectoryProvider
+	}
+	if primary.GenesisProvider == nil {
+		primary.GenesisProvider = fallback.GenesisProvider
 	}
 	return primary
 }

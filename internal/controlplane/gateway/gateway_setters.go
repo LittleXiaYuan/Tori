@@ -810,6 +810,9 @@ func (g *Gateway) CogniExperiences() map[string]*cogni.ExperienceStore { return 
 // SetCogniGenesis attaches the self-genesis engine for /v1/cognis/generate.
 func (g *Gateway) SetCogniGenesis(gen *cogni.Genesis) { g.cogniGenesis = gen }
 
+// CogniGenesis exposes the self-genesis engine to the Cogni Kernel pack.
+func (g *Gateway) CogniGenesis() *cogni.Genesis { return g.cogniGenesis }
+
 // SetCogniEvolution attaches the evolution engine for /v1/cognis/{id}/evolve.
 func (g *Gateway) SetCogniEvolution(ee *cogni.EvolutionEngine) { g.cogniEvolution = ee }
 

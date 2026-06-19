@@ -43,6 +43,7 @@ type fakeDependencyProvider struct {
 	traces      cogni.TraceStore
 	sentinel    *cogni.Sentinel
 	dir         string
+	genesis     *cogni.Genesis
 }
 
 func (p fakeDependencyProvider) CogniBus() *cogni.CogniBus { return p.bus }
@@ -64,6 +65,8 @@ func (p fakeDependencyProvider) CogniTraceStore() cogni.TraceStore { return p.tr
 func (p fakeDependencyProvider) CogniSentinel() *cogni.Sentinel { return p.sentinel }
 
 func (p fakeDependencyProvider) CogniDirectory() string { return p.dir }
+
+func (p fakeDependencyProvider) CogniGenesis() *cogni.Genesis { return p.genesis }
 
 func (fakeRuntimeReporter) CogniKernelRuntimeState() RuntimeStateReport {
 	return RuntimeStateReport{
@@ -469,6 +472,86 @@ func TestCogniKernelRouterOwnsBundleImportAndPersistence(t *testing.T) {
 	}
 	if api.called != 0 {
 		t.Fatalf("bundle routes should not delegate to API adapter, called=%d", api.called)
+	}
+}
+
+func TestCogniKernelRouterOwnsGenerate(t *testing.T) {
+	api := &fakeCogniAPI{}
+	registry := cogni.NewRegistry()
+	dir := t.TempDir()
+	genesis := cogni.NewGenesis(func(ctx context.Context, system, user string) (string, error) {
+		if user != "代码审查助手" {
+			t.Fatalf("unexpected genesis prompt: %q", user)
+		}
+		return `{
+			"id": "code-reviewer",
+			"display_name": "代码审查助手",
+			"description": "审查代码并给出风险建议",
+			"activation": {"keywords": ["review", "审查"], "min_score": 0.3},
+			"context": {"static": "你负责审查代码质量、安全风险和测试缺口。"},
+			"checks": [
+				{"message": "please review this code", "expect_active": true},
+				{"message": "帮我审查这段代码", "expect_active": true},
+				{"message": "今天天气如何", "expect_active": false}
+			]
+		}`, nil
+	})
+	router := NewRouterWithDeps(api, fakeRuntimeReporter{}, Dependencies{
+		RegistryProvider:  fakeDependencyProvider{registry: registry},
+		DirectoryProvider: fakeDependencyProvider{dir: dir},
+		GenesisProvider:   fakeDependencyProvider{genesis: genesis},
+	})
+
+	body, _ := json.Marshal(map[string]any{"description": "代码审查助手", "auto_save": true})
+	req := httptest.NewRequest(http.MethodPost, "/v1/cognis/generate", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	router.ServeCogniKernel(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("generate status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	var result struct {
+		Status      string            `json:"status"`
+		Declaration cogni.Declaration `json:"declaration"`
+		Saved       bool              `json:"saved"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&result); err != nil {
+		t.Fatalf("decode generate result: %v", err)
+	}
+	if result.Status != "ok" || result.Declaration.ID != "code-reviewer" || !result.Saved {
+		t.Fatalf("unexpected generate result: %+v", result)
+	}
+	if _, ok := registry.Get("code-reviewer"); !ok {
+		t.Fatalf("generated declaration should be saved to registry")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "code-reviewer.json")); err != nil {
+		t.Fatalf("generated declaration should be persisted: %v", err)
+	}
+	if api.called != 0 {
+		t.Fatalf("generate should not delegate to API adapter, called=%d", api.called)
+	}
+}
+
+func TestCogniKernelRouterGenerateValidation(t *testing.T) {
+	router := NewRouterWithDeps(&fakeCogniAPI{}, fakeRuntimeReporter{}, Dependencies{
+		GenesisProvider: fakeDependencyProvider{genesis: cogni.NewGenesis(func(ctx context.Context, system, user string) (string, error) {
+			return `{}`, nil
+		})},
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/cognis/generate", bytes.NewReader([]byte(`{"description":"   "}`)))
+	w := httptest.NewRecorder()
+	router.ServeCogniKernel(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("blank description status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	router = NewRouter(&fakeCogniAPI{}, fakeRuntimeReporter{})
+	req = httptest.NewRequest(http.MethodPost, "/v1/cognis/generate", bytes.NewReader([]byte(`{"description":"x"}`)))
+	w = httptest.NewRecorder()
+	router.ServeCogniKernel(w, req)
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("missing genesis status=%d body=%s", w.Code, w.Body.String())
 	}
 }
 
