@@ -88,6 +88,14 @@ function formatBytes(bytes?: number): string {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
 }
 
+function sourceName(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url;
+  }
+}
+
 function studioHrefForPack(params: {
   manifest: PackManifest;
   goal: string;
@@ -104,6 +112,39 @@ function studioHrefForPack(params: {
   if (packageUrl) query.set("packageUrl", packageUrl);
   if (sha256) query.set("sha256", sha256);
   return `/packs/studio?${query.toString()}`;
+}
+
+function installSourceForPack(params: {
+  manifest: PackManifest;
+  catalogEntry?: PackCatalogEntry;
+  releaseEntry?: PackReleaseCatalogEntry;
+}): { label: string; url?: string; sha256?: string; sizeBytes?: number } | null {
+  const catalogSHA = typeof params.catalogEntry?.sha256 === "string" ? params.catalogEntry.sha256 : undefined;
+  if (params.releaseEntry) {
+    return {
+      label: `官方发布源 · ${sourceName(params.releaseEntry.release_url)}`,
+      url: params.releaseEntry.package_url,
+      sha256: params.releaseEntry.sha256,
+      sizeBytes: params.releaseEntry.size_bytes,
+    };
+  }
+  if (params.catalogEntry) {
+    const url = params.catalogEntry.package_url || params.catalogEntry.manifest_url || params.catalogEntry.manifest_path || params.catalogEntry.source;
+    return {
+      label: params.catalogEntry.source ? `私有源 · ${sourceName(params.catalogEntry.source)}` : "私有源",
+      url,
+      sha256: catalogSHA,
+    };
+  }
+  if (params.manifest.distribution?.packageUrl) {
+    return {
+      label: "Manifest 分发源",
+      url: params.manifest.distribution.packageUrl,
+      sha256: params.manifest.distribution.sha256,
+      sizeBytes: params.manifest.distribution.sizeBytes,
+    };
+  }
+  return null;
 }
 
 export default function PackDetailClientPage() {
@@ -224,6 +265,7 @@ export default function PackDetailClientPage() {
   const usability = packUsability(manifest);
   const readiness = packReadiness(manifest);
   const openPath = usability.primaryActionPath || menus[0]?.path || routesFrontend[0]?.path;
+  const installSource = installSourceForPack({ manifest, catalogEntry, releaseEntry });
   const usagePrompt = [
     `我正在查看云雀能力包：${manifest.name} (${manifest.id})。`,
     "请用普通用户能理解的话告诉我：它能做什么、适合哪些任务、第一句话该怎么说、启用前要注意什么。",
@@ -408,6 +450,29 @@ export default function PackDetailClientPage() {
                   <span>{example}</span>
                 </div>
               ))}
+            </div>
+          </Card>
+        )}
+
+        {installSource && (
+          <Card className="section-card p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Download size={16} style={{ color: "var(--yunque-primary)" }} />
+              <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
+                来源与安装包
+              </div>
+            </div>
+            <div className="text-xs mb-2" style={{ color: "var(--yunque-text-secondary)" }}>
+              {installSource.label}
+            </div>
+            {installSource.url && (
+              <div className="font-mono break-all text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
+                {installSource.url}
+              </div>
+            )}
+            <div className="mt-2 flex flex-wrap gap-2">
+              {installSource.sha256 && <Chip size="sm" variant="soft">SHA256 {installSource.sha256}</Chip>}
+              {installSource.sizeBytes && <Chip size="sm" variant="soft">{formatBytes(installSource.sizeBytes)}</Chip>}
             </div>
           </Card>
         )}

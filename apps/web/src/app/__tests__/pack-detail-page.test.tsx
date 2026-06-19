@@ -132,6 +132,12 @@ describe("PackDetailClientPage", () => {
     render(<PackDetailClientPage />);
 
     expect(await screen.findByText("Needs Context Pack")).toBeInTheDocument();
+    expect(screen.getByText("来源与安装包")).toBeInTheDocument();
+    expect(screen.getByText("官方发布源 · example.com")).toBeInTheDocument();
+    expect(screen.getByText("https://example.com/needs-context.yqpack")).toBeInTheDocument();
+    expect(screen.getByText("SHA256 abc123")).toBeInTheDocument();
+    expect(screen.getByText("4 KB")).toBeInTheDocument();
+
     const studioLinks = screen.getAllByRole("link", { name: /交给小羽补齐/ });
     expect(studioLinks[0]).toHaveAttribute("href", expect.stringContaining("packageUrl=https%3A%2F%2Fexample.com%2Fneeds-context.yqpack"));
     expect(studioLinks[0]).toHaveAttribute("href", expect.stringContaining("sha256=abc123"));
