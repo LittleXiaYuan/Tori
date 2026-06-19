@@ -1,10 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Card, Spinner, Chip, Input, Button } from "@heroui/react";
-import { Bot, Search, History, AlertTriangle } from "lucide-react";
+import { Activity, Bot, ClipboardList, History, Search, Send, AlertTriangle } from "lucide-react";
 import PageHeader from "@/components/page-header";
 import { formatErrorMessage } from "@/lib/error-utils";
+import { chatPromptHref, taskDetailHref, traceTaskHref } from "@/lib/pack-action-links";
+import { microAgentTaskPrompt, microAgentTraceSummaryPrompt, previewTracePayload } from "@/lib/micro-agent-pack-actions";
 import {
   createMicroAgentPackClient,
   type AgentEntry,
@@ -109,6 +112,13 @@ function AgentCard({ agent, highlighted }: { agent: AgentEntry; highlighted?: bo
           {agent.content}
         </pre>
       </details>
+      <div className="mt-2">
+        <Link href={chatPromptHref(microAgentTaskPrompt(agent))}>
+          <Button size="sm" variant="ghost">
+            <Send size={13} /> 用它开始任务
+          </Button>
+        </Link>
+      </div>
     </div>
   );
 }
@@ -221,6 +231,23 @@ function TraceColumn({
         <EmptyState text="输入一个任务 ID 来查看其 ReAct 推理轨迹。" />
       ) : (
         <div className="space-y-1 max-h-[560px] overflow-y-auto">
+          <div className="mb-2 flex flex-wrap gap-2">
+            <Link href={chatPromptHref(microAgentTraceSummaryPrompt(taskId, entries))}>
+              <Button size="sm" variant="ghost">
+                <Send size={13} /> 总结这段推理
+              </Button>
+            </Link>
+            <Link href={taskDetailHref(taskId)}>
+              <Button size="sm" variant="ghost">
+                <ClipboardList size={13} /> 查看任务
+              </Button>
+            </Link>
+            <Link href={traceTaskHref(taskId)}>
+              <Button size="sm" variant="ghost">
+                <Activity size={13} /> 查看执行轨迹
+              </Button>
+            </Link>
+          </div>
           {entries.map((e) => {
             const kind = e.kind.replace(/^reasoning\./, "");
             const color: "accent" | "success" | "danger" | "warning" | "default" =
@@ -235,7 +262,7 @@ function TraceColumn({
                       : kind === "reflect"
                         ? "warning"
                         : "accent";
-            const summary = previewPayload(e.payload);
+            const summary = previewTracePayload(e.payload);
             return (
               <div
                 key={e.id}
@@ -265,19 +292,6 @@ function TraceColumn({
       )}
     </Card>
   );
-}
-
-function previewPayload(payload?: Record<string, unknown>): string {
-  if (!payload) return "";
-  const candidates = ["thought", "decision", "observation", "reason", "answer", "reflection", "summary"];
-  for (const k of candidates) {
-    const v = payload[k];
-    if (typeof v === "string" && v.trim() !== "") return v;
-  }
-  for (const v of Object.values(payload)) {
-    if (typeof v === "string" && v.trim() !== "") return v;
-  }
-  return "";
 }
 
 export default function MicroAgentPackPage() {
