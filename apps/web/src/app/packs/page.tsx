@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Button, Card, Chip, Input, Label, Spinner, TextField } from "@heroui/react";
 import {
@@ -19,8 +19,10 @@ import {
   PinOff,
   Power,
   RotateCcw,
+  Search,
   ShieldAlert,
   ShieldCheck,
+  SlidersHorizontal,
   Store,
 } from "lucide-react";
 import PageHeader from "@/components/page-header";
@@ -52,6 +54,13 @@ const PACK_RELEASE_SOURCES = [
 ];
 const OFFICIAL_BACKUP_MANIFEST = "packs/official/backup-pack/pack.json";
 const packsClient = createPacksClient(createYunqueSDKClientOptions());
+const PAGE_SIZE = 12;
+
+type KindFilter = "all" | "actionable" | "infrastructure" | "experimental";
+type InstallFilter = "all" | "installed" | "enabled" | "disabled" | "available";
+type RiskFilter = "all" | "low" | "medium" | "high";
+type SourceFilter = "all" | "installed" | "official" | "private";
+type SortMode = "name" | "kind" | "risk" | "status";
 
 function formatTime(value?: string): string {
   if (!value) return "-";
@@ -88,6 +97,98 @@ function sourceName(url: string): string {
   }
 }
 
+function packSearchText(manifest: PackManifest): string {
+  return [
+    manifest.id,
+    manifest.name,
+    manifest.description,
+    manifest.version,
+    manifest.status,
+    manifest.metadata?.usageSurface,
+    manifest.metadata?.primaryActionLabel,
+    manifest.metadata?.limitation,
+    ...packExamples(manifest, 5),
+    ...(manifest.backend?.capabilities || []),
+    ...(manifest.backend?.permissions || []),
+    ...(manifest.backend?.routes || []),
+    ...(manifest.backend?.routeSpecs || []).map((route) => `${route.method} ${route.path} ${route.description || ""}`),
+  ].filter(Boolean).join(" ").toLowerCase();
+}
+
+function sortPacks<T>(items: T[], manifestOf: (item: T) => PackManifest, sortMode: SortMode): T[] {
+  const riskOrder = { high: 0, medium: 1, low: 2 } as const;
+  const kindOrder = { actionable: 0, infrastructure: 1, experimental: 2, documented: 3 } as const;
+  return [...items].sort((a, b) => {
+    const ma = manifestOf(a);
+    const mb = manifestOf(b);
+    if (sortMode === "risk") return riskOrder[riskProfileForPack(ma).level] - riskOrder[riskProfileForPack(mb).level] || ma.name.localeCompare(mb.name);
+    if (sortMode === "kind") return kindOrder[packUsability(ma).kind] - kindOrder[packUsability(mb).kind] || ma.name.localeCompare(mb.name);
+    if (sortMode === "status") return String(ma.status || "").localeCompare(String(mb.status || "")) || ma.name.localeCompare(mb.name);
+    return ma.name.localeCompare(mb.name);
+  });
+}
+
+function pageCountFor(total: number): number {
+  return Math.max(1, Math.ceil(total / PAGE_SIZE));
+}
+
+function paginate<T>(items: T[], page: number): T[] {
+  return items.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+}
+
+function renderFilterGroup(
+  label: string,
+  options: Array<[string, string]>,
+  value: string,
+  onChange: (value: string) => void,
+) {
+  return (
+    <div>
+      <div className="mb-2 text-xs font-medium" style={{ color: "var(--yunque-text-muted)" }}>{label}</div>
+      <div className="flex flex-wrap gap-1.5">
+        {options.map(([key, text]) => (
+          <Button
+            key={key}
+            size="sm"
+            variant="ghost"
+            className={value === key ? "btn-accent" : undefined}
+            aria-pressed={value === key}
+            onPress={() => onChange(key)}
+          >
+            {text}
+          </Button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function renderPagination(
+  label: string,
+  currentPage: number,
+  pageCount: number,
+  total: number,
+  onPrev: () => void,
+  onNext: () => void,
+) {
+  if (total <= PAGE_SIZE) return null;
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+        {label} · 第 {currentPage} / {pageCount} 页 · 共 {total} 个
+      </div>
+      <div className="flex items-center gap-2">
+        <Button size="sm" variant="ghost" isDisabled={currentPage <= 1} onPress={onPrev}>
+          上一页
+        </Button>
+        <Button size="sm" variant="ghost" isDisabled={currentPage >= pageCount} onPress={onNext}>
+          下一页
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export default function PacksPageOptimized() {
   const navigationPrefs = useNavigationPreferences();
   const { data, loading, refresh } = useApiData(async () => packsClient.installed(), { packs: [], count: 0 });
@@ -102,31 +203,94 @@ export default function PacksPageOptimized() {
   const [manifestPath, setManifestPath] = useState(OFFICIAL_BACKUP_MANIFEST);
   const [busy, setBusy] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [showAlpha, setShowAlpha] = useState(false);
+  const [query, setQuery] = useState("");
+  const [kindFilter, setKindFilter] = useState<KindFilter>("all");
+  const [installFilter, setInstallFilter] = useState<InstallFilter>("all");
+  const [riskFilter, setRiskFilter] = useState<RiskFilter>("all");
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
+  const [sortMode, setSortMode] = useState<SortMode>("name");
+  const [installedPage, setInstalledPage] = useState(1);
+  const [releasePage, setReleasePage] = useState(1);
+  const [privatePage, setPrivatePage] = useState(1);
 
   const packs = data?.packs || [];
-  const groupedPacks = useMemo(() => ({
-    stable: packs.filter((p) => p.manifest.status === "stable"),
-    beta: packs.filter((p) => p.manifest.status === "beta"),
-    alpha: packs.filter((p) => p.manifest.status === "alpha"),
-    other: packs.filter((p) => !["stable", "beta", "alpha"].includes(String(p.manifest.status || ""))),
-  }), [packs]);
   const catalogEntries = catalog?.entries || [];
   const privateCatalogEntries = catalogEntries.filter((entry) => catalogActionForEntry(entry).kind !== "use");
+  const releaseEntries = releaseCatalog.entries || [];
   const stats = useMemo(() => ({
-    available: (releaseCatalog.entries || []).filter((entry) => catalogActionForEntry(entry).kind !== "use").length + privateCatalogEntries.length,
+    available: releaseEntries.filter((entry) => catalogActionForEntry(entry).kind !== "use").length + privateCatalogEntries.length,
     installed: packs.length,
     enabled: packs.filter((p) => p.status === "enabled").length,
-  }), [packs, privateCatalogEntries.length, releaseCatalog.entries]);
+  }), [packs, privateCatalogEntries.length, releaseEntries]);
   const packKindStats = useMemo(() => {
     const manifests = new Map<string, PackManifest>();
     for (const pack of packs) manifests.set(pack.manifest.id, pack.manifest);
-    for (const entry of releaseCatalog.entries || []) manifests.set(entry.manifest.id, entry.manifest);
+    for (const entry of releaseEntries) manifests.set(entry.manifest.id, entry.manifest);
     for (const entry of catalogEntries) manifests.set(entry.manifest.id, entry.manifest);
     const counts = { actionable: 0, infrastructure: 0, experimental: 0, documented: 0 };
     for (const manifest of manifests.values()) counts[packUsability(manifest).kind] += 1;
     return counts;
-  }, [packs, releaseCatalog.entries, catalogEntries]);
+  }, [packs, releaseEntries, catalogEntries]);
+  const normalizedQuery = query.trim().toLowerCase();
+  const matchesFilters = (manifest: PackManifest, options?: { installedStatus?: string; source: SourceFilter }) => {
+    const usability = packUsability(manifest);
+    const risk = riskProfileForPack(manifest);
+    if (normalizedQuery && !packSearchText(manifest).includes(normalizedQuery)) return false;
+    if (kindFilter !== "all") {
+      if (kindFilter === "infrastructure") {
+        if (usability.kind !== "infrastructure" && usability.kind !== "documented") return false;
+      } else if (usability.kind !== kindFilter) {
+        return false;
+      }
+    }
+    if (riskFilter !== "all" && risk.level !== riskFilter) return false;
+    if (sourceFilter !== "all" && options?.source !== sourceFilter) return false;
+    if (installFilter === "installed" && !options?.installedStatus) return false;
+    if (installFilter === "enabled" && options?.installedStatus !== "enabled") return false;
+    if (installFilter === "disabled" && options?.installedStatus !== "disabled") return false;
+    if (installFilter === "available" && options?.installedStatus) return false;
+    return true;
+  };
+  const filteredInstalledPacks = useMemo(
+    () => sortPacks(
+      packs.filter((pack) => matchesFilters(pack.manifest, { installedStatus: pack.status, source: "installed" })),
+      (pack) => pack.manifest,
+      sortMode,
+    ),
+    [packs, normalizedQuery, kindFilter, installFilter, riskFilter, sourceFilter, sortMode],
+  );
+  const filteredReleaseEntries = useMemo(
+    () => sortPacks(
+      releaseEntries.filter((entry) => matchesFilters(entry.manifest, { source: "official" })),
+      (entry) => entry.manifest,
+      sortMode,
+    ),
+    [releaseEntries, normalizedQuery, kindFilter, installFilter, riskFilter, sourceFilter, sortMode],
+  );
+  const filteredPrivateCatalogEntries = useMemo(
+    () => sortPacks(
+      privateCatalogEntries.filter((entry) => matchesFilters(entry.manifest, { source: "private" })),
+      (entry) => entry.manifest,
+      sortMode,
+    ),
+    [privateCatalogEntries, normalizedQuery, kindFilter, installFilter, riskFilter, sourceFilter, sortMode],
+  );
+  const totalMatches = filteredInstalledPacks.length + filteredReleaseEntries.length + filteredPrivateCatalogEntries.length;
+  const installedPageCount = pageCountFor(filteredInstalledPacks.length);
+  const currentInstalledPage = Math.min(installedPage, installedPageCount);
+  const pagedInstalledPacks = paginate(filteredInstalledPacks, currentInstalledPage);
+  const releasePageCount = pageCountFor(filteredReleaseEntries.length);
+  const currentReleasePage = Math.min(releasePage, releasePageCount);
+  const pagedReleaseEntries = paginate(filteredReleaseEntries, currentReleasePage);
+  const privatePageCount = pageCountFor(filteredPrivateCatalogEntries.length);
+  const currentPrivatePage = Math.min(privatePage, privatePageCount);
+  const pagedPrivateCatalogEntries = paginate(filteredPrivateCatalogEntries, currentPrivatePage);
+
+  useEffect(() => {
+    setInstalledPage(1);
+    setReleasePage(1);
+    setPrivatePage(1);
+  }, [normalizedQuery, kindFilter, installFilter, riskFilter, sourceFilter, sortMode]);
 
   const refreshAll = async () => {
     await Promise.all([refresh(), refreshCatalog(), refreshReleaseCatalog()]);
@@ -266,10 +430,72 @@ export default function PacksPageOptimized() {
             {showAdvanced ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
             {showAdvanced ? "隐藏" : "显示"}技术详情
           </Button>
-          <Button size="sm" variant="ghost" onPress={() => setShowAlpha(!showAlpha)}>
-            {showAlpha ? "隐藏" : "显示"}开发中能力
-          </Button>
         </div>
+
+        <Card className="mt-4 p-4" style={{ background: "var(--yunque-surface)", border: "1px solid var(--yunque-border)" }}>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
+              <SlidersHorizontal size={15} style={{ color: "var(--yunque-accent)" }} />
+              商店筛选
+            </div>
+            <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+              匹配 {totalMatches} 个 · 已安装 {filteredInstalledPacks.length} · 官方源 {filteredReleaseEntries.length} · 私有源 {filteredPrivateCatalogEntries.length}
+            </div>
+          </div>
+          <div className="grid gap-3 lg:grid-cols-[minmax(220px,1fr)_auto]">
+            <TextField value={query} onChange={setQuery}>
+              <Label>搜索能力包</Label>
+              <Input placeholder="搜索名称、用途、权限、能力、入口" />
+            </TextField>
+            <Button
+              variant="outline"
+              className="self-end"
+              onPress={() => {
+                setQuery("");
+                setKindFilter("all");
+                setInstallFilter("all");
+                setRiskFilter("all");
+                setSourceFilter("all");
+                setSortMode("name");
+              }}
+            >
+              <Search size={14} /> 重置
+            </Button>
+          </div>
+          <div className="mt-3 grid gap-3 xl:grid-cols-5">
+            {renderFilterGroup("类型", [
+              ["all", "全部"],
+              ["actionable", "可用"],
+              ["infrastructure", "基础"],
+              ["experimental", "实验"],
+            ], kindFilter, (value) => setKindFilter(value as KindFilter))}
+            {renderFilterGroup("状态", [
+              ["all", "全部"],
+              ["installed", "已安装"],
+              ["enabled", "已启用"],
+              ["disabled", "已禁用"],
+              ["available", "可安装"],
+            ], installFilter, (value) => setInstallFilter(value as InstallFilter))}
+            {renderFilterGroup("风险", [
+              ["all", "全部"],
+              ["low", "低"],
+              ["medium", "留意"],
+              ["high", "授权"],
+            ], riskFilter, (value) => setRiskFilter(value as RiskFilter))}
+            {renderFilterGroup("来源", [
+              ["all", "全部"],
+              ["installed", "已安装"],
+              ["official", "官方"],
+              ["private", "私有"],
+            ], sourceFilter, (value) => setSourceFilter(value as SourceFilter))}
+            {renderFilterGroup("排序", [
+              ["name", "名称"],
+              ["kind", "类型"],
+              ["risk", "风险"],
+              ["status", "阶段"],
+            ], sortMode, (value) => setSortMode(value as SortMode))}
+          </div>
+        </Card>
       </div>
 
       <div className="flex-1 overflow-y-auto p-5 space-y-4">
@@ -309,20 +535,30 @@ export default function PacksPageOptimized() {
             <div className="flex items-center gap-2 text-xs py-6" style={{ color: "var(--yunque-text-muted)" }}>
               <Spinner size="sm" /> 正在读取发布内容
             </div>
-          ) : releaseCatalog.entries.length > 0 ? (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {releaseCatalog.entries.map((entry) => renderInstallableCard(entry.manifest, {
-                key: entry.package_url,
-                source: entry.release_tag || sourceName(entry.release_url),
-                size: formatBytes(entry.size_bytes),
-                action: catalogActionForEntry(entry),
-                busyKey: `install:${entry.package_url}`,
-                onInstall: () => installRelease(entry),
-              }))}
+          ) : filteredReleaseEntries.length > 0 ? (
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {pagedReleaseEntries.map((entry) => renderInstallableCard(entry.manifest, {
+                  key: entry.package_url,
+                  source: entry.release_tag || sourceName(entry.release_url),
+                  size: formatBytes(entry.size_bytes),
+                  action: catalogActionForEntry(entry),
+                  busyKey: `install:${entry.package_url}`,
+                  onInstall: () => installRelease(entry),
+                }))}
+              </div>
+              {renderPagination(
+                "官方源",
+                currentReleasePage,
+                releasePageCount,
+                filteredReleaseEntries.length,
+                () => setReleasePage((value) => Math.max(1, value - 1)),
+                () => setReleasePage((value) => Math.min(releasePageCount, value + 1)),
+              )}
             </div>
           ) : (
             <div className="text-xs py-4" style={{ color: "var(--yunque-text-muted)" }}>
-              暂时没有读到可安装的 .yqpack 发布包。
+              {releaseEntries.length > 0 ? "没有符合筛选条件的官方源能力包。" : "暂时没有读到可安装的 .yqpack 发布包。"}
             </div>
           )}
         </section>
@@ -370,19 +606,29 @@ export default function PacksPageOptimized() {
             <div className="flex items-center gap-2 text-xs py-6" style={{ color: "var(--yunque-text-muted)" }}>
               <Spinner size="sm" /> 正在读取私有源
             </div>
-          ) : privateCatalogEntries.length > 0 ? (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {privateCatalogEntries.map((entry) => renderInstallableCard(entry.manifest, {
-                key: entry.manifest.id,
-                source: entry.source || entry.manifest_path || entry.manifest_url || entry.package_url,
-                action: catalogActionForEntry(entry),
-                busyKey: `install:${entry.manifest.id}`,
-                onInstall: () => installCatalogEntry(entry),
-              }))}
+          ) : filteredPrivateCatalogEntries.length > 0 ? (
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {pagedPrivateCatalogEntries.map((entry) => renderInstallableCard(entry.manifest, {
+                  key: entry.manifest.id,
+                  source: entry.source || entry.manifest_path || entry.manifest_url || entry.package_url,
+                  action: catalogActionForEntry(entry),
+                  busyKey: `install:${entry.manifest.id}`,
+                  onInstall: () => installCatalogEntry(entry),
+                }))}
+              </div>
+              {renderPagination(
+                "私有源",
+                currentPrivatePage,
+                privatePageCount,
+                filteredPrivateCatalogEntries.length,
+                () => setPrivatePage((value) => Math.max(1, value - 1)),
+                () => setPrivatePage((value) => Math.min(privatePageCount, value + 1)),
+              )}
             </div>
           ) : (
             <div className="text-xs py-4" style={{ color: "var(--yunque-text-muted)" }}>
-              当前没有来自私有源的待安装能力包。可以在后端 catalog 配置中接入 OSS 或团队源。
+              {privateCatalogEntries.length > 0 ? "没有符合筛选条件的私有源能力包。" : "当前没有来自私有源的待安装能力包。可以在后端 catalog 配置中接入 OSS 或团队源。"}
             </div>
           )}
         </section>
@@ -427,12 +673,25 @@ export default function PacksPageOptimized() {
               先从官方源或私有源选择一个能力包
             </div>
           </Card>
+        ) : filteredInstalledPacks.length === 0 ? (
+          <Card className="section-card p-8 text-center">
+            <Boxes size={32} className="mx-auto mb-3" style={{ color: "var(--yunque-text-muted)" }} />
+            <div className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>没有符合筛选条件的已安装能力包</div>
+            <div className="text-xs mt-1" style={{ color: "var(--yunque-text-muted)" }}>
+              可以清空搜索，或切换类型、状态、风险和来源筛选。
+            </div>
+          </Card>
         ) : (
           <div className="space-y-6">
-            {renderInstalledSection("已安装的正式版能力包", groupedPacks.stable)}
-            {renderInstalledSection("已安装的测试版能力包", groupedPacks.beta)}
-            {renderInstalledSection("已安装的其他能力包", groupedPacks.other)}
-            {showAlpha && renderInstalledSection("已安装的开发中能力包", groupedPacks.alpha, "仅供测试")}
+            {renderInstalledSection("已安装能力包", pagedInstalledPacks)}
+            {renderPagination(
+              "已安装",
+              currentInstalledPage,
+              installedPageCount,
+              filteredInstalledPacks.length,
+              () => setInstalledPage((value) => Math.max(1, value - 1)),
+              () => setInstalledPage((value) => Math.min(installedPageCount, value + 1)),
+            )}
           </div>
         )}
       </div>

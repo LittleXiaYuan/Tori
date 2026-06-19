@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import PacksPageOptimized from "../packs/page";
 
@@ -93,6 +93,23 @@ const filesManifest = {
   },
 };
 
+const makePack = (index: number) => ({
+  manifest: {
+    ...filesManifest,
+    id: `yunque.pack.generated-${index}`,
+    name: `Generated Pack ${index}`,
+    description: `分页测试能力包 ${index}`,
+    metadata: {
+      ...filesManifest.metadata,
+      primaryActionLabel: `打开分页能力 ${index}`,
+      usageSurface: `分页测试入口 ${index}`,
+      example1: `分页测试示例 ${index}`,
+    },
+  },
+  status: "disabled",
+  updatedAt: "2026-06-19T00:00:00Z",
+});
+
 describe("PacksPageOptimized", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -140,5 +157,77 @@ describe("PacksPageOptimized", () => {
     expect(screen.getByText("用户能感知到的位置：Chat 产物区、任务结果页、文件预览与下载入口")).toBeInTheDocument();
     expect(screen.getByText("开始生成文档")).toBeInTheDocument();
     expect(screen.getByText("查看最近产物")).toBeInTheDocument();
+  });
+
+  it("filters installed packs by search and resets the store filters", async () => {
+    render(<PacksPageOptimized />);
+
+    expect(await screen.findByText("Documents (文档生成)")).toBeInTheDocument();
+    expect(screen.getByText("Files (产物文件)")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("搜索能力包"), { target: { value: "文档" } });
+
+    expect(screen.getByText("Documents (文档生成)")).toBeInTheDocument();
+    expect(screen.queryByText("Files (产物文件)")).not.toBeInTheDocument();
+    expect(screen.getByText(/匹配 1 个/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "重置" }));
+
+    expect(screen.getByText("Documents (文档生成)")).toBeInTheDocument();
+    expect(screen.getByText("Files (产物文件)")).toBeInTheDocument();
+  });
+
+  it("filters source and install state without hiding official release cards", async () => {
+    packsClientMock.releaseCatalog.mockResolvedValueOnce({
+      generated_at: "2026-06-19T00:00:00Z",
+      releases: ["https://example.com/releases/tag/pack%2Fdocs%2Fv0.1.0"],
+      count: 1,
+      entries: [{
+        release_url: "https://example.com/releases/tag/pack%2Fdocs%2Fv0.1.0",
+        release_tag: "pack/docs/v0.1.0",
+        package_url: "https://example.com/docs.yqpack",
+        package_name: "docs.yqpack",
+        size_bytes: 2048,
+        sha256: "abc",
+        manifest: {
+          ...documentsManifest,
+          id: "yunque.pack.remote-docs",
+          name: "Remote Docs Pack",
+        },
+      }],
+    });
+
+    render(<PacksPageOptimized />);
+
+    expect(await screen.findByText("Remote Docs Pack")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "可安装" }));
+    fireEvent.click(screen.getByRole("button", { name: "官方" }));
+
+    expect(screen.getByText("Remote Docs Pack")).toBeInTheDocument();
+    expect(screen.queryByText("Documents (文档生成)")).not.toBeInTheDocument();
+    expect(screen.getByText(/官方源 1/)).toBeInTheDocument();
+  });
+
+  it("paginates installed packs so a large pack set stays scannable", async () => {
+    packsClientMock.installed.mockResolvedValueOnce({
+      packs: [
+        { manifest: documentsManifest, status: "enabled", updatedAt: "2026-06-19T00:00:00Z" },
+        ...Array.from({ length: 13 }, (_, index) => makePack(index + 1)),
+      ],
+      count: 14,
+    });
+
+    render(<PacksPageOptimized />);
+
+    expect(await screen.findByText("Documents (文档生成)")).toBeInTheDocument();
+    expect(screen.queryByText("Generated Pack 9")).not.toBeInTheDocument();
+    expect(screen.getByText("已安装 · 第 1 / 2 页 · 共 14 个")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "下一页" }));
+
+    expect(screen.getByText("Generated Pack 9")).toBeInTheDocument();
+    expect(screen.queryByText("Documents (文档生成)")).not.toBeInTheDocument();
+    expect(screen.getByText("已安装 · 第 2 / 2 页 · 共 14 个")).toBeInTheDocument();
   });
 });
