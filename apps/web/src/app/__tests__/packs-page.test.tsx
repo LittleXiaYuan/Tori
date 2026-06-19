@@ -326,7 +326,7 @@ describe("PacksPageOptimized", () => {
     expect(screen.getByRole("button", { name: /需补说明1/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /需补入口1/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /查看补肉队列/ })).toBeInTheDocument();
-    expect(screen.getByText("按体检缺口自动挑出最需要小羽补用途、入口、示例或能力边界的能力包。")).toBeInTheDocument();
+    expect(screen.getByText("按体检缺口自动挑出最需要小羽补用途、入口、示例或能力边界的能力包。当前展示 2 个，共 2 个待补肉。")).toBeInTheDocument();
     expect(screen.getByText("还缺：使用示例、用户感知位置、打开/使用入口、后端能力声明")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "复制批量补肉任务" })).toBeInTheDocument();
     const batchChatLink = screen.getByRole("link", { name: /交给 Chat 批量补肉/ });

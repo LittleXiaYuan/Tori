@@ -340,7 +340,7 @@ export default function PacksPageOptimized() {
     installed: packs.length,
     enabled: packs.filter((p) => p.status === "enabled").length,
   }), [packs, privateCatalogEntries.length, releaseEntries]);
-  const readinessQueue = useMemo<ReadinessQueueItem[]>(() => {
+  const readinessItems = useMemo<ReadinessQueueItem[]>(() => {
     const seen = new Map<string, ReadinessQueueItem>();
     for (const pack of packs) {
       seen.set(pack.manifest.id, { manifest: pack.manifest, sourceLabel: pack.status === "enabled" ? "已安装 · 已启用" : "已安装" });
@@ -374,9 +374,10 @@ export default function PacksPageOptimized() {
         return order[ra.level] - order[rb.level]
           || rb.missing.length - ra.missing.length
           || a.manifest.name.localeCompare(b.manifest.name);
-      })
-      .slice(0, 6);
+      });
   }, [packs, releaseEntries, privateCatalogEntries]);
+  const readinessQueue = useMemo(() => readinessItems.slice(0, 6), [readinessItems]);
+  const readinessQueueTotal = readinessItems.length;
   const packKindStats = useMemo(() => {
     const manifests = new Map<string, PackManifest>();
     for (const pack of packs) manifests.set(pack.manifest.id, pack.manifest);
@@ -740,7 +741,7 @@ export default function PacksPageOptimized() {
               <div>
                 <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>补肉优先队列</div>
                 <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
-                  按体检缺口自动挑出最需要小羽补用途、入口、示例或能力边界的能力包。
+                  按体检缺口自动挑出最需要小羽补用途、入口、示例或能力边界的能力包。当前展示 {readinessQueue.length} 个，共 {readinessQueueTotal} 个待补肉。
                 </div>
               </div>
               <Button size="sm" variant="outline" onPress={() => {
