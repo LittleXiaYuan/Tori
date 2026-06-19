@@ -52,11 +52,7 @@ func (g *Gateway) registerChatRoutes() {
 	// Bots routes migrated to the control-plane pack (internal/packs/controlplane).
 
 	// Persona
-	g.mux.HandleFunc("/v1/persona", g.requireAuth(g.handlePersona))
-	g.mux.HandleFunc("/v1/persona/skills", g.requireAuth(g.handlePersonaSkills))
-	g.mux.HandleFunc("/v1/persona/presets", g.requireAuth(g.handlePresets))
-	g.mux.HandleFunc("/v1/persona/presets/custom", g.requireAuth(g.handleCustomPreset))
-	g.mux.HandleFunc("/v1/persona/presets/features", g.requireAuth(g.handlePresetFeatures))
+	// Persona base/preset routes are owned by the persona pack.
 
 	// Emotion (/v1/emotion/stickers, /v1/emotion/history) are owned by the emotion
 	// pack (internal/packs/emotion), mounted via gw.RegisterModule in

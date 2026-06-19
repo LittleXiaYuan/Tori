@@ -189,6 +189,12 @@ func (g *Gateway) SetSkillGrowthPipeline(p skillgrowth.GapHandler) {
 // SetPersonaChain attaches a persona priority chain for session/conversation overrides.
 func (g *Gateway) SetPersonaChain(pc *persona.PriorityChain) { g.personaChain = pc }
 
+// Persona exposes the base persona store to the persona pack.
+func (g *Gateway) Persona() *persona.Persona { return g.persona }
+
+// PersonaChain exposes the priority chain to the persona pack.
+func (g *Gateway) PersonaChain() *persona.PriorityChain { return g.personaChain }
+
 // SetCostTracker attaches a cost tracking module. /v1/cost/* is mounted by the
 // cost pack once the task engine registers it with the wired tracker.
 func (g *Gateway) SetCostTracker(ct *costtrack.Tracker) {

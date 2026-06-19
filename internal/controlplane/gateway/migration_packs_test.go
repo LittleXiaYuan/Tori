@@ -37,6 +37,7 @@ import (
 	modulespack "yunque-agent/internal/packs/modules"
 	notificationspack "yunque-agent/internal/packs/notifications"
 	orchestratorpack "yunque-agent/internal/packs/orchestrator"
+	personapack "yunque-agent/internal/packs/persona"
 	reflectionpack "yunque-agent/internal/packs/reflection"
 	retrievalpack "yunque-agent/internal/packs/retrieval"
 	reveriepack "yunque-agent/internal/packs/reverie"
@@ -92,6 +93,7 @@ var migrationPackPaths = map[string][]string{
 	modulespack.PackID:       modulespack.Paths(),
 	notificationspack.PackID: notificationspack.Paths(),
 	orchestratorpack.PackID:  orchestratorpack.Paths(),
+	personapack.PackID:       personapack.Paths(),
 	reflectionpack.PackID:    reflectionpack.Paths(),
 	retrievalpack.PackID:     retrievalpack.Paths(),
 	schedulerpack.PackID:     schedulerpack.Paths(),
@@ -135,6 +137,7 @@ var migrationPackNames = map[string]string{
 	modulespack.PackID:       "Runtime Modules",
 	notificationspack.PackID: "Notifications",
 	orchestratorpack.PackID:  "IDE Work Orchestrator",
+	personapack.PackID:       "Persona",
 	reflectionpack.PackID:    "Reflection",
 	retrievalpack.PackID:     "Retrieval",
 	schedulerpack.PackID:     "Scheduler",
@@ -199,6 +202,7 @@ func registerMigrationPacks(gw *Gateway) {
 	_ = gw.RegisterModule(modulespack.New(gw))
 	_ = gw.RegisterModule(notificationspack.NewProvider(gw.Notifier))
 	_ = gw.RegisterModule(orchestratorpack.New(gw))
+	_ = gw.RegisterModule(personapack.New(gw))
 	_ = gw.RegisterModule(reflectionpack.New(gw))
 	_ = gw.RegisterModule(retrievalpack.New(gw))
 	_ = gw.RegisterModule(schedulerpack.NewProvider(gw.Scheduler))
@@ -286,6 +290,8 @@ func newTestGatewayWithMigrationPack(t *testing.T, packID string, status packrun
 		_ = gw.RegisterModule(notificationspack.New(nil))
 	case orchestratorpack.PackID:
 		_ = gw.RegisterModule(orchestratorpack.New(gw))
+	case personapack.PackID:
+		_ = gw.RegisterModule(personapack.New(gw))
 	case reflectionpack.PackID:
 		_ = gw.RegisterModule(reflectionpack.New(gw))
 	case retrievalpack.PackID:
@@ -331,6 +337,7 @@ func TestMigrationPackRouteGating(t *testing.T) {
 		{"modules", modulespack.PackID, "/v1/modules"},
 		{"notifications", notificationspack.PackID, "/api/notify/channels"},
 		{"orchestrator", orchestratorpack.PackID, "/v1/orchestrator/status"},
+		{"persona", personapack.PackID, "/v1/persona"},
 		{"reflection", reflectionpack.PackID, "/v1/reflect/experiences"},
 		{"retrieval", retrievalpack.PackID, "/v1/search/providers"},
 		{"scheduler", schedulerpack.PackID, "/v1/scheduler/jobs"},

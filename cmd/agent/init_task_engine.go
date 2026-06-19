@@ -67,6 +67,7 @@ import (
 	nightschoolpack "yunque-agent/internal/packs/nightschool"
 	notificationspack "yunque-agent/internal/packs/notifications"
 	orchestratorpack "yunque-agent/internal/packs/orchestrator"
+	personapack "yunque-agent/internal/packs/persona"
 	reflectionpack "yunque-agent/internal/packs/reflection"
 	retrievalpack "yunque-agent/internal/packs/retrieval"
 	reveriepack "yunque-agent/internal/packs/reverie"
@@ -239,6 +240,7 @@ func initTaskEngine(
 
 	// Persona-modes pack — owns /v1/persona/mode* natively (de-shelled from the
 	// gateway monolith). Resolves the mode manager lazily, so order is moot.
+	_ = gw.RegisterModule(personapack.New(gw))
 	_ = gw.RegisterModule(modespack.New(gw))
 	// Reverie pack — owns /v1/reverie/* natively (de-shelled from the monolith).
 	_ = gw.RegisterModule(reveriepack.New(gw))

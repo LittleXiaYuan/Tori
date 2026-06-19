@@ -716,6 +716,7 @@ func fallbackBuiltinPackManifestPaths() []string {
 		"packs/official/micro-agent-pack/pack.json",
 		"packs/official/notifications-pack/pack.json",
 		"packs/official/orchestrator-pack/pack.json",
+		"packs/official/persona-pack/pack.json",
 		"packs/official/reflection-pack/pack.json",
 		"packs/official/retrieval-pack/pack.json",
 		"packs/official/lora-pack/pack.json",

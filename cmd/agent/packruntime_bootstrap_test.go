@@ -242,6 +242,23 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 		t.Fatal("expected Identity profiles routeSpec")
 	}
 
+	personaPack, ok := registry.Get("yunque.pack.persona")
+	if !ok {
+		t.Fatal("expected Persona builtin pack to be installed")
+	}
+	if personaPack.Status != packruntime.PackStatusEnabled {
+		t.Fatalf("expected Persona default enabled, got %s", personaPack.Status)
+	}
+	if personaPack.Manifest.SDK.TypeScript != "yunque-client/persona" {
+		t.Fatalf("unexpected Persona SDK import: %s", personaPack.Manifest.SDK.TypeScript)
+	}
+	if !hasRouteSpec(personaPack.Manifest.Backend.RouteSpecs, "GET", "/v1/persona") {
+		t.Fatal("expected Persona read routeSpec")
+	}
+	if !hasRouteSpec(personaPack.Manifest.Backend.RouteSpecs, "POST", "/v1/persona/presets/custom") {
+		t.Fatal("expected Persona custom preset routeSpec")
+	}
+
 	retrievalPack, ok := registry.Get("yunque.pack.retrieval")
 	if !ok {
 		t.Fatal("expected Retrieval builtin pack to be installed")
@@ -526,7 +543,7 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 	// Count reflects the current packs/official/ set (incl. the newer
 	// console/control-plane/knowledge/memory/skills/work/workspace packs and the
 	// cognitive-layer/state packs). Adjust if the builtin pack set changes.
-	if got := len(registry.List()); got != 45 {
+	if got := len(registry.List()); got != 46 {
 		t.Fatalf("expected idempotent builtin install, got %d packs", got)
 	}
 }

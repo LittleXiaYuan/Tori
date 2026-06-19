@@ -1,0 +1,102 @@
+{
+  "id": "yunque.pack.persona",
+  "name": "Persona (人格与提示词)",
+  "version": "0.1.0",
+  "description": "人格与提示词能力：管理云雀的基础身份、性格提示、人格技能片段与预设。Persona Modes 仍由独立能力包提供。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": [
+      "persona.read",
+      "persona.write",
+      "persona.skills.read",
+      "persona.skills.write",
+      "persona.presets.read",
+      "persona.presets.write"
+    ],
+    "routes": [
+      "/v1/persona",
+      "/v1/persona/skills",
+      "/v1/persona/presets",
+      "/v1/persona/presets/custom",
+      "/v1/persona/presets/features"
+    ],
+    "permissions": [
+      "persona:read",
+      "persona:write"
+    ],
+    "routeSpecs": [
+      {
+        "method": "GET",
+        "path": "/v1/persona",
+        "description": "Read the base persona identity, soul, and persona skills."
+      },
+      {
+        "method": "PUT",
+        "path": "/v1/persona",
+        "description": "Update the base persona identity and soul prompt."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/persona/skills",
+        "description": "List persona skill prompt fragments."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/persona/skills",
+        "description": "Add a persona skill prompt fragment."
+      },
+      {
+        "method": "DELETE",
+        "path": "/v1/persona/skills",
+        "description": "Delete a persona skill prompt fragment."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/persona/presets",
+        "description": "List persona presets and the active preset."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/persona/presets",
+        "description": "Switch the active persona preset."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/persona/presets/custom",
+        "description": "Create a custom persona preset."
+      },
+      {
+        "method": "DELETE",
+        "path": "/v1/persona/presets/custom",
+        "description": "Remove a custom persona preset."
+      },
+      {
+        "method": "PUT",
+        "path": "/v1/persona/presets/features",
+        "description": "Update feature flags for a persona preset."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [],
+    "assets": {
+      "type": "builtin"
+    }
+  },
+  "sdk": {
+    "typescript": "yunque-client/persona"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "group": "cogni",
+    "phase": "A3",
+    "preload": "true",
+    "note": "Natively owns the base /v1/persona and persona preset surfaces through the Pack Runtime gate. /v1/persona/mode* stays in the persona-modes pack."
+  },
+  "status": "beta"
+}

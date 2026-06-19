@@ -17,99 +17,14 @@ import (
 	"time"
 
 	"yunque-agent/internal/agentcore/llm"
-	"yunque-agent/internal/agentcore/persona"
 	"yunque-agent/internal/agentcore/planner"
 	"yunque-agent/internal/agentcore/session"
 	"yunque-agent/internal/apperror"
 	"yunque-agent/pkg/safego"
 )
 
-// --- Persona API ---
-
-func (g *Gateway) handlePersona(w http.ResponseWriter, r *http.Request) {
-	if g.persona == nil {
-		apperror.WriteCode(w, apperror.CodeInternal, "persona not configured")
-		return
-	}
-	switch r.Method {
-	case http.MethodGet:
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{
-			"identity": g.persona.Identity(),
-			"soul":     g.persona.Soul(),
-			"skills":   g.persona.Skills(),
-		})
-	case http.MethodPut:
-		var req struct {
-			Identity *string `json:"identity"`
-			Soul     *string `json:"soul"`
-		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			apperror.WriteCode(w, apperror.CodeBadRequest, "invalid json")
-			return
-		}
-		if req.Identity != nil {
-			if err := g.persona.SetIdentity(*req.Identity); err != nil {
-				apperror.Write(w, apperror.Wrap(apperror.CodeInternal, "set identity", err))
-				return
-			}
-		}
-		if req.Soul != nil {
-			if err := g.persona.SetSoul(*req.Soul); err != nil {
-				apperror.Write(w, apperror.Wrap(apperror.CodeInternal, "set soul", err))
-				return
-			}
-		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
-	default:
-		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET or PUT")
-	}
-}
-
-func (g *Gateway) handlePersonaSkills(w http.ResponseWriter, r *http.Request) {
-	if g.persona == nil {
-		apperror.WriteCode(w, apperror.CodeInternal, "persona not configured")
-		return
-	}
-	switch r.Method {
-	case http.MethodGet:
-		w.Header().Set("Content-Type", "application/json")
-		skills := g.persona.Skills()
-		if skills == nil {
-			skills = []persona.Skill{}
-		}
-		json.NewEncoder(w).Encode(map[string]any{"skills": skills})
-	case http.MethodPost:
-		var req struct {
-			Name        string `json:"name"`
-			Description string `json:"description"`
-			Content     string `json:"content"`
-		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Name == "" {
-			apperror.WriteCode(w, apperror.CodeBadRequest, "name is required")
-			return
-		}
-		if err := g.persona.AddSkill(req.Name, req.Description, req.Content); err != nil {
-			apperror.Write(w, apperror.Wrap(apperror.CodeInternal, "add skill", err))
-			return
-		}
-		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
-	case http.MethodDelete:
-		var req struct {
-			Name string `json:"name"`
-		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Name == "" {
-			apperror.WriteCode(w, apperror.CodeBadRequest, "name is required")
-			return
-		}
-		g.persona.DeleteSkill(req.Name)
-		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
-	default:
-		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET, POST, or DELETE")
-	}
-}
+// Persona base/preset HTTP handlers were de-shelled into the persona pack
+// (internal/packs/persona). The gateway keeps only narrow persona accessors.
 
 // --- Conversation API ---
 
