@@ -113,11 +113,8 @@ var migrationPackPaths = map[string][]string{
 	toripack.PackID:            toripack.Paths(),
 	tracepack.PackID:           tracepack.Paths(),
 	// Monolith route groups extracted into native packs (Tier 0 microkernel).
-	modespack.PackID: {"/v1/persona/modes", "/v1/persona/mode", "/v1/persona/mode/current"},
-	reveriepack.PackID: {
-		"/v1/reverie/journal", "/v1/reverie/stats", "/v1/reverie/config",
-		"/v1/reverie/think", "/v1/reverie/thought", "/v1/reverie/targets", "/v1/reverie/actions",
-	},
+	modespack.PackID:     {"/v1/persona/modes", "/v1/persona/mode", "/v1/persona/mode/current"},
+	reveriepack.PackID:   reveriepack.Paths(),
 	idepack.PackID:       {"/v1/ide/review", "/v1/ide/status"},
 	cronpack.PackID:      {"/v1/cron/list", "/v1/cron/add", "/v1/cron/remove", "/v1/cron/run"},
 	documentspack.PackID: {"/v1/documents/generate", "/v1/documents/templates"},
@@ -326,6 +323,8 @@ func newTestGatewayWithMigrationPack(t *testing.T, packID string, status packrun
 		_ = gw.RegisterModule(reflectionpack.New(gw))
 	case retrievalpack.PackID:
 		_ = gw.RegisterModule(retrievalpack.New(gw))
+	case reveriepack.PackID:
+		_ = gw.RegisterModule(reveriepack.New(gw))
 	case schedulerpack.PackID:
 		_ = gw.RegisterModule(schedulerpack.New(nil))
 	case sessionqueuepack.PackID:
@@ -379,6 +378,7 @@ func TestMigrationPackRouteGating(t *testing.T) {
 		{"rbac", rbacpack.PackID, "/v1/rbac/my-roles"},
 		{"reflection", reflectionpack.PackID, "/v1/reflect/experiences"},
 		{"retrieval", retrievalpack.PackID, "/v1/search/providers"},
+		{"reverie", reveriepack.PackID, "/v1/reverie/dream/status"},
 		{"scheduler", schedulerpack.PackID, "/v1/scheduler/jobs"},
 		{"session-queue", sessionqueuepack.PackID, "/v1/sessions/queue"},
 		{"skillhub", skillhubpack.PackID, "/api/skillhub/search"},

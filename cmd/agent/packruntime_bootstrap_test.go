@@ -381,6 +381,23 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 		t.Fatal("expected Reflection strategies routeSpec")
 	}
 
+	reverie, ok := registry.Get("yunque.pack.reverie")
+	if !ok {
+		t.Fatal("expected Reverie builtin pack to be installed")
+	}
+	if reverie.Status != packruntime.PackStatusEnabled {
+		t.Fatalf("expected Reverie default enabled, got %s", reverie.Status)
+	}
+	if reverie.Manifest.SDK.TypeScript != "yunque-client/reverie" {
+		t.Fatalf("unexpected Reverie SDK import: %s", reverie.Manifest.SDK.TypeScript)
+	}
+	if !hasRouteSpec(reverie.Manifest.Backend.RouteSpecs, "GET", "/v1/reverie/journal") {
+		t.Fatal("expected Reverie journal routeSpec")
+	}
+	if !hasRouteSpec(reverie.Manifest.Backend.RouteSpecs, "GET", "/v1/reverie/dream/status") {
+		t.Fatal("expected Reverie dream status routeSpec")
+	}
+
 	mcpDispatch, ok := registry.Get("yunque.pack.mcp-dispatch")
 	if !ok {
 		t.Fatal("expected MCP Dispatch builtin pack to be installed")
@@ -645,7 +662,7 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 	// Count reflects the current packs/official/ set (incl. the newer
 	// console/control-plane/knowledge/memory/skills/work/workspace packs and the
 	// cognitive-layer/state packs). Adjust if the builtin pack set changes.
-	if got := len(registry.List()); got != 52 {
+	if got := len(registry.List()); got != 53 {
 		t.Fatalf("expected idempotent builtin install, got %d packs", got)
 	}
 }

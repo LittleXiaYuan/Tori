@@ -1,0 +1,104 @@
+{
+  "id": "yunque.pack.reverie",
+  "name": "Reverie (内在独白)",
+  "version": "0.1.0",
+  "description": "内在独白与离线梦境状态能力：查看思考日志、配置自发思考、触发一次思考，并观察小羽离线梦境循环。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": [
+      "reverie.journal.read",
+      "reverie.stats.read",
+      "reverie.config.read",
+      "reverie.config.write",
+      "reverie.think",
+      "reverie.thought.delete",
+      "reverie.targets.read",
+      "reverie.actions.read",
+      "reverie.dream.status"
+    ],
+    "routes": [
+      "/v1/reverie/journal",
+      "/v1/reverie/stats",
+      "/v1/reverie/config",
+      "/v1/reverie/think",
+      "/v1/reverie/thought",
+      "/v1/reverie/targets",
+      "/v1/reverie/actions",
+      "/v1/reverie/dream/status"
+    ],
+    "permissions": [
+      "reverie:read",
+      "reverie:write",
+      "cogni:dream:read"
+    ],
+    "routeSpecs": [
+      {
+        "method": "GET",
+        "path": "/v1/reverie/journal",
+        "description": "List Reverie thoughts with filters and pagination."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/reverie/stats",
+        "description": "Read Reverie summary statistics."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/reverie/config",
+        "description": "Read Reverie configuration and running state."
+      },
+      {
+        "method": "PUT",
+        "path": "/v1/reverie/config",
+        "description": "Update Reverie configuration."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/reverie/think",
+        "description": "Trigger one Reverie think cycle."
+      },
+      {
+        "method": "DELETE",
+        "path": "/v1/reverie/thought",
+        "description": "Delete a Reverie thought by id."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/reverie/targets",
+        "description": "List Reverie delivery targets."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/reverie/actions",
+        "description": "List Reverie action execution log."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/reverie/dream/status",
+        "description": "Read offline dream loop and Cogni evolution status."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [],
+    "assets": {
+      "type": "builtin"
+    }
+  },
+  "sdk": {
+    "typescript": "yunque-client/reverie"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "group": "cogni",
+    "phase": "A4",
+    "preload": "true",
+    "note": "Natively owns /v1/reverie/* including dream status through Pack Runtime. Dream status is read-only and does not mutate Cogni decisions."
+  },
+  "status": "beta"
+}

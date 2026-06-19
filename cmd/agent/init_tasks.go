@@ -722,6 +722,7 @@ func fallbackBuiltinPackManifestPaths() []string {
 		"packs/official/rbac-pack/pack.json",
 		"packs/official/reflection-pack/pack.json",
 		"packs/official/retrieval-pack/pack.json",
+		"packs/official/reverie-pack/pack.json",
 		"packs/official/lora-pack/pack.json",
 		"packs/official/browser-intent-pack/pack.json",
 		"packs/official/computer-use-pack/pack.json",

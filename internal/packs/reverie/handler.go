@@ -1,9 +1,7 @@
-// Package reveriepack mounts the Reverie (inner-monologue) HTTP surface
-// (/v1/reverie/{journal,stats,config,think,thought,actions,targets}) as a v2
-// capability pack (Tier 0 microkernel). Native pack: handler logic lives here
-// and talks to the Reverie engine through a narrow accessor; the gateway no
-// longer hosts these routes (the admin-only /v1/cognitive-layer and
-// /v1/reverie/dream/status stay on the gateway for now).
+// Package reveriepack mounts the Reverie (inner-monologue) HTTP surface as a
+// v2 capability pack (Tier 0 microkernel). Native pack: handler logic lives
+// here and talks to the Reverie/Cogni engines through narrow accessors; the
+// gateway no longer hosts these routes.
 package reveriepack
 
 import (
@@ -19,6 +17,8 @@ import (
 
 	"yunque-agent/internal/agentcore/planner"
 	"yunque-agent/internal/apperror"
+	"yunque-agent/internal/cognikernel"
+	"yunque-agent/pkg/cogni"
 	"yunque-agent/pkg/packruntime"
 )
 
@@ -30,6 +30,8 @@ type Gateway interface {
 	Reverie() *planner.Reverie
 	// ReverieChannelTypes lists registered channel types, for the targets view.
 	ReverieChannelTypes() []string
+	CogniKernel() *cognikernel.CogniKernel
+	CogniEvolution() *cogni.EvolutionEngine
 }
 
 // Handler is the reverie pack backend module.
@@ -85,6 +87,34 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 		mk("/v1/reverie/thought", h.handleDeleteThought),
 		mk("/v1/reverie/targets", h.handleTargets),
 		mk("/v1/reverie/actions", h.handleActions),
+		packruntime.BackendRoute{Method: http.MethodGet, Path: "/v1/reverie/dream/status", Handler: h.handleDreamStatus},
+	}
+}
+
+func RouteSpecs() []packruntime.BackendRouteSpec {
+	return []packruntime.BackendRouteSpec{
+		{Method: http.MethodGet, Path: "/v1/reverie/journal", Description: "List Reverie thoughts with filters and pagination."},
+		{Method: http.MethodGet, Path: "/v1/reverie/stats", Description: "Read Reverie summary statistics."},
+		{Method: http.MethodGet, Path: "/v1/reverie/config", Description: "Read Reverie configuration and running state."},
+		{Method: http.MethodPut, Path: "/v1/reverie/config", Description: "Update Reverie configuration."},
+		{Method: http.MethodPost, Path: "/v1/reverie/think", Description: "Trigger one Reverie think cycle."},
+		{Method: http.MethodDelete, Path: "/v1/reverie/thought", Description: "Delete a Reverie thought by id."},
+		{Method: http.MethodGet, Path: "/v1/reverie/targets", Description: "List Reverie delivery targets."},
+		{Method: http.MethodGet, Path: "/v1/reverie/actions", Description: "List Reverie action execution log."},
+		{Method: http.MethodGet, Path: "/v1/reverie/dream/status", Description: "Read offline dream loop and Cogni evolution status."},
+	}
+}
+
+func Paths() []string {
+	return []string{
+		"/v1/reverie/journal",
+		"/v1/reverie/stats",
+		"/v1/reverie/config",
+		"/v1/reverie/think",
+		"/v1/reverie/thought",
+		"/v1/reverie/targets",
+		"/v1/reverie/actions",
+		"/v1/reverie/dream/status",
 	}
 }
 
@@ -325,6 +355,28 @@ func (h *Handler) handleActions(w http.ResponseWriter, r *http.Request) {
 	log := rev.ActionLog()
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{"actions": log, "total": len(log)})
+}
+
+// handleDreamStatus returns a read-only view of the offline dream loop
+// (小羽 / RWKV-7) and recent self-evolution experiments.
+func (h *Handler) handleDreamStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET only")
+		return
+	}
+	out := map[string]any{}
+	if h.gw != nil && h.gw.CogniKernel() != nil {
+		out["configured"] = true
+		out["dream"] = h.gw.CogniKernel().DreamStatus()
+	} else {
+		out["configured"] = false
+		out["message"] = "offline dream engine not configured (set OFFLINE_LLM_BASE_URL)"
+	}
+	if h.gw != nil && h.gw.CogniEvolution() != nil {
+		out["evolution"] = h.gw.CogniEvolution().AllExperiments()
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(out)
 }
 
 // handleTargets returns the configured push targets for Reverie delivery.

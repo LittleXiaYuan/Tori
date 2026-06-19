@@ -15,7 +15,7 @@ import (
 // ModeManager exposes the persona mode manager to backend packs (the modes pack).
 func (g *Gateway) ModeManager() *modes.ModeManager { return g.modeManager }
 
-//  from handlers_reverie.go 
+//  from handlers_reverie.go
 // 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 // Reverie API 鈥?visualization and operations endpoints
 //
@@ -29,7 +29,7 @@ func (g *Gateway) ModeManager() *modes.ModeManager { return g.modeManager }
 
 // Reverie HTTP handlers were de-shelled into the reverie pack
 // (internal/packs/reverie). The gateway only exposes the accessors below; the
-// admin-only /v1/cognitive-layer and /v1/reverie/dream/status stay on the gateway.
+// admin-only /v1/cognitive-layer safety valve stays on the gateway.
 
 // Reverie exposes the inner-monologue engine to backend packs (the reverie pack).
 func (g *Gateway) Reverie() *planner.Reverie { return g.reverie }
@@ -45,5 +45,3 @@ func (g *Gateway) ReverieChannelTypes() []string {
 	}
 	return out
 }
-
-

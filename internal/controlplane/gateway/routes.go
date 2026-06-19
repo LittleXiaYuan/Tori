@@ -191,15 +191,11 @@ func (g *Gateway) registerProviderRoutes() {
 // ──────────────────────────────────────────────
 
 func (g *Gateway) registerReverieRoutes() {
-	// The reverie inner-monologue surface (/v1/reverie/{journal,stats,config,
-	// think,thought,targets,actions}) is owned by the reverie pack
-	// (internal/packs/reverie), mounted via gw.RegisterModule in
-	// cmd/agent/init_task_engine.go. Only the two routes below stay on the
-	// gateway: dream/status is observability, and the cognitive-layer switch is
-	// admin-gated (pack routes only run through requireAuth, not requireAdmin).
+	// The reverie inner-monologue and dream-status surfaces (/v1/reverie*) are
+	// owned by the reverie pack (internal/packs/reverie), mounted via
+	// gw.RegisterModule in cmd/agent/init_task_engine.go. The cognitive-layer
+	// switch stays on the gateway because it is an admin safety valve.
 
-	// Offline dream loop + self-evolution status (read-only observability).
-	g.mux.HandleFunc("/v1/reverie/dream/status", g.requireAuth(g.handleDreamStatus))
 	// Cognitive-layer master switch — runtime hot-toggle (admin-only). GET reads
 	// state; POST {"enabled":bool} flips the whole cognitive stack without restart.
 	g.mux.HandleFunc("/v1/cognitive-layer", g.requireAuth(g.requireAdmin(g.handleCognitiveLayer)))

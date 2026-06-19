@@ -16,9 +16,11 @@ import (
 	"yunque-agent/internal/agentcore/skillgrowth/adapter"
 	"yunque-agent/internal/agentcore/tools"
 	"yunque-agent/internal/agentcore/trust"
+	"yunque-agent/internal/cognikernel"
 	"yunque-agent/internal/controlplane/tenant"
 	"yunque-agent/internal/observe"
 	"yunque-agent/internal/tori"
+	"yunque-agent/pkg/cogni"
 	"yunque-agent/pkg/plugin"
 )
 
@@ -247,4 +249,18 @@ func (g *Gateway) SmartRouter() *router.Router {
 		return nil
 	}
 	return g.smartRouter
+}
+
+func (g *Gateway) CogniKernel() *cognikernel.CogniKernel {
+	if g == nil {
+		return nil
+	}
+	return g.cogniKernel
+}
+
+func (g *Gateway) CogniEvolution() *cogni.EvolutionEngine {
+	if g == nil {
+		return nil
+	}
+	return g.cogniEvolution
 }
