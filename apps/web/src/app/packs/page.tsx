@@ -118,6 +118,15 @@ export default function PacksPageOptimized() {
     installed: packs.length,
     enabled: packs.filter((p) => p.status === "enabled").length,
   }), [packs, privateCatalogEntries.length, releaseCatalog.entries]);
+  const packKindStats = useMemo(() => {
+    const manifests = new Map<string, PackManifest>();
+    for (const pack of packs) manifests.set(pack.manifest.id, pack.manifest);
+    for (const entry of releaseCatalog.entries || []) manifests.set(entry.manifest.id, entry.manifest);
+    for (const entry of catalogEntries) manifests.set(entry.manifest.id, entry.manifest);
+    const counts = { actionable: 0, infrastructure: 0, experimental: 0, documented: 0 };
+    for (const manifest of manifests.values()) counts[packUsability(manifest).kind] += 1;
+    return counts;
+  }, [packs, releaseCatalog.entries, catalogEntries]);
 
   const refreshAll = async () => {
     await Promise.all([refresh(), refreshCatalog(), refreshReleaseCatalog()]);
@@ -209,6 +218,47 @@ export default function PacksPageOptimized() {
             <div className="kpi-label">已启用</div>
             <div className="kpi-value">{stats.enabled}</div>
           </Card>
+        </div>
+
+        <div className="mt-4 rounded-lg border p-4" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-bg-hover)" }}>
+          <div className="mb-3 flex items-start justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>能力包不是都要单独打开</div>
+              <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
+                云雀会把能力包分成三类：能直接操作的入口、支撑 Chat/任务/知识的基础能力，以及仍在验证的实验能力。
+              </div>
+            </div>
+            <Chip size="sm" variant="soft">按当前来源统计</Chip>
+          </div>
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="rounded-md p-3" style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.18)" }}>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>可直接使用</span>
+                <span className="text-lg font-semibold" style={{ color: "var(--yunque-success)" }}>{packKindStats.actionable}</span>
+              </div>
+              <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
+                有明确页面或主入口，适合用户查看、编辑、执行或继续处理。
+              </div>
+            </div>
+            <div className="rounded-md p-3" style={{ background: "rgba(59,130,246,0.08)", border: "1px solid rgba(59,130,246,0.18)" }}>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>基础能力</span>
+                <span className="text-lg font-semibold" style={{ color: "var(--yunque-primary)" }}>{packKindStats.infrastructure + packKindStats.documented}</span>
+              </div>
+              <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
+                通常不单独当应用打开，而是在 Chat、任务、记忆、知识或设置页里生效。
+              </div>
+            </div>
+            <div className="rounded-md p-3" style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.20)" }}>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>实验中</span>
+                <span className="text-lg font-semibold" style={{ color: "var(--yunque-warning)" }}>{packKindStats.experimental}</span>
+              </div>
+              <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
+                可体验但不作为稳定主路径；启用前先看限制、权限和风险说明。
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="flex items-center gap-3 mt-4">

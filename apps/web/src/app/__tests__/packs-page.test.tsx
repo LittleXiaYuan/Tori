@@ -127,6 +127,11 @@ describe("PacksPageOptimized", () => {
 
     expect(await screen.findByText("Documents (文档生成)")).toBeInTheDocument();
     expect(screen.getByText("Files (产物文件)")).toBeInTheDocument();
+    expect(screen.getByText("能力包不是都要单独打开")).toBeInTheDocument();
+    expect(screen.getByText("可直接使用")).toBeInTheDocument();
+    expect(screen.getByText("基础能力")).toBeInTheDocument();
+    expect(screen.getByText("实验中")).toBeInTheDocument();
+    expect(screen.getByText("通常不单独当应用打开，而是在 Chat、任务、记忆、知识或设置页里生效。")).toBeInTheDocument();
 
     await waitFor(() => {
       expect(screen.getAllByText("怎么用它").length).toBeGreaterThanOrEqual(2);
