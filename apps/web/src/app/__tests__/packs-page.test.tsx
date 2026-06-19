@@ -120,6 +120,13 @@ const needsContextManifest = {
   },
 };
 
+const alphaManifest = {
+  ...filesManifest,
+  id: "yunque.pack.alpha",
+  name: "Alpha Pack",
+  status: "alpha",
+};
+
 describe("PacksPageOptimized", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -263,6 +270,32 @@ describe("PacksPageOptimized", () => {
     fireEvent.click(screen.getByRole("button", { name: "清除体检" }));
 
     expect(screen.getByText("Needs Context Pack")).toBeInTheDocument();
+    expect(screen.getByText("Documents (文档生成)")).toBeInTheDocument();
+  });
+
+  it("filters packs by stability so users can avoid experimental packs", async () => {
+    packsClientMock.installed.mockResolvedValueOnce({
+      packs: [
+        { manifest: documentsManifest, status: "enabled", updatedAt: "2026-06-19T00:00:00Z" },
+        { manifest: alphaManifest, status: "disabled", updatedAt: "2026-06-19T00:00:00Z" },
+      ],
+      count: 2,
+    });
+
+    render(<PacksPageOptimized />);
+
+    expect(await screen.findByText("Alpha Pack")).toBeInTheDocument();
+    expect(screen.getByText("Documents (文档生成)")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "开发中" }));
+
+    expect(screen.getByText("Alpha Pack")).toBeInTheDocument();
+    expect(screen.queryByText("Documents (文档生成)")).not.toBeInTheDocument();
+    expect(screen.getByText("稳定性：开发中")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "清除稳定性" }));
+
+    expect(screen.getByText("Alpha Pack")).toBeInTheDocument();
     expect(screen.getByText("Documents (文档生成)")).toBeInTheDocument();
   });
 

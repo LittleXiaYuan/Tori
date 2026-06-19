@@ -58,6 +58,7 @@ type KindFilter = "all" | "actionable" | "infrastructure" | "experimental";
 type InstallFilter = "all" | "installed" | "enabled" | "disabled" | "available";
 type RiskFilter = "all" | "low" | "medium" | "high";
 type SourceFilter = "all" | "installed" | "official" | "private";
+type StabilityFilter = "all" | "stable" | "beta" | "alpha";
 type ReadinessFilter = "all" | "complete" | "needs_context" | "needs_entry";
 type SortMode = "name" | "kind" | "risk" | "readiness" | "status";
 
@@ -85,6 +86,12 @@ const SOURCE_FILTER_LABELS: Record<SourceFilter, string> = {
   installed: "已安装",
   official: "官方源",
   private: "私有源",
+};
+const STABILITY_FILTER_LABELS: Record<StabilityFilter, string> = {
+  all: "全部稳定性",
+  stable: "正式版",
+  beta: "测试版",
+  alpha: "开发中",
 };
 const READINESS_FILTER_LABELS: Record<ReadinessFilter, string> = {
   all: "全部体检",
@@ -263,6 +270,7 @@ export default function PacksPageOptimized() {
   const [installFilter, setInstallFilter] = useState<InstallFilter>("all");
   const [riskFilter, setRiskFilter] = useState<RiskFilter>("all");
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
+  const [stabilityFilter, setStabilityFilter] = useState<StabilityFilter>("all");
   const [readinessFilter, setReadinessFilter] = useState<ReadinessFilter>("all");
   const [sortMode, setSortMode] = useState<SortMode>("name");
   const [installedPage, setInstalledPage] = useState(1);
@@ -302,6 +310,7 @@ export default function PacksPageOptimized() {
     }
     if (riskFilter !== "all" && risk.level !== riskFilter) return false;
     if (sourceFilter !== "all" && options?.source !== sourceFilter) return false;
+    if (stabilityFilter !== "all" && manifest.status !== stabilityFilter) return false;
     if (readinessFilter !== "all" && readiness.level !== readinessFilter) return false;
     if (installFilter === "installed" && !options?.installedStatus) return false;
     if (installFilter === "enabled" && options?.installedStatus !== "enabled") return false;
@@ -315,7 +324,7 @@ export default function PacksPageOptimized() {
       (pack) => pack.manifest,
       sortMode,
     ),
-    [packs, normalizedQuery, kindFilter, installFilter, riskFilter, sourceFilter, readinessFilter, sortMode],
+    [packs, normalizedQuery, kindFilter, installFilter, riskFilter, sourceFilter, stabilityFilter, readinessFilter, sortMode],
   );
   const filteredReleaseEntries = useMemo(
     () => sortPacks(
@@ -323,7 +332,7 @@ export default function PacksPageOptimized() {
       (entry) => entry.manifest,
       sortMode,
     ),
-    [releaseEntries, normalizedQuery, kindFilter, installFilter, riskFilter, sourceFilter, readinessFilter, sortMode],
+    [releaseEntries, normalizedQuery, kindFilter, installFilter, riskFilter, sourceFilter, stabilityFilter, readinessFilter, sortMode],
   );
   const filteredPrivateCatalogEntries = useMemo(
     () => sortPacks(
@@ -331,7 +340,7 @@ export default function PacksPageOptimized() {
       (entry) => entry.manifest,
       sortMode,
     ),
-    [privateCatalogEntries, normalizedQuery, kindFilter, installFilter, riskFilter, sourceFilter, readinessFilter, sortMode],
+    [privateCatalogEntries, normalizedQuery, kindFilter, installFilter, riskFilter, sourceFilter, stabilityFilter, readinessFilter, sortMode],
   );
   const totalMatches = filteredInstalledPacks.length + filteredReleaseEntries.length + filteredPrivateCatalogEntries.length;
   const installedPageCount = pageCountFor(filteredInstalledPacks.length);
@@ -348,7 +357,7 @@ export default function PacksPageOptimized() {
     setInstalledPage(1);
     setReleasePage(1);
     setPrivatePage(1);
-  }, [normalizedQuery, kindFilter, installFilter, riskFilter, sourceFilter, readinessFilter, sortMode]);
+  }, [normalizedQuery, kindFilter, installFilter, riskFilter, sourceFilter, stabilityFilter, readinessFilter, sortMode]);
 
   const refreshAll = async () => {
     await Promise.all([refresh(), refreshCatalog(), refreshReleaseCatalog()]);
@@ -442,6 +451,12 @@ export default function PacksPageOptimized() {
       label: `来源：${SOURCE_FILTER_LABELS[sourceFilter]}`,
       clearLabel: "清除来源",
       clear: () => setSourceFilter("all"),
+    }] : []),
+    ...(stabilityFilter !== "all" ? [{
+      key: "stability",
+      label: `稳定性：${STABILITY_FILTER_LABELS[stabilityFilter]}`,
+      clearLabel: "清除稳定性",
+      clear: () => setStabilityFilter("all"),
     }] : []),
     ...(readinessFilter !== "all" ? [{
       key: "readiness",
@@ -563,6 +578,7 @@ export default function PacksPageOptimized() {
                 setInstallFilter("all");
                 setRiskFilter("all");
                 setSourceFilter("all");
+                setStabilityFilter("all");
                 setReadinessFilter("all");
                 setSortMode("name");
               }}
@@ -570,7 +586,7 @@ export default function PacksPageOptimized() {
               <Search size={14} /> 重置
             </Button>
           </div>
-          <div className="mt-3 grid gap-3 xl:grid-cols-6">
+          <div className="mt-3 grid gap-3 xl:grid-cols-7">
             {renderFilterGroup("类型", [
               ["all", "全部"],
               ["actionable", "可用"],
@@ -596,6 +612,12 @@ export default function PacksPageOptimized() {
               ["official", "官方"],
               ["private", "私有"],
             ], sourceFilter, (value) => setSourceFilter(value as SourceFilter))}
+            {renderFilterGroup("稳定性", [
+              ["all", "全部"],
+              ["stable", "正式"],
+              ["beta", "测试"],
+              ["alpha", "开发中"],
+            ], stabilityFilter, (value) => setStabilityFilter(value as StabilityFilter))}
             {renderFilterGroup("体检", [
               ["all", "全部"],
               ["complete", "完整"],
