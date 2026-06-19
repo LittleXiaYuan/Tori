@@ -338,6 +338,12 @@ describe("PacksPageOptimized", () => {
     expect(batchPrompt).toContain("不要自动应用改动");
     expect(batchPrompt).toContain("预览 diff");
     expect(batchPrompt).toContain("studio_url");
+    const batchStudioLink = screen.getByRole("link", { name: /导入 Studio 逐包处理/ });
+    expect(batchStudioLink).toHaveAttribute("href", expect.stringContaining("/packs/studio?batch="));
+    const batchStudioPrompt = new URL(batchStudioLink.getAttribute("href")!, "http://localhost").searchParams.get("batch") || "";
+    expect(batchStudioPrompt).toContain("yunque.pack_studio.batch_draft_request.v1");
+    expect(batchStudioPrompt).toContain("yunque.pack.needs-entry");
+    expect(batchStudioPrompt).toContain("studio_url");
     const queueStudioLink = screen.getAllByRole("link", { name: /交给小羽补齐/ })
       .find((link) => link.getAttribute("href")?.includes("yunque.pack.needs-entry"));
     expect(queueStudioLink).toHaveAttribute("href", expect.stringContaining("/packs/studio?"));

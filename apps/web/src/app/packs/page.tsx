@@ -471,6 +471,7 @@ export default function PacksPageOptimized() {
   const pagedPrivateCatalogEntries = paginate(filteredPrivateCatalogEntries, currentPrivatePage);
   const batchReadinessPrompt = useMemo(() => buildBatchReadinessPrompt(readinessQueue), [readinessQueue]);
   const batchReadinessChatHref = readinessQueue.length > 0 ? `/chat?q=${encodeURIComponent(batchReadinessPrompt)}` : "";
+  const batchReadinessStudioHref = readinessQueue.length > 0 ? `/packs/studio?batch=${encodeURIComponent(batchReadinessPrompt)}` : "";
 
   useEffect(() => {
     setInstalledPage(1);
@@ -753,6 +754,11 @@ export default function PacksPageOptimized() {
               <Button size="sm" variant="outline" onPress={copyBatchReadinessPrompt}>
                 复制批量补肉任务
               </Button>
+              <Link href={batchReadinessStudioHref}>
+                <Button size="sm" variant="outline">
+                  导入 Studio 逐包处理 <Wrench size={14} />
+                </Button>
+              </Link>
               <Link href={batchReadinessChatHref}>
                 <Button size="sm" className="btn-accent">
                   交给 Chat 批量补肉 <ArrowRight size={14} />

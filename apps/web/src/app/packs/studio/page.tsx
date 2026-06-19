@@ -674,7 +674,7 @@ export default function PackStudioPage() {
   const [workspaceReport, setWorkspaceReport] = useState<PackStudioWorkspaceReport | null>(null);
   const [patchFile, setPatchFile] = useState("");
   const [patchContent, setPatchContent] = useState("");
-  const [importedBatchText, setImportedBatchText] = useState("");
+  const [importedBatchText, setImportedBatchText] = useState(() => searchParams.get("batch") || "");
   const [importedPatchPlanText, setImportedPatchPlanText] = useState("");
   const [importedPatchDraftText, setImportedPatchDraftText] = useState("");
   const [patching, setPatching] = useState(false);

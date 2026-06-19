@@ -393,9 +393,6 @@ describe("PackStudioPage", () => {
   });
 
   it("imports a batch readiness request and lets users continue pack by pack", async () => {
-    render(<PackStudioPage />);
-
-    expect(await screen.findByText("导入批量补肉任务")).toBeInTheDocument();
     const batchRequest = {
       kind: "yunque.pack_studio.batch_draft_request.v1",
       goal: "批量把这些能力包补齐用途和入口。",
@@ -425,10 +422,14 @@ describe("PackStudioPage", () => {
         },
       ],
     };
-    fireEvent.change(screen.getByLabelText("导入批量补肉任务 JSON"), {
-      target: { value: `小羽收到批量补肉任务。\n\n\`\`\`json\n${JSON.stringify(batchRequest, null, 2)}\n\`\`\`` },
-    });
+    navigationMock.query = new URLSearchParams({
+      batch: `小羽收到批量补肉任务。\n\n\`\`\`json\n${JSON.stringify(batchRequest, null, 2)}\n\`\`\``,
+    }).toString();
 
+    render(<PackStudioPage />);
+
+    expect(await screen.findByText("导入批量补肉任务")).toBeInTheDocument();
+    expect((screen.getByLabelText("导入批量补肉任务 JSON") as HTMLTextAreaElement).value).toContain("yunque.pack_studio.batch_draft_request.v1");
     expect(screen.getByText("2 个包")).toBeInTheDocument();
     expect(screen.getByText("逐包处理")).toBeInTheDocument();
     expect(screen.getByText("目标：批量把这些能力包补齐用途和入口。")).toBeInTheDocument();
