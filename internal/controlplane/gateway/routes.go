@@ -102,12 +102,8 @@ func (g *Gateway) registerMemoryRoutes() {
 	// Identity (/v1/identity/*) is owned by the identity pack
 	// (internal/packs/identity), mounted via gw.RegisterModule.
 
-	// Embeddings
-	g.mux.HandleFunc("/v1/embeddings", g.requireAuth(g.handleEmbeddings))
-
-	// Search
-	g.mux.HandleFunc("/v1/search", g.requireAuth(g.handleSearch))
-	g.mux.HandleFunc("/v1/search/providers", g.requireAuth(g.handleSearchProviders))
+	// Embeddings and web search (/v1/embeddings, /v1/search*) are owned by the
+	// retrieval pack (internal/packs/retrieval), mounted via gw.RegisterModule.
 }
 
 func (g *Gateway) registerKnowledgeRoutes() {

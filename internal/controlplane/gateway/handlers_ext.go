@@ -362,53 +362,6 @@ func verifyFeishuRequest(h http.Header, body []byte) error {
 	return nil
 }
 
-// --- Cost Tracking API ---
-
-// --- Embeddings API ---
-
-func (g *Gateway) handleEmbeddings(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	if g.embedResolver == nil {
-		json.NewEncoder(w).Encode(map[string]string{"error": "embeddings not configured"})
-		return
-	}
-	switch r.Method {
-	case http.MethodGet:
-		json.NewEncoder(w).Encode(map[string]any{
-			"providers": g.embedResolver.List(),
-		})
-	case http.MethodPost:
-		var req struct {
-			Text     string `json:"text"`
-			Provider string `json:"provider"`
-		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			apperror.WriteCode(w, apperror.CodeBadRequest, "invalid request")
-			return
-		}
-		embedder, ok := g.embedResolver.Primary()
-		if req.Provider != "" {
-			embedder, ok = g.embedResolver.Get(req.Provider)
-		}
-		if !ok {
-			apperror.WriteCode(w, apperror.CodeBadRequest, "no embedder available")
-			return
-		}
-		vec, err := embedder.Embed(r.Context(), req.Text)
-		if err != nil {
-			apperror.WriteCode(w, apperror.CodeLLMError, "embedding failed: "+err.Error())
-			return
-		}
-		json.NewEncoder(w).Encode(map[string]any{
-			"embedding":  vec,
-			"dimensions": len(vec),
-			"model":      embedder.Model(),
-		})
-	default:
-		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "method not allowed")
-	}
-}
-
 // --- Subagent API ---
 
 func (g *Gateway) handleSubagent(w http.ResponseWriter, r *http.Request) {

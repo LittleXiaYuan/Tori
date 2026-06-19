@@ -128,7 +128,7 @@ func TestAuthWithAPIKey(t *testing.T) {
 }
 
 func TestSearchEndpointsGracefullyHandleNoProviders(t *testing.T) {
-	gw, tm := newTestGateway()
+	gw, tm := newTestGatewayMigrationEnabled()
 	t1 := tm.Register("search-org")
 
 	req := httptest.NewRequest("GET", "/v1/search/providers", nil)

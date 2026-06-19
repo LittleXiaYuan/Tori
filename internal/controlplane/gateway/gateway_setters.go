@@ -158,6 +158,12 @@ func (g *Gateway) SetBotManager(bm *bots.Manager) { g.botMgr = bm }
 // SetSearchRegistry attaches a web search registry.
 func (g *Gateway) SetSearchRegistry(sr *websearch.Registry) { g.searchReg = sr }
 
+// SearchRegistry exposes the web search registry to the retrieval pack.
+func (g *Gateway) SearchRegistry() *websearch.Registry { return g.searchReg }
+
+// SearchEnabled reports whether web search is enabled by runtime config.
+func (g *Gateway) SearchEnabled() bool { return g.searchOn.Load() }
+
 // SetSmartRouter attaches a smart model router.
 func (g *Gateway) SetSmartRouter(r *router.Router) { g.smartRouter = r }
 
@@ -208,6 +214,9 @@ func (g *Gateway) ForkPersister() *session.ForkPersister { return g.forkPersiste
 
 // SetEmbeddings attaches an embeddings resolver.
 func (g *Gateway) SetEmbeddings(er *embeddings.Resolver) { g.embedResolver = er }
+
+// EmbeddingsResolver exposes the embeddings resolver to the retrieval pack.
+func (g *Gateway) EmbeddingsResolver() *embeddings.Resolver { return g.embedResolver }
 
 // SetSubagentManager attaches a subagent manager.
 func (g *Gateway) SetSubagentManager(sm *subagent.Manager) { g.subagentMgr = sm }

@@ -68,6 +68,7 @@ import (
 	notificationspack "yunque-agent/internal/packs/notifications"
 	orchestratorpack "yunque-agent/internal/packs/orchestrator"
 	reflectionpack "yunque-agent/internal/packs/reflection"
+	retrievalpack "yunque-agent/internal/packs/retrieval"
 	reveriepack "yunque-agent/internal/packs/reverie"
 	schedulerpack "yunque-agent/internal/packs/scheduler"
 	skillhubpack "yunque-agent/internal/packs/skillhub"
@@ -269,6 +270,9 @@ func initTaskEngine(
 	// Identity pack — owns /v1/identity/* natively and resolves the cross-channel
 	// identity resolver lazily through a narrow host accessor.
 	_ = gw.RegisterModule(identitypack.New(gw))
+	// Retrieval pack — owns /v1/embeddings and /v1/search* natively, reading the
+	// configured embedding/search providers lazily through narrow host accessors.
+	_ = gw.RegisterModule(retrievalpack.New(gw))
 
 	// Inner Life pack — exposes the soul-layer outputs (curiosity / reflection /
 	// dreaming) over a read-only HTTP surface. Registered here because the

@@ -1,0 +1,70 @@
+{
+  "id": "yunque.pack.retrieval",
+  "name": "Retrieval (检索与向量化)",
+  "version": "0.1.0",
+  "description": "检索与向量化能力：查看/调用嵌入模型，并通过已配置的搜索源执行网页检索。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": [
+      "retrieval.embeddings.list",
+      "retrieval.embeddings.embed",
+      "retrieval.search.query",
+      "retrieval.search.providers"
+    ],
+    "routes": [
+      "/v1/embeddings",
+      "/v1/search",
+      "/v1/search/providers"
+    ],
+    "permissions": [
+      "embeddings:read",
+      "embeddings:write",
+      "network:read",
+      "search:read"
+    ],
+    "routeSpecs": [
+      {
+        "method": "GET",
+        "path": "/v1/embeddings",
+        "description": "List configured embedding providers."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/embeddings",
+        "description": "Generate a vector embedding for text."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/search",
+        "description": "Run a web search through the configured provider."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/search/providers",
+        "description": "List configured web search providers and enablement state."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [],
+    "assets": {
+      "type": "builtin"
+    }
+  },
+  "sdk": {
+    "typescript": "yunque-client/retrieval"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "group": "knowledge",
+    "phase": "A3",
+    "preload": "true",
+    "note": "Natively owns /v1/embeddings and /v1/search* through the Pack Runtime gate. It reads configured search and embedding providers through narrow host accessors."
+  },
+  "status": "beta"
+}

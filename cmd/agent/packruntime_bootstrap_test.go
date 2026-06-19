@@ -242,6 +242,23 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 		t.Fatal("expected Identity profiles routeSpec")
 	}
 
+	retrievalPack, ok := registry.Get("yunque.pack.retrieval")
+	if !ok {
+		t.Fatal("expected Retrieval builtin pack to be installed")
+	}
+	if retrievalPack.Status != packruntime.PackStatusEnabled {
+		t.Fatalf("expected Retrieval default enabled, got %s", retrievalPack.Status)
+	}
+	if retrievalPack.Manifest.SDK.TypeScript != "yunque-client/retrieval" {
+		t.Fatalf("unexpected Retrieval SDK import: %s", retrievalPack.Manifest.SDK.TypeScript)
+	}
+	if !hasRouteSpec(retrievalPack.Manifest.Backend.RouteSpecs, "POST", "/v1/embeddings") {
+		t.Fatal("expected Retrieval embeddings routeSpec")
+	}
+	if !hasRouteSpec(retrievalPack.Manifest.Backend.RouteSpecs, "GET", "/v1/search/providers") {
+		t.Fatal("expected Retrieval search providers routeSpec")
+	}
+
 	forks, ok := registry.Get("yunque.pack.forks")
 	if !ok {
 		t.Fatal("expected Conversation Forks builtin pack to be installed")
@@ -492,7 +509,7 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 	// Count reflects the current packs/official/ set (incl. the newer
 	// console/control-plane/knowledge/memory/skills/work/workspace packs and the
 	// cognitive-layer/state packs). Adjust if the builtin pack set changes.
-	if got := len(registry.List()); got != 43 {
+	if got := len(registry.List()); got != 44 {
 		t.Fatalf("expected idempotent builtin install, got %d packs", got)
 	}
 }

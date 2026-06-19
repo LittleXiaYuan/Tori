@@ -2,14 +2,9 @@ package gateway
 
 import (
 	"context"
-	"encoding/json"
-	"net/http"
-	"strconv"
 	"strings"
 
 	"yunque-agent/internal/agentcore/memory"
-	"yunque-agent/internal/agentcore/websearch"
-	"yunque-agent/internal/apperror"
 )
 
 // MemoryManager exposes the memory manager to backend packs (e.g. the memory
@@ -63,72 +58,5 @@ func (g *Gateway) WireGraphToPlanner() {
 			return ""
 		}
 		return strings.Join(parts, "\n---\n")
-	})
-}
-
-// from handlers_search.go
-func (g *Gateway) handleSearch(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET only")
-		return
-	}
-	if !g.searchOn.Load() {
-		apperror.WriteCode(w, apperror.CodeBadRequest, "search is disabled")
-		return
-	}
-	query := r.URL.Query().Get("q")
-	if query == "" {
-		apperror.WriteCode(w, apperror.CodeBadRequest, "q is required")
-		return
-	}
-	limit := 5
-	if l := r.URL.Query().Get("limit"); l != "" {
-		if n, err := strconv.Atoi(l); err == nil && n > 0 {
-			limit = n
-		}
-	}
-	if g.searchReg == nil || len(g.searchReg.List()) == 0 {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{
-			"results":   []websearch.Result{},
-			"total":     0,
-			"enabled":   false,
-			"providers": []string{},
-		})
-		return
-	}
-	provider := r.URL.Query().Get("provider")
-	var results any
-	var err error
-	if provider != "" {
-		results, err = g.searchReg.SearchWith(r.Context(), provider, query, limit)
-	} else {
-		results, err = g.searchReg.Search(r.Context(), query, limit)
-	}
-	if err != nil {
-		apperror.Write(w, apperror.Wrap(apperror.CodeInternal, "search failed", err))
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{
-		"results": results,
-	})
-}
-
-func (g *Gateway) handleSearchProviders(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET only")
-		return
-	}
-	if g.searchReg == nil {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{"enabled": false, "providers": []string{}})
-		return
-	}
-	providers := g.searchReg.List()
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{
-		"enabled":   g.searchOn.Load() && len(providers) > 0,
-		"providers": providers,
 	})
 }
