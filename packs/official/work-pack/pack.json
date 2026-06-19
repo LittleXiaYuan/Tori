@@ -57,6 +57,13 @@
     "group": "work",
     "phase": "A2",
     "preload": "true",
+    "usability": "actionable",
+    "primaryActionLabel": "查看任务和产物",
+    "primaryActionPath": "/missions",
+    "descriptionStyle": "one-line-plus-three-examples",
+    "example1": "查看从 Chat 发起的任务、进度和完成结果。",
+    "example2": "进入项目和工作流页面管理更长周期的工作。",
+    "example3": "暂停、恢复、重跑任务，并把产物继续交给云雀处理。",
     "note": "Task platform pack: natively owns the task (/v1/tasks/*), project (/v1/projects/*), and workflow (/v1/workflows/*) surfaces. Fully de-shelled — handler impls live in internal/packs/work (no gateway bridge). Default-preloaded like memory/skills so the task/project/workflow UI works out-of-box."
   },
   "status": "beta"

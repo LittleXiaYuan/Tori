@@ -133,7 +133,9 @@
     "descriptionStyle": "one-line-plus-three-examples",
     "example1": "创建 Go/npm 依赖 SBOM 快照。",
     "example2": "对比 baseline 并生成 drift diff。",
-    "example3": "导出 CycloneDX、CI gate 和供应链证据包。"
+    "example3": "导出 CycloneDX、CI gate 和供应链证据包。",
+    "usability": "experimental",
+    "limitation": "当前主要做本地 SBOM 快照、diff 和证据导出，不会自动修改依赖或提交修复。"
   },
   "status": "alpha"
 }

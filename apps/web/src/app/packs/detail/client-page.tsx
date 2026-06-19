@@ -39,6 +39,7 @@ import {
   groupPackPermissions,
   packFeatureFlags,
   packUsageExplanation,
+  packUsability,
   riskProfileForPack,
 } from "@/lib/pack-presentation";
 
@@ -192,7 +193,8 @@ export default function PackDetailClientPage() {
   const featureFlags = packFeatureFlags(manifest);
   const surfaceLabels = capabilitySurfaceLabels(manifest);
   const usageExplanation = packUsageExplanation(manifest);
-  const openPath = menus[0]?.path || routesFrontend[0]?.path;
+  const usability = packUsability(manifest);
+  const openPath = usability.primaryActionPath || menus[0]?.path || routesFrontend[0]?.path;
 
   const installFromCatalog = () => {
     if (!catalogEntry) {
@@ -239,6 +241,9 @@ export default function PackDetailClientPage() {
             </Chip>
           )}
           <Chip size="sm" variant="soft">v{manifest.version}</Chip>
+          <Chip size="sm" style={{ background: "rgba(59,130,246,0.08)", color: "var(--yunque-primary)" }}>
+            {usability.label}
+          </Chip>
           <Chip size="sm" variant="soft" className="font-mono">{manifest.id}</Chip>
         </div>
 
@@ -267,7 +272,7 @@ export default function PackDetailClientPage() {
           {installed && enabled && openPath && (
             <Link href={openPath}>
               <Button variant="outline">
-                <ExternalLink size={14} /> 打开能力界面
+                <ExternalLink size={14} /> {usability.primaryActionLabel || "打开能力界面"}
               </Button>
             </Link>
           )}
@@ -277,6 +282,33 @@ export default function PackDetailClientPage() {
       {/* 可滚动内容 */}
       <div className="flex-1 overflow-y-auto p-5 space-y-4">
         {/* 场景化能做什么 */}
+        <Card className="section-card p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Sparkles size={16} style={{ color: "var(--yunque-accent)" }} />
+            <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
+              用户能拿它做什么
+            </div>
+          </div>
+          <div className="text-sm" style={{ color: "var(--yunque-text-secondary)" }}>
+            {usability.description}
+          </div>
+          {openPath && (
+            <div className="flex items-center gap-2 mt-3">
+              <Link href={openPath}>
+                <Button size="sm" className="btn-accent">
+                  <ExternalLink size={14} /> {usability.primaryActionLabel || "打开入口"}
+                </Button>
+              </Link>
+              <code className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>{openPath}</code>
+            </div>
+          )}
+          {usability.limitation && (
+            <div className="mt-3 rounded-md p-3 text-xs" style={{ background: "rgba(245,158,11,0.10)", color: "var(--yunque-warning)" }}>
+              当前限制：{usability.limitation}
+            </div>
+          )}
+        </Card>
+
         {examples.length > 0 && (
           <Card className="section-card p-4">
             <div className="flex items-center gap-2 mb-3">

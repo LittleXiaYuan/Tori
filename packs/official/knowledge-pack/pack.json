@@ -43,6 +43,13 @@
     "group": "intelligence",
     "phase": "A2",
     "preload": "true",
+    "usability": "actionable",
+    "primaryActionLabel": "管理知识来源",
+    "primaryActionPath": "/knowledge",
+    "descriptionStyle": "one-line-plus-three-examples",
+    "example1": "上传文件、粘贴 URL 或导入仓库作为知识来源。",
+    "example2": "查看每个来源的状态、更新时间和可检索内容。",
+    "example3": "让 Chat 和任务在需要时召回这些知识。",
     "note": "Default-preloaded pack: in the pack model (can be disabled) but enabled out-of-box. Frontend nav stays static for now; pack-gating lands with profile removal."
   },
   "status": "beta"

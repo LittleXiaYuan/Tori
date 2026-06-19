@@ -38,6 +38,7 @@ import {
   groupPackPermissions,
   packExamples,
   packFeatureFlags,
+  packUsability,
   riskProfileForPack,
 } from "@/lib/pack-presentation";
 
@@ -411,9 +412,10 @@ export default function PacksPageOptimized() {
     const examples = packExamples(manifest);
     const permissionGroups = groupPackPermissions(manifest.backend?.permissions || []);
     const labels = capabilitySurfaceLabels(manifest);
+    const usability = packUsability(manifest);
     const actionBusyKey = options.action.kind === "enable" ? `enable:${manifest.id}` : options.busyKey;
     const disabled = options.action.disabled || busy === actionBusyKey;
-    const primaryEntry = manifest.frontend?.menus?.[0] || manifest.frontend?.routes?.[0];
+    const primaryPath = usability.primaryActionPath || manifest.frontend?.menus?.[0]?.path || manifest.frontend?.routes?.[0]?.path;
 
     return (
       <Card key={options.key} className="section-card p-4 hover-lift">
@@ -423,6 +425,7 @@ export default function PacksPageOptimized() {
               <PackageCheck size={16} style={{ color: "var(--yunque-accent)" }} />
               <span className="font-semibold text-sm" style={{ color: "var(--yunque-text)" }}>{manifest.name}</span>
               <Chip size="sm" style={{ background: badge.bg, color: badge.color }}>{badge.label}</Chip>
+              <Chip size="sm" style={{ background: "rgba(59,130,246,0.08)", color: "var(--yunque-primary)" }}>{usability.label}</Chip>
               <Chip size="sm" style={{
                 background: risk.level === "high" ? "rgba(239,68,68,0.12)" : risk.level === "medium" ? "rgba(245,158,11,0.12)" : "rgba(34,197,94,0.10)",
                 color: risk.level === "high" ? "var(--yunque-danger)" : risk.level === "medium" ? "var(--yunque-warning)" : "var(--yunque-success)",
@@ -460,11 +463,16 @@ export default function PacksPageOptimized() {
           {labels.map((label) => (
             <Chip key={label} size="sm" style={{ background: "rgba(59,130,246,0.08)", color: "var(--yunque-primary)" }}>{label}</Chip>
           ))}
-          {primaryEntry?.path && (
+          {primaryPath && (
             <Chip size="sm" style={{ background: "rgba(255,255,255,0.05)", color: "var(--yunque-text-muted)" }}>
-              入口 {primaryEntry.path}
+              入口 {primaryPath}
             </Chip>
           )}
+        </div>
+
+        <div className="text-xs mb-3" style={{ color: "var(--yunque-text-muted)" }}>
+          {usability.description}
+          {usability.limitation ? ` 当前限制：${usability.limitation}` : ""}
         </div>
 
         {permissionGroups.length > 0 && (
@@ -487,6 +495,11 @@ export default function PacksPageOptimized() {
           <Link href={`/packs/detail?id=${encodeURIComponent(manifest.id)}`}>
             <Button size="sm" variant="ghost">查看详情 <ArrowRight size={14} /></Button>
           </Link>
+          {primaryPath && (
+            <Link href={primaryPath}>
+              <Button size="sm" variant="ghost">{usability.primaryActionLabel || "打开入口"} <ExternalLink size={14} /></Button>
+            </Link>
+          )}
           {risk.requiresAuthorization && (
             <span className="text-xs" style={{ color: "var(--yunque-warning)" }}>启用前建议确认授权</span>
           )}
@@ -503,8 +516,9 @@ export default function PacksPageOptimized() {
     const examples = packExamples(manifest);
     const labels = capabilitySurfaceLabels(manifest);
     const permissionGroups = groupPackPermissions(manifest.backend?.permissions || []);
+    const usability = packUsability(manifest);
     const navItems = navItemsForPack(pack);
-    const openPath = manifest.frontend?.menus?.[0]?.path || manifest.frontend?.routes?.[0]?.path;
+    const openPath = usability.primaryActionPath || manifest.frontend?.menus?.[0]?.path || manifest.frontend?.routes?.[0]?.path;
 
     return (
       <Card key={manifest.id} className="section-card p-4 hover-lift">
@@ -516,6 +530,7 @@ export default function PacksPageOptimized() {
                 <span className="font-semibold text-sm" style={{ color: "var(--yunque-text)" }}>{manifest.name}</span>
                 <Chip size="sm" style={{ background: tone.bg, color: tone.color }}>{tone.label}</Chip>
                 <Chip size="sm" style={{ background: badge.bg, color: badge.color }}>{badge.label}</Chip>
+                <Chip size="sm" style={{ background: "rgba(59,130,246,0.08)", color: "var(--yunque-primary)" }}>{usability.label}</Chip>
                 <Chip size="sm" style={{
                   background: risk.level === "high" ? "rgba(239,68,68,0.12)" : risk.level === "medium" ? "rgba(245,158,11,0.12)" : "rgba(34,197,94,0.10)",
                   color: risk.level === "high" ? "var(--yunque-danger)" : risk.level === "medium" ? "var(--yunque-warning)" : "var(--yunque-success)",
@@ -552,6 +567,11 @@ export default function PacksPageOptimized() {
             )}
           </div>
 
+          <div className="text-xs mb-3" style={{ color: "var(--yunque-text-muted)" }}>
+            {usability.description}
+            {usability.limitation ? ` 当前限制：${usability.limitation}` : ""}
+          </div>
+
           {permissionGroups.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mb-3">
               {permissionGroups.slice(0, 4).map((group) => (
@@ -577,7 +597,7 @@ export default function PacksPageOptimized() {
           {pack.status === "enabled" && openPath && (
             <Link href={openPath}>
               <Button size="sm" variant="ghost">
-                <ExternalLink size={14} /> 打开
+                <ExternalLink size={14} /> {usability.primaryActionLabel || "打开"}
               </Button>
             </Link>
           )}

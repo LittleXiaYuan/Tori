@@ -41,6 +41,13 @@
     "group": "intelligence",
     "phase": "A2",
     "preload": "true",
+    "usability": "actionable",
+    "primaryActionLabel": "查看和整理记忆",
+    "primaryActionPath": "/memory",
+    "descriptionStyle": "one-line-plus-three-examples",
+    "example1": "查看短期、中期、长期记忆和情感历史。",
+    "example2": "搜索某段记忆，确认云雀为什么记住它。",
+    "example3": "新增、更新或整理会影响后续对话的个人偏好。",
     "note": "Default-preloaded pack: in the pack model (can be disabled) but enabled out-of-box. Frontend nav stays static for now; pack-gating with proper initial-state handling lands with profile removal."
   },
   "status": "beta"

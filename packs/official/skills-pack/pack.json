@@ -41,6 +41,13 @@
     "group": "skills",
     "phase": "A2",
     "preload": "true",
+    "usability": "actionable",
+    "primaryActionLabel": "管理技能",
+    "primaryActionPath": "/skills",
+    "descriptionStyle": "one-line-plus-three-examples",
+    "example1": "查看当前可用技能、来源和启用状态。",
+    "example2": "扫描本地技能变更，并审核动态技能。",
+    "example3": "进入技能策略和技能分析页面查看调用质量。",
     "note": "Fully de-shelled: natively owns the core /v1/skills/* surface (listing/scan/dynamic/approve/reject) in internal/packs/skills — no gateway bridge. SkillHub (/api/skillhub/*) and market (/v1/market/*) now live in their own native packs. Default-preloaded like memory so the skills UI works out-of-box; nav stays static during this phase."
   },
   "status": "beta"

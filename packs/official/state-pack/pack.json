@@ -38,6 +38,13 @@
     "group": "work",
     "phase": "A2",
     "preload": "true",
+    "usability": "infrastructure",
+    "primaryActionLabel": "由任务和对话自动使用",
+    "primaryActionPath": "/missions",
+    "descriptionStyle": "one-line-plus-three-examples",
+    "example1": "为任务、目标、焦点和资源追踪提供结构化状态。",
+    "example2": "用户通常不直接打开它，而是在任务中心看到结果。",
+    "example3": "启用后 Planner 和任务运行页可读取当前工作状态。",
     "note": "Default-preloaded core context pack: natively owns /v1/state* through the state-kernel accessor. No separate menu; UI surfaces consume the API from existing task/work views."
   },
   "status": "beta"

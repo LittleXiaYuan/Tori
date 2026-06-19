@@ -129,7 +129,9 @@
     "descriptionStyle": "one-line-plus-three-examples",
     "example1": "维护探针清单并执行一次安全演练。",
     "example2": "生成调度、指标与降级写回计划。",
-    "example3": "导出本次探针运行的证据包。"
+    "example3": "导出本次探针运行的证据包。",
+    "usability": "experimental",
+    "limitation": "当前主要用于安全演练和治理计划，调度、指标写回、告警写回仍是计划/本地记录，不会直接改动生产降级状态。"
   },
   "status": "alpha"
 }

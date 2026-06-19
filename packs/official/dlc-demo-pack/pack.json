@@ -53,6 +53,10 @@
   "metadata": {
     "spec": "docs/spec/pack-frontend-dlc.md",
     "build": "runtime.sha256 is filled by scripts/release-pack when module.wasm is compiled via 'GOOS=wasip1 GOARCH=wasm go build -o module.wasm ./module'",
+    "usability": "experimental",
+    "primaryActionLabel": "打开沙箱界面",
+    "primaryActionPath": "/packs/dlc-demo",
+    "limitation": "这是 DLC/iframe/WASM 的参考包，用于验证热插拔界面和 bridge 权限，不是业务功能。",
     "descriptionStyle": "one-line-plus-three-examples",
     "example1": "在沙箱 iframe 中加载自带前端，握手后自适应高度。",
     "example2": "通过 postMessage 桥发起受白名单约束的 backend.call。",

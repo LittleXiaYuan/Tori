@@ -101,6 +101,13 @@
   "metadata": {
     "group": "control-plane",
     "phase": "A2",
+    "usability": "actionable",
+    "primaryActionLabel": "查看治理与运维",
+    "primaryActionPath": "/trust",
+    "descriptionStyle": "one-line-plus-three-examples",
+    "example1": "查看信任、审计、审批和用量等治理页面。",
+    "example2": "管理模型、Provider、插件、Bot 与工具执行状态。",
+    "example3": "面向进阶用户排查系统健康、指标和租户隔离问题。",
     "note": "Always-on core governance pack: default-enabled so audit/trust/usage governance APIs stay available out of the box. Backend route ownership has migrated in slices; observability, approvals, tenants, inbox, bots, and tools routes are native, while remaining governance/ops surfaces continue through the gateway bridge until filled in."
   },
   "status": "beta"

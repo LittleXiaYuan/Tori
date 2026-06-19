@@ -129,7 +129,9 @@
     "descriptionStyle": "one-line-plus-three-examples",
     "example1": "维护认知场景集并运行 deterministic judge。",
     "example2": "生成 shadow response 收集与指标计划。",
-    "example3": "导出 canary 评估和回滚证据包。"
+    "example3": "导出 canary 评估和回滚证据包。",
+    "usability": "experimental",
+    "limitation": "当前主要运行本地确定性评估和计划生成，不会自动镜像真实流量、调用线上 Judge、发布指标或回滚版本。"
   },
   "status": "alpha"
 }

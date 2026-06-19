@@ -43,6 +43,15 @@ export type PackCatalogAction = {
   needsInstallSource: boolean;
 };
 
+export type PackUsability = {
+  kind: "actionable" | "experimental" | "infrastructure" | "documented";
+  label: string;
+  description: string;
+  primaryActionLabel?: string;
+  primaryActionPath?: string;
+  limitation?: string;
+};
+
 type EntryLike = {
   manifest: PackManifest;
   package_url?: string;
@@ -120,6 +129,53 @@ export function packExamples(manifest: PackManifest, limit = 3): string[] {
     .map((key) => metadata[key])
     .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
     .slice(0, limit);
+}
+
+export function packUsability(manifest: PackManifest): PackUsability {
+  const metadata = manifest.metadata || {};
+  const declared = metadata.usability;
+  const primaryActionLabel = metadata.primaryActionLabel;
+  const primaryActionPath = metadata.primaryActionPath || manifest.frontend?.menus?.[0]?.path || manifest.frontend?.routes?.[0]?.path;
+  const limitation = metadata.limitation;
+
+  if (declared === "experimental" || manifest.status === "alpha") {
+    return {
+      kind: "experimental",
+      label: "实验能力",
+      description: "可以体验，但不要把它当成稳定主路径；请先看当前限制。",
+      primaryActionLabel,
+      primaryActionPath,
+      limitation,
+    };
+  }
+  if (declared === "infrastructure") {
+    return {
+      kind: "infrastructure",
+      label: "后台支撑",
+      description: "它主要被云雀内部、任务或其他页面调用，通常不需要单独打开。",
+      primaryActionLabel,
+      primaryActionPath,
+      limitation,
+    };
+  }
+  if (declared === "actionable" || primaryActionPath) {
+    return {
+      kind: "actionable",
+      label: "可直接使用",
+      description: "启用后可以打开对应入口查看、编辑或执行相关工作。",
+      primaryActionLabel,
+      primaryActionPath,
+      limitation,
+    };
+  }
+  return {
+    kind: "documented",
+    label: "能力声明",
+    description: "当前主要提供能力声明、权限和运行时信息，具体使用由云雀自动调度。",
+    primaryActionLabel,
+    primaryActionPath,
+    limitation,
+  };
 }
 
 export function packFeatureFlags(manifest: PackManifest): PackFeatureFlags {
@@ -212,6 +268,7 @@ export function riskProfileForPack(manifest: PackManifest): PackRiskProfile {
 }
 
 export function packUsageExplanation(manifest: PackManifest): string[] {
+  const usability = packUsability(manifest);
   if (manifest.id === "yunque.pack.computer-use") {
     return [
       "启用后 Planner 可生成电脑使用计划。",
@@ -237,6 +294,15 @@ export function packUsageExplanation(manifest: PackManifest): string[] {
   }
   if (hasFrontend) {
     explanation.push("启用后会同步它声明的界面入口，可从能力包中心、侧栏或命令菜单打开。");
+  }
+  if (usability.primaryActionPath) {
+    explanation.push(`${usability.primaryActionLabel || "主要入口"}：${usability.primaryActionPath}`);
+  }
+  if (usability.kind === "infrastructure") {
+    explanation.push("它是后台支撑包，通常由对话、任务或其他页面自动调用。");
+  }
+  if (usability.limitation) {
+    explanation.push(`当前限制：${usability.limitation}`);
   }
   if (explanation.length === 0) {
     explanation.push("云雀会读取它的声明信息，但当前没有发现可自动调度的能力。");

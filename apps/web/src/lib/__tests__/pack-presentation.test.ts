@@ -8,6 +8,7 @@ import {
   groupPackPermissions,
   packFeatureFlags,
   packUsageExplanation,
+  packUsability,
   riskProfileForPack,
 } from "../pack-presentation";
 
@@ -151,5 +152,54 @@ describe("pack-presentation", () => {
     expect(formatPackInstallError(new Error("manifest schema invalid"))).toContain("manifest 不合法");
     expect(formatPackInstallError(new Error("unsupported platform"))).toContain("当前平台不支持");
     expect(formatPackInstallError(new Error("download timeout"))).toContain("下载失败");
+  });
+
+  it("summarizes pack usability from metadata and frontend entries", () => {
+    const actionable: PackManifest = {
+      id: "yunque.pack.memory",
+      name: "Memory",
+      version: "0.1.0",
+      metadata: {
+        usability: "actionable",
+        primaryActionLabel: "查看和整理记忆",
+        primaryActionPath: "/memory",
+      },
+    };
+    const experimental: PackManifest = {
+      id: "yunque.pack.computer-use",
+      name: "Computer Use",
+      version: "0.1.0",
+      status: "alpha",
+      metadata: {
+        limitation: "当前只生成计划，不执行本机桌面控制。",
+      },
+    };
+    const infrastructure: PackManifest = {
+      id: "yunque.pack.state",
+      name: "State",
+      version: "0.1.0",
+      metadata: {
+        usability: "infrastructure",
+        primaryActionLabel: "由任务和对话自动使用",
+        primaryActionPath: "/missions",
+      },
+    };
+
+    expect(packUsability(actionable)).toMatchObject({
+      kind: "actionable",
+      label: "可直接使用",
+      primaryActionLabel: "查看和整理记忆",
+      primaryActionPath: "/memory",
+    });
+    expect(packUsability(experimental)).toMatchObject({
+      kind: "experimental",
+      label: "实验能力",
+      limitation: "当前只生成计划，不执行本机桌面控制。",
+    });
+    expect(packUsability(infrastructure)).toMatchObject({
+      kind: "infrastructure",
+      label: "后台支撑",
+      primaryActionPath: "/missions",
+    });
   });
 });

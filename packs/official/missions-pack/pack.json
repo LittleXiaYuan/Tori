@@ -50,6 +50,13 @@
     "group": "work",
     "phase": "A4",
     "preload": "true",
+    "usability": "actionable",
+    "primaryActionLabel": "查看任务中心",
+    "primaryActionPath": "/missions",
+    "descriptionStyle": "one-line-plus-three-examples",
+    "example1": "把 Chat 里的自然语言目标解析成任务意图。",
+    "example2": "在任务中心查看任务、进度、结果和后续处理入口。",
+    "example3": "帮助云雀把对话闭环连接到任务产物。",
     "note": "Natively owns /v1/missions/* through Pack Runtime. The UI route is built into the web shell while this pack owns the parsing API."
   },
   "status": "beta"

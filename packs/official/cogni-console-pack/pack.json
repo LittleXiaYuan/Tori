@@ -31,6 +31,13 @@
     "group": "extensions",
     "phase": "A2",
     "preload": "true",
+    "usability": "actionable",
+    "primaryActionLabel": "查看 Cogni",
+    "primaryActionPath": "/cognis",
+    "descriptionStyle": "one-line-plus-three-examples",
+    "example1": "查看当前 Cogni 的状态、角色和来源。",
+    "example2": "理解 Cogni 与底层 cogni-kernel 运行时的关系。",
+    "example3": "后续从这里创建、演化或停用 Cogni。",
     "note": "Default-preloaded Cogni management console surface (/cognis). Distinct from yunque.pack.cogni-kernel (backend runtime loops). Frontend nav stays static for now."
   },
   "status": "beta"

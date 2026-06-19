@@ -187,7 +187,9 @@
     "descriptionStyle": "one-line-plus-three-examples",
     "example1": "安装、加载、卸载并执行 WASM 插件。",
     "example2": "生成 ABI、远程安装和缓存验证计划。",
-    "example3": "检查安全包结构并输出 installer registration handoff。"
+    "example3": "检查安全包结构并输出 installer registration handoff。",
+    "usability": "experimental",
+    "limitation": "当前远程安装和真实运行时 host 仍受严格门禁；多数安装链路先生成计划或写 pack-local 记录。"
   },
   "status": "alpha"
 }
