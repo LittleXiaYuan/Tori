@@ -32,6 +32,28 @@ function sampleValues() {
   }, null, 2);
 }
 
+const userFacingSteps = [
+  {
+    title: "1. 保存记忆快照",
+    body: "把当前记忆键值保存成可对比的 baseline，后续可以回看每次变化。",
+  },
+  {
+    title: "2. 对比漂移与回溯",
+    body: "选择两个快照或一个时间点，查看哪些记忆新增、修改、删除。",
+  },
+  {
+    title: "3. 生成回滚证据",
+    body: "输出 dry-run 回滚计划、审计证明和迁移交接材料，供人工确认。",
+  },
+];
+
+const boundaryItems = [
+  "不会直接修改 live memory 或 Ledger KV。",
+  "不会自动切换 kv_history adapter 或执行 schema 迁移。",
+  "不会跳过审批执行真实回滚。",
+  "不会把审计证明预览当成已写入的 Merkle 证明。",
+];
+
 export default function MemoryTimeTravelPackPage() {
   const [status, setStatus] = useState<MemoryTimeTravelStatus | null>(null);
   const [auditVerification, setAuditVerification] = useState<MemoryTimeTravelAuditVerification | null>(null);
@@ -541,9 +563,42 @@ export default function MemoryTimeTravelPackPage() {
     <div className="page-root space-y-6 animate-fade-in-up">
       <PageHeader icon={<History size={20} />} title="Memory Time Travel" />
 
+      <Card className="section-card overflow-hidden p-0">
+        <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="p-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <Chip size="sm" style={{ background: "rgba(245,158,11,0.12)", color: "var(--yunque-warning)" }}>实验中</Chip>
+              <Chip size="sm" variant="soft">可保存快照</Chip>
+              <Chip size="sm" variant="soft">回滚只生成计划</Chip>
+            </div>
+            <div className="mt-3 text-base font-semibold" style={{ color: "var(--yunque-text)" }}>
+              这个能力包现在适合做什么
+            </div>
+            <div className="mt-2 max-w-3xl text-sm leading-6" style={{ color: "var(--yunque-text-secondary)" }}>
+              它用于给云雀的记忆做版本快照、时间点回看和漂移对比。当前可以保存 pack-local 快照、生成 diff、导出证据包和 dry-run 回滚计划；真实 Ledger 写回、自动回滚、原生 kv_history 切换与定时清理仍需要人工审批和后续接入。
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              {userFacingSteps.map((item) => (
+                <div key={item.title} className="rounded-lg p-3" style={{ background: "var(--yunque-bg-hover)", border: "1px solid var(--yunque-border)" }}>
+                  <div className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>{item.title}</div>
+                  <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>{item.body}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="p-5" style={{ background: "rgba(245,158,11,0.08)", borderLeft: "1px solid var(--yunque-border)" }}>
+            <div className="mb-3 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>当前不会做什么</div>
+            <div className="space-y-2 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
+              {boundaryItems.map((item) => <div key={item}>{item}</div>)}
+            </div>
+          </div>
+        </div>
+      </Card>
+
       <Card className="section-card p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
+            <div className="mb-3 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>技术状态</div>
             <div className="mb-1 flex items-center gap-2">
               <Chip size="sm" style={{ background: status?.ledger_history_ready ? "rgba(34,197,94,0.12)" : "rgba(250,204,21,0.12)", color: status?.ledger_history_ready ? "#22c55e" : "#facc15" }}>
                 {status?.ledger_history_ready ? "Ledger history ready" : "Pack shell"}

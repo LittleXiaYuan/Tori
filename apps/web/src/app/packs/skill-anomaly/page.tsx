@@ -36,6 +36,28 @@ function sampleEvent(skillSlug: string, anomalous = false) {
   }, null, 2);
 }
 
+const userFacingSteps = [
+  {
+    title: "1. 建立正常行为画像",
+    body: "记录 Skill 平时会做什么、耗时多少、是否成功，形成可比较的基线。",
+  },
+  {
+    title: "2. 检测可疑调用",
+    body: "把候选行为拿来 dry-run 检查，判断是否需要人工审批或阻断。",
+  },
+  {
+    title: "3. 交给治理流程",
+    body: "生成审计、审批队列和全局审批桥接计划，供后续接入 Trust。",
+  },
+];
+
+const boundaryItems = [
+  "不会直接扣 Trust Score。",
+  "不会自动批准或释放 runtime action。",
+  "不会追加 Merkle Chain 审计记录。",
+  "不会调用全局 Approval Manager。",
+];
+
 export default function SkillAnomalyPackPage() {
   const [status, setStatus] = useState<SkillAnomalyStatus | null>(null);
   const [profiles, setProfiles] = useState<SkillAnomalyProfileSummary[]>([]);
@@ -208,9 +230,42 @@ export default function SkillAnomalyPackPage() {
     <div className="page-root space-y-6 animate-fade-in-up">
       <PageHeader icon={<Radar size={20} />} title="Skill 行为异常" />
 
+      <Card className="section-card overflow-hidden p-0">
+        <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="p-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <Chip size="sm" style={{ background: "rgba(245,158,11,0.12)", color: "var(--yunque-warning)" }}>实验中</Chip>
+              <Chip size="sm" variant="soft">可检测异常</Chip>
+              <Chip size="sm" variant="soft">审批只生成计划</Chip>
+            </div>
+            <div className="mt-3 text-base font-semibold" style={{ color: "var(--yunque-text)" }}>
+              这个能力包现在适合做什么
+            </div>
+            <div className="mt-2 max-w-3xl text-sm leading-6" style={{ color: "var(--yunque-text-secondary)" }}>
+              它用于观察 Skill 的正常行为，并在出现越权参数、异常动作或失败模式时生成 NeedsApproval 计划。当前可以写入行为样本、dry-run 检测异常、导出证据包和生成审批桥接计划；真实 Trust 扣分、全局审批入队和 runtime action 放行仍未自动执行。
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              {userFacingSteps.map((item) => (
+                <div key={item.title} className="rounded-lg p-3" style={{ background: "var(--yunque-bg-hover)", border: "1px solid var(--yunque-border)" }}>
+                  <div className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>{item.title}</div>
+                  <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>{item.body}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="p-5" style={{ background: "rgba(245,158,11,0.08)", borderLeft: "1px solid var(--yunque-border)" }}>
+            <div className="mb-3 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>当前不会做什么</div>
+            <div className="space-y-2 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
+              {boundaryItems.map((item) => <div key={item}>{item}</div>)}
+            </div>
+          </div>
+        </div>
+      </Card>
+
       <Card className="section-card p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
+            <div className="mb-3 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>技术状态</div>
             <div className="mb-1 flex items-center gap-2">
               <Chip size="sm" style={{ background: status?.audit_hook_ready ? "rgba(34,197,94,0.12)" : "rgba(250,204,21,0.12)", color: status?.audit_hook_ready ? "#22c55e" : "#facc15" }}>
                 {status?.audit_hook_ready ? "Audit hook ready" : status?.audit_hook_plan_ready ? "Audit plan ready" : "Pack shell"}

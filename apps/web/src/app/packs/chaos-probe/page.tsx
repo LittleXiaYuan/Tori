@@ -84,6 +84,28 @@ function gateTone(gate?: string): { bg: string; fg: string } {
   }
 }
 
+const userFacingSteps = [
+  {
+    title: "1. 准备安全探针",
+    body: "维护只读 health、guardrail 或 runtime 检查项，明确每个探针的安全范围。",
+  },
+  {
+    title: "2. 运行一次演练",
+    body: "生成健康报告、失败原因和降级建议，判断系统是否仍能稳住。",
+  },
+  {
+    title: "3. 输出运行计划",
+    body: "生成调度、指标、告警和降级状态引擎的交接计划。",
+  },
+];
+
+const boundaryItems = [
+  "不会破坏生产环境或注入真实故障。",
+  "不会创建后台定时任务。",
+  "不会发送告警或发布 Prometheus 指标。",
+  "不会写入真实 runtime degrade-state engine。",
+];
+
 export default function ChaosProbePackPage() {
   const [status, setStatus] = useState<ChaosProbeStatus | null>(null);
   const [reports, setReports] = useState<ChaosProbeReportSummary[]>([]);
@@ -308,9 +330,42 @@ export default function ChaosProbePackPage() {
     <div className="page-root space-y-6 animate-fade-in-up">
       <PageHeader icon={<Activity size={20} />} title="Chaos Probe" />
 
+      <Card className="section-card overflow-hidden p-0">
+        <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="p-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <Chip size="sm" style={{ background: "rgba(245,158,11,0.12)", color: "var(--yunque-warning)" }}>实验中</Chip>
+              <Chip size="sm" variant="soft">只跑安全探针</Chip>
+              <Chip size="sm" variant="soft">降级只生成计划</Chip>
+            </div>
+            <div className="mt-3 text-base font-semibold" style={{ color: "var(--yunque-text)" }}>
+              这个能力包现在适合做什么
+            </div>
+            <div className="mt-2 max-w-3xl text-sm leading-6" style={{ color: "var(--yunque-text-secondary)" }}>
+              它用于用安全探针检查云雀运行时、护栏和关键链路是否健康，帮助你在真正事故前看到降级建议。当前可以保存 probe definitions、运行 one-shot 检查、查看健康报告并导出证据；真实后台调度、指标发布、告警发送和运行时降级写入仍是计划。
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              {userFacingSteps.map((item) => (
+                <div key={item.title} className="rounded-lg p-3" style={{ background: "var(--yunque-bg-hover)", border: "1px solid var(--yunque-border)" }}>
+                  <div className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>{item.title}</div>
+                  <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>{item.body}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="p-5" style={{ background: "rgba(245,158,11,0.08)", borderLeft: "1px solid var(--yunque-border)" }}>
+            <div className="mb-3 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>当前不会做什么</div>
+            <div className="space-y-2 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
+              {boundaryItems.map((item) => <div key={item}>{item}</div>)}
+            </div>
+          </div>
+        </div>
+      </Card>
+
       <Card className="section-card p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
+            <div className="mb-3 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>技术状态</div>
             <div className="mb-1 flex items-center gap-2">
               <Chip
                 size="sm"
