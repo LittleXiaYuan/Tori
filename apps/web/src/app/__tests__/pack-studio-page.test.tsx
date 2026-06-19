@@ -361,6 +361,7 @@ describe("PackStudioPage", () => {
     expect(screen.getByText("改包工作流状态")).toBeInTheDocument();
     expect(screen.getByText("小羽可以帮你生成计划和草稿，但每一步都必须经过 diff、审计、复检和显式安装确认。")).toBeInTheDocument();
     expect(screen.getByText("不自动应用")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "复制交付摘要" })).toBeInTheDocument();
     expect(screen.getByText("Plan / Draft")).toBeInTheDocument();
     expect(screen.getAllByText("下一步：载入草稿或交给小羽生成 Draft").length).toBeGreaterThan(0);
 
@@ -603,6 +604,19 @@ describe("PackStudioPage", () => {
       expect(screen.getByRole("button", { name: "启用" })).toBeDisabled();
     });
     expect(screen.getAllByText("下一步：打开入口或查看详情").length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "复制交付摘要" }));
+    const deliverySummary = vi.mocked(navigator.clipboard.writeText).mock.calls.at(-1)?.[0] || "";
+    expect(deliverySummary).toContain("# Pack Studio 改包交付摘要");
+    expect(deliverySummary).toContain("- 改包目标：增加一个可查看运行结果的界面");
+    expect(deliverySummary).toContain("- 审计：通过；风险：medium；改动：1；可改：1；需源码/专项审计：0");
+    expect(deliverySummary).toContain("- 包路径：C:\\yunque\\packs\\studio\\yunque.pack.wasm-plugin-0.1.0-studio.yqpack");
+    expect(deliverySummary).toContain("- SHA256：" + "d".repeat(64));
+    expect(deliverySummary).toContain("- 安装状态：enabled；安装包：WASM 能力包 (yunque.pack.wasm-plugin)");
+    expect(deliverySummary).toContain("- 高风险或审计阻断改动不得继续打包/安装。");
+    await waitFor(() => {
+      expect(toastMock).toHaveBeenCalledWith("已复制改包交付摘要", "success");
+    });
 
     fireEvent.click(screen.getByRole("button", { name: "复制任务" }));
 

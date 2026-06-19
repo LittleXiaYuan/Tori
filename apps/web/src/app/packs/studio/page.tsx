@@ -93,6 +93,68 @@ function workflowStateColor(state: StudioWorkflowStep["state"]): "success" | "wa
   return "default";
 }
 
+function buildDeliverySummary(params: {
+  manifest?: PackManifest;
+  goal: string;
+  workspaceReport: PackStudioWorkspaceReport | null;
+  patchReport: PackStudioPatchReport | null;
+  auditReport: PackStudioAuditReport | null;
+  repackReport: PackStudioRepackReport | null;
+  reinspectReport: YqpackInspectReport | null;
+  installedRepack: InstalledPack | null;
+  workflowSteps: StudioWorkflowStep[];
+}): string {
+  const { manifest, goal, workspaceReport, patchReport, auditReport, repackReport, reinspectReport, installedRepack, workflowSteps } = params;
+  const lines = [
+    "# Pack Studio 改包交付摘要",
+    "",
+    `- 能力包：${manifest?.name || "-"} (${manifest?.id || "-"})`,
+    `- 版本：${manifest?.version || "-"}`,
+    `- 改包目标：${goal}`,
+    `- 工作区：${workspaceReport?.workspace_path || "尚未准备"}`,
+    `- 原始 SHA：${workspaceReport?.original_sha256 || "-"}`,
+    "",
+    "## 流程状态",
+    ...workflowSteps.map((step) => `- ${step.title}：${workflowStateLabel(step.state)}；下一步：${step.action}`),
+    "",
+    "## diff 与审计",
+    patchReport
+      ? `- diff：${patchReport.applied ? "已应用到工作区副本" : "仅预览"}；文件：${patchReport.relative_path}；新 SHA：${patchReport.new_sha256}`
+      : "- diff：尚未生成",
+    auditReport
+      ? `- 审计：${auditReport.allowed ? "通过" : "阻断"}；风险：${auditReport.risk_level}；改动：${auditReport.change_count}；可改：${auditReport.editable_change_count}；需源码/专项审计：${auditReport.guarded_change_count}`
+      : "- 审计：尚未运行",
+    ...(auditReport?.warnings || []).map((warning) => `- 审计警告：${warning}`),
+    "",
+    "## 新 yqpack",
+    repackReport
+      ? `- 包路径：${repackReport.package_path}`
+      : "- 包路径：尚未重新打包",
+    repackReport
+      ? `- SHA256：${repackReport.sha256}`
+      : "- SHA256：-",
+    repackReport
+      ? `- 大小：${repackReport.size_bytes.toLocaleString()} bytes`
+      : "- 大小：-",
+    reinspectReport
+      ? `- 复检：${reinspectReport.sha256_match ? "SHA 匹配" : "SHA 不匹配"}；文件：${reinspectReport.entry_count}；可改：${reinspectReport.editable_count}；需审计：${reinspectReport.guarded_count}`
+      : "- 复检：尚未运行",
+    "",
+    "## 安装与回滚",
+    installedRepack
+      ? `- 安装状态：${installedRepack.status}；安装包：${installedRepack.manifest.name} (${installedRepack.manifest.id})`
+      : "- 安装状态：尚未安装",
+    "- 回滚策略：新包应作为显式安装版本处理；验证失败时先禁用，再回滚到上一版本或原始 yqpack。",
+    "",
+    "## 安全边界",
+    "- 小羽输出不会自动写入文件，必须先进入 diff 预览。",
+    "- 工作区是 yqpack 的可编辑副本，不直接修改已安装能力包。",
+    "- 高风险或审计阻断改动不得继续打包/安装。",
+    "- 上传 OSS 或发布前必须保留 package path、SHA256、审计结果和回滚路径。",
+  ];
+  return `${lines.join("\n")}\n`;
+}
+
 function packSlug(manifest: PackManifest): string {
   return manifest.id.replace(/^yunque\.pack\./, "");
 }
@@ -681,11 +743,27 @@ export default function PackStudioPage() {
     repackReport,
     workspaceReport,
   ]);
+  const deliverySummary = useMemo(() => buildDeliverySummary({
+    manifest,
+    goal,
+    workspaceReport,
+    patchReport,
+    auditReport,
+    repackReport,
+    reinspectReport,
+    installedRepack,
+    workflowSteps,
+  }), [auditReport, goal, installedRepack, manifest, patchReport, reinspectReport, repackReport, workflowSteps, workspaceReport]);
 
   const copyPrompt = async () => {
     if (!prompt) return;
     await navigator.clipboard?.writeText(prompt);
     showToast("已复制小羽改包任务", "success");
+  };
+
+  const copyDeliverySummary = async () => {
+    await navigator.clipboard?.writeText(deliverySummary);
+    showToast("已复制改包交付摘要", "success");
   };
 
   const copyDraftPlan = async () => {
@@ -1174,7 +1252,12 @@ export default function PackStudioPage() {
                           小羽可以帮你生成计划和草稿，但每一步都必须经过 diff、审计、复检和显式安装确认。
                         </div>
                       </div>
-                      <Chip size="sm" variant="soft">不自动应用</Chip>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Chip size="sm" variant="soft">不自动应用</Chip>
+                        <Button size="sm" variant="outline" onPress={copyDeliverySummary}>
+                          <Copy size={13} /> 复制交付摘要
+                        </Button>
+                      </div>
                     </div>
                     <div className="grid gap-2 lg:grid-cols-4">
                       {workflowSteps.map((step) => (
