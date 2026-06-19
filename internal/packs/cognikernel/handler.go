@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -49,10 +50,15 @@ type CostTrackerProvider interface {
 	CogniCostTracker() *cogni.CostTracker
 }
 
+type ExperienceProvider interface {
+	CogniExperiences() map[string]*cogni.ExperienceStore
+}
+
 type Dependencies struct {
 	BusProvider         BusProvider
 	FederationProvider  FederationProvider
 	CostTrackerProvider CostTrackerProvider
+	ExperienceProvider  ExperienceProvider
 }
 
 type RuntimeStateReport struct {
@@ -140,6 +146,7 @@ type Router struct {
 	busProvider        BusProvider
 	federationProvider FederationProvider
 	costTracker        CostTrackerProvider
+	experienceProvider ExperienceProvider
 }
 
 func NewRouter(api API, reporter RuntimeStateReporter) *Router {
@@ -158,6 +165,7 @@ func NewRouterWithDeps(api API, reporter RuntimeStateReporter, deps Dependencies
 		busProvider:        deps.BusProvider,
 		federationProvider: deps.FederationProvider,
 		costTracker:        deps.CostTrackerProvider,
+		experienceProvider: deps.ExperienceProvider,
 	}
 }
 
@@ -189,6 +197,9 @@ func (r *Router) RuntimeRoutes() []packruntime.BackendRoute {
 }
 
 func (r *Router) ServeCogniKernel(w http.ResponseWriter, req *http.Request) {
+	if r.serveExperience(w, req) {
+		return
+	}
 	if r == nil || r.api == nil {
 		writeJSONStatus(w, http.StatusServiceUnavailable, map[string]any{
 			"error":   "cogni api handler not configured",
@@ -308,6 +319,159 @@ func (r *Router) HandleRouteDecision(w http.ResponseWriter, req *http.Request) {
 	writeJSON(w, result)
 }
 
+func (r *Router) serveExperience(w http.ResponseWriter, req *http.Request) bool {
+	id, rest, ok := experienceRoute(req.URL.Path)
+	if !ok {
+		return false
+	}
+	switch {
+	case rest == "experience":
+		r.HandleExperience(w, req, id)
+	case rest == "experience/record":
+		r.HandleExperienceRecord(w, req, id)
+	case strings.HasPrefix(rest, "experience/patterns/"):
+		r.HandleExperiencePatternRoute(w, req, id, strings.TrimPrefix(rest, "experience/"))
+	default:
+		return false
+	}
+	return true
+}
+
+func experienceRoute(path string) (id, rest string, ok bool) {
+	path = strings.TrimPrefix(path, SubResourceRoute)
+	path = strings.Trim(path, "/")
+	if path == "" {
+		return "", "", false
+	}
+	segs := strings.SplitN(path, "/", 2)
+	if len(segs) != 2 || segs[0] == "" {
+		return "", "", false
+	}
+	return segs[0], segs[1], strings.HasPrefix(segs[1], "experience")
+}
+
+func (r *Router) HandleExperience(w http.ResponseWriter, req *http.Request, id string) {
+	if req.Method != http.MethodGet {
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET only")
+		return
+	}
+	if r.experienceStores() == nil {
+		writeJSON(w, map[string]any{"enabled": false})
+		return
+	}
+	es, ok := r.experienceStore(id)
+	if !ok {
+		writeJSON(w, map[string]any{"enabled": false, "id": id})
+		return
+	}
+	writeJSON(w, map[string]any{
+		"id":           id,
+		"enabled":      true,
+		"summary":      es.Summary(5),
+		"stats":        es.Stats(),
+		"tool_memory":  es.ToolMemory(""),
+		"patterns":     es.Patterns(),
+		"domain_facts": es.DomainFacts(),
+	})
+}
+
+func (r *Router) HandleExperienceRecord(w http.ResponseWriter, req *http.Request, id string) {
+	if req.Method != http.MethodPost {
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "POST only")
+		return
+	}
+	es, ok := r.experienceStore(id)
+	if !ok {
+		apperror.WriteCode(w, apperror.CodeNotFound, "no experience store for cogni: "+id)
+		return
+	}
+
+	var body struct {
+		Type string          `json:"type"`
+		Data json.RawMessage `json:"data"`
+	}
+	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+		apperror.WriteCode(w, apperror.CodeBadRequest, "invalid JSON: "+err.Error())
+		return
+	}
+
+	switch body.Type {
+	case "tool_memory":
+		var tm cogni.ToolExperience
+		if err := json.Unmarshal(body.Data, &tm); err != nil {
+			apperror.WriteCode(w, apperror.CodeBadRequest, err.Error())
+			return
+		}
+		es.AddToolMemory(tm)
+		writeJSON(w, map[string]any{"status": "ok", "type": "tool_memory"})
+	case "pattern":
+		var p cogni.BehaviorPattern
+		if err := json.Unmarshal(body.Data, &p); err != nil {
+			apperror.WriteCode(w, apperror.CodeBadRequest, err.Error())
+			return
+		}
+		es.SuggestPattern(p)
+		writeJSON(w, map[string]any{"status": "ok", "type": "pattern", "id": p.ID})
+	case "fact":
+		var f cogni.DomainFact
+		if err := json.Unmarshal(body.Data, &f); err != nil {
+			apperror.WriteCode(w, apperror.CodeBadRequest, err.Error())
+			return
+		}
+		es.AddFact(f)
+		writeJSON(w, map[string]any{"status": "ok", "type": "fact"})
+	default:
+		apperror.WriteCode(w, apperror.CodeBadRequest, "type must be tool_memory, pattern, or fact")
+	}
+}
+
+func (r *Router) HandleExperiencePatternRoute(w http.ResponseWriter, req *http.Request, id, rest string) {
+	parts := strings.Split(rest, "/")
+	if len(parts) != 3 || parts[0] != "patterns" || parts[2] != "confirm" {
+		apperror.WriteCode(w, apperror.CodeNotFound, "unknown cogni experience pattern sub-resource")
+		return
+	}
+	r.HandleExperienceConfirmPattern(w, req, id, parts[1])
+}
+
+func (r *Router) HandleExperienceConfirmPattern(w http.ResponseWriter, req *http.Request, id, patternID string) {
+	if req.Method != http.MethodPost {
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "POST only")
+		return
+	}
+	if patternID == "" {
+		apperror.WriteCode(w, apperror.CodeBadRequest, "pattern id is required")
+		return
+	}
+	es, ok := r.experienceStore(id)
+	if !ok {
+		apperror.WriteCode(w, apperror.CodeNotFound, "no experience store for cogni: "+id)
+		return
+	}
+	if !es.ConfirmPattern(patternID) {
+		apperror.WriteCode(w, apperror.CodeNotFound, "experience pattern not found: "+patternID)
+		return
+	}
+
+	writeJSON(w, map[string]any{"status": "ok", "type": "pattern", "id": patternID, "confirmed": true})
+}
+
+func (r *Router) experienceStore(id string) (*cogni.ExperienceStore, bool) {
+	stores := r.experienceStores()
+	if stores == nil {
+		return nil, false
+	}
+	es, ok := stores[id]
+	return es, ok
+}
+
+func (r *Router) experienceStores() map[string]*cogni.ExperienceStore {
+	if r == nil || r.experienceProvider == nil {
+		return nil
+	}
+	return r.experienceProvider.CogniExperiences()
+}
+
 func (r *Router) cogniFederation() *cogni.CogniFederation {
 	if r == nil || r.federationProvider == nil {
 		return nil
@@ -381,6 +545,9 @@ func inferDependencies(api API) Dependencies {
 	if inferred, ok := api.(CostTrackerProvider); ok {
 		deps.CostTrackerProvider = inferred
 	}
+	if inferred, ok := api.(ExperienceProvider); ok {
+		deps.ExperienceProvider = inferred
+	}
 	return deps
 }
 
@@ -393,6 +560,9 @@ func mergeDependencies(primary, fallback Dependencies) Dependencies {
 	}
 	if primary.CostTrackerProvider == nil {
 		primary.CostTrackerProvider = fallback.CostTrackerProvider
+	}
+	if primary.ExperienceProvider == nil {
+		primary.ExperienceProvider = fallback.ExperienceProvider
 	}
 	return primary
 }

@@ -92,12 +92,6 @@ func (g *Gateway) handleCognis(w http.ResponseWriter, r *http.Request) {
 			g.cogniWorkflowsList(w, r, id)
 		case len(segs) >= 2 && segs[1] == "workflow":
 			g.cogniWorkflowRun(w, r, id, segs)
-		case len(segs) == 2 && segs[1] == "experience":
-			g.cogniExperience(w, r, id)
-		case len(segs) == 3 && segs[1] == "experience" && segs[2] == "record":
-			g.cogniExperienceRecord(w, r, id)
-		case len(segs) == 3 && segs[1] == "experience" && strings.HasPrefix(segs[2], "patterns/"):
-			g.cogniExperiencePatternRoute(w, r, id, segs[2])
 		case len(segs) == 2 && segs[1] == "evolve":
 			g.cogniEvolve(w, r, id)
 		case len(segs) == 2 && segs[1] == "evolution":

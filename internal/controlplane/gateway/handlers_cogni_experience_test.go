@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -11,6 +12,53 @@ import (
 	"yunque-agent/pkg/cogni"
 	"yunque-agent/pkg/packruntime"
 )
+
+func TestCogniKernelPackServesExperienceRecordAndSummary(t *testing.T) {
+	gw, tm := newTestGatewayWithCogniKernelPack(t, packruntime.PackStatusEnabled)
+	tenant := tm.Register("cogni-experience")
+
+	reg := cogni.NewRegistry()
+	if err := reg.Add(&cogni.Declaration{ID: "reviewer", DisplayName: "Reviewer"}, "test"); err != nil {
+		t.Fatalf("add cogni declaration: %v", err)
+	}
+	gw.SetCogniRegistry(reg, t.TempDir())
+
+	store := cogni.NewExperienceStore("reviewer", cogni.ExperienceConfig{StoreDir: t.TempDir()})
+	gw.SetCogniExperiences(map[string]*cogni.ExperienceStore{"reviewer": store})
+
+	toolData, _ := json.Marshal(cogni.ToolExperience{
+		Tool:       "review",
+		Context:    "go code",
+		Learned:    "check package boundaries",
+		Confidence: 0.9,
+	})
+	body, _ := json.Marshal(map[string]any{"type": "tool_memory", "data": json.RawMessage(toolData)})
+	req := httptest.NewRequest(http.MethodPost, "/v1/cognis/reviewer/experience/record", bytes.NewReader(body))
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("record status = %d, body = %s", w.Code, w.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/cognis/reviewer/experience", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("summary status = %d, body = %s", w.Code, w.Body.String())
+	}
+	var report map[string]any
+	if err := json.NewDecoder(w.Body).Decode(&report); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if report["enabled"] != true || report["id"] != "reviewer" {
+		t.Fatalf("unexpected response: %#v", report)
+	}
+	if len(store.ToolMemory("review")) != 1 {
+		t.Fatalf("expected tool memory to be recorded")
+	}
+}
 
 func TestCogniExperienceConfirmPattern(t *testing.T) {
 	gw, tm := newTestGatewayWithCogniKernelPack(t, packruntime.PackStatusEnabled)

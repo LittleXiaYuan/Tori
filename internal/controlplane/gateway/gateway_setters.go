@@ -789,6 +789,9 @@ func (g *Gateway) SetCogniWorkflowEngine(we *cogni.WorkflowEngine) { g.cogniWork
 // SetCogniExperiences attaches the per-cogni experience stores.
 func (g *Gateway) SetCogniExperiences(m map[string]*cogni.ExperienceStore) { g.cogniExperiences = m }
 
+// CogniExperiences exposes per-cogni experience stores to the Cogni Kernel pack.
+func (g *Gateway) CogniExperiences() map[string]*cogni.ExperienceStore { return g.cogniExperiences }
+
 // SetCogniGenesis attaches the self-genesis engine for /v1/cognis/generate.
 func (g *Gateway) SetCogniGenesis(gen *cogni.Genesis) { g.cogniGenesis = gen }
 

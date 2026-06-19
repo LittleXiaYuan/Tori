@@ -31,9 +31,10 @@ type fakeBusProvider struct {
 func (p fakeBusProvider) CogniBus() *cogni.CogniBus { return p.bus }
 
 type fakeDependencyProvider struct {
-	bus        *cogni.CogniBus
-	federation *cogni.CogniFederation
-	tracker    *cogni.CostTracker
+	bus         *cogni.CogniBus
+	federation  *cogni.CogniFederation
+	tracker     *cogni.CostTracker
+	experiences map[string]*cogni.ExperienceStore
 }
 
 func (p fakeDependencyProvider) CogniBus() *cogni.CogniBus { return p.bus }
@@ -41,6 +42,10 @@ func (p fakeDependencyProvider) CogniBus() *cogni.CogniBus { return p.bus }
 func (p fakeDependencyProvider) CogniFederation() *cogni.CogniFederation { return p.federation }
 
 func (p fakeDependencyProvider) CogniCostTracker() *cogni.CostTracker { return p.tracker }
+
+func (p fakeDependencyProvider) CogniExperiences() map[string]*cogni.ExperienceStore {
+	return p.experiences
+}
 
 func (fakeRuntimeReporter) CogniKernelRuntimeState() RuntimeStateReport {
 	return RuntimeStateReport{
@@ -323,6 +328,100 @@ func TestCogniKernelRouterFederationAndEconomicsMissingDeps(t *testing.T) {
 	}
 	if economics["enabled"] != false {
 		t.Fatalf("expected disabled economics, got %#v", economics)
+	}
+}
+
+func TestCogniKernelRouterOwnsExperience(t *testing.T) {
+	api := &fakeCogniAPI{}
+	store := cogni.NewExperienceStore("reviewer", cogni.ExperienceConfig{
+		StoreDir:      t.TempDir(),
+		RequireReview: true,
+	})
+	router := NewRouterWithDeps(api, fakeRuntimeReporter{}, Dependencies{
+		ExperienceProvider: fakeDependencyProvider{experiences: map[string]*cogni.ExperienceStore{"reviewer": store}},
+	})
+
+	toolData, _ := json.Marshal(cogni.ToolExperience{
+		Tool:       "review",
+		Context:    "go code",
+		Learned:    "check package boundaries",
+		Confidence: 0.9,
+	})
+	body, _ := json.Marshal(map[string]any{"type": "tool_memory", "data": json.RawMessage(toolData)})
+	req := httptest.NewRequest(http.MethodPost, "/v1/cognis/reviewer/experience/record", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	router.ServeCogniKernel(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("tool memory record status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	patternData, _ := json.Marshal(cogni.BehaviorPattern{
+		ID:       "pat-timeout",
+		Trigger:  "timeout",
+		Response: "switch provider",
+	})
+	body, _ = json.Marshal(map[string]any{"type": "pattern", "data": json.RawMessage(patternData)})
+	req = httptest.NewRequest(http.MethodPost, "/v1/cognis/reviewer/experience/record", bytes.NewReader(body))
+	w = httptest.NewRecorder()
+	router.ServeCogniKernel(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("pattern record status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/cognis/reviewer/experience/patterns/pat-timeout/confirm", nil)
+	w = httptest.NewRecorder()
+	router.ServeCogniKernel(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("confirm pattern status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/cognis/reviewer/experience", nil)
+	w = httptest.NewRecorder()
+	router.ServeCogniKernel(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("experience get status=%d body=%s", w.Code, w.Body.String())
+	}
+	var report map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &report); err != nil {
+		t.Fatalf("decode experience: %v", err)
+	}
+	if report["enabled"] != true || report["id"] != "reviewer" {
+		t.Fatalf("unexpected experience report: %#v", report)
+	}
+	patterns := store.Patterns()
+	if len(patterns) != 1 || !patterns[0].Confirmed {
+		t.Fatalf("pattern was not confirmed: %+v", patterns)
+	}
+	if len(store.ToolMemory("review")) != 1 {
+		t.Fatalf("expected tool memory to be recorded")
+	}
+	if api.called != 0 {
+		t.Fatalf("experience routes should not delegate to API adapter, called=%d", api.called)
+	}
+}
+
+func TestCogniKernelRouterExperienceMissingStore(t *testing.T) {
+	router := NewRouter(&fakeCogniAPI{}, fakeRuntimeReporter{})
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/cognis/reviewer/experience", nil)
+	w := httptest.NewRecorder()
+	router.ServeCogniKernel(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("get missing store status=%d body=%s", w.Code, w.Body.String())
+	}
+	var report map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &report); err != nil {
+		t.Fatalf("decode missing store report: %v", err)
+	}
+	if report["enabled"] != false {
+		t.Fatalf("expected disabled experience report, got %#v", report)
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/cognis/reviewer/experience/record", bytes.NewReader([]byte(`{}`)))
+	w = httptest.NewRecorder()
+	router.ServeCogniKernel(w, req)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("record missing store status=%d body=%s", w.Code, w.Body.String())
 	}
 }
 
