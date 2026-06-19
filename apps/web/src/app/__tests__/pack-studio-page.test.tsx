@@ -311,6 +311,19 @@ describe("PackStudioPage", () => {
     expect((screen.getByLabelText("SHA256") as HTMLInputElement).value).toBe("9".repeat(64));
     expect(screen.getByText("已从能力包中心带入检查信息")).toBeInTheDocument();
     expect(screen.getByText("可以直接只读检查远程包；这一步只校验 SHA、manifest 与文件分类，不会安装、启用或改动本地能力包。")).toBeInTheDocument();
+    expect(screen.getByText("URL: https://oss.example.com/wasm-plugin.yqpack")).toBeInTheDocument();
+    expect(screen.getByText(`SHA256: ${"9".repeat(64)}`)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "立即只读检查" }));
+
+    await waitFor(() => {
+      expect(packsClientMock.studioInspect).toHaveBeenCalledWith({
+        packagePath: undefined,
+        packageUrl: "https://oss.example.com/wasm-plugin.yqpack",
+        sha256: "9".repeat(64),
+        goal: "补一个结果面板",
+      });
+    });
   });
 
   it("turns real pack metadata into a guarded Xiaoyu modification task", async () => {

@@ -1281,12 +1281,21 @@ export default function PackStudioPage() {
                 </TextField>
               </div>
               {prefilledPackageSource && !inspectReport && (
-                <div className="mt-3 flex gap-2 rounded-md border p-3 text-xs" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-bg-hover)", color: "var(--yunque-text-secondary)" }}>
-                  <ShieldCheck size={15} style={{ color: "var(--yunque-primary)", flex: "0 0 auto" }} />
-                  <div>
-                    <div className="font-medium" style={{ color: "var(--yunque-text)" }}>已从能力包中心带入检查信息</div>
-                    <div className="mt-1">可以直接只读检查远程包；这一步只校验 SHA、manifest 与文件分类，不会安装、启用或改动本地能力包。</div>
+                <div className="mt-3 flex flex-col gap-3 rounded-md border p-3 text-xs md:flex-row md:items-start md:justify-between" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-bg-hover)", color: "var(--yunque-text-secondary)" }}>
+                  <div className="flex min-w-0 gap-2">
+                    <ShieldCheck size={15} style={{ color: "var(--yunque-primary)", flex: "0 0 auto" }} />
+                    <div className="min-w-0">
+                      <div className="font-medium" style={{ color: "var(--yunque-text)" }}>已从能力包中心带入检查信息</div>
+                      <div className="mt-1">可以直接只读检查远程包；这一步只校验 SHA、manifest 与文件分类，不会安装、启用或改动本地能力包。</div>
+                      <div className="mt-2 space-y-1 font-mono text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
+                        {packageUrl.trim() && <div className="break-all">URL: {packageUrl.trim()}</div>}
+                        {packageSHA.trim() && <div className="break-all">SHA256: {packageSHA.trim()}</div>}
+                      </div>
+                    </div>
                   </div>
+                  <Button size="sm" className="btn-accent shrink-0" onPress={inspectYqpack} isDisabled={inspecting}>
+                    {inspecting ? <Spinner size="sm" /> : <FileSearch size={14} />} 立即只读检查
+                  </Button>
                 </div>
               )}
               <div className="mt-3 flex flex-wrap gap-2">
