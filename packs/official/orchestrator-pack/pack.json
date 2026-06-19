@@ -85,7 +85,7 @@
       {
         "key": "orchestrator",
         "label": "任务编排",
-        "path": "/missions",
+        "path": "/workers",
         "icon": "workflow",
         "order": 155
       }
@@ -102,6 +102,9 @@
     "blueprint": "docs/spec/pack-runtime-blueprint.md",
     "stage": "native-pack-route-migration",
     "descriptionStyle": "one-line-plus-three-examples",
+    "primaryActionLabel": "管理任务编排",
+    "primaryActionPath": "/workers",
+    "usageSurface": "AI IDE 协作页、编排守护进程、IDE 检测、活跃会话与任务分派状态",
     "example1": "查看本地 IDE worker 是否可用，以及当前编排 daemon 是否运行。",
     "example2": "启动或停止任务自动分派，并查看任务相关事件时间线。",
     "example3": "注册自定义 worker 适配器，让云雀把任务交给外部编码工具。"

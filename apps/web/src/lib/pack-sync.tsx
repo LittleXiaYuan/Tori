@@ -87,6 +87,7 @@ const STATIC_NAV_PACK_IDS = new Set<string>([
   "yunque.pack.control-plane",
   "yunque.pack.work",
   "yunque.pack.skills",
+  "yunque.pack.mcp-dispatch",
   // Default-preloaded packs: rendered via static core nav; their manifest
   // menus must not double-list when enabled.
   "yunque.pack.memory",

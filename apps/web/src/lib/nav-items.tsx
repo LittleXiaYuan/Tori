@@ -53,6 +53,7 @@ export const MEMORY_PACK_ID = "yunque.pack.memory";
 export const KNOWLEDGE_PACK_ID = "yunque.pack.knowledge";
 export const COGNI_CONSOLE_PACK_ID = "yunque.pack.cogni-console";
 export const WORKSPACE_PACK_ID = "yunque.pack.workspace";
+export const MCP_DISPATCH_PACK_ID = "yunque.pack.mcp-dispatch";
 
 /**
  * Packs that ship enabled by default. The nav seeds its "enabled" set with
@@ -95,7 +96,7 @@ export const NAV_ITEMS: NavItem[] = [
   { id: "nav-task-run", href: "/task-run", label: "执行视图", group: "工作", layer: "core", packId: WORK_PACK_ID, icon: <Terminal size={16} />, keywords: "task run 执行 运行" },
   { id: "nav-projects", href: "/projects", label: "项目", group: "工作", layer: "core", packId: WORK_PACK_ID, icon: <FolderGit2 size={16} />, keywords: "projects 项目 repo workspace" },
   { id: "nav-workflows", href: "/workflows", label: "工作流", group: "工作", layer: "lab", packId: WORK_PACK_ID, icon: <Blocks size={16} />, keywords: "workflow 工作流 流程 lab 实验" },
-  { id: "nav-workers", href: "/workers", label: "Worker", group: "工作", layer: "control-plane", packId: CONTROL_PLANE_PACK_ID, icon: <Cpu size={16} />, keywords: "workers worker 进程 运维" },
+  { id: "nav-workers", href: "/workers", label: "外部 Worker", group: "工作", layer: "pack", packId: MCP_DISPATCH_PACK_ID, icon: <Cpu size={16} />, keywords: "workers worker AI IDE MCP 外部执行器 协作 分派" },
 
   // 智能 - 核心功能（核心「智能」只保留 知识库 / 记忆，不再被内省 Pack 挤占）
   { id: "nav-knowledge", href: "/knowledge", label: "知识库", group: "智能", layer: "core", defaultVisible: true, packId: KNOWLEDGE_PACK_ID, icon: <BookOpen size={16} />, keywords: "knowledge 知识 RAG" },

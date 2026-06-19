@@ -144,6 +144,20 @@ function auditPack({ manifestPath, manifest }) {
       blocking: false,
     });
   }
+  if (manifest.id === "yunque.pack.mcp-dispatch" && !entryPaths.includes("/workers")) {
+    issues.push({
+      code: "worker-pack-missing-workers-entry",
+      message: "MCP dispatch pack must open the AI IDE / Worker surface at /workers",
+      blocking: true,
+    });
+  }
+  if (manifest.id === "yunque.pack.orchestrator" && !entryPaths.includes("/workers")) {
+    issues.push({
+      code: "orchestrator-pack-missing-workers-entry",
+      message: "orchestrator pack must open the AI IDE / Worker surface at /workers",
+      blocking: true,
+    });
+  }
 
   return {
     id: manifest.id,
