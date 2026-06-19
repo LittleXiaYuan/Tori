@@ -158,6 +158,9 @@ describe("PacksPageOptimized", () => {
     expect(screen.getByText("用户能感知到的位置：Chat 产物区、任务结果页、文件预览与下载入口")).toBeInTheDocument();
     expect(screen.getByText("开始生成文档")).toBeInTheDocument();
     expect(screen.getByText("查看最近产物")).toBeInTheDocument();
+    const studioLinks = screen.getAllByRole("link", { name: /小羽优化/ });
+    expect(studioLinks[0]).toHaveAttribute("href", expect.stringContaining("/packs/studio?packId=yunque.pack.documents"));
+    expect(decodeURIComponent(studioLinks[0].getAttribute("href") || "")).toContain("让 Documents (文档生成) 更像一个用户能直接理解和使用的能力包");
   });
 
   it("filters installed packs by search and resets the store filters", async () => {

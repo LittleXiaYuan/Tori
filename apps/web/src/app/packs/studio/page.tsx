@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Button, Card, Chip, Input, Label, Spinner, TextArea, TextField } from "@heroui/react";
 import {
   ArrowRight,
@@ -36,6 +37,7 @@ import {
 import { createPacksClient, type InstalledPack, type PackManifest, type PackStudioAuditReport, type PackStudioPatchReport, type PackStudioPlanReport, type PackStudioRepackReport, type PackStudioWorkspaceReport, type YqpackInspectReport } from "yunque-client/packs";
 
 const packsClient = createPacksClient(createYunqueSDKClientOptions());
+const DEFAULT_STUDIO_GOAL = "让这个能力包更像一个用户能直接理解和使用的功能，而不是只看到存在。";
 
 type PackCandidate = {
   manifest: PackManifest;
@@ -568,6 +570,7 @@ function mapStudioPlanReport(report: PackStudioPlanReport): StudioAnalysis {
 }
 
 export default function PackStudioPage() {
+  const searchParams = useSearchParams();
   const { data, loading, refresh } = useApiData(async () => {
     const [installed, catalog] = await Promise.all([packsClient.installed(), packsClient.catalog()]);
     const map = new Map<string, PackCandidate>();
@@ -591,8 +594,8 @@ export default function PackStudioPage() {
     }
     return { packs: [...map.values()].sort((a, b) => a.manifest.name.localeCompare(b.manifest.name)) };
   }, { packs: [] as PackCandidate[] });
-  const [selectedId, setSelectedId] = useState("");
-  const [goal, setGoal] = useState("让这个能力包更像一个用户能直接理解和使用的功能，而不是只看到存在。");
+  const [selectedId, setSelectedId] = useState(() => searchParams.get("packId") || "");
+  const [goal, setGoal] = useState(() => searchParams.get("goal") || DEFAULT_STUDIO_GOAL);
   const [packagePath, setPackagePath] = useState("");
   const [packageUrl, setPackageUrl] = useState("");
   const [packageSHA, setPackageSHA] = useState("");

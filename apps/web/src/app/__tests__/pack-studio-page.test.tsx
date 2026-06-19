@@ -18,11 +18,18 @@ const packsClientMock = vi.hoisted(() => ({
 }));
 
 const toastMock = vi.hoisted(() => vi.fn());
+const navigationMock = vi.hoisted(() => ({
+  query: "",
+}));
 
 vi.mock("next/link", () => ({
   default: ({ href, children, ...props }: { href: string; children: React.ReactNode }) => (
     <a href={href} {...props}>{children}</a>
   ),
+}));
+
+vi.mock("next/navigation", () => ({
+  useSearchParams: () => new URLSearchParams(navigationMock.query),
 }));
 
 vi.mock("yunque-client/packs", () => ({
@@ -92,6 +99,7 @@ const documentsManifest = {
 describe("PackStudioPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    navigationMock.query = "";
     Object.assign(navigator, {
       clipboard: { writeText: vi.fn().mockResolvedValue(undefined) },
     });
@@ -279,6 +287,24 @@ describe("PackStudioPage", () => {
       pack: { manifest: wasmManifest, status: "installed" },
       status: "installed",
     });
+  });
+
+  it("opens the selected pack and goal from store links", async () => {
+    navigationMock.query = new URLSearchParams({
+      packId: "yunque.pack.wasm-plugin",
+      goal: "补一个结果面板",
+    }).toString();
+
+    render(<PackStudioPage />);
+
+    expect((await screen.findAllByText("WASM 能力包")).length).toBeGreaterThan(0);
+    await waitFor(() => {
+      expect(packsClientMock.studioPlan).toHaveBeenCalledWith({
+        packId: "yunque.pack.wasm-plugin",
+        goal: "补一个结果面板",
+      });
+    });
+    expect((screen.getByLabelText("这次想补强什么") as HTMLInputElement).value).toBe("补一个结果面板");
   });
 
   it("turns real pack metadata into a guarded Xiaoyu modification task", async () => {

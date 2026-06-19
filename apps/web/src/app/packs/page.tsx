@@ -98,6 +98,11 @@ function sourceName(url: string): string {
   }
 }
 
+function packStudioHref(manifest: PackManifest): string {
+  const goal = `让 ${manifest.name} 更像一个用户能直接理解和使用的能力包，补齐用途、入口、权限说明和可回滚改造建议。`;
+  return `/packs/studio?packId=${encodeURIComponent(manifest.id)}&goal=${encodeURIComponent(goal)}`;
+}
+
 function packSearchText(manifest: PackManifest): string {
   return [
     manifest.id,
@@ -826,6 +831,9 @@ export default function PacksPageOptimized() {
           <Link href={`/packs/detail?id=${encodeURIComponent(manifest.id)}`}>
             <Button size="sm" variant="ghost">查看详情 <ArrowRight size={14} /></Button>
           </Link>
+          <Link href={packStudioHref(manifest)}>
+            <Button size="sm" variant="ghost">小羽优化 <Wrench size={14} /></Button>
+          </Link>
           {primaryPath && (
             <Link href={primaryPath}>
               <Button size="sm" variant="ghost">{usability.primaryActionLabel || "打开入口"} <ExternalLink size={14} /></Button>
@@ -958,6 +966,11 @@ export default function PacksPageOptimized() {
               {isPackPinned(pack) ? "取消侧栏" : "固定侧栏"}
             </Button>
           )}
+          <Link href={packStudioHref(manifest)}>
+            <Button size="sm" variant="ghost">
+              <Wrench size={14} /> 小羽优化
+            </Button>
+          </Link>
           <Link href={`/packs/detail?id=${encodeURIComponent(manifest.id)}`} className="ml-auto">
             <Button size="sm" variant="ghost">详情 <ArrowRight size={14} /></Button>
           </Link>
