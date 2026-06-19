@@ -137,6 +137,36 @@ function auditPack({ manifestPath, manifest }) {
       blocking: true,
     });
   }
+  if (isActionableUserPack({ manifest, metadata, userVisible, hasConcretePage, usesRuntimeHost, isBackendSupportPack })) {
+    if (metadata.usability !== "actionable") {
+      issues.push({
+        code: "missing-actionable-usability",
+        message: "user-actionable pack should declare metadata.usability=actionable",
+        blocking: true,
+      });
+    }
+    if (!metadata.primaryActionPath) {
+      issues.push({
+        code: "missing-actionable-primary-path",
+        message: "user-actionable pack needs a primary action path",
+        blocking: true,
+      });
+    }
+    if (!metadata.primaryActionLabel) {
+      issues.push({
+        code: "missing-actionable-primary-label",
+        message: "user-actionable pack needs a user-readable primary action label",
+        blocking: true,
+      });
+    }
+    if (!metadata.usageSurface) {
+      issues.push({
+        code: "missing-actionable-usage-surface",
+        message: "user-actionable pack should describe where users feel its effect",
+        blocking: true,
+      });
+    }
+  }
   if ((manifest.status === "alpha" || metadata.usability === "experimental") && !metadata.limitation) {
     issues.push({
       code: "missing-experimental-limitation",
@@ -184,6 +214,13 @@ function gradePack({ manifest, userVisible, examples, hasConcretePage, usesRunti
   if (manifest.status === "alpha" || manifest.metadata?.usability === "experimental") return "experimental";
   if (userVisible && examples.length >= 2 && (hasConcretePage || usesRuntimeHost)) return "actionable";
   return "documented";
+}
+
+function isActionableUserPack({ manifest, metadata, userVisible, hasConcretePage, usesRuntimeHost, isBackendSupportPack }) {
+  if (metadata.usability === "experimental" || manifest.status === "alpha") return false;
+  if (metadata.usability === "infrastructure" || isBackendSupportPack) return false;
+  if (metadata.usability === "actionable") return true;
+  return userVisible && (hasConcretePage || usesRuntimeHost);
 }
 
 function appRouteExists(routePath) {

@@ -78,6 +78,10 @@
     "example": "true",
     "sync": "backend-registry-drives-frontend",
     "descriptionStyle": "one-line-plus-three-examples",
+    "usability": "actionable",
+    "primaryActionLabel": "导出或恢复数据",
+    "primaryActionPath": "/packs/backup",
+    "usageSurface": "备份恢复页、本地数据迁移与版本回滚前的数据保护",
     "example1": "查看当前备份状态与存储位置。",
     "example2": "导出一份可迁移的本地数据归档。",
     "example3": "导入归档并保留可回滚恢复记录。"

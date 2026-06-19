@@ -44,6 +44,7 @@
     "usability": "actionable",
     "primaryActionLabel": "查看和整理记忆",
     "primaryActionPath": "/memory",
+    "usageSurface": "记忆页、Chat 个性化上下文、任务沉淀与长期偏好管理",
     "descriptionStyle": "one-line-plus-three-examples",
     "example1": "查看短期、中期、长期记忆和情感历史。",
     "example2": "搜索某段记忆，确认云雀为什么记住它。",

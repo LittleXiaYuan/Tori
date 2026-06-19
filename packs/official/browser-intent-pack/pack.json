@@ -151,6 +151,10 @@
     "stage": "bridge-gateway-to-pack",
     "sync": "backend-registry-drives-frontend",
     "descriptionStyle": "one-line-plus-three-examples",
+    "usability": "actionable",
+    "primaryActionLabel": "连接浏览器执行任务",
+    "primaryActionPath": "/packs/browser",
+    "usageSurface": "浏览器意图页、Chat 浏览器指令、扩展连接状态、截图/OCR 与人工审批队列",
     "example1": "检查浏览器连接与运行配置。",
     "example2": "把自然语言目标转成导航/点击计划。",
     "example3": "采集页面截图、OCR 与扩展动作证据。"

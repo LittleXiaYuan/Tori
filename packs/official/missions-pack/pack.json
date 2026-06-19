@@ -53,6 +53,7 @@
     "usability": "actionable",
     "primaryActionLabel": "查看任务中心",
     "primaryActionPath": "/missions",
+    "usageSurface": "任务中心、Chat 发起任务、任务进度、产物和可恢复现场",
     "descriptionStyle": "one-line-plus-three-examples",
     "example1": "把 Chat 里的自然语言目标解析成任务意图。",
     "example2": "在任务中心查看任务、进度、结果和后续处理入口。",

@@ -60,6 +60,7 @@
     "usability": "actionable",
     "primaryActionLabel": "查看任务和产物",
     "primaryActionPath": "/missions",
+    "usageSurface": "任务中心、工作流、项目、执行视图、Chat 任务进度与产物区",
     "descriptionStyle": "one-line-plus-three-examples",
     "example1": "查看从 Chat 发起的任务、进度和完成结果。",
     "example2": "生成、编辑、保存并运行可复用的 DAG 工作流。",

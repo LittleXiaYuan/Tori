@@ -69,6 +69,10 @@
   "metadata": {
     "sync": "backend-registry-drives-frontend",
     "descriptionStyle": "one-line-plus-three-examples",
+    "usability": "actionable",
+    "primaryActionLabel": "查看微代理并开始任务",
+    "primaryActionPath": "/packs/micro-agent",
+    "usageSurface": "微代理页、Chat 任务起手、ReAct 推理轨迹与任务执行视图",
     "example1": "查看 Agent 当前加载的所有领域微代理（按 scope 分组）。",
     "example2": "看某条消息会触发哪些微代理被注入到提示中。",
     "example3": "回放某个任务的 ReAct 推理轨迹（思考 / 决策 / 观察 / 回溯）。"

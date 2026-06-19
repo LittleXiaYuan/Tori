@@ -81,6 +81,10 @@
   "metadata": {
     "sync": "backend-registry-drives-frontend",
     "descriptionStyle": "one-line-plus-three-examples",
+    "usability": "actionable",
+    "primaryActionLabel": "查看世界模型",
+    "primaryActionPath": "/packs/world-model",
+    "usageSurface": "世界模型页、外部状态快照、过期状态提醒、失败根因与因果时间线",
     "example1": "查看 Agent 当前对外部世界（文件/数据库/API）的认知。",
     "example2": "找出 Agent 认为已经过期、需要重新核实的状态条目。",
     "example3": "分析失败任务的因果链条与跨任务的失败模式。"

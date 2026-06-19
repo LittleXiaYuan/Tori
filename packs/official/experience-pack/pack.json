@@ -76,6 +76,10 @@
   "metadata": {
     "sync": "backend-registry-drives-frontend",
     "descriptionStyle": "one-line-plus-three-examples",
+    "usability": "actionable",
+    "primaryActionLabel": "查看经验和偏好",
+    "primaryActionPath": "/packs/experience",
+    "usageSurface": "经验页、技能推荐、用户偏好画像与任务自评记录",
     "example1": "看 Agent 当前最推荐使用哪些技能。",
     "example2": "查看 Agent 累积的对你的偏好（喜欢的类别 / 想要避免的类别）。",
     "example3": "回看 Agent 对每个已完成任务的自我评分。"

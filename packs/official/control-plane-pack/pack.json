@@ -104,6 +104,7 @@
     "usability": "actionable",
     "primaryActionLabel": "查看治理与运维",
     "primaryActionPath": "/trust",
+    "usageSurface": "信任中心、审计、模型、指标、租户、审批与高级控制面",
     "descriptionStyle": "one-line-plus-three-examples",
     "example1": "查看信任、审计、审批和用量等治理页面。",
     "example2": "管理模型、Provider、插件、Bot 与工具执行状态。",

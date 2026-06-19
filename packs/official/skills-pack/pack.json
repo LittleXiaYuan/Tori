@@ -44,6 +44,7 @@
     "usability": "actionable",
     "primaryActionLabel": "管理技能",
     "primaryActionPath": "/skills",
+    "usageSurface": "技能页、技能扫描、技能策略、技能分析与任务/Chat 中的技能调用",
     "descriptionStyle": "one-line-plus-three-examples",
     "example1": "查看当前可用技能、来源和启用状态。",
     "example2": "扫描本地技能变更，并审核动态技能。",

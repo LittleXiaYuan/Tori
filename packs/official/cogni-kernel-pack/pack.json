@@ -206,6 +206,10 @@
     "sync": "backend-registry-drives-frontend",
     "runtimeArtifact": "cogni-runtime-pack-state.json",
     "descriptionStyle": "one-line-plus-three-examples",
+    "usability": "infrastructure",
+    "primaryActionLabel": "查看 Cogni 管理",
+    "primaryActionPath": "/cognis",
+    "usageSurface": "Cogni 管理页、Planner 选择 Cogni、运行轨迹、健康检查与能力包状态门禁",
     "example1": "列出、重载并校验 Cogni Declaration。",
     "example2": "查看 Cogni trace、健康状态和告警。",
     "example3": "导出 bundle 并检查经验/经济/联邦状态。"

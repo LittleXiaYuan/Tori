@@ -70,6 +70,10 @@
   "metadata": {
     "sync": "backend-registry-drives-frontend",
     "descriptionStyle": "one-line-plus-three-examples",
+    "usability": "actionable",
+    "primaryActionLabel": "查看内在生活",
+    "primaryActionPath": "/packs/inner-life",
+    "usageSurface": "内在生活页、好奇心探索、自动反思与梦境时间线",
     "example1": "查看 Agent 在空闲时探索过哪些问题。",
     "example2": "回看每一次对话后的自我反思评分。",
     "example3": "浏览夜间梦境周期发现的新事实与技能缺口。"

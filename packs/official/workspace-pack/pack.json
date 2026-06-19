@@ -34,6 +34,7 @@
     "usability": "actionable",
     "primaryActionLabel": "查看工作台概览",
     "primaryActionPath": "/dashboard",
+    "usageSurface": "工作台概览、首次进入后的主状态、最近任务和关键提醒",
     "descriptionStyle": "one-line-plus-three-examples",
     "example1": "查看系统健康、模型配置和近期工作概览。",
     "example2": "从概览页跳到 Chat、任务中心、知识库等主路径。",

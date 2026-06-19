@@ -46,6 +46,7 @@
     "usability": "actionable",
     "primaryActionLabel": "管理知识来源",
     "primaryActionPath": "/knowledge",
+    "usageSurface": "知识库页、文本/文件/URL/仓库导入、RAG 检索与任务上下文",
     "descriptionStyle": "one-line-plus-three-examples",
     "example1": "上传文件、粘贴 URL 或导入仓库作为知识来源。",
     "example2": "查看每个来源的状态、更新时间和可检索内容。",

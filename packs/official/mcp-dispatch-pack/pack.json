@@ -106,6 +106,7 @@
     "stage": "native-pack-route-migration",
     "auth": "MCP probe methods are passthrough; JSON-RPC POST composes host RequireAuth inside the pack.",
     "descriptionStyle": "one-line-plus-three-examples",
+    "usability": "actionable",
     "primaryActionLabel": "连接 AI IDE",
     "primaryActionPath": "/workers",
     "usageSurface": "AI IDE 协作页、Worker MCP 配置、外部执行器列表与分派队列",

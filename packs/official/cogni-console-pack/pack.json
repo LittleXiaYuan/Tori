@@ -34,6 +34,7 @@
     "usability": "actionable",
     "primaryActionLabel": "查看 Cogni",
     "primaryActionPath": "/cognis",
+    "usageSurface": "Cogni 管理页、声明创建、健康检查、演化与运行轨迹入口",
     "descriptionStyle": "one-line-plus-three-examples",
     "example1": "查看当前 Cogni 的状态、角色和来源。",
     "example2": "理解 Cogni 与底层 cogni-kernel 运行时的关系。",
