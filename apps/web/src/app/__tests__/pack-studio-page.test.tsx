@@ -605,8 +605,17 @@ describe("PackStudioPage", () => {
 
     expect(await screen.findByText("匹配 14 个 · 第 1 / 2 页")).toBeInTheDocument();
     expect(screen.getByText("Studio 候选 · 每页 12 个")).toBeInTheDocument();
+    expect(screen.getAllByText("待补肉").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/交给小羽先补/).length).toBeGreaterThan(0);
     expect(screen.getAllByText("Bulk Pack 1").length).toBeGreaterThan(0);
     expect(screen.queryByText("Bulk Pack 9")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "后台支撑" }));
+    expect(screen.getByText("匹配 0 个 · 第 1 / 1 页")).toBeInTheDocument();
+    expect(screen.getByText("没有匹配的能力包。可以清除搜索，或切换来源筛选。")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "待补肉" }));
+    expect(screen.getByText("匹配 14 个 · 第 1 / 2 页")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "下一页" }));
 

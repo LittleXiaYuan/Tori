@@ -56,6 +56,7 @@ type PackCandidate = {
 };
 
 type StudioCandidateSourceFilter = "all" | PackCandidate["source"];
+type StudioCandidateDeliveryFilter = "all" | ReturnType<typeof packDeliveryProfile>["level"];
 
 type StudioAnalysis = {
   packId?: string;
@@ -721,6 +722,7 @@ export default function PackStudioPage() {
   const [selectedId, setSelectedId] = useState(() => searchParams.get("packId") || "");
   const [candidateQuery, setCandidateQuery] = useState("");
   const [candidateSourceFilter, setCandidateSourceFilter] = useState<StudioCandidateSourceFilter>("all");
+  const [candidateDeliveryFilter, setCandidateDeliveryFilter] = useState<StudioCandidateDeliveryFilter>("all");
   const [candidatePage, setCandidatePage] = useState(1);
   const [goal, setGoal] = useState(() => searchParams.get("goal") || DEFAULT_STUDIO_GOAL);
   const [packagePath, setPackagePath] = useState(() => searchParams.get("packagePath") || "");
@@ -753,14 +755,23 @@ export default function PackStudioPage() {
     const query = candidateQuery.trim().toLowerCase();
     return candidates.filter((candidate) => {
       if (candidateSourceFilter !== "all" && candidate.source !== candidateSourceFilter) return false;
+      const delivery = packDeliveryProfile(candidate.manifest);
+      if (candidateDeliveryFilter !== "all" && delivery.level !== candidateDeliveryFilter) return false;
       if (!query) return true;
       const manifest = candidate.manifest;
+      const readiness = packReadiness(manifest);
       const haystack = [
         manifest.id,
         manifest.name,
         manifest.description,
         manifest.status,
         sourceLabel(candidate),
+        delivery.label,
+        delivery.description,
+        delivery.nextStep,
+        readiness.label,
+        readiness.description,
+        ...readiness.missing,
         ...(manifest.backend?.capabilities || []),
         ...(manifest.backend?.permissions || []),
         ...(manifest.frontend?.menus || []).map((menu) => `${menu.label} ${menu.path}`),
@@ -768,7 +779,7 @@ export default function PackStudioPage() {
       ].filter(Boolean).join(" ").toLowerCase();
       return haystack.includes(query);
     });
-  }, [candidateQuery, candidateSourceFilter, candidates]);
+  }, [candidateDeliveryFilter, candidateQuery, candidateSourceFilter, candidates]);
   const candidatePageCount = Math.max(1, Math.ceil(filteredCandidates.length / STUDIO_CANDIDATE_PAGE_SIZE));
   const safeCandidatePage = Math.min(candidatePage, candidatePageCount);
   const pagedCandidates = filteredCandidates.slice(
@@ -782,7 +793,7 @@ export default function PackStudioPage() {
 
   useEffect(() => {
     setCandidatePage(1);
-  }, [candidateQuery, candidateSourceFilter, candidates.length]);
+  }, [candidateDeliveryFilter, candidateQuery, candidateSourceFilter, candidates.length]);
 
   useEffect(() => {
     if (!selected || (!selected.packageUrl && !selected.sha256)) return;
@@ -1482,6 +1493,24 @@ export default function PackStudioPage() {
                 {label}
               </Button>
             ))}
+            <span className="mx-1 h-5 w-px" style={{ background: "var(--yunque-border)" }} />
+            {([
+              ["all", "全部交付"],
+              ["needs_meat", "待补肉"],
+              ["plan_only", "实验/计划"],
+              ["support", "后台支撑"],
+              ["ready", "可直接交付"],
+            ] as Array<[StudioCandidateDeliveryFilter, string]>).map(([value, label]) => (
+              <Button
+                key={value}
+                size="sm"
+                variant={candidateDeliveryFilter === value ? "primary" : "outline"}
+                className={candidateDeliveryFilter === value ? "btn-accent" : ""}
+                onPress={() => setCandidateDeliveryFilter(value)}
+              >
+                {label}
+              </Button>
+            ))}
             {candidateQuery.trim() && (
               <Button size="sm" variant="ghost" onPress={() => setCandidateQuery("")}>
                 清除搜索
@@ -1499,6 +1528,8 @@ export default function PackStudioPage() {
               <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
                 {pagedCandidates.map((candidate) => {
                   const usability = packUsability(candidate.manifest);
+                  const readiness = packReadiness(candidate.manifest);
+                  const delivery = packDeliveryProfile(candidate.manifest);
                   const active = candidate.manifest.id === (manifest?.id || "");
                   return (
                     <button
@@ -1518,7 +1549,12 @@ export default function PackStudioPage() {
                       <div className="mt-1 truncate text-xs" style={{ color: "var(--yunque-text-muted)" }}>{candidate.manifest.id}</div>
                       <div className="mt-2 flex flex-wrap gap-1">
                         <Chip size="sm" style={{ background: "rgba(59,130,246,0.08)", color: "var(--yunque-primary)" }}>{usability.label}</Chip>
+                        <Chip size="sm" color={deliveryChipColor(delivery.tone)}>{delivery.label}</Chip>
+                        {readiness.missing.length > 0 && <Chip size="sm" variant="soft">缺 {readiness.missing.length} 项</Chip>}
                         <Chip size="sm" variant="soft">v{candidate.manifest.version}</Chip>
+                      </div>
+                      <div className="mt-2 line-clamp-2 text-[11px] leading-5" style={{ color: "var(--yunque-text-muted)" }}>
+                        {delivery.nextStep}
                       </div>
                     </button>
                   );

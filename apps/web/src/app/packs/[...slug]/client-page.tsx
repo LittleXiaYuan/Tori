@@ -109,7 +109,11 @@ export default function PackRuntimeRouteClientPage() {
     examples.length > 0 ? `已有示例：${examples.join(" / ")}` : "",
     "请不要夸大实验能力；如果它只是后台支撑能力，请告诉我应该从 Chat、任务、记忆、知识或能力包详情哪里感知它。",
   ].filter(Boolean).join("\n");
-  const studioGoal = `让 ${manifest.name} 更像一个用户能直接理解和使用的能力包，补齐用途、入口、示例、权限边界和回滚说明。`;
+  const studioGoal = delivery.level === "plan_only"
+    ? `把 ${manifest.name} 从实验/计划能力打磨到用户能验证的路径：明确当前不执行什么、结果在哪里看、如何验证和回滚。`
+    : delivery.level === "needs_meat"
+      ? `让 ${manifest.name} 更像一个用户能直接理解和使用的能力包，优先补齐 ${readiness.missing.join("、") || "用途、入口、示例、权限边界和回滚说明"}。`
+      : `让 ${manifest.name} 更像一个用户能直接理解和使用的能力包，补齐用途、入口、示例、权限边界和回滚说明。`;
   const studioHref = `/packs/studio?packId=${encodeURIComponent(manifest.id)}&goal=${encodeURIComponent(studioGoal)}`;
 
   return (
