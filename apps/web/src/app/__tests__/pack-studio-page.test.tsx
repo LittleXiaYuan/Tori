@@ -6,6 +6,9 @@ const packsClientMock = vi.hoisted(() => ({
   installed: vi.fn(),
   catalog: vi.fn(),
   install: vi.fn(),
+  enable: vi.fn(),
+  disable: vi.fn(),
+  rollback: vi.fn(),
   studioPlan: vi.fn(),
   studioInspect: vi.fn(),
   studioWorkspace: vi.fn(),
@@ -264,6 +267,18 @@ describe("PackStudioPage", () => {
       pack: { manifest: wasmManifest, status: "installed" },
       status: "installed",
     });
+    packsClientMock.enable.mockResolvedValue({
+      pack: { manifest: wasmManifest, status: "enabled" },
+      status: "enabled",
+    });
+    packsClientMock.disable.mockResolvedValue({
+      pack: { manifest: wasmManifest, status: "disabled" },
+      status: "disabled",
+    });
+    packsClientMock.rollback.mockResolvedValue({
+      pack: { manifest: wasmManifest, status: "installed" },
+      status: "installed",
+    });
   });
 
   it("turns real pack metadata into a guarded Xiaoyu modification task", async () => {
@@ -403,6 +418,17 @@ describe("PackStudioPage", () => {
         sha256: "d".repeat(64),
         source: "pack-studio:C:\\yunque\\packs\\studio\\yunque.pack.wasm-plugin-0.1.0-studio.yqpack",
       });
+    });
+    expect(await screen.findByText("已安装未启用")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /打开入口/ })).toHaveAttribute("href", "/packs/wasm-plugin");
+    expect(screen.getByRole("link", { name: /查看详情/ })).toHaveAttribute("href", "/packs/detail?id=yunque.pack.wasm-plugin");
+
+    fireEvent.click(screen.getByRole("button", { name: "启用" }));
+    await waitFor(() => {
+      expect(packsClientMock.enable).toHaveBeenCalledWith("yunque.pack.wasm-plugin");
+    });
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "启用" })).toBeDisabled();
     });
 
     fireEvent.click(screen.getByRole("button", { name: "复制任务" }));

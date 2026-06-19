@@ -8,6 +8,7 @@ import {
   Boxes,
   ClipboardCheck,
   Copy,
+  ExternalLink,
   FileSearch,
   PackageCheck,
   RefreshCw,
@@ -27,7 +28,7 @@ import {
   packUsability,
   riskProfileForPack,
 } from "@/lib/pack-presentation";
-import { createPacksClient, type PackManifest, type PackStudioAuditReport, type PackStudioPatchReport, type PackStudioPlanReport, type PackStudioRepackReport, type PackStudioWorkspaceReport, type YqpackInspectReport } from "yunque-client/packs";
+import { createPacksClient, type InstalledPack, type PackManifest, type PackStudioAuditReport, type PackStudioPatchReport, type PackStudioPlanReport, type PackStudioRepackReport, type PackStudioWorkspaceReport, type YqpackInspectReport } from "yunque-client/packs";
 
 const packsClient = createPacksClient(createYunqueSDKClientOptions());
 
@@ -72,6 +73,10 @@ function packRoutes(manifest: PackManifest): string[] {
   const specs = manifest.backend?.routeSpecs || [];
   if (specs.length > 0) return specs.map((route) => `${route.method} ${route.path}`);
   return manifest.backend?.routes || [];
+}
+
+function packPrimaryPath(manifest: PackManifest): string | undefined {
+  return packUsability(manifest).primaryActionPath || manifest.frontend?.menus?.[0]?.path || manifest.frontend?.routes?.[0]?.path;
 }
 
 function sourceLabel(candidate: PackCandidate): string {
@@ -297,6 +302,8 @@ export default function PackStudioPage() {
   const [reinspectReport, setReinspectReport] = useState<YqpackInspectReport | null>(null);
   const [reinspecting, setReinspecting] = useState(false);
   const [installingRepack, setInstallingRepack] = useState(false);
+  const [installedRepack, setInstalledRepack] = useState<InstalledPack | null>(null);
+  const [postInstallBusy, setPostInstallBusy] = useState<string | null>(null);
 
   const candidates = data?.packs || [];
   const selected = useMemo(
@@ -371,6 +378,7 @@ export default function PackStudioPage() {
       setAuditReport(null);
       setRepackReport(null);
       setReinspectReport(null);
+      setInstalledRepack(null);
       showToast("已准备 Pack Studio 工作区", "success");
     } catch (error) {
       showToast(error instanceof Error ? error.message : "准备工作区失败", "error");
@@ -399,6 +407,7 @@ export default function PackStudioPage() {
         setAuditReport(null);
         setRepackReport(null);
         setReinspectReport(null);
+        setInstalledRepack(null);
       }
       showToast(apply ? "已应用到工作区" : "已生成 diff 预览", "success");
     } catch (error) {
@@ -435,6 +444,7 @@ export default function PackStudioPage() {
       });
       setRepackReport(report);
       setReinspectReport(null);
+      setInstalledRepack(null);
       showToast("已生成新的 yqpack", "success");
     } catch (error) {
       showToast(error instanceof Error ? error.message : "重新打包失败", "error");
@@ -453,6 +463,7 @@ export default function PackStudioPage() {
         goal,
       });
       setReinspectReport(report);
+      setInstalledRepack(null);
       showToast("新 yqpack 复检通过", "success");
     } catch (error) {
       showToast(error instanceof Error ? error.message : "新包复检失败", "error");
@@ -465,11 +476,12 @@ export default function PackStudioPage() {
     if (!repackReport || !reinspectReport?.sha256_match) return;
     setInstallingRepack(true);
     try {
-      await packsClient.install({
+      const response = await packsClient.install({
         packagePath: repackReport.package_path,
         sha256: repackReport.sha256,
         source: `pack-studio:${repackReport.package_path}`,
       });
+      setInstalledRepack(response.pack);
       showToast("已安装新的能力包，启用前请再次确认权限", "success");
       refresh();
       refreshStudioPlan();
@@ -477,6 +489,27 @@ export default function PackStudioPage() {
       showToast(error instanceof Error ? error.message : "安装新包失败", "error");
     } finally {
       setInstallingRepack(false);
+    }
+  };
+
+  const mutateInstalledRepack = async (action: "enable" | "disable" | "rollback") => {
+    const id = installedRepack?.manifest.id;
+    if (!id) return;
+    setPostInstallBusy(action);
+    try {
+      const response = action === "enable"
+        ? await packsClient.enable(id)
+        : action === "disable"
+          ? await packsClient.disable(id)
+          : await packsClient.rollback(id);
+      setInstalledRepack(response.pack);
+      showToast(action === "enable" ? "已启用新能力包" : action === "disable" ? "已禁用新能力包" : "已回滚能力包", "success");
+      refresh();
+      refreshStudioPlan();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "能力包状态更新失败", "error");
+    } finally {
+      setPostInstallBusy(null);
     }
   };
 
@@ -821,6 +854,41 @@ export default function PackStudioPage() {
                               {reinspectReport.sha256_match ? "复检 SHA 匹配" : "复检 SHA 不匹配"}
                             </Chip>
                             <span>{reinspectReport.entry_count} 个文件 · {reinspectReport.editable_count} 可改 · {reinspectReport.guarded_count} 需审计</span>
+                          </div>
+                        )}
+                        {installedRepack && (
+                          <div className="mt-3 rounded-md border p-3" style={{ borderColor: "var(--yunque-border)" }}>
+                            <div className="mb-2 flex flex-wrap items-center gap-2">
+                              <Chip size="sm" color={installedRepack.status === "enabled" ? "success" : "warning"}>
+                                {installedRepack.status === "enabled" ? "已启用" : "已安装未启用"}
+                              </Chip>
+                              <span className="font-medium" style={{ color: "var(--yunque-text)" }}>{installedRepack.manifest.name}</span>
+                              <span className="font-mono">{installedRepack.manifest.version}</span>
+                            </div>
+                            <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+                              启用前再次确认权限；出问题可在这里禁用或回滚，也可以回到能力包中心继续管理。
+                            </div>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {packPrimaryPath(installedRepack.manifest) && (
+                                <Link href={packPrimaryPath(installedRepack.manifest)!}>
+                                  <Button size="sm" variant="outline">
+                                    <ExternalLink size={14} /> 打开入口
+                                  </Button>
+                                </Link>
+                              )}
+                              <Button size="sm" variant="outline" onPress={() => mutateInstalledRepack("enable")} isDisabled={postInstallBusy === "enable" || installedRepack.status === "enabled"}>
+                                {postInstallBusy === "enable" ? <Spinner size="sm" /> : <Sparkles size={14} />} 启用
+                              </Button>
+                              <Button size="sm" variant="outline" onPress={() => mutateInstalledRepack("disable")} isDisabled={postInstallBusy === "disable" || installedRepack.status !== "enabled"}>
+                                {postInstallBusy === "disable" ? <Spinner size="sm" /> : <ShieldCheck size={14} />} 禁用
+                              </Button>
+                              <Button size="sm" variant="ghost" onPress={() => mutateInstalledRepack("rollback")} isDisabled={postInstallBusy === "rollback"}>
+                                {postInstallBusy === "rollback" ? <Spinner size="sm" /> : <RotateCcw size={14} />} 回滚
+                              </Button>
+                              <Link href={`/packs/detail?id=${encodeURIComponent(installedRepack.manifest.id)}`}>
+                                <Button size="sm" variant="ghost">查看详情 <ArrowRight size={14} /></Button>
+                              </Link>
+                            </div>
                           </div>
                         )}
                         <div className="mt-2 space-y-1">
