@@ -386,6 +386,31 @@ export default function PacksPageOptimized() {
     for (const manifest of manifests.values()) counts[packUsability(manifest).kind] += 1;
     return counts;
   }, [packs, releaseEntries, catalogEntries]);
+  const readinessStats = useMemo(() => {
+    const manifests = new Map<string, PackManifest>();
+    for (const pack of packs) manifests.set(pack.manifest.id, pack.manifest);
+    for (const entry of releaseEntries) manifests.set(entry.manifest.id, entry.manifest);
+    for (const entry of catalogEntries) manifests.set(entry.manifest.id, entry.manifest);
+    const counts = {
+      total: manifests.size,
+      complete: 0,
+      needs_context: 0,
+      needs_entry: 0,
+      missingExamples: 0,
+      missingSurface: 0,
+      missingEntry: 0,
+      missingBackend: 0,
+    };
+    for (const manifest of manifests.values()) {
+      const readiness = packReadiness(manifest);
+      counts[readiness.level] += 1;
+      if (readiness.missing.includes("使用示例")) counts.missingExamples += 1;
+      if (readiness.missing.includes("用户感知位置")) counts.missingSurface += 1;
+      if (readiness.missing.includes("打开/使用入口")) counts.missingEntry += 1;
+      if (readiness.missing.includes("后端能力声明")) counts.missingBackend += 1;
+    }
+    return counts;
+  }, [packs, releaseEntries, catalogEntries]);
   const normalizedQuery = query.trim().toLowerCase();
   const matchesFilters = (manifest: PackManifest, options?: { installedStatus?: string; source: SourceFilter }) => {
     const usability = packUsability(manifest);
@@ -638,6 +663,74 @@ export default function PacksPageOptimized() {
                 可体验但不作为稳定主路径；启用前先看限制、权限和风险说明。
               </div>
             </div>
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-lg border p-4" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-surface)" }}>
+          <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>能力包体检总览</div>
+              <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
+                已体检 {readinessStats.total} 个能力包，按用途说明、用户能感知的位置、入口和后端能力声明判断是否需要补肉。
+              </div>
+            </div>
+            <a href="#readiness-queue">
+              <Button
+                size="sm"
+                variant="outline"
+                isDisabled={readinessQueue.length === 0}
+                onPress={() => {
+                  if (readinessQueue.length === 0) return;
+                  setSortMode("readiness");
+                }}
+              >
+                查看补肉队列 <ArrowRight size={14} />
+              </Button>
+            </a>
+          </div>
+          <div className="grid gap-3 md:grid-cols-3">
+            <button
+              type="button"
+              className="rounded-md p-3 text-left transition-colors hover:bg-white/5"
+              style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.18)" }}
+              onClick={() => setReadinessFilter("complete")}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>说明完整</span>
+                <span className="text-lg font-semibold" style={{ color: "var(--yunque-success)" }}>{readinessStats.complete}</span>
+              </div>
+              <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
+                用户能看懂用途、入口、示例和能力边界，可优先作为可用能力展示。
+              </div>
+            </button>
+            <button
+              type="button"
+              className="rounded-md p-3 text-left transition-colors hover:bg-white/5"
+              style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.20)" }}
+              onClick={() => setReadinessFilter("needs_context")}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>需补说明</span>
+                <span className="text-lg font-semibold" style={{ color: "var(--yunque-warning)" }}>{readinessStats.needs_context}</span>
+              </div>
+              <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
+                常见缺口：示例 {readinessStats.missingExamples}、感知位置 {readinessStats.missingSurface}。
+              </div>
+            </button>
+            <button
+              type="button"
+              className="rounded-md p-3 text-left transition-colors hover:bg-white/5"
+              style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.18)" }}
+              onClick={() => setReadinessFilter("needs_entry")}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>需补入口</span>
+                <span className="text-lg font-semibold" style={{ color: "var(--yunque-danger)" }}>{readinessStats.needs_entry}</span>
+              </div>
+              <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
+                常见缺口：打开入口 {readinessStats.missingEntry}、后端声明 {readinessStats.missingBackend}。
+              </div>
+            </button>
           </div>
         </div>
 

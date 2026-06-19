@@ -320,6 +320,12 @@ describe("PacksPageOptimized", () => {
     expect(screen.getByText("Documents (文档生成)")).toBeInTheDocument();
     expect(screen.getByText("补肉优先队列")).toBeInTheDocument();
     expect(screen.getByText("补肉优先队列").closest("#readiness-queue")).not.toBeNull();
+    expect(screen.getByText("能力包体检总览")).toBeInTheDocument();
+    expect(screen.getByText("已体检 3 个能力包，按用途说明、用户能感知的位置、入口和后端能力声明判断是否需要补肉。")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /说明完整1/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /需补说明1/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /需补入口1/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /查看补肉队列/ })).toBeInTheDocument();
     expect(screen.getByText("按体检缺口自动挑出最需要小羽补用途、入口、示例或能力边界的能力包。")).toBeInTheDocument();
     expect(screen.getByText("还缺：使用示例、用户感知位置、打开/使用入口、后端能力声明")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "复制批量补肉任务" })).toBeInTheDocument();
@@ -337,6 +343,13 @@ describe("PacksPageOptimized", () => {
     expect(queueStudioLink).toHaveAttribute("href", expect.stringContaining("/packs/studio?"));
 
     fireEvent.click(screen.getByRole("button", { name: "只看需补入口" }));
+
+    expect(screen.getAllByText("Needs Entry Pack").length).toBeGreaterThan(0);
+    expect(screen.getByText("体检：需补入口")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "清除体检" }));
+
+    fireEvent.click(screen.getByRole("button", { name: /需补入口1/ }));
 
     expect(screen.getAllByText("Needs Entry Pack").length).toBeGreaterThan(0);
     expect(screen.getByText("体检：需补入口")).toBeInTheDocument();
