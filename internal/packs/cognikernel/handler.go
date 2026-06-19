@@ -155,8 +155,51 @@ func (r *Router) HandleRuntimePackState(w http.ResponseWriter, req *http.Request
 
 func RuntimeRouteSpecs() []packruntime.BackendRouteSpec {
 	return []packruntime.BackendRouteSpec{
-		{Method: http.MethodGet, Path: RuntimePackStateRoute, Description: "Read live Cogni runtime-loop and pack-state gate status."},
+		{Method: http.MethodGet, Path: "/v1/cognis/runtime/pack-state", Description: "Read live Cogni runtime-loop and pack-state gate status."},
 	}
+}
+
+func RouteSpecs() []packruntime.BackendRouteSpec {
+	return []packruntime.BackendRouteSpec{
+		{Method: http.MethodGet, Path: "/v1/cognis", Description: "List Cogni declarations with health summaries."},
+		{Method: http.MethodPost, Path: "/v1/cognis", Description: "Create an inline Cogni declaration."},
+		{Method: http.MethodGet, Path: "/v1/cognis/", Description: "Read one Cogni declaration or its sub-resources."},
+		{Method: http.MethodPost, Path: "/v1/cognis/", Description: "Run Cogni mutations such as reload, enable, disable, verify, generate, import, evolve, experience record, workflow run, federation update, or routing."},
+		{Method: http.MethodDelete, Path: "/v1/cognis/", Description: "Remove one Cogni declaration."},
+		{Method: http.MethodPost, Path: "/v1/cognis/reload", Description: "Reload Cogni declarations from disk."},
+		{Method: http.MethodGet, Path: "/v1/cognis/traces", Description: "List recent per-turn Cogni evaluation traces."},
+		{Method: http.MethodGet, Path: "/v1/cognis/stats", Description: "Read Cogni trace activation statistics."},
+		{Method: http.MethodGet, Path: "/v1/cognis/health", Description: "Read health metrics for all recently observed Cogni declarations."},
+		{Method: http.MethodGet, Path: "/v1/cognis/alerts", Description: "List Cogni sentinel alerts."},
+		{Method: http.MethodPost, Path: "/v1/cognis/alerts/scan", Description: "Run a Cogni sentinel alert scan."},
+		{Method: http.MethodGet, Path: "/v1/cognis/verify", Description: "Verify all Cogni declarations."},
+		{Method: http.MethodPost, Path: "/v1/cognis/verify", Description: "Verify all Cogni declarations."},
+		{Method: http.MethodPost, Path: "/v1/cognis/generate", Description: "Generate a Cogni declaration from a natural-language description."},
+		{Method: http.MethodGet, Path: "/v1/cognis/export", Description: "Export Cogni declarations as a bundle."},
+		{Method: http.MethodPost, Path: "/v1/cognis/export", Description: "Export Cogni declarations as a bundle."},
+		{Method: http.MethodPost, Path: "/v1/cognis/import", Description: "Import a Cogni bundle and persist accepted declarations."},
+		{Method: http.MethodGet, Path: "/v1/cognis/evolution", Description: "List Cogni evolution experiments."},
+		{Method: http.MethodGet, Path: "/v1/cognis/federation", Description: "Read Cogni federation status."},
+		{Method: http.MethodGet, Path: "/v1/cognis/federation/peers", Description: "List Cogni federation peers."},
+		{Method: http.MethodPost, Path: "/v1/cognis/federation/peers", Description: "Add a Cogni federation peer."},
+		{Method: http.MethodPost, Path: "/v1/cognis/federation/discover", Description: "Discover remote Cogni federation skills."},
+		{Method: http.MethodGet, Path: "/v1/cognis/economics", Description: "Read Cogni economics and cost summary."},
+		{Method: http.MethodPost, Path: "/v1/cognis/route", Description: "Route a message through Cogni candidates."},
+		{Method: http.MethodGet, Path: "/v1/cognis/runtime/pack-state", Description: "Read live Cogni runtime-loop and pack-state gate status."},
+	}
+}
+
+func Paths() []string {
+	seen := map[string]bool{}
+	paths := []string{}
+	for _, spec := range RouteSpecs() {
+		if seen[spec.Path] {
+			continue
+		}
+		seen[spec.Path] = true
+		paths = append(paths, spec.Path)
+	}
+	return paths
 }
 
 func (h *Handler) PackID() string { return PackID }

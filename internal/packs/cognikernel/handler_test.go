@@ -80,6 +80,40 @@ func TestCogniKernelHandlerRoutesExposeSurface(t *testing.T) {
 	}
 }
 
+func TestCogniKernelRouteSpecsExposeConcreteSubresources(t *testing.T) {
+	specs := RouteSpecs()
+	seen := map[string]map[string]bool{}
+	for _, spec := range specs {
+		if seen[spec.Path] == nil {
+			seen[spec.Path] = map[string]bool{}
+		}
+		seen[spec.Path][spec.Method] = true
+	}
+
+	for _, want := range []struct {
+		method string
+		path   string
+	}{
+		{http.MethodPost, "/v1/cognis/reload"},
+		{http.MethodGet, "/v1/cognis/traces"},
+		{http.MethodPost, "/v1/cognis/alerts/scan"},
+		{http.MethodPost, "/v1/cognis/generate"},
+		{http.MethodPost, "/v1/cognis/import"},
+		{http.MethodPost, "/v1/cognis/federation/discover"},
+		{http.MethodPost, "/v1/cognis/route"},
+		{http.MethodGet, RuntimePackStateRoute},
+	} {
+		if !seen[want.path][want.method] {
+			t.Fatalf("missing routeSpec %s %s", want.method, want.path)
+		}
+	}
+
+	paths := Paths()
+	if len(paths) >= len(specs) {
+		t.Fatalf("Paths should collapse duplicate method specs: paths=%d specs=%d", len(paths), len(specs))
+	}
+}
+
 func TestCogniKernelRouterOwnsRuntimeStateBeforeAPIDelegation(t *testing.T) {
 	api := &fakeCogniAPI{}
 	router := NewRouter(api, fakeRuntimeReporter{})

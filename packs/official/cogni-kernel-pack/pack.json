@@ -27,6 +27,22 @@
     "routes": [
       "/v1/cognis",
       "/v1/cognis/",
+      "/v1/cognis/reload",
+      "/v1/cognis/traces",
+      "/v1/cognis/stats",
+      "/v1/cognis/health",
+      "/v1/cognis/alerts",
+      "/v1/cognis/alerts/scan",
+      "/v1/cognis/verify",
+      "/v1/cognis/generate",
+      "/v1/cognis/export",
+      "/v1/cognis/import",
+      "/v1/cognis/evolution",
+      "/v1/cognis/federation",
+      "/v1/cognis/federation/peers",
+      "/v1/cognis/federation/discover",
+      "/v1/cognis/economics",
+      "/v1/cognis/route",
       "/v1/cognis/runtime/pack-state"
     ],
     "permissions": [
@@ -39,7 +55,7 @@
       {
         "method": "GET",
         "path": "/v1/cognis",
-        "description": "List Cogni declarations and health summaries."
+        "description": "List Cogni declarations with health summaries."
       },
       {
         "method": "POST",
@@ -49,17 +65,112 @@
       {
         "method": "GET",
         "path": "/v1/cognis/",
-        "description": "Read Cogni detail, traces, health, workflows, experience, evolution, federation or economics sub-resources."
+        "description": "Read one Cogni declaration or its sub-resources."
       },
       {
         "method": "POST",
         "path": "/v1/cognis/",
-        "description": "Reload, enable, disable, verify, generate, import, evolve, record experience, run workflows or update federation sub-resources."
+        "description": "Run Cogni mutations such as reload, enable, disable, verify, generate, import, evolve, experience record, workflow run, federation update, or routing."
       },
       {
         "method": "DELETE",
         "path": "/v1/cognis/",
-        "description": "Remove a Cogni declaration."
+        "description": "Remove one Cogni declaration."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/cognis/reload",
+        "description": "Reload Cogni declarations from disk."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/cognis/traces",
+        "description": "List recent per-turn Cogni evaluation traces."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/cognis/stats",
+        "description": "Read Cogni trace activation statistics."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/cognis/health",
+        "description": "Read health metrics for all recently observed Cogni declarations."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/cognis/alerts",
+        "description": "List Cogni sentinel alerts."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/cognis/alerts/scan",
+        "description": "Run a Cogni sentinel alert scan."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/cognis/verify",
+        "description": "Verify all Cogni declarations."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/cognis/verify",
+        "description": "Verify all Cogni declarations."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/cognis/generate",
+        "description": "Generate a Cogni declaration from a natural-language description."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/cognis/export",
+        "description": "Export Cogni declarations as a bundle."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/cognis/export",
+        "description": "Export Cogni declarations as a bundle."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/cognis/import",
+        "description": "Import a Cogni bundle and persist accepted declarations."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/cognis/evolution",
+        "description": "List Cogni evolution experiments."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/cognis/federation",
+        "description": "Read Cogni federation status."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/cognis/federation/peers",
+        "description": "List Cogni federation peers."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/cognis/federation/peers",
+        "description": "Add a Cogni federation peer."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/cognis/federation/discover",
+        "description": "Discover remote Cogni federation skills."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/cognis/economics",
+        "description": "Read Cogni economics and cost summary."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/cognis/route",
+        "description": "Route a message through Cogni candidates."
       },
       {
         "method": "GET",

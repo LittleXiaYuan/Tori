@@ -31,6 +31,15 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 	if cogni.Manifest.SDK.TypeScript != "yunque-client/cognis" {
 		t.Fatalf("unexpected Cogni Kernel SDK import: %s", cogni.Manifest.SDK.TypeScript)
 	}
+	if !hasRouteSpec(cogni.Manifest.Backend.RouteSpecs, "POST", "/v1/cognis/generate") {
+		t.Fatal("expected Cogni Kernel generate routeSpec")
+	}
+	if !hasRouteSpec(cogni.Manifest.Backend.RouteSpecs, "GET", "/v1/cognis/traces") {
+		t.Fatal("expected Cogni Kernel traces routeSpec")
+	}
+	if !hasRouteSpec(cogni.Manifest.Backend.RouteSpecs, "GET", "/v1/cognis/runtime/pack-state") {
+		t.Fatal("expected Cogni Kernel runtime pack-state routeSpec")
+	}
 	lora, ok := registry.Get("yunque.pack.lora")
 	if !ok {
 		t.Fatal("expected LoRA builtin pack to be installed")
