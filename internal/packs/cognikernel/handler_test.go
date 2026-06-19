@@ -190,7 +190,7 @@ func TestCogniKernelRouteSpecsExposeConcreteSubresources(t *testing.T) {
 	}
 }
 
-func TestCogniKernelRouterOwnsRuntimeStateBeforeAPIDelegation(t *testing.T) {
+func TestCogniKernelRouterOwnsRuntimeStateAndRejectsUnknownSubresources(t *testing.T) {
 	api := &fakeCogniAPI{}
 	router := NewRouter(api, fakeRuntimeReporter{})
 
@@ -207,8 +207,8 @@ func TestCogniKernelRouterOwnsRuntimeStateBeforeAPIDelegation(t *testing.T) {
 	req = httptest.NewRequest(http.MethodPost, SubResourceRoute+"reviewer/legacy-only", nil)
 	w = httptest.NewRecorder()
 	router.ServeCogniKernel(w, req)
-	if w.Code != http.StatusNoContent || api.called != 1 {
-		t.Fatalf("sub-resource route should delegate to API adapter, status=%d called=%d", w.Code, api.called)
+	if w.Code != http.StatusNotFound || api.called != 0 {
+		t.Fatalf("unknown sub-resource should be rejected by pack, status=%d called=%d", w.Code, api.called)
 	}
 }
 
@@ -1189,14 +1189,14 @@ func TestCogniKernelRouterRouteDecisionRequiresBus(t *testing.T) {
 	}
 }
 
-func TestCogniKernelRouterReportsMissingAPIAdapter(t *testing.T) {
+func TestCogniKernelRouterRejectsUnknownSubresourceWithoutAdapter(t *testing.T) {
 	router := NewRouter(nil, fakeRuntimeReporter{})
 
 	req := httptest.NewRequest(http.MethodPost, SubResourceRoute+"reviewer/legacy-only", nil)
 	w := httptest.NewRecorder()
 	router.ServeCogniKernel(w, req)
-	if w.Code != http.StatusServiceUnavailable {
-		t.Fatalf("missing API adapter status=%d body=%s", w.Code, w.Body.String())
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("unknown sub-resource status=%d body=%s", w.Code, w.Body.String())
 	}
 }
 

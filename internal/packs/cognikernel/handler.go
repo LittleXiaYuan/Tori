@@ -30,13 +30,10 @@ const (
 	RuntimePackStateRoute   = "/v1/cognis/runtime/pack-state"
 )
 
-// API is the pack-owned Cogni Kernel HTTP surface. The current Gateway still
-// implements it as an adapter during the migration, but the pack no longer
-// depends on a Gateway-named bridge method. A standalone Cogni API service can
-// replace the adapter without changing Pack Runtime route ownership.
-type API interface {
-	ServeCogniKernel(w http.ResponseWriter, r *http.Request)
-}
+// DependencySource supplies Cogni subsystems to the pack. Gateway currently
+// implements these small provider interfaces, but HTTP route ownership stays in
+// this package instead of falling back to a Gateway adapter.
+type DependencySource interface{}
 
 type RuntimeStateReporter interface {
 	CogniKernelRuntimeState() RuntimeStateReport
@@ -124,31 +121,30 @@ type RuntimeStateReport struct {
 }
 
 // Handler exposes CogniKernel/Cognis management as a Pack Runtime backend
-// module. Business operations may still be served by a Gateway adapter during
-// this migration phase, but route dispatch, runtime-state handling, enablement
-// and method gates are owned by this package.
+// module. Route dispatch, runtime-state handling, enablement and method gates
+// are owned by this package.
 type Handler struct {
 	router  *Router
 	host    packruntime.Host
 	started atomic.Bool
 }
 
-func NewHandler(api API) *Handler {
-	return NewHandlerWithRuntimeState(api, nil)
+func NewHandler(source DependencySource) *Handler {
+	return NewHandlerWithRuntimeState(source, nil)
 }
 
-func NewHandlerWithRuntimeState(api API, reporter RuntimeStateReporter) *Handler {
-	return NewHandlerWithDeps(api, reporter, inferDependencies(api))
+func NewHandlerWithRuntimeState(source DependencySource, reporter RuntimeStateReporter) *Handler {
+	return NewHandlerWithDeps(source, reporter, inferDependencies(source))
 }
 
-func NewHandlerWithDeps(api API, reporter RuntimeStateReporter, deps Dependencies) *Handler {
+func NewHandlerWithDeps(source DependencySource, reporter RuntimeStateReporter, deps Dependencies) *Handler {
 	if reporter == nil {
-		if inferred, ok := api.(RuntimeStateReporter); ok {
+		if inferred, ok := source.(RuntimeStateReporter); ok {
 			reporter = inferred
 		}
 	}
-	deps = mergeDependencies(deps, inferDependencies(api))
-	return &Handler{router: NewRouterWithDeps(api, reporter, deps)}
+	deps = mergeDependencies(deps, inferDependencies(source))
+	return &Handler{router: NewRouterWithDeps(source, reporter, deps)}
 }
 
 // compile-time assertion: Cogni Kernel is a v2 capability Module (Tier 0 microkernel).
@@ -177,10 +173,8 @@ func (h *Handler) Stop(ctx context.Context) error {
 }
 
 // Router is the pack-owned route dispatcher for Cogni Kernel. It keeps runtime
-// pack-state as a first-class pack route and delegates declaration operations to
-// the supplied API adapter.
+// pack-state and declaration operations as first-class pack routes.
 type Router struct {
-	api                API
 	reporter           RuntimeStateReporter
 	busProvider        BusProvider
 	federationProvider FederationProvider
@@ -195,18 +189,17 @@ type Router struct {
 	evolutionProvider  EvolutionProvider
 }
 
-func NewRouter(api API, reporter RuntimeStateReporter) *Router {
-	return NewRouterWithDeps(api, reporter, inferDependencies(api))
+func NewRouter(source DependencySource, reporter RuntimeStateReporter) *Router {
+	return NewRouterWithDeps(source, reporter, inferDependencies(source))
 }
 
-func NewRouterWithBus(api API, reporter RuntimeStateReporter, busProvider BusProvider) *Router {
-	return NewRouterWithDeps(api, reporter, Dependencies{BusProvider: busProvider})
+func NewRouterWithBus(source DependencySource, reporter RuntimeStateReporter, busProvider BusProvider) *Router {
+	return NewRouterWithDeps(source, reporter, Dependencies{BusProvider: busProvider})
 }
 
-func NewRouterWithDeps(api API, reporter RuntimeStateReporter, deps Dependencies) *Router {
-	deps = mergeDependencies(deps, inferDependencies(api))
+func NewRouterWithDeps(source DependencySource, reporter RuntimeStateReporter, deps Dependencies) *Router {
+	deps = mergeDependencies(deps, inferDependencies(source))
 	return &Router{
-		api:                api,
 		reporter:           reporter,
 		busProvider:        deps.BusProvider,
 		federationProvider: deps.FederationProvider,
@@ -272,14 +265,11 @@ func (r *Router) ServeCogniKernel(w http.ResponseWriter, req *http.Request) {
 	if r.serveObservability(w, req) {
 		return
 	}
-	if r == nil || r.api == nil {
-		writeJSONStatus(w, http.StatusServiceUnavailable, map[string]any{
-			"error":   "cogni api handler not configured",
-			"pack_id": PackID,
-		})
+	if r == nil {
+		writeJSONStatus(w, http.StatusServiceUnavailable, map[string]any{"error": "cogni kernel router not configured", "pack_id": PackID})
 		return
 	}
-	r.api.ServeCogniKernel(w, req)
+	apperror.WriteCode(w, apperror.CodeNotFound, "unknown cogni sub-resource")
 }
 
 func (r *Router) serveRegistry(w http.ResponseWriter, req *http.Request) bool {
@@ -1387,39 +1377,39 @@ func delegatedRouteSpecs() []delegatedRouteSpec {
 	return out
 }
 
-func inferDependencies(api API) Dependencies {
+func inferDependencies(source DependencySource) Dependencies {
 	var deps Dependencies
-	if inferred, ok := api.(BusProvider); ok {
+	if inferred, ok := source.(BusProvider); ok {
 		deps.BusProvider = inferred
 	}
-	if inferred, ok := api.(FederationProvider); ok {
+	if inferred, ok := source.(FederationProvider); ok {
 		deps.FederationProvider = inferred
 	}
-	if inferred, ok := api.(CostTrackerProvider); ok {
+	if inferred, ok := source.(CostTrackerProvider); ok {
 		deps.CostTrackerProvider = inferred
 	}
-	if inferred, ok := api.(ExperienceProvider); ok {
+	if inferred, ok := source.(ExperienceProvider); ok {
 		deps.ExperienceProvider = inferred
 	}
-	if inferred, ok := api.(RegistryProvider); ok {
+	if inferred, ok := source.(RegistryProvider); ok {
 		deps.RegistryProvider = inferred
 	}
-	if inferred, ok := api.(WorkflowEngineProvider); ok {
+	if inferred, ok := source.(WorkflowEngineProvider); ok {
 		deps.WorkflowProvider = inferred
 	}
-	if inferred, ok := api.(TraceStoreProvider); ok {
+	if inferred, ok := source.(TraceStoreProvider); ok {
 		deps.TraceStoreProvider = inferred
 	}
-	if inferred, ok := api.(SentinelProvider); ok {
+	if inferred, ok := source.(SentinelProvider); ok {
 		deps.SentinelProvider = inferred
 	}
-	if inferred, ok := api.(DirectoryProvider); ok {
+	if inferred, ok := source.(DirectoryProvider); ok {
 		deps.DirectoryProvider = inferred
 	}
-	if inferred, ok := api.(GenesisProvider); ok {
+	if inferred, ok := source.(GenesisProvider); ok {
 		deps.GenesisProvider = inferred
 	}
-	if inferred, ok := api.(EvolutionProvider); ok {
+	if inferred, ok := source.(EvolutionProvider); ok {
 		deps.EvolutionProvider = inferred
 	}
 	return deps
