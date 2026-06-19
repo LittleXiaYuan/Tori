@@ -66,9 +66,9 @@
     "preload": "true",
     "note": "Natively owns /v1/speech* through Pack Runtime. STT streaming reuses the kernel WebSocket origin policy.",
     "usability": "infrastructure",
-    "primaryActionLabel": "回到对话",
-    "primaryActionPath": "/chat",
-    "usageSurface": "Chat 语音输入、朗读与插件语音能力",
+    "primaryActionLabel": "开始语音任务",
+    "primaryActionPath": "/chat?q=%E5%B8%AE%E6%88%91%E5%BC%80%E5%A7%8B%E4%B8%80%E4%B8%AA%E8%AF%AD%E9%9F%B3%E4%BB%BB%E5%8A%A1%EF%BC%9A%E5%85%88%E8%AF%B4%E6%98%8E%E5%8F%AF%E4%BB%A5%E5%BD%95%E9%9F%B3%E8%BD%AC%E5%86%99%E3%80%81%E6%9C%97%E8%AF%BB%E5%9B%9E%E5%A4%8D%E6%88%96%E6%9F%A5%E7%9C%8B%E5%8F%AF%E7%94%A8%E9%9F%B3%E8%89%B2",
+    "usageSurface": "Chat 语音输入、助手朗读、实时转写与插件语音能力",
     "example1": "把音频转成文字后交给 Chat 处理。",
     "example2": "把助手回复转换为语音朗读。",
     "example3": "查看当前可用音色列表供插件或前端选择。"

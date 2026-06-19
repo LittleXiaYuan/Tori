@@ -53,9 +53,9 @@
     "preload": "true",
     "note": "Natively owns /v1/documents/* through Pack Runtime. It reaches document skills through a narrow SkillsRegistry accessor.",
     "usability": "infrastructure",
-    "primaryActionLabel": "去对话生成文档",
-    "primaryActionPath": "/chat",
-    "usageSurface": "Chat、任务产物与文档生成技能",
+    "primaryActionLabel": "开始生成文档",
+    "primaryActionPath": "/chat?q=%E5%B8%AE%E6%88%91%E7%94%9F%E6%88%90%E4%B8%80%E4%BB%BD%E5%8F%AF%E4%B8%8B%E8%BD%BD%E7%9A%84%E6%96%87%E6%A1%A3%EF%BC%8C%E5%85%88%E9%97%AE%E6%88%91%E4%B8%BB%E9%A2%98%E3%80%81%E6%A0%BC%E5%BC%8F%E5%92%8C%E6%A8%A1%E6%9D%BF%E8%A6%81%E6%B1%82",
+    "usageSurface": "Chat 自动发起文档任务、任务产物区、文档生成技能与模板目录",
     "example1": "在对话里要求云雀生成 docx、xlsx、html 或 pptx。",
     "example2": "任务完成后在产物区预览或下载生成文件。",
     "example3": "读取模板目录，让文档输出沿用固定格式。"

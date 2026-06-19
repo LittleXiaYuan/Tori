@@ -225,9 +225,14 @@ function isActionableUserPack({ manifest, metadata, userVisible, hasConcretePage
 
 function appRouteExists(routePath) {
   if (typeof routePath !== "string" || !routePath.startsWith("/")) return false;
-  const segments = routePath.split("/").filter(Boolean);
+  const pathname = stripQueryAndHash(routePath);
+  const segments = pathname.split("/").filter(Boolean);
   const pagePath = join(appDir, ...segments, "page.tsx");
   return existsSync(pagePath);
+}
+
+function stripQueryAndHash(routePath) {
+  return routePath.split(/[?#]/, 1)[0] || "/";
 }
 
 function findPackManifests(root) {

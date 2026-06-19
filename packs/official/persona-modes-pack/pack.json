@@ -57,9 +57,9 @@
     "preload": "true",
     "note": "Natively owns /v1/persona/mode* through Pack Runtime. Base persona CRUD remains in yunque.pack.persona.",
     "usability": "infrastructure",
-    "primaryActionLabel": "回到对话",
-    "primaryActionPath": "/chat",
-    "usageSurface": "Chat 当前人格模式与会话上下文",
+    "primaryActionLabel": "切换对话风格",
+    "primaryActionPath": "/chat?q=%E5%85%88%E6%A3%80%E6%9F%A5%E5%BD%93%E5%89%8D%E4%BA%BA%E6%A0%BC%E6%A8%A1%E5%BC%8F%EF%BC%8C%E7%84%B6%E5%90%8E%E6%A0%B9%E6%8D%AE%E6%88%91%E8%BF%99%E6%AC%A1%E7%9A%84%E7%9B%AE%E6%A0%87%E5%BB%BA%E8%AE%AE%E9%80%82%E5%90%88%E7%9A%84%E5%AF%B9%E8%AF%9D%E9%A3%8E%E6%A0%BC",
+    "usageSurface": "Chat 当前人格模式、会话上下文、设置中的 Persona 基础配置",
     "example1": "查看当前会话正在使用的人格模式。",
     "example2": "在不同任务场景间切换人格模式。",
     "example3": "让 Persona 基础能力和模式切换可以分别启停。"
