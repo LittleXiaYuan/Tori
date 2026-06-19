@@ -921,6 +921,34 @@ export default function PackStudioPage() {
     },
   ], [auditReport, inspectReport, reinspectReport, repackReport, workspaceReport]);
   const releaseReady = releaseChecklist.every((item) => item.ready);
+  const publishHandoffChecklist = useMemo(() => [
+    {
+      label: "本地复检",
+      ready: Boolean(reinspectReport?.sha256_match),
+      detail: reinspectReport
+        ? `SHA ${reinspectReport.sha256_match ? "匹配" : "不匹配"}，${reinspectReport.entry_count} 个文件`
+        : "先复检新 yqpack，确认它和重打包 SHA 一致。",
+    },
+    {
+      label: "本地安装验证",
+      ready: Boolean(installedRepack),
+      detail: installedRepack
+        ? `${installedRepack.manifest.name} · ${installedRepack.status === "enabled" ? "已启用" : "已安装未启用"}`
+        : "复检通过后先安装到本机验证，不直接影响发布源。",
+    },
+    {
+      label: "上传 OSS / Release",
+      ready: Boolean(repackReport),
+      detail: repackReport
+        ? `上传 package_path 并保留 SHA256：${repackReport.sha256}`
+        : "重新打包后再上传 OSS 或 GitHub Release。",
+    },
+    {
+      label: "刷新能力包中心",
+      ready: Boolean(repackReport),
+      detail: "更新 catalog/release 后回 /packs 刷新官方源/私有源。",
+    },
+  ], [installedRepack, reinspectReport, repackReport]);
   const deliverySummary = useMemo(() => buildDeliverySummary({
     manifest,
     goal,
@@ -1907,6 +1935,37 @@ export default function PackStudioPage() {
                         </div>
                         <div className="break-all font-mono">{repackReport.package_path}</div>
                         <div className="mt-1 break-all font-mono">SHA256：{repackReport.sha256}</div>
+                        <div className="mt-3 rounded-md border p-3" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-surface)" }}>
+                          <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
+                            <div>
+                              <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>发布与验证路径</div>
+                              <div className="mt-1 text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
+                                新 yqpack 不会自动上传或启用；先本地复检，再安装验证，最后更新发布源并回能力包中心刷新。
+                              </div>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              <Button size="sm" variant="ghost" onPress={copyDeliverySummary}>
+                                <Copy size={13} /> 复制发布交接摘要
+                              </Button>
+                              <Link href="/packs">
+                                <Button size="sm" variant="outline">
+                                  回能力包中心 <ArrowRight size={13} />
+                                </Button>
+                              </Link>
+                            </div>
+                          </div>
+                          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                            {publishHandoffChecklist.map((item) => (
+                              <div key={item.label} className="rounded px-2 py-2" style={{ background: "var(--yunque-bg-hover)" }}>
+                                <div className="mb-1 flex items-center justify-between gap-2">
+                                  <span className="font-medium" style={{ color: "var(--yunque-text)" }}>{item.label}</span>
+                                  <Chip size="sm" color={item.ready ? "success" : "warning"}>{item.ready ? "就绪" : "待完成"}</Chip>
+                                </div>
+                                <div className="break-all text-[11px] leading-5">{item.detail}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                         <div className="mt-3 flex flex-wrap gap-2">
                           <Button variant="outline" onPress={reinspectRepack} isDisabled={reinspecting}>
                             {reinspecting ? <Spinner size="sm" /> : <FileSearch size={14} />} 复检新包

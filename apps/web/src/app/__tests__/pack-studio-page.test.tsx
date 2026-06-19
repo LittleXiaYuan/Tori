@@ -767,6 +767,11 @@ describe("PackStudioPage", () => {
     expect(await screen.findByText("新 yqpack 已生成")).toBeInTheDocument();
     expect(screen.getByText("C:\\yunque\\packs\\studio\\yunque.pack.wasm-plugin-0.1.0-studio.yqpack")).toBeInTheDocument();
     expect(screen.getByText("SHA256：" + "d".repeat(64))).toBeInTheDocument();
+    expect(screen.getByText("发布与验证路径")).toBeInTheDocument();
+    expect(screen.getByText("新 yqpack 不会自动上传或启用；先本地复检，再安装验证，最后更新发布源并回能力包中心刷新。")).toBeInTheDocument();
+    expect(screen.getByText("上传 package_path 并保留 SHA256：" + "d".repeat(64))).toBeInTheDocument();
+    expect(screen.getByText("更新 catalog/release 后回 /packs 刷新官方源/私有源。")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /回能力包中心/ })).toHaveAttribute("href", "/packs");
     expect(screen.getAllByText("下一步：复检新包 SHA").length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole("button", { name: "复检新包" }));
