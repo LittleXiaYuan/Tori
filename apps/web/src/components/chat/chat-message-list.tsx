@@ -178,11 +178,11 @@ function renderPackStudioPlan(plan: PackStudioPatchPlanSummary) {
           </div>
         </div>
         <a
-          href="/packs/studio"
+          href="/packs/studio#import-plan"
           className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1.5 text-[11px] font-medium"
           style={{ background: "var(--yunque-accent-muted)", color: "var(--yunque-accent)" }}
         >
-          回到 Studio <ArrowRight size={11} />
+          导入 Plan <ArrowRight size={11} />
         </a>
       </div>
       <div className="mt-2 break-all font-mono text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
@@ -203,7 +203,7 @@ function renderPackStudioPlan(plan: PackStudioPatchPlanSummary) {
         ))}
       </div>
       <div className="mt-2 leading-5" style={{ color: "var(--yunque-text-muted)" }}>
-        这张卡只展示结构化计划，不包含完整文件内容。请在 Studio 载入草稿、预览 diff、运行审计、重新打包并复检 SHA 后再安装或回滚。
+        这张卡只展示结构化计划，不包含完整文件内容。请在 Studio 导入 Plan、载入草稿、预览 diff、运行审计、重新打包并复检 SHA 后再安装或回滚。
       </div>
     </div>
   );
@@ -230,11 +230,11 @@ function renderPackStudioDraft(draft: PackStudioPatchDraft) {
           </div>
         </div>
         <a
-          href="/packs/studio"
+          href="/packs/studio#import-draft"
           className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1.5 text-[11px] font-medium"
           style={{ background: "var(--yunque-success-muted)", color: "var(--yunque-success)" }}
         >
-          回到 Studio <ArrowRight size={11} />
+          导入 Draft <ArrowRight size={11} />
         </a>
       </div>
       <div className="mt-2 break-all font-mono text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
@@ -280,11 +280,11 @@ function renderPackStudioDraftRequest(request: PackStudioPatchDraftRequest) {
           </div>
         </div>
         <a
-          href="/packs/studio"
+          href="/packs/studio#draft-queue"
           className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1.5 text-[11px] font-medium"
           style={{ background: "var(--yunque-accent-muted)", color: "var(--yunque-accent)" }}
         >
-          回到 Studio <ArrowRight size={11} />
+          查看草稿队列 <ArrowRight size={11} />
         </a>
       </div>
       <div className="mt-2 break-all font-mono text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>

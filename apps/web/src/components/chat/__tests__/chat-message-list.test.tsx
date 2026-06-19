@@ -156,7 +156,7 @@ describe("ChatMessageList file preview", () => {
     expect(screen.getByText("manifest 草稿")).toBeInTheDocument();
     expect(screen.getByText("风险：low")).toBeInTheDocument();
     expect(screen.getByText("摘要：abcd1234")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /回到 Studio/ })).toHaveAttribute("href", "/packs/studio");
+    expect(screen.getByRole("link", { name: /导入 Plan/ })).toHaveAttribute("href", "/packs/studio#import-plan");
     expect(screen.getByText("请以小羽改包方式优化能力包。")).toBeInTheDocument();
     expect(screen.queryByText(/yunque.pack_studio.patch_plan.v1/)).not.toBeInTheDocument();
   });
@@ -198,7 +198,7 @@ describe("ChatMessageList file preview", () => {
     expect(screen.getByText("内置审计")).toBeInTheDocument();
     expect(screen.getByText(/原因：补强能力说明/)).toBeInTheDocument();
     expect(screen.getByText("我已经准备好单文件草稿，先回 Studio 审一下。")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /回到 Studio/ })).toHaveAttribute("href", "/packs/studio");
+    expect(screen.getByRole("link", { name: /导入 Draft/ })).toHaveAttribute("href", "/packs/studio#import-draft");
     expect(screen.queryByText(/yunque.pack_studio.patch_draft.v1/)).not.toBeInTheDocument();
     expect(screen.queryByText(/这段完整内容不应该直接展示/)).not.toBeInTheDocument();
 
@@ -253,6 +253,7 @@ describe("ChatMessageList file preview", () => {
     expect(screen.getByText("摘要：feedbeef")).toBeInTheDocument();
     expect(screen.getByText("重新打包")).toBeInTheDocument();
     expect(screen.getByText(/小羽应只返回 yunque\.pack_studio\.patch_draft\.v1/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /查看草稿队列/ })).toHaveAttribute("href", "/packs/studio#draft-queue");
     expect(screen.getByText("请生成这个能力包界面的 Draft。")).toBeInTheDocument();
     expect(screen.queryByText(/yunque.pack_studio.patch_draft_request.v1/)).not.toBeInTheDocument();
     expect(screen.queryByText(/starter 内容不应该直接展示/)).not.toBeInTheDocument();

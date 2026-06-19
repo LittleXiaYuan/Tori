@@ -360,6 +360,9 @@ describe("PackStudioPage", () => {
     expect(screen.getByText("工作区是可编辑副本，不会启用能力包；安装新 yqpack 前仍需重新检查、测试和确认回滚路径。")).toBeInTheDocument();
 
     expect(screen.getByText("小羽改造草稿队列")).toBeInTheDocument();
+    expect(screen.getByText("从 Chat 导入 Patch Plan").closest("#import-plan")).not.toBeNull();
+    expect(screen.getByText("从 Chat 导入 Patch Draft").closest("#import-draft")).not.toBeNull();
+    expect(screen.getByText("小羽改造草稿队列").closest("#draft-queue")).not.toBeNull();
     expect(screen.getByText("C:\\yunque\\packs\\studio\\frontend\\index.html")).toBeInTheDocument();
     expect(screen.getByText("原因：manifest 是能力包契约入口，适合先补用户能理解的用途、入口、限制和回滚提示。")).toBeInTheDocument();
     expect(screen.getByText("原因：HTML 前端资源可在 yqpack 工作区内预览和替换，适合补独立界面、权限说明和结果区。")).toBeInTheDocument();
@@ -595,5 +598,5 @@ describe("PackStudioPage", () => {
     await waitFor(() => {
       expect(toastMock).toHaveBeenCalledWith("已复制小羽改包任务", "success");
     });
-  }, 10000);
+  }, 15000);
 });

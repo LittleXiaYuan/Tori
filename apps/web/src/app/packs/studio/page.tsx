@@ -1078,7 +1078,7 @@ export default function PackStudioPage() {
                     <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
                       草稿只会填入工作区改动框；真正写入仍需先预览 diff，并在应用后运行内置审计。
                     </div>
-                    <div className="mt-3 rounded-md border p-3" style={{ borderColor: "var(--yunque-border)" }}>
+                    <div id="import-plan" className="mt-3 scroll-mt-24 rounded-md border p-3" style={{ borderColor: "var(--yunque-border)" }}>
                       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                         <div>
                           <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>从 Chat 导入 Patch Plan</div>
@@ -1147,7 +1147,7 @@ export default function PackStudioPage() {
                           </div>
                         </div>
                       )}
-                      <div className="mt-3 rounded-md border p-3" style={{ borderColor: "var(--yunque-border)" }}>
+                      <div id="import-draft" className="mt-3 scroll-mt-24 rounded-md border p-3" style={{ borderColor: "var(--yunque-border)" }}>
                         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                           <div>
                             <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>从 Chat 导入 Patch Draft</div>
@@ -1204,7 +1204,7 @@ export default function PackStudioPage() {
                       </div>
                     </div>
                     {draftCandidates.length > 0 && (
-                      <div className="mt-3 rounded-md p-2" style={{ background: "var(--yunque-bg-hover)" }}>
+                      <div id="draft-queue" className="mt-3 scroll-mt-24 rounded-md p-2" style={{ background: "var(--yunque-bg-hover)" }}>
                         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                           <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>小羽改造草稿队列</div>
                           <Button size="sm" variant="ghost" onPress={copyDraftPlan}>
