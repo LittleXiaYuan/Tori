@@ -996,8 +996,9 @@ describe("PackStudioPage", () => {
         source: "pack-studio:C:\\yunque\\packs\\studio\\yunque.pack.wasm-plugin-0.1.0-studio.yqpack",
       });
     });
-    expect(await screen.findByText("已安装未启用")).toBeInTheDocument();
+    expect((await screen.findAllByText("已安装未启用")).length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText("WASM 能力包 · 已安装未启用").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText("已安装").length).toBeGreaterThan(0);
     expect(screen.getByRole("link", { name: /打开入口/ })).toHaveAttribute("href", "/packs/wasm-plugin");
     expect(screen.getByRole("link", { name: /查看权限与来源/ })).toHaveAttribute("href", "/packs/detail?id=yunque.pack.wasm-plugin");
     expect(screen.getByRole("link", { name: /回中心管理/ })).toHaveAttribute("href", "/packs");
@@ -1010,6 +1011,7 @@ describe("PackStudioPage", () => {
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "启用" })).toBeDisabled();
     });
+    expect(screen.getAllByText("已启用").length).toBeGreaterThan(0);
     expect(screen.getAllByText("下一步：打开入口或查看详情").length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole("button", { name: "复制交付摘要" }));

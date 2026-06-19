@@ -457,6 +457,17 @@ function sourceLabel(candidate: PackCandidate): string {
   return "源内可安装";
 }
 
+function syncCandidateWithInstalledPack(candidate: PackCandidate, installedPack: InstalledPack | null): PackCandidate {
+  if (!installedPack || installedPack.manifest.id !== candidate.manifest.id) return candidate;
+  return {
+    ...candidate,
+    manifest: installedPack.manifest,
+    source: "installed",
+    installed: true,
+    enabled: installedPack.status === "enabled",
+  };
+}
+
 function buildEditableFiles(manifest: PackManifest): string[] {
   const slug = packSlug(manifest);
   const routes = packPaths(manifest);
@@ -750,7 +761,10 @@ export default function PackStudioPage() {
   const [installedRepack, setInstalledRepack] = useState<InstalledPack | null>(null);
   const [postInstallBusy, setPostInstallBusy] = useState<string | null>(null);
 
-  const candidates = data?.packs || [];
+  const candidates = useMemo(
+    () => (data?.packs || []).map((candidate) => syncCandidateWithInstalledPack(candidate, installedRepack)),
+    [data?.packs, installedRepack],
+  );
   const filteredCandidates = useMemo(() => {
     const query = candidateQuery.trim().toLowerCase();
     return candidates.filter((candidate) => {
@@ -846,9 +860,9 @@ export default function PackStudioPage() {
   };
 
   const contextCandidate = useMemo<PackCandidate | undefined>(() => {
-    if (!inspectReport?.manifest) return selected;
+    if (!inspectReport?.manifest) return selected ? syncCandidateWithInstalledPack(selected, installedRepack) : selected;
     const matched = candidates.find((item) => item.manifest.id === inspectReport.manifest.id);
-    return {
+    const candidate = {
       manifest: inspectReport.manifest,
       source: matched?.source || selected?.source || "release",
       enabled: matched?.enabled || false,
@@ -856,7 +870,8 @@ export default function PackStudioPage() {
       packageUrl: matched?.packageUrl || packageUrl.trim() || undefined,
       sha256: inspectReport.sha256 || matched?.sha256 || packageSHA.trim() || undefined,
     };
-  }, [candidates, inspectReport, packageSHA, packageUrl, selected]);
+    return syncCandidateWithInstalledPack(candidate, installedRepack);
+  }, [candidates, inspectReport, installedRepack, packageSHA, packageUrl, selected]);
   const manifest = contextCandidate?.manifest;
   const contextSourceLabel = useMemo(() => {
     if (!contextCandidate) return "未选择";
