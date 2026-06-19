@@ -20,6 +20,28 @@ function formatBytes(bytes: number): string {
 
 const backupPack = createBackupPackClient();
 
+const userFacingSteps = [
+  {
+    title: "1. 先看备份范围",
+    body: "确认会打包哪些本地数据、文件数量和当前版本。",
+  },
+  {
+    title: "2. 导出可回滚副本",
+    body: "把当前云雀数据下载成 ZIP，适合迁移、升级前留底或排障交接。",
+  },
+  {
+    title: "3. 谨慎导入恢复",
+    body: "选择旧备份覆盖当前记录，恢复后再检查对话、记忆和任务结果。",
+  },
+];
+
+const boundaryItems = [
+  "导入恢复会覆盖当前记录，请先导出当前副本。",
+  "不会把备份自动上传到云端。",
+  "不会校验第三方 ZIP 的可信来源。",
+  "不会只恢复单个模块，当前按备份包整体恢复。",
+];
+
 export default function BackupPage() {
   const [info, setInfo] = useState<BackupInfo | null>(null);
   const [loading, setLoading] = useState(true);
@@ -74,6 +96,38 @@ export default function BackupPage() {
   return (
     <div className="page-root space-y-6 animate-fade-in-up">
       <PageHeader icon={<FileArchive size={20} />} title="备份与恢复" />
+
+      <Card className="section-card overflow-hidden p-0">
+        <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="p-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <Chip size="sm" style={{ background: "rgba(34,197,94,0.10)", color: "var(--yunque-success)" }}>可直接使用</Chip>
+              <Chip size="sm" variant="soft">本地数据</Chip>
+              <Chip size="sm" variant="soft">导入会覆盖</Chip>
+            </div>
+            <div className="mt-3 text-base font-semibold" style={{ color: "var(--yunque-text)" }}>
+              这个能力包现在适合做什么
+            </div>
+            <div className="mt-2 max-w-3xl text-sm leading-6" style={{ color: "var(--yunque-text-secondary)" }}>
+              它用于在升级、迁移或排障前保留一份云雀本地数据副本。当前可以查看备份范围、导出 ZIP、从 ZIP 恢复；导入恢复是破坏性动作，会覆盖当前记录，建议先导出当前状态再操作。
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              {userFacingSteps.map((item) => (
+                <div key={item.title} className="rounded-lg p-3" style={{ background: "var(--yunque-bg-hover)", border: "1px solid var(--yunque-border)" }}>
+                  <div className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>{item.title}</div>
+                  <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>{item.body}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="p-5" style={{ background: "rgba(245,158,11,0.08)", borderLeft: "1px solid var(--yunque-border)" }}>
+            <div className="mb-3 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>操作前请确认</div>
+            <div className="space-y-2 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
+              {boundaryItems.map((item) => <div key={item}>{item}</div>)}
+            </div>
+          </div>
+        </div>
+      </Card>
 
       {/* Info banner */}
       <Card className="section-card p-4 flex items-start gap-3">

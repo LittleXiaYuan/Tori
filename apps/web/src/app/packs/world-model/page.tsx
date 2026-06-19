@@ -83,6 +83,28 @@ function EmptyState({ text }: { text: string }) {
   );
 }
 
+const userFacingSteps = [
+  {
+    title: "1. 查看云雀相信的事实",
+    body: "检查文件、API、配置等世界状态是否过期或置信度太低。",
+  },
+  {
+    title: "2. 发现反复失败模式",
+    body: "把跨任务出现的因果共性找出来，减少同类错误反复发生。",
+  },
+  {
+    title: "3. 追溯单个任务根因",
+    body: "输入失败任务 ID，生成修复方案、打开任务详情或查看轨迹。",
+  },
+];
+
+const boundaryItems = [
+  "不会自动改文件、数据库、API 或配置。",
+  "不会把低置信度状态当成事实直接执行。",
+  "不会自动重跑失败任务。",
+  "不会替代人工确认根因和修复方案。",
+];
+
 function StateColumn({
   entries,
   staleKeys,
@@ -345,6 +367,38 @@ export default function WorldModelPackPage() {
   return (
     <div className="page-root space-y-6 animate-fade-in-up">
       <PageHeader icon={<Globe size={20} />} title="世界模型" />
+
+      <Card className="section-card overflow-hidden p-0">
+        <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="p-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <Chip size="sm" style={{ background: "rgba(34,197,94,0.10)", color: "var(--yunque-success)" }}>可直接使用</Chip>
+              <Chip size="sm" variant="soft">看事实</Chip>
+              <Chip size="sm" variant="soft">查根因</Chip>
+            </div>
+            <div className="mt-3 text-base font-semibold" style={{ color: "var(--yunque-text)" }}>
+              这个能力包现在适合做什么
+            </div>
+            <div className="mt-2 max-w-3xl text-sm leading-6" style={{ color: "var(--yunque-text-secondary)" }}>
+              它用于把云雀对外部环境的理解变成可查看、可质疑、可追溯的事实和因果线索。当前可以查看世界状态、识别过期事实、发现跨任务失败模式，并把根因链交给 Chat 生成修复方案。
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              {userFacingSteps.map((item) => (
+                <div key={item.title} className="rounded-lg p-3" style={{ background: "var(--yunque-bg-hover)", border: "1px solid var(--yunque-border)" }}>
+                  <div className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>{item.title}</div>
+                  <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>{item.body}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="p-5" style={{ background: "rgba(245,158,11,0.08)", borderLeft: "1px solid var(--yunque-border)" }}>
+            <div className="mb-3 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>当前不会做什么</div>
+            <div className="space-y-2 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
+              {boundaryItems.map((item) => <div key={item}>{item}</div>)}
+            </div>
+          </div>
+        </div>
+      </Card>
 
       <Card className="section-card p-4 text-sm" style={{ color: "var(--yunque-text-muted)" }}>
         Agent 维护对外部世界（文件、数据库、API、配置）的认知，并通过因果引擎分析失败任务的根因与跨任务模式。
