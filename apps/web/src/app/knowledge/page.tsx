@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { showToast } from "@/components/toast-provider";
 import EmptyState from "@/components/empty-state";
+import PackSurfaceGuide from "@/components/pack-surface-guide";
 
 type ImportMode = null | "url" | "repo" | "text";
 
@@ -217,6 +218,8 @@ export default function KnowledgePage() {
           </Button>
         </div>
       </div>
+
+      <PackSurfaceGuide surface="knowledge" />
 
       {/* Stats cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 stagger-children">

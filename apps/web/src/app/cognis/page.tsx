@@ -41,6 +41,7 @@ import {
   Workflow,
 } from "lucide-react";
 import PageHeader from "@/components/page-header";
+import PackSurfaceGuide from "@/components/pack-surface-guide";
 import { showToast } from "@/components/toast-provider";
 import { formatErrorMessage } from "@/lib/error-utils";
 import { createCognisClient } from "yunque-client/cognis";
@@ -365,6 +366,8 @@ export default function CognisPage() {
           </Button>
         }
       />
+
+      <PackSurfaceGuide surface="cognis" />
 
       {packOff && (
         <Card className="section-card p-4 border-l-4" style={{ borderLeftColor: "#ffaa00" }}>

@@ -23,6 +23,7 @@ import { usePolling } from "@/lib/use-polling";
 import { DashboardSkeleton } from "@/components/skeleton-loader";
 import { formatErrorMessage } from "@/lib/error-utils";
 import { DASHBOARD_SCENARIOS, scenarioChatHref } from "@/lib/product-scenarios";
+import PackSurfaceGuide from "@/components/pack-surface-guide";
 
 /* ── helpers ───────────────────────────────────── */
 
@@ -221,6 +222,8 @@ export default function DashboardPage() {
           <Tooltip.Content>刷新</Tooltip.Content>
         </Tooltip>
       </div>
+
+      <PackSurfaceGuide surface="dashboard" />
 
       {/* ── Setup Banner ── */}
       {setupNeeded && (

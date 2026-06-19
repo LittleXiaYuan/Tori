@@ -1,0 +1,56 @@
+"use client";
+
+import { Card, Chip } from "@heroui/react";
+import type { PackSurfaceKey } from "@/lib/pack-surface-guidance";
+import { packSurfaceGuide } from "@/lib/pack-surface-guidance";
+
+const kindTone: Record<string, { bg: string; fg: string }> = {
+  "可操作": { bg: "rgba(34,197,94,0.10)", fg: "var(--yunque-success)" },
+  "基础能力": { bg: "rgba(59,130,246,0.08)", fg: "var(--yunque-primary)" },
+  "治理": { bg: "rgba(245,158,11,0.10)", fg: "var(--yunque-warning)" },
+};
+
+export default function PackSurfaceGuide({ surface }: { surface: PackSurfaceKey }) {
+  const guide = packSurfaceGuide(surface);
+  const Icon = guide.icon;
+
+  return (
+    <Card className="section-card overflow-hidden p-0">
+      <div className="grid gap-0 lg:grid-cols-[280px_minmax(0,1fr)]">
+        <div className="p-4" style={{ background: "rgba(255,255,255,0.025)", borderRight: "1px solid var(--yunque-border)" }}>
+          <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
+            <Icon size={16} aria-hidden={true} />
+            {guide.title}
+          </div>
+          <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
+            {guide.description}
+          </div>
+        </div>
+        <div className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-3">
+          {guide.items.map((item) => {
+            const tone = kindTone[item.kind] || kindTone["基础能力"];
+            return (
+              <div key={item.id} className="rounded-lg p-3" style={{ border: "1px solid var(--yunque-border)", background: "var(--yunque-bg-hover)" }}>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-medium" style={{ color: "var(--yunque-text)" }}>{item.title}</div>
+                    <div className="mt-1 truncate text-[11px]" style={{ color: "var(--yunque-text-muted)" }} translate="no">{item.id}</div>
+                  </div>
+                  <Chip size="sm" style={{ background: tone.bg, color: tone.fg, fontSize: "var(--text-2xs)" }}>{item.kind}</Chip>
+                </div>
+                <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>{item.summary}</div>
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {item.actions.map((action) => (
+                    <span key={action} className="rounded-full px-2 py-1 text-[11px]" style={{ background: "rgba(255,255,255,0.05)", color: "var(--yunque-text-muted)" }}>
+                      {action}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </Card>
+  );
+}

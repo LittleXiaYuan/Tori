@@ -35,10 +35,14 @@ describe("TrustPage", () => {
     expect(screen.getByText("不会绕过审批直接允许高风险动作。")).toBeInTheDocument();
     expect(screen.getByText("不会把实验能力默认变成生产级权限。")).toBeInTheDocument();
     expect(screen.getByText("处理待审批")).toBeInTheDocument();
-    expect(screen.getByText("查看审计")).toBeInTheDocument();
+    expect(screen.getAllByText("查看审计").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("观察健康")).toBeInTheDocument();
     expect(screen.getByText("管理模型")).toBeInTheDocument();
     expect(screen.getByText("查看工具执行")).toBeInTheDocument();
+    expect(screen.getByText("这里承接的能力包")).toBeInTheDocument();
+    expect(screen.getByText("控制面")).toBeInTheDocument();
+    expect(screen.getByText("权限")).toBeInTheDocument();
+    expect(screen.getByText(/控制工具、联网、写入、远程包和模型配置的授权边界/)).toBeInTheDocument();
     expect(await screen.findByText("browser-intent")).toBeInTheDocument();
   });
 });

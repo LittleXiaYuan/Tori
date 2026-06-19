@@ -7,6 +7,7 @@ import { Brain, Heart, Clock, RefreshCw, Layers, Zap, Settings2, Search, Plus, T
 import { showToast } from "@/components/toast-provider";
 import EmptyState from "@/components/empty-state";
 import PageHeader from "@/components/page-header";
+import PackSurfaceGuide from "@/components/pack-surface-guide";
 
 export default function MemoryPage() {
   const [emotions, setEmotions] = useState<EmotionHistoryEntry[]>([]);
@@ -124,6 +125,8 @@ export default function MemoryPage() {
           </Tooltip>
         </div>
       </div>
+
+      <PackSurfaceGuide surface="memory" />
 
       {/* Add memory */}
       {showAdd && (
