@@ -255,6 +255,55 @@ function buildPatchPlanPrompt(prompt: string, patchPlan: ReturnType<typeof build
   ].join("\n");
 }
 
+function buildPatchDraftRequestPrompt(prompt: string, workspace: PackStudioWorkspaceReport, candidate: StudioDraftCandidate, goal: string): string {
+  const request = {
+    kind: "yunque.pack_studio.patch_draft_request.v1",
+    pack: {
+      id: workspace.manifest.id,
+      name: workspace.manifest.name,
+      version: workspace.manifest.version,
+    },
+    goal,
+    workspace: {
+      id: workspace.workspace_id,
+      path: workspace.workspace_path,
+      original_sha256: workspace.original_sha256,
+    },
+    target: {
+      file_path: candidate.filePath,
+      label: candidate.label,
+      reason: candidate.reason,
+      risk_level: candidate.riskLevel,
+      gates: candidate.gates,
+      content_summary: {
+        length: candidate.content.length,
+        hash: stableStringHash(candidate.content),
+      },
+    },
+    starter_content: candidate.content,
+    expected_output: {
+      kind: "yunque.pack_studio.patch_draft.v1",
+      file_path: candidate.filePath,
+      content: "完整的新文件内容，不是 diff，也不是片段",
+      risk_level: candidate.riskLevel,
+      gates: candidate.gates,
+    },
+  };
+
+  return [
+    prompt,
+    "",
+    "下面是 Pack Studio 的 Patch Draft Request。请基于 starter_content 和目标，生成一个单文件 Patch Draft。",
+    "输出必须只包含一段 fenced JSON，kind 必须是 yunque.pack_studio.patch_draft.v1。",
+    "content 必须是完整的新文件内容，不要输出 diff、片段或解释文本。",
+    "不要声称已经应用改动；用户回到 Studio 导入后仍要预览 diff、运行内置审计、重新打包和复检 SHA。",
+    "",
+    "```json",
+    JSON.stringify(request, null, 2),
+    "```",
+  ].join("\n");
+}
+
 function sourceLabel(candidate: PackCandidate): string {
   if (candidate.installed && candidate.enabled) return "已启用";
   if (candidate.installed) return "已安装";
@@ -536,6 +585,12 @@ export default function PackStudioPage() {
     if (!patchPlan) return;
     await navigator.clipboard?.writeText(JSON.stringify(patchPlan, null, 2));
     showToast("已复制结构化 Patch Plan", "success");
+  };
+
+  const copyPatchDraftRequest = async (candidate: StudioDraftCandidate) => {
+    if (!workspaceReport) return;
+    await navigator.clipboard?.writeText(buildPatchDraftRequestPrompt(prompt, workspaceReport, candidate, goal));
+    showToast("已复制 Patch Draft 请求", "success");
   };
 
   const inspectYqpack = async () => {
@@ -1170,9 +1225,19 @@ export default function PackStudioPage() {
                                   </Chip>
                                   <Chip size="sm" variant="soft">{candidate.applyable ? "可预览应用" : "只读说明"}</Chip>
                                 </div>
-                                <Button size="sm" variant="outline" onPress={() => fillDraftCandidate(candidate)} isDisabled={!candidate.applyable}>
-                                  <Sparkles size={13} /> 载入草稿
-                                </Button>
+                                <div className="flex flex-wrap gap-1">
+                                  <Button size="sm" variant="outline" onPress={() => fillDraftCandidate(candidate)} isDisabled={!candidate.applyable}>
+                                    <Sparkles size={13} /> 载入草稿
+                                  </Button>
+                                  <Button size="sm" variant="ghost" onPress={() => copyPatchDraftRequest(candidate)} isDisabled={!candidate.applyable}>
+                                    <Copy size={13} /> 复制 Draft 请求
+                                  </Button>
+                                  <Link href={`/chat?q=${encodeURIComponent(buildPatchDraftRequestPrompt(prompt, workspaceReport, candidate, goal))}`}>
+                                    <Button size="sm" variant="ghost" isDisabled={!candidate.applyable}>
+                                      <ArrowRight size={13} /> 交给小羽生成 Draft
+                                    </Button>
+                                  </Link>
+                                </div>
                               </div>
                               <div className="mt-1 truncate font-mono text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>{candidate.filePath}</div>
                               <div className="mt-1 text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>{candidate.summary}</div>

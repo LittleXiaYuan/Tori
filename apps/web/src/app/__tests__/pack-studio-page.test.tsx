@@ -399,6 +399,29 @@ describe("PackStudioPage", () => {
     expect(linkedPatchPlan.candidates[1].file_path).toBe("C:\\yunque\\packs\\studio\\frontend\\index.html");
     expect(linkedPatchPlan.candidates[1].content_summary.length).toBeGreaterThan(100);
 
+    const draftRequestButtons = screen.getAllByRole("button", { name: "复制 Draft 请求" });
+    fireEvent.click(draftRequestButtons[1]);
+    const draftRequestPrompt = vi.mocked(navigator.clipboard.writeText).mock.calls.at(-1)?.[0] || "";
+    expect(draftRequestPrompt).toContain("yunque.pack_studio.patch_draft_request.v1");
+    expect(draftRequestPrompt).toContain("yunque.pack_studio.patch_draft.v1");
+    expect(draftRequestPrompt).toContain("content 必须是完整的新文件内容，不要输出 diff、片段或解释文本");
+    expect(draftRequestPrompt).toContain("starter_content");
+    expect(draftRequestPrompt).toContain("<!doctype html>");
+    expect(draftRequestPrompt).toContain("不要声称已经应用改动");
+    await waitFor(() => {
+      expect(toastMock).toHaveBeenCalledWith("已复制 Patch Draft 请求", "success");
+    });
+
+    const draftRequestLink = screen.getAllByRole("link", { name: /交给小羽生成 Draft/ })[1];
+    expect(draftRequestLink).toHaveAttribute("href", expect.stringContaining("/chat?q="));
+    const draftRequestQuery = new URL(draftRequestLink.getAttribute("href")!, "http://localhost").searchParams.get("q") || "";
+    expect(draftRequestQuery).toContain("yunque.pack_studio.patch_draft_request.v1");
+    expect(draftRequestQuery).toContain("完整的新文件内容");
+    const draftRequestJson = draftRequestQuery.match(/```json\n([\s\S]+?)\n```/)?.[1] || "";
+    const linkedDraftRequest = JSON.parse(draftRequestJson);
+    expect(linkedDraftRequest.target.file_path).toBe("C:\\yunque\\packs\\studio\\frontend\\index.html");
+    expect(linkedDraftRequest.expected_output.kind).toBe("yunque.pack_studio.patch_draft.v1");
+
     const importedChatMessage = [
       "小羽整理好了 Pack Studio Patch Plan。",
       "",
