@@ -53,6 +53,13 @@ type PackStudioRepackRequest struct {
 	Goal          string `json:"goal,omitempty"`
 }
 
+// PackStudioAuditRequest runs read-only checks against a prepared Pack Studio
+// workspace before repack/install.
+type PackStudioAuditRequest struct {
+	WorkspacePath string `json:"workspace_path"`
+	Goal          string `json:"goal,omitempty"`
+}
+
 // PackStudioPlanOptions carries host-derived state that is not part of a
 // manifest, such as whether the pack is already installed or enabled.
 type PackStudioPlanOptions struct {
@@ -103,6 +110,19 @@ type YqpackEntryReport struct {
 	Editable    bool   `json:"editable"`
 	Reason      string `json:"reason"`
 	NeedsSource bool   `json:"needs_source,omitempty"`
+}
+
+// PackStudioWorkspaceChange describes one file-level change detected between
+// the original yqpack and the current workspace snapshot.
+type PackStudioWorkspaceChange struct {
+	Path        string `json:"path"`
+	Kind        string `json:"kind"`
+	Status      string `json:"status"`
+	Editable    bool   `json:"editable"`
+	NeedsSource bool   `json:"needs_source,omitempty"`
+	OldSHA256   string `json:"old_sha256,omitempty"`
+	NewSHA256   string `json:"new_sha256,omitempty"`
+	Reason      string `json:"reason,omitempty"`
 }
 
 // YqpackInspectReport is a read-only archive inspection result for Pack
@@ -173,6 +193,25 @@ type PackStudioRepackReport struct {
 	Inspect       YqpackInspectReport `json:"inspect"`
 	Warnings      []string            `json:"warnings,omitempty"`
 	NextSteps     []string            `json:"next_steps"`
+}
+
+// PackStudioAuditReport is a read-only readiness report for a prepared Studio
+// workspace. It does not install, enable, or mutate registry state.
+type PackStudioAuditReport struct {
+	GeneratedAt         time.Time                   `json:"generated_at"`
+	WorkspacePath       string                      `json:"workspace_path"`
+	WorkspaceID         string                      `json:"workspace_id"`
+	OriginalSHA256      string                      `json:"original_sha256"`
+	CurrentSHA256       string                      `json:"current_sha256"`
+	Manifest            Manifest                    `json:"manifest"`
+	ChangeCount         int                         `json:"change_count"`
+	EditableChangeCount int                         `json:"editable_change_count"`
+	GuardedChangeCount  int                         `json:"guarded_change_count"`
+	Allowed             bool                        `json:"allowed"`
+	RiskLevel           string                      `json:"risk_level"`
+	Changes             []PackStudioWorkspaceChange `json:"changes"`
+	Warnings            []string                    `json:"warnings,omitempty"`
+	NextSteps           []string                    `json:"next_steps"`
 }
 
 // BuildPackStudioPlan turns a manifest into a conservative, auditable

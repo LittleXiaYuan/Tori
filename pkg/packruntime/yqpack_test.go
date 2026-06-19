@@ -358,6 +358,47 @@ func TestRepackStudioWorkspaceBuildsInspectableYqpack(t *testing.T) {
 	}
 }
 
+func TestAuditStudioWorkspaceReportsEditableAndGuardedChanges(t *testing.T) {
+	workspace := t.TempDir()
+	manifest := minimalManifest("yunque.pack.audit", "0.1.0")
+	if err := SaveManifest(filepath.Join(workspace, ManifestFileName), manifest); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(workspace, "backend"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(workspace, "backend", "plugin.wasm"), []byte("wasm-v1"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := writePackStudioWorkspaceMarker(workspace, "audit-test", strings.Repeat("a", 64), time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	manifest.Description = "改得更清楚"
+	if err := SaveManifest(filepath.Join(workspace, ManifestFileName), manifest); err != nil {
+		t.Fatal(err)
+	}
+	report, err := AuditStudioWorkspace(PackStudioAuditRequest{WorkspacePath: workspace, Goal: "补齐说明"})
+	if err != nil {
+		t.Fatalf("audit editable change: %v", err)
+	}
+	if !report.Allowed || report.RiskLevel != "medium" || report.ChangeCount != 1 || report.EditableChangeCount != 1 || report.GuardedChangeCount != 0 {
+		t.Fatalf("unexpected editable audit report: %#v", report)
+	}
+	if report.Changes[0].Path != ManifestFileName || report.Changes[0].Status != "modified" || !report.Changes[0].Editable {
+		t.Fatalf("unexpected editable change: %#v", report.Changes)
+	}
+	if err := os.WriteFile(filepath.Join(workspace, "backend", "plugin.wasm"), []byte("wasm-v2"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	report, err = AuditStudioWorkspace(PackStudioAuditRequest{WorkspacePath: workspace})
+	if err != nil {
+		t.Fatalf("audit guarded change: %v", err)
+	}
+	if report.Allowed || report.RiskLevel != "high" || report.GuardedChangeCount != 1 || len(report.Warnings) == 0 {
+		t.Fatalf("expected guarded audit block: %#v", report)
+	}
+}
+
 func containsYqpackEntry(entries []YqpackEntryReport, path string, kind string, editable bool) bool {
 	for _, entry := range entries {
 		if entry.Path == path && entry.Kind == kind && entry.Editable == editable {

@@ -1821,6 +1821,48 @@ func TestPackStudioPatchPreviewsAndAppliesWorkspaceText(t *testing.T) {
 	}
 }
 
+func TestPackStudioAuditReportsWorkspaceRisk(t *testing.T) {
+	workspace := t.TempDir()
+	manifest := packruntime.Manifest{
+		ID:           "yunque.pack.audit-http",
+		Name:         "Audit HTTP",
+		Version:      "0.1.0",
+		RequiresCore: ">=0.1.0",
+		Optional:     true,
+		DefaultState: "disabled",
+	}
+	if err := packruntime.SaveManifest(filepath.Join(workspace, packruntime.ManifestFileName), manifest); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(workspace, "backend"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(workspace, "backend", "plugin.wasm"), []byte("wasm-v1"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	marker := `{"kind":"yunque-pack-studio-workspace","workspace_id":"audit-http-test","original_sha256":"` + strings.Repeat("a", 64) + `","created_at":"2026-06-19T00:00:00Z","entries":{"pack.json":{"path":"pack.json","kind":"manifest","size_bytes":1,"sha256":"old-manifest","editable":true},"backend/plugin.wasm":{"path":"backend/plugin.wasm","kind":"wasm","size_bytes":7,"sha256":"old-wasm","editable":false,"needs_source":true,"reason":"WASM 二进制不能硬改；需要源码、ABI 说明和 wasm 回归测试。"}}}`
+	if err := os.WriteFile(workspace+".studio.json", []byte(marker), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gw, tenants := newTestGatewayWithConfig(GatewayConfig{})
+	tenant := tenants.Register("pack-studio-audit")
+	body, _ := json.Marshal(packruntime.PackStudioAuditRequest{WorkspacePath: workspace})
+	req := httptest.NewRequest(http.MethodPost, "/v1/packs/studio/audit", bytes.NewReader(body))
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("audit status=%d body=%s", w.Code, w.Body.String())
+	}
+	var report packruntime.PackStudioAuditReport
+	if err := json.NewDecoder(w.Body).Decode(&report); err != nil {
+		t.Fatalf("decode audit: %v", err)
+	}
+	if report.Allowed || report.GuardedChangeCount == 0 || report.RiskLevel != "high" {
+		t.Fatalf("expected guarded audit report: %#v", report)
+	}
+}
+
 func TestPackStudioRepackBuildsYqpackWithoutInstalling(t *testing.T) {
 	workspace := t.TempDir()
 	manifest := packruntime.Manifest{

@@ -27,7 +27,7 @@ import {
   packUsability,
   riskProfileForPack,
 } from "@/lib/pack-presentation";
-import { createPacksClient, type PackManifest, type PackStudioPatchReport, type PackStudioPlanReport, type PackStudioRepackReport, type PackStudioWorkspaceReport, type YqpackInspectReport } from "yunque-client/packs";
+import { createPacksClient, type PackManifest, type PackStudioAuditReport, type PackStudioPatchReport, type PackStudioPlanReport, type PackStudioRepackReport, type PackStudioWorkspaceReport, type YqpackInspectReport } from "yunque-client/packs";
 
 const packsClient = createPacksClient(createYunqueSDKClientOptions());
 
@@ -290,6 +290,8 @@ export default function PackStudioPage() {
   const [patchContent, setPatchContent] = useState("");
   const [patching, setPatching] = useState(false);
   const [patchReport, setPatchReport] = useState<PackStudioPatchReport | null>(null);
+  const [auditing, setAuditing] = useState(false);
+  const [auditReport, setAuditReport] = useState<PackStudioAuditReport | null>(null);
   const [repacking, setRepacking] = useState(false);
   const [repackReport, setRepackReport] = useState<PackStudioRepackReport | null>(null);
   const [reinspectReport, setReinspectReport] = useState<YqpackInspectReport | null>(null);
@@ -366,6 +368,7 @@ export default function PackStudioPage() {
       setPatchFile(report.editable_files[0] || "");
       setPatchContent("");
       setPatchReport(null);
+      setAuditReport(null);
       setRepackReport(null);
       setReinspectReport(null);
       showToast("已准备 Pack Studio 工作区", "success");
@@ -393,6 +396,7 @@ export default function PackStudioPage() {
       });
       setPatchReport(report);
       if (apply) {
+        setAuditReport(null);
         setRepackReport(null);
         setReinspectReport(null);
       }
@@ -401,6 +405,23 @@ export default function PackStudioPage() {
       showToast(error instanceof Error ? error.message : "工作区改动失败", "error");
     } finally {
       setPatching(false);
+    }
+  };
+
+  const auditWorkspace = async () => {
+    if (!workspaceReport) return;
+    setAuditing(true);
+    try {
+      const report = await packsClient.studioAudit({
+        workspacePath: workspaceReport.workspace_path,
+        goal,
+      });
+      setAuditReport(report);
+      showToast(report.allowed ? "内置审计通过" : "内置审计发现高风险改动", report.allowed ? "success" : "warning");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "工作区审计失败", "error");
+    } finally {
+      setAuditing(false);
     }
   };
 
@@ -729,7 +750,10 @@ export default function PackStudioPage() {
                       <Button variant="outline" onPress={() => submitPatch(true)} isDisabled={patching}>
                         {patching ? <Spinner size="sm" /> : <Wrench size={14} />} 应用到工作区
                       </Button>
-                      <Button variant="outline" onPress={repackWorkspace} isDisabled={repacking}>
+                      <Button variant="outline" onPress={auditWorkspace} isDisabled={auditing}>
+                        {auditing ? <Spinner size="sm" /> : <ShieldCheck size={14} />} 运行内置审计
+                      </Button>
+                      <Button variant="outline" onPress={repackWorkspace} isDisabled={repacking || auditReport?.allowed === false}>
                         {repacking ? <Spinner size="sm" /> : <PackageCheck size={14} />} 重新打包
                       </Button>
                     </div>
@@ -745,6 +769,30 @@ export default function PackStudioPage() {
                             <div key={warning} style={{ color: "var(--yunque-warning)" }}>{warning}</div>
                           ))}
                         </div>
+                      </div>
+                    )}
+                    {auditReport && (
+                      <div className="mt-3 rounded-md border p-3 text-xs" style={{ borderColor: "var(--yunque-border)", color: "var(--yunque-text-secondary)" }}>
+                        <div className="mb-2 flex flex-wrap items-center gap-2">
+                          <Chip size="sm" color={auditReport.allowed ? "success" : "danger"}>
+                            {auditReport.allowed ? "审计通过" : "审计阻断"}
+                          </Chip>
+                          <Chip size="sm" variant="soft">风险：{auditReport.risk_level}</Chip>
+                          <span>{auditReport.change_count} 个改动 · {auditReport.editable_change_count} 可改 · {auditReport.guarded_change_count} 需源码/专项审计</span>
+                        </div>
+                        <div className="break-all font-mono">当前 SHA：{auditReport.current_sha256}</div>
+                        {auditReport.changes.length > 0 && (
+                          <div className="mt-2 grid gap-1">
+                            {auditReport.changes.slice(0, 6).map((change) => (
+                              <div key={`${change.status}:${change.path}`} className="rounded px-2 py-1" style={{ background: "var(--yunque-bg-hover)" }}>
+                                <span className="font-mono">{change.status}</span> · <span className="font-mono">{change.path}</span> · {change.kind}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {(auditReport.warnings || []).map((warning) => (
+                          <div key={warning} className="mt-1" style={{ color: "var(--yunque-danger)" }}>{warning}</div>
+                        ))}
                       </div>
                     )}
                     {repackReport && (

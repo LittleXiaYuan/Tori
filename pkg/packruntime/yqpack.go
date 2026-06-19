@@ -34,10 +34,21 @@ const ManifestPubName = "manifest.pub"
 const packStudioWorkspaceMarkerSuffix = ".studio.json"
 
 type packStudioWorkspaceMarker struct {
-	Kind           string    `json:"kind"`
-	WorkspaceID    string    `json:"workspace_id"`
-	OriginalSHA256 string    `json:"original_sha256"`
-	CreatedAt      time.Time `json:"created_at"`
+	Kind           string                                  `json:"kind"`
+	WorkspaceID    string                                  `json:"workspace_id"`
+	OriginalSHA256 string                                  `json:"original_sha256"`
+	CreatedAt      time.Time                               `json:"created_at"`
+	Entries        map[string]packStudioWorkspaceFileState `json:"entries,omitempty"`
+}
+
+type packStudioWorkspaceFileState struct {
+	Path        string `json:"path"`
+	Kind        string `json:"kind"`
+	SizeBytes   int64  `json:"size_bytes"`
+	SHA256      string `json:"sha256,omitempty"`
+	Editable    bool   `json:"editable"`
+	NeedsSource bool   `json:"needs_source,omitempty"`
+	Reason      string `json:"reason,omitempty"`
 }
 
 // zipEpoch is the fixed timestamp written to every entry. ZIP can't represent
@@ -517,12 +528,129 @@ func RepackStudioWorkspace(req PackStudioRepackRequest) (PackStudioRepackReport,
 	}, nil
 }
 
+// AuditStudioWorkspace compares the current workspace snapshot with the
+// original Pack Studio extraction marker and reports guarded-file changes.
+func AuditStudioWorkspace(req PackStudioAuditRequest) (PackStudioAuditReport, error) {
+	workspacePath := strings.TrimSpace(req.WorkspacePath)
+	if workspacePath == "" {
+		return PackStudioAuditReport{}, fmt.Errorf("workspace_path is required")
+	}
+	workspaceAbs, err := filepath.Abs(workspacePath)
+	if err != nil {
+		return PackStudioAuditReport{}, fmt.Errorf("pack studio audit: workspace abs: %w", err)
+	}
+	marker, err := readPackStudioWorkspaceMarker(workspaceAbs)
+	if err != nil {
+		return PackStudioAuditReport{}, err
+	}
+	if _, err := LoadManifest(filepath.Join(workspaceAbs, ManifestFileName)); err != nil {
+		return PackStudioAuditReport{}, fmt.Errorf("pack studio audit: load manifest: %w", err)
+	}
+	current, err := snapshotPackStudioWorkspace(workspaceAbs)
+	if err != nil {
+		return PackStudioAuditReport{}, fmt.Errorf("pack studio audit: snapshot workspace: %w", err)
+	}
+	if len(marker.Entries) == 0 {
+		return PackStudioAuditReport{}, fmt.Errorf("pack studio audit: workspace marker does not contain original file fingerprints")
+	}
+	paths := make(map[string]bool, len(marker.Entries)+len(current))
+	for path := range marker.Entries {
+		paths[path] = true
+	}
+	for path := range current {
+		paths[path] = true
+	}
+	ordered := make([]string, 0, len(paths))
+	for path := range paths {
+		ordered = append(ordered, path)
+	}
+	sort.Strings(ordered)
+
+	report := PackStudioAuditReport{
+		GeneratedAt:    time.Now().UTC(),
+		WorkspacePath:  workspaceAbs,
+		WorkspaceID:    marker.WorkspaceID,
+		OriginalSHA256: marker.OriginalSHA256,
+		Allowed:        true,
+		RiskLevel:      "low",
+		Changes:        []PackStudioWorkspaceChange{},
+		NextSteps: []string{
+			"确认 changes 中没有非预期文件。",
+			"若 guarded_change_count 为 0，可以继续重新打包并复检新 yqpack。",
+			"若 guarded_change_count 大于 0，回到源码与专项测试，不要直接安装。",
+		},
+	}
+	for _, path := range ordered {
+		oldState, hadOld := marker.Entries[path]
+		newState, hasNew := current[path]
+		if hadOld && hasNew && oldState.SHA256 == newState.SHA256 {
+			continue
+		}
+		state := newState
+		if !hasNew {
+			state = oldState
+		}
+		status := "modified"
+		switch {
+		case !hadOld && hasNew:
+			status = "added"
+		case hadOld && !hasNew:
+			status = "deleted"
+		}
+		change := PackStudioWorkspaceChange{
+			Path:        path,
+			Kind:        state.Kind,
+			Status:      status,
+			Editable:    state.Editable,
+			NeedsSource: state.NeedsSource,
+			Reason:      state.Reason,
+		}
+		if hadOld {
+			change.OldSHA256 = oldState.SHA256
+		}
+		if hasNew {
+			change.NewSHA256 = newState.SHA256
+		}
+		report.Changes = append(report.Changes, change)
+		report.ChangeCount++
+		if change.Editable {
+			report.EditableChangeCount++
+		} else {
+			report.GuardedChangeCount++
+			report.Allowed = false
+			report.RiskLevel = "high"
+			report.Warnings = append(report.Warnings, "guarded file changed: "+path)
+		}
+	}
+	if report.ChangeCount > 0 && report.RiskLevel == "low" {
+		report.RiskLevel = "medium"
+	}
+	out := filepath.Join(os.TempDir(), "yunque-pack-studio-audit-"+safeArtifactSegment(marker.WorkspaceID)+".yqpack")
+	defer os.Remove(out)
+	digest, err := PackToYqpack(workspaceAbs, out)
+	if err != nil {
+		return PackStudioAuditReport{}, fmt.Errorf("pack studio audit: pack workspace snapshot: %w", err)
+	}
+	report.CurrentSHA256 = digest
+	manifest, _, _, err := InspectYqpackManifestFile(out)
+	if err != nil {
+		return PackStudioAuditReport{}, fmt.Errorf("pack studio audit: inspect workspace snapshot: %w", err)
+	}
+	report.Manifest = manifest
+	return report, nil
+}
+
 func writePackStudioWorkspaceMarker(workspacePath, workspaceID, originalSHA256 string, createdAt time.Time) error {
+	entries, err := snapshotPackStudioWorkspace(workspacePath)
+	if err != nil {
+		return fmt.Errorf("yqpack: snapshot studio workspace marker: %w", err)
+	}
 	marker := packStudioWorkspaceMarker{
 		Kind:           "yunque-pack-studio-workspace",
 		WorkspaceID:    strings.TrimSpace(workspaceID),
 		OriginalSHA256: strings.TrimSpace(originalSHA256),
 		CreatedAt:      createdAt.UTC(),
+		Entries:        entries,
 	}
 	data, err := json.MarshalIndent(marker, "", "  ")
 	if err != nil {
@@ -535,32 +663,63 @@ func writePackStudioWorkspaceMarker(workspacePath, workspaceID, originalSHA256 s
 }
 
 func validatePackStudioWorkspace(workspacePath string) error {
+	_, err := readPackStudioWorkspaceMarker(workspacePath)
+	return err
+}
+
+func readPackStudioWorkspaceMarker(workspacePath string) (packStudioWorkspaceMarker, error) {
 	info, err := os.Stat(workspacePath)
 	if err != nil {
-		return fmt.Errorf("pack studio patch: workspace not found: %w", err)
+		return packStudioWorkspaceMarker{}, fmt.Errorf("pack studio patch: workspace not found: %w", err)
 	}
 	if !info.IsDir() {
-		return fmt.Errorf("pack studio patch: workspace_path must be a directory")
+		return packStudioWorkspaceMarker{}, fmt.Errorf("pack studio patch: workspace_path must be a directory")
 	}
 	if _, err := os.Stat(filepath.Join(workspacePath, ManifestFileName)); err != nil {
-		return fmt.Errorf("pack studio patch: workspace is missing pack.json: %w", err)
+		return packStudioWorkspaceMarker{}, fmt.Errorf("pack studio patch: workspace is missing pack.json: %w", err)
 	}
 	data, err := os.ReadFile(packStudioWorkspaceMarkerPath(workspacePath))
 	if err != nil {
-		return fmt.Errorf("pack studio patch: workspace was not prepared by Pack Studio")
+		return packStudioWorkspaceMarker{}, fmt.Errorf("pack studio patch: workspace was not prepared by Pack Studio")
 	}
 	var marker packStudioWorkspaceMarker
 	if err := json.Unmarshal(data, &marker); err != nil {
-		return fmt.Errorf("pack studio patch: invalid workspace marker")
+		return packStudioWorkspaceMarker{}, fmt.Errorf("pack studio patch: invalid workspace marker")
 	}
 	if marker.Kind != "yunque-pack-studio-workspace" || strings.TrimSpace(marker.WorkspaceID) == "" {
-		return fmt.Errorf("pack studio patch: invalid workspace marker")
+		return packStudioWorkspaceMarker{}, fmt.Errorf("pack studio patch: invalid workspace marker")
 	}
-	return nil
+	return marker, nil
 }
 
 func packStudioWorkspaceMarkerPath(workspacePath string) string {
 	return workspacePath + packStudioWorkspaceMarkerSuffix
+}
+
+func snapshotPackStudioWorkspace(workspacePath string) (map[string]packStudioWorkspaceFileState, error) {
+	files, err := collectYqpackFiles(workspacePath)
+	if err != nil {
+		return nil, err
+	}
+	entries := make(map[string]packStudioWorkspaceFileState, len(files))
+	for _, rel := range files {
+		abs := filepath.Join(workspacePath, filepath.FromSlash(rel))
+		data, err := os.ReadFile(abs)
+		if err != nil {
+			return nil, fmt.Errorf("read %s: %w", abs, err)
+		}
+		report := classifyYqpackPath(rel, int64(len(data)), false)
+		entries[rel] = packStudioWorkspaceFileState{
+			Path:        report.Path,
+			Kind:        report.Kind,
+			SizeBytes:   report.SizeBytes,
+			SHA256:      hex.EncodeToString(sha256Sum(data)),
+			Editable:    report.Editable,
+			NeedsSource: report.NeedsSource,
+			Reason:      report.Reason,
+		}
+	}
+	return entries, nil
 }
 
 // InspectYqpackBytes is the byte-oriented counterpart to InspectYqpackFile. It
@@ -649,14 +808,18 @@ func InspectYqpackManifestBytes(data []byte) (Manifest, string, error) {
 
 func classifyYqpackEntry(f *zip.File) YqpackEntryReport {
 	path := filepath.ToSlash(strings.TrimSpace(f.Name))
+	return classifyYqpackPath(path, int64(f.UncompressedSize64), f.FileInfo().IsDir())
+}
+
+func classifyYqpackPath(path string, sizeBytes int64, isDir bool) YqpackEntryReport {
 	entry := YqpackEntryReport{
 		Path:      path,
 		Kind:      "file",
-		SizeBytes: int64(f.UncompressedSize64),
+		SizeBytes: sizeBytes,
 		Editable:  false,
 		Reason:    "需要源码或对应运行时测试后才能修改。",
 	}
-	if f.FileInfo().IsDir() {
+	if isDir {
 		entry.Kind = "directory"
 		entry.Reason = "目录项本身不需要修改。"
 		return entry

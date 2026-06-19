@@ -97,6 +97,7 @@ func (g *Gateway) registerPackRoutes() {
 	g.mux.HandleFunc("/v1/packs/studio/inspect", g.requireAuth(g.handlePackStudioInspect))
 	g.mux.HandleFunc("/v1/packs/studio/workspace", g.requireAuth(g.handlePackStudioWorkspace))
 	g.mux.HandleFunc("/v1/packs/studio/patch", g.requireAuth(g.handlePackStudioPatch))
+	g.mux.HandleFunc("/v1/packs/studio/audit", g.requireAuth(g.handlePackStudioAudit))
 	g.mux.HandleFunc("/v1/packs/studio/repack", g.requireAuth(g.handlePackStudioRepack))
 	g.mux.HandleFunc("/v1/packs/install", g.requireAuth(g.handlePackInstall))
 	g.mux.HandleFunc("/v1/packs/enable", g.requireAuth(g.handlePackEnable))
@@ -1620,6 +1621,24 @@ func (g *Gateway) handlePackStudioPatch(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	report, err := packruntime.PatchStudioWorkspaceFile(req)
+	if err != nil {
+		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+		return
+	}
+	writeJSON(w, report)
+}
+
+func (g *Gateway) handlePackStudioAudit(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSONStatus(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+		return
+	}
+	var req packruntime.PackStudioAuditRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": "invalid request body"})
+		return
+	}
+	report, err := packruntime.AuditStudioWorkspace(req)
 	if err != nil {
 		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 		return

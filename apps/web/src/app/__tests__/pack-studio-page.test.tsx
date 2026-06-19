@@ -10,6 +10,7 @@ const packsClientMock = vi.hoisted(() => ({
   studioInspect: vi.fn(),
   studioWorkspace: vi.fn(),
   studioPatch: vi.fn(),
+  studioAudit: vi.fn(),
   studioRepack: vi.fn(),
 }));
 
@@ -230,6 +231,24 @@ describe("PackStudioPage", () => {
       warnings: [],
       next_steps: ["运行 audit_commands"],
     }));
+    packsClientMock.studioAudit.mockResolvedValue({
+      generated_at: "2026-06-19T00:00:00Z",
+      workspace_path: "C:\\yunque\\packs\\studio\\yunque.pack.wasm-plugin-0.1.0-aaaaaaaaaaaa",
+      workspace_id: "yunque.pack.wasm-plugin-0.1.0-aaaaaaaaaaaa",
+      original_sha256: "a".repeat(64),
+      current_sha256: "e".repeat(64),
+      manifest: wasmManifest,
+      change_count: 1,
+      editable_change_count: 1,
+      guarded_change_count: 0,
+      allowed: true,
+      risk_level: "medium",
+      changes: [
+        { path: "pack.json", kind: "manifest", status: "modified", editable: true },
+      ],
+      warnings: [],
+      next_steps: ["若 guarded_change_count 为 0，可以继续重新打包并复检新 yqpack。"],
+    });
     packsClientMock.studioRepack.mockResolvedValue({
       generated_at: "2026-06-19T00:00:00Z",
       workspace_path: "C:\\yunque\\packs\\studio\\yunque.pack.wasm-plugin-0.1.0-aaaaaaaaaaaa",
@@ -345,6 +364,16 @@ describe("PackStudioPage", () => {
       expect(packsClientMock.studioPatch).toHaveBeenCalledWith(expect.objectContaining({ apply: true }));
     });
     expect(await screen.findByText("已应用")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "运行内置审计" }));
+    await waitFor(() => {
+      expect(packsClientMock.studioAudit).toHaveBeenCalledWith({
+        workspacePath: "C:\\yunque\\packs\\studio\\yunque.pack.wasm-plugin-0.1.0-aaaaaaaaaaaa",
+        goal: "增加一个可查看运行结果的界面",
+      });
+    });
+    expect(await screen.findByText("审计通过")).toBeInTheDocument();
+    expect(screen.getByText("1 个改动 · 1 可改 · 0 需源码/专项审计")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "重新打包" }));
     await waitFor(() => {
