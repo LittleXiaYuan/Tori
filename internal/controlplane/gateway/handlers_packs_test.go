@@ -1619,6 +1619,62 @@ func TestPackStudioInspectYqpackIsReadOnly(t *testing.T) {
 	}
 }
 
+func TestPackStudioWorkspacePreparesEditableCopyWithoutInstalling(t *testing.T) {
+	srcDir := t.TempDir()
+	manifest := packruntime.Manifest{
+		ID:           "yunque.pack.workspace-http",
+		Name:         "Workspace HTTP",
+		Version:      "0.1.0",
+		Optional:     true,
+		DefaultState: "disabled",
+		Backend:      packruntime.BackendManifest{Capabilities: []string{"workspace.http"}},
+		Frontend: packruntime.FrontendManifest{
+			Menus:  []packruntime.FrontendMenu{{Key: "workspace-http", Label: "Workspace", Path: "/packs/workspace-http"}},
+			Routes: []packruntime.FrontendRoute{{Path: "/packs/workspace-http", Component: "WorkspaceHTTPPackPage"}},
+		},
+	}
+	writeTestPackManifest(t, filepath.Join(srcDir, packruntime.ManifestFileName), manifest)
+	if err := os.WriteFile(filepath.Join(srcDir, "README.md"), []byte("# workspace"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	pkgPath := filepath.Join(t.TempDir(), "workspace-http.yqpack")
+	sha, err := packruntime.PackToYqpack(srcDir, pkgPath)
+	if err != nil {
+		t.Fatalf("PackToYqpack: %v", err)
+	}
+	registry, err := packruntime.NewRegistry(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewRegistry: %v", err)
+	}
+	gw, tenants := newTestGatewayWithConfig(GatewayConfig{Packs: registry})
+	tenant := tenants.Register("pack-studio-workspace")
+
+	body := bytes.NewBufferString(`{"package_path":` + strconv.Quote(pkgPath) + `,"sha256":"` + sha + `","goal":"准备工作区"}`)
+	req := httptest.NewRequest(http.MethodPost, "/v1/packs/studio/workspace", body)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("workspace status=%d body=%s", w.Code, w.Body.String())
+	}
+	var report packruntime.PackStudioWorkspaceReport
+	if err := json.NewDecoder(w.Body).Decode(&report); err != nil {
+		t.Fatalf("decode workspace report: %v", err)
+	}
+	if report.WorkspacePath == "" || report.Manifest.ID != manifest.ID || !report.SHA256Match || report.OriginalSHA256 != sha {
+		t.Fatalf("unexpected workspace report: %#v", report)
+	}
+	if _, err := os.Stat(filepath.Join(report.WorkspacePath, packruntime.ManifestFileName)); err != nil {
+		t.Fatalf("expected pack.json in workspace: %v", err)
+	}
+	if len(report.EditableFiles) == 0 || len(report.RepackCommands) == 0 || len(report.RollbackCommands) == 0 {
+		t.Fatalf("expected workspace guidance: %#v", report)
+	}
+	if _, ok := registry.Get(manifest.ID); ok {
+		t.Fatal("workspace endpoint must not install the pack")
+	}
+}
+
 func TestPackRoutesTogglePackStatus(t *testing.T) {
 	registry, err := packruntime.NewRegistry(t.TempDir())
 	if err != nil {

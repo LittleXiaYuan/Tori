@@ -7,6 +7,7 @@ const packsClientMock = vi.hoisted(() => ({
   catalog: vi.fn(),
   studioPlan: vi.fn(),
   studioInspect: vi.fn(),
+  studioWorkspace: vi.fn(),
 }));
 
 const toastMock = vi.hoisted(() => vi.fn());
@@ -193,6 +194,26 @@ describe("PackStudioPage", () => {
         xiaoyu_prompt: "",
       },
     });
+    packsClientMock.studioWorkspace.mockResolvedValue({
+      generated_at: "2026-06-19T00:00:00Z",
+      workspace_path: "C:\\yunque\\packs\\studio\\yunque.pack.wasm-plugin-0.1.0-aaaaaaaaaaaa",
+      workspace_id: "yunque.pack.wasm-plugin-0.1.0-aaaaaaaaaaaa",
+      package_source: "C:\\packs\\wasm-plugin.yqpack",
+      original_sha256: "a".repeat(64),
+      expected_sha256: "a".repeat(64),
+      sha256_match: true,
+      manifest: wasmManifest,
+      inspect: {} as never,
+      editable_files: ["C:\\yunque\\packs\\studio\\pack.json", "C:\\yunque\\packs\\studio\\frontend\\index.html"],
+      guarded_files: ["C:\\yunque\\packs\\studio\\backend\\plugin.wasm"],
+      audit_commands: ["node scripts\\check-pack-usability.mjs --strict"],
+      repack_commands: [
+        "go run ./cmd/yunque-plugin pack C:\\yunque\\packs\\studio\\yunque.pack.wasm-plugin-0.1.0-aaaaaaaaaaaa --out dist\\packs\\yunque.pack.wasm-plugin-0.1.0-studio.yqpack",
+      ],
+      rollback_commands: ["新包安装后若验证失败，执行 /v1/packs/disable 禁用新包。"],
+      next_steps: ["让小羽只修改 editable_files 中的文件，先给 diff 预览。"],
+      warnings: [],
+    });
   });
 
   it("turns real pack metadata into a guarded Xiaoyu modification task", async () => {
@@ -257,6 +278,21 @@ describe("PackStudioPage", () => {
     expect(screen.getByText("frontend/index.html")).toBeInTheDocument();
     expect(screen.getByText("backend/plugin.wasm")).toBeInTheDocument();
     expect(screen.getByText("只读检查不会安装能力包；它只告诉小羽真实包内有哪些文件、哪些能改、哪些必须保留边界。")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "准备工作区" }));
+    await waitFor(() => {
+      expect(packsClientMock.studioWorkspace).toHaveBeenCalledWith({
+        packagePath: "C:\\packs\\wasm-plugin.yqpack",
+        packageUrl: undefined,
+        sha256: "a".repeat(64),
+        goal: "增加一个可查看运行结果的界面",
+      });
+    });
+    expect(await screen.findByText("Pack Studio 工作区")).toBeInTheDocument();
+    expect(screen.getByText("yunque.pack.wasm-plugin-0.1.0-aaaaaaaaaaaa")).toBeInTheDocument();
+    expect(screen.getByText("go run ./cmd/yunque-plugin pack C:\\yunque\\packs\\studio\\yunque.pack.wasm-plugin-0.1.0-aaaaaaaaaaaa --out dist\\packs\\yunque.pack.wasm-plugin-0.1.0-studio.yqpack")).toBeInTheDocument();
+    expect(screen.getByText("新包安装后若验证失败，执行 /v1/packs/disable 禁用新包。")).toBeInTheDocument();
+    expect(screen.getByText("工作区是可编辑副本，不会启用能力包；安装新 yqpack 前仍需重新检查、测试和确认回滚路径。")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "复制任务" }));
 

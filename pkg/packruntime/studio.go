@@ -25,6 +25,15 @@ type PackStudioInspectRequest struct {
 	Goal        string `json:"goal,omitempty"`
 }
 
+// PackStudioWorkspaceRequest prepares an editable Pack Studio workspace from a
+// yqpack artifact. It is a controlled extraction flow, not an install.
+type PackStudioWorkspaceRequest struct {
+	PackagePath string `json:"package_path,omitempty"`
+	PackageURL  string `json:"package_url,omitempty"`
+	SHA256      string `json:"sha256,omitempty"`
+	Goal        string `json:"goal,omitempty"`
+}
+
 // PackStudioPlanOptions carries host-derived state that is not part of a
 // manifest, such as whether the pack is already installed or enabled.
 type PackStudioPlanOptions struct {
@@ -94,6 +103,27 @@ type YqpackInspectReport struct {
 	GuardedCount   int                  `json:"guarded_count"`
 	Warnings       []string             `json:"warnings,omitempty"`
 	Plan           PackStudioPlanReport `json:"plan"`
+}
+
+// PackStudioWorkspaceReport describes a prepared editable workspace and the
+// exact commands needed to audit, repackage, and roll back safely.
+type PackStudioWorkspaceReport struct {
+	GeneratedAt      time.Time           `json:"generated_at"`
+	WorkspacePath    string              `json:"workspace_path"`
+	WorkspaceID      string              `json:"workspace_id"`
+	PackageSource    string              `json:"package_source"`
+	OriginalSHA256   string              `json:"original_sha256"`
+	ExpectedSHA256   string              `json:"expected_sha256,omitempty"`
+	SHA256Match      bool                `json:"sha256_match"`
+	Manifest         Manifest            `json:"manifest"`
+	Inspect          YqpackInspectReport `json:"inspect"`
+	EditableFiles    []string            `json:"editable_files"`
+	GuardedFiles     []string            `json:"guarded_files"`
+	AuditCommands    []string            `json:"audit_commands"`
+	RepackCommands   []string            `json:"repack_commands"`
+	RollbackCommands []string            `json:"rollback_commands"`
+	NextSteps        []string            `json:"next_steps"`
+	Warnings         []string            `json:"warnings,omitempty"`
 }
 
 // BuildPackStudioPlan turns a manifest into a conservative, auditable

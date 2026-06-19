@@ -177,6 +177,60 @@ func TestInspectYqpackFileBuildsStudioReportWithoutInstalling(t *testing.T) {
 	}
 }
 
+func TestPrepareStudioWorkspaceFromYqpackDoesNotInstall(t *testing.T) {
+	srcDir := t.TempDir()
+	manifest := minimalManifest("yunque.pack.workspace", "0.1.0")
+	manifest.Name = "Workspace Pack"
+	manifest.Frontend = FrontendManifest{
+		Menus:  []FrontendMenu{{Key: "workspace", Label: "Workspace", Path: "/packs/workspace"}},
+		Routes: []FrontendRoute{{Path: "/packs/workspace", Component: "WorkspacePackPage"}},
+		Assets: FrontendAssets{Type: FrontendAssetsTypeIframeBundle, Entry: "index.html"},
+	}
+	if err := SaveManifest(filepath.Join(srcDir, ManifestFileName), manifest); err != nil {
+		t.Fatalf("save manifest: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(srcDir, "frontend"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(srcDir, "frontend", "index.html"), []byte("<main>Workspace</main>"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(srcDir, "manifest.sig"), []byte("sig"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	pkgPath := filepath.Join(t.TempDir(), "workspace.yqpack")
+	sha, err := PackToYqpack(srcDir, pkgPath)
+	if err != nil {
+		t.Fatalf("pack: %v", err)
+	}
+	registry, err := NewRegistry(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	report, err := registry.PrepareStudioWorkspaceFromYqpack(pkgPath, sha, "准备可编辑副本")
+	if err != nil {
+		t.Fatalf("prepare workspace: %v", err)
+	}
+	if report.WorkspacePath == "" || report.WorkspaceID == "" || report.Manifest.ID != manifest.ID {
+		t.Fatalf("unexpected workspace report: %#v", report)
+	}
+	if _, err := os.Stat(filepath.Join(report.WorkspacePath, ManifestFileName)); err != nil {
+		t.Fatalf("expected manifest extracted to workspace: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(report.WorkspacePath, "frontend", "index.html")); err != nil {
+		t.Fatalf("expected frontend extracted to workspace: %v", err)
+	}
+	if len(report.EditableFiles) == 0 || len(report.GuardedFiles) == 0 {
+		t.Fatalf("expected editable and guarded files: %#v", report)
+	}
+	if _, ok := registry.Get(manifest.ID); ok {
+		t.Fatal("workspace prepare must not install the pack")
+	}
+	if _, err := registry.PrepareStudioWorkspaceFromYqpack(pkgPath, strings.Repeat("0", 64), "bad sha"); err == nil {
+		t.Fatal("expected sha mismatch to block workspace preparation")
+	}
+}
+
 func containsYqpackEntry(entries []YqpackEntryReport, path string, kind string, editable bool) bool {
 	for _, entry := range entries {
 		if entry.Path == path && entry.Kind == kind && entry.Editable == editable {

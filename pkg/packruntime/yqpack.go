@@ -279,6 +279,94 @@ func InspectYqpackFile(path string, expectedSHA256 string, goal string) (YqpackI
 	return InspectYqpackBytes(data, abs, expectedSHA256, goal)
 }
 
+// PrepareStudioWorkspaceFromYqpack verifies and extracts a local .yqpack into
+// <registry>/studio/<id>-<version>-<sha>. It intentionally does not register or
+// enable the pack; the output is an editable work copy for review and rebuild.
+func (r *Registry) PrepareStudioWorkspaceFromYqpack(path string, expectedSHA256 string, goal string) (PackStudioWorkspaceReport, error) {
+	if r == nil {
+		return PackStudioWorkspaceReport{}, fmt.Errorf("yqpack: nil registry")
+	}
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return PackStudioWorkspaceReport{}, fmt.Errorf("yqpack: abs path: %w", err)
+	}
+	data, err := os.ReadFile(abs)
+	if err != nil {
+		return PackStudioWorkspaceReport{}, fmt.Errorf("yqpack: read %s: %w", abs, err)
+	}
+	return r.PrepareStudioWorkspaceFromYqpackBytes(data, abs, expectedSHA256, goal)
+}
+
+// PrepareStudioWorkspaceFromYqpackBytes is the byte-oriented workspace
+// preparation path used by remote package previews.
+func (r *Registry) PrepareStudioWorkspaceFromYqpackBytes(data []byte, source string, expectedSHA256 string, goal string) (PackStudioWorkspaceReport, error) {
+	if r == nil {
+		return PackStudioWorkspaceReport{}, fmt.Errorf("yqpack: nil registry")
+	}
+	inspect, err := InspectYqpackBytes(data, source, expectedSHA256, goal)
+	if err != nil {
+		return PackStudioWorkspaceReport{}, err
+	}
+	if !inspect.SHA256Match {
+		return PackStudioWorkspaceReport{}, fmt.Errorf("yqpack: sha256 mismatch (expected %s got %s)", inspect.ExpectedSHA256, inspect.SHA256)
+	}
+	zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		return PackStudioWorkspaceReport{}, fmt.Errorf("yqpack: open zip: %w", err)
+	}
+	workspaceID := strings.Join([]string{
+		safeArtifactSegment(inspect.Manifest.ID),
+		safeArtifactSegment(inspect.Manifest.Version),
+		inspect.SHA256[:12],
+	}, "-")
+	workspaceRoot := filepath.Join(r.root, "studio")
+	workspacePath := filepath.Join(workspaceRoot, workspaceID)
+	if err := os.MkdirAll(workspaceRoot, 0o755); err != nil {
+		return PackStudioWorkspaceReport{}, fmt.Errorf("yqpack: mkdir studio root: %w", err)
+	}
+	_ = os.RemoveAll(workspacePath)
+	if err := os.MkdirAll(workspacePath, 0o755); err != nil {
+		return PackStudioWorkspaceReport{}, fmt.Errorf("yqpack: mkdir studio workspace: %w", err)
+	}
+	if err := extractZip(zr, workspacePath); err != nil {
+		_ = os.RemoveAll(workspacePath)
+		return PackStudioWorkspaceReport{}, fmt.Errorf("yqpack: extract studio workspace: %w", err)
+	}
+	report := PackStudioWorkspaceReport{
+		GeneratedAt:      r.now().UTC(),
+		WorkspacePath:    workspacePath,
+		WorkspaceID:      workspaceID,
+		PackageSource:    strings.TrimSpace(source),
+		OriginalSHA256:   inspect.SHA256,
+		ExpectedSHA256:   inspect.ExpectedSHA256,
+		SHA256Match:      inspect.SHA256Match,
+		Manifest:         inspect.Manifest,
+		Inspect:          inspect,
+		EditableFiles:    []string{},
+		GuardedFiles:     []string{},
+		AuditCommands:    packStudioWorkspaceAuditCommands(inspect.Manifest),
+		RepackCommands:   packStudioWorkspaceRepackCommands(workspacePath, inspect.Manifest),
+		RollbackCommands: packStudioWorkspaceRollbackCommands(inspect.Manifest),
+		NextSteps: []string{
+			"让小羽只修改 editable_files 中的文件，先给 diff 预览。",
+			"用户确认后再在 workspace 内写入改动。",
+			"跑 audit_commands，通过后执行 repack_commands 生成新的 yqpack。",
+			"安装新包前保留 original_sha256，并准备 rollback_commands。",
+		},
+		Warnings: append([]string(nil), inspect.Warnings...),
+	}
+	for _, entry := range inspect.Entries {
+		if entry.Editable {
+			report.EditableFiles = append(report.EditableFiles, filepath.Join(workspacePath, filepath.FromSlash(entry.Path)))
+		} else if !strings.EqualFold(entry.Kind, "directory") {
+			report.GuardedFiles = append(report.GuardedFiles, filepath.Join(workspacePath, filepath.FromSlash(entry.Path)))
+		}
+	}
+	sort.Strings(report.EditableFiles)
+	sort.Strings(report.GuardedFiles)
+	return report, nil
+}
+
 // InspectYqpackBytes is the byte-oriented counterpart to InspectYqpackFile. It
 // is safe for downloaded package previews because it never writes file content
 // to disk and never registers the pack.
@@ -412,6 +500,36 @@ func classifyYqpackEntry(f *zip.File) YqpackEntryReport {
 		entry.Reason = "资产或运行时文件，修改前需要确认引用关系和测试覆盖。"
 	}
 	return entry
+}
+
+func packStudioWorkspaceAuditCommands(manifest Manifest) []string {
+	commands := []string{"node scripts\\check-pack-usability.mjs --strict"}
+	if len(manifest.Backend.RouteSpecs) > 0 || len(manifest.Backend.Routes) > 0 {
+		commands = append(commands, "go test ./pkg/packruntime ./internal/controlplane/gateway ./internal/packs/... ./cmd/agent -count=1")
+	}
+	if manifest.Backend.IsWasm() {
+		commands = append(commands, "go test ./internal/controlplane/gateway -run WASM -count=1")
+	}
+	commands = append(commands, "cd apps/web && npm run typecheck", "cd apps/web && npm test")
+	return commands
+}
+
+func packStudioWorkspaceRepackCommands(workspacePath string, manifest Manifest) []string {
+	out := filepath.Join("dist", "packs", safeArtifactSegment(manifest.ID)+"-"+safeArtifactSegment(manifest.Version)+"-studio.yqpack")
+	return []string{
+		fmt.Sprintf("go run ./cmd/yunque-plugin pack %s --out %s", workspacePath, out),
+		"Get-FileHash " + out + " -Algorithm SHA256",
+		"安装前再次运行 /v1/packs/studio/inspect 核对新 yqpack 的 manifest、sha256 和文件分类。",
+	}
+}
+
+func packStudioWorkspaceRollbackCommands(manifest Manifest) []string {
+	return []string{
+		"保留 original_sha256 对应的原始 yqpack，不覆盖原包。",
+		"新包安装后若验证失败，执行 /v1/packs/disable 禁用新包。",
+		"如果该包已有 previousVersion，可再执行 /v1/packs/rollback 回到上一版本。",
+		fmt.Sprintf("重新打开能力包中心确认 %s 的入口、状态和权限说明。", manifest.ID),
+	}
 }
 
 func sha256Sum(data []byte) []byte {

@@ -27,7 +27,7 @@ import {
   packUsability,
   riskProfileForPack,
 } from "@/lib/pack-presentation";
-import { createPacksClient, type PackManifest, type PackStudioPlanReport, type YqpackInspectReport } from "yunque-client/packs";
+import { createPacksClient, type PackManifest, type PackStudioPlanReport, type PackStudioWorkspaceReport, type YqpackInspectReport } from "yunque-client/packs";
 
 const packsClient = createPacksClient(createYunqueSDKClientOptions());
 
@@ -284,6 +284,8 @@ export default function PackStudioPage() {
   const [packageSHA, setPackageSHA] = useState("");
   const [inspecting, setInspecting] = useState(false);
   const [inspectReport, setInspectReport] = useState<YqpackInspectReport | null>(null);
+  const [preparingWorkspace, setPreparingWorkspace] = useState(false);
+  const [workspaceReport, setWorkspaceReport] = useState<PackStudioWorkspaceReport | null>(null);
 
   const candidates = data?.packs || [];
   const selected = useMemo(
@@ -327,11 +329,36 @@ export default function PackStudioPage() {
         goal,
       });
       setInspectReport(report);
+      setWorkspaceReport(null);
       showToast("已完成 yqpack 只读检查", "success");
     } catch (error) {
       showToast(error instanceof Error ? error.message : "yqpack 检查失败", "error");
     } finally {
       setInspecting(false);
+    }
+  };
+
+  const prepareWorkspace = async () => {
+    const path = packagePath.trim();
+    const url = packageUrl.trim();
+    if (!path && !url) {
+      showToast("请先填写本地 yqpack 路径或 OSS/Release URL", "warning");
+      return;
+    }
+    setPreparingWorkspace(true);
+    try {
+      const report = await packsClient.studioWorkspace({
+        packagePath: path || undefined,
+        packageUrl: url || undefined,
+        sha256: packageSHA.trim() || inspectReport?.sha256,
+        goal,
+      });
+      setWorkspaceReport(report);
+      showToast("已准备 Pack Studio 工作区", "success");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "准备工作区失败", "error");
+    } finally {
+      setPreparingWorkspace(false);
     }
   };
 
@@ -503,6 +530,9 @@ export default function PackStudioPage() {
                 <Button variant="outline" onPress={inspectYqpack} isDisabled={inspecting}>
                   {inspecting ? <Spinner size="sm" /> : <FileSearch size={14} />} 只读检查
                 </Button>
+                <Button variant="outline" onPress={prepareWorkspace} isDisabled={preparingWorkspace || !inspectReport?.sha256_match}>
+                  {preparingWorkspace ? <Spinner size="sm" /> : <Wrench size={14} />} 准备工作区
+                </Button>
               </div>
               {inspectReport && (
                 <div className="mt-4 grid gap-3 lg:grid-cols-[260px_minmax(0,1fr)]">
@@ -538,6 +568,46 @@ export default function PackStudioPage() {
                     <div className="mt-3 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
                       只读检查不会安装能力包；它只告诉小羽真实包内有哪些文件、哪些能改、哪些必须保留边界。
                     </div>
+                  </div>
+                </div>
+              )}
+              {workspaceReport && (
+                <div className="mt-4 rounded-md border p-3" style={{ borderColor: "var(--yunque-border)" }}>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>Pack Studio 工作区</div>
+                      <div className="mt-1 break-all font-mono text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>{workspaceReport.workspace_path}</div>
+                    </div>
+                    <Chip size="sm" variant="soft">{workspaceReport.workspace_id}</Chip>
+                  </div>
+                  <div className="mt-3 grid gap-3 lg:grid-cols-3">
+                    <div>
+                      <div className="mb-2 text-xs font-medium" style={{ color: "var(--yunque-text)" }}>下一步</div>
+                      <div className="space-y-1">
+                        {workspaceReport.next_steps.map((step) => (
+                          <div key={step} className="rounded px-2 py-1 text-xs" style={{ background: "var(--yunque-bg-hover)", color: "var(--yunque-text-secondary)" }}>{step}</div>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="mb-2 text-xs font-medium" style={{ color: "var(--yunque-text)" }}>重打包命令</div>
+                      <div className="space-y-1">
+                        {workspaceReport.repack_commands.map((command) => (
+                          <div key={command} className="rounded px-2 py-1 font-mono text-[11px]" style={{ background: "var(--yunque-bg-hover)", color: "var(--yunque-text-secondary)" }}>{command}</div>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="mb-2 text-xs font-medium" style={{ color: "var(--yunque-text)" }}>回滚命令</div>
+                      <div className="space-y-1">
+                        {workspaceReport.rollback_commands.map((command) => (
+                          <div key={command} className="rounded px-2 py-1 text-xs" style={{ background: "var(--yunque-bg-hover)", color: "var(--yunque-text-secondary)" }}>{command}</div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-3 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+                    工作区是可编辑副本，不会启用能力包；安装新 yqpack 前仍需重新检查、测试和确认回滚路径。
                   </div>
                 </div>
               )}

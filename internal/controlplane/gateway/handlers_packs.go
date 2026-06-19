@@ -94,6 +94,7 @@ func (g *Gateway) registerPackRoutes() {
 	g.mux.HandleFunc("/v1/packs/backend-route-audit", g.requireAuth(g.handlePackBackendRouteAudit))
 	g.mux.HandleFunc("/v1/packs/studio/plan", g.requireAuth(g.handlePackStudioPlan))
 	g.mux.HandleFunc("/v1/packs/studio/inspect", g.requireAuth(g.handlePackStudioInspect))
+	g.mux.HandleFunc("/v1/packs/studio/workspace", g.requireAuth(g.handlePackStudioWorkspace))
 	g.mux.HandleFunc("/v1/packs/install", g.requireAuth(g.handlePackInstall))
 	g.mux.HandleFunc("/v1/packs/enable", g.requireAuth(g.handlePackEnable))
 	g.mux.HandleFunc("/v1/packs/disable", g.requireAuth(g.handlePackDisable))
@@ -1583,6 +1584,28 @@ func (g *Gateway) handlePackStudioInspect(w http.ResponseWriter, r *http.Request
 	writeJSON(w, report)
 }
 
+func (g *Gateway) handlePackStudioWorkspace(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSONStatus(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+		return
+	}
+	if g.packRegistry == nil {
+		writeJSONStatus(w, http.StatusServiceUnavailable, map[string]any{"error": "pack registry not configured"})
+		return
+	}
+	var req packruntime.PackStudioWorkspaceRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": "invalid request body"})
+		return
+	}
+	report, err := g.preparePackStudioWorkspace(r, req)
+	if err != nil {
+		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+		return
+	}
+	writeJSON(w, report)
+}
+
 func inspectPackStudioYqpack(r *http.Request, req packruntime.PackStudioInspectRequest) (packruntime.YqpackInspectReport, error) {
 	if strings.TrimSpace(req.PackagePath) != "" {
 		return packruntime.InspectYqpackFile(req.PackagePath, req.SHA256, req.Goal)
@@ -1591,27 +1614,50 @@ func inspectPackStudioYqpack(r *http.Request, req packruntime.PackStudioInspectR
 	if packageURL == "" {
 		return packruntime.YqpackInspectReport{}, fmt.Errorf("package_path or package_url is required")
 	}
+	data, err := downloadPackStudioYqpack(r, packageURL)
+	if err != nil {
+		return packruntime.YqpackInspectReport{}, err
+	}
+	return packruntime.InspectYqpackBytes(data, packageURL, req.SHA256, req.Goal)
+}
+
+func (g *Gateway) preparePackStudioWorkspace(r *http.Request, req packruntime.PackStudioWorkspaceRequest) (packruntime.PackStudioWorkspaceReport, error) {
+	if strings.TrimSpace(req.PackagePath) != "" {
+		return g.packRegistry.PrepareStudioWorkspaceFromYqpack(req.PackagePath, req.SHA256, req.Goal)
+	}
+	packageURL := strings.TrimSpace(req.PackageURL)
+	if packageURL == "" {
+		return packruntime.PackStudioWorkspaceReport{}, fmt.Errorf("package_path or package_url is required")
+	}
+	data, err := downloadPackStudioYqpack(r, packageURL)
+	if err != nil {
+		return packruntime.PackStudioWorkspaceReport{}, err
+	}
+	return g.packRegistry.PrepareStudioWorkspaceFromYqpackBytes(data, packageURL, req.SHA256, req.Goal)
+}
+
+func downloadPackStudioYqpack(r *http.Request, packageURL string) ([]byte, error) {
 	httpReq, err := http.NewRequestWithContext(r.Context(), http.MethodGet, packageURL, nil)
 	if err != nil {
-		return packruntime.YqpackInspectReport{}, fmt.Errorf("create yqpack request: %w", err)
+		return nil, fmt.Errorf("create yqpack request: %w", err)
 	}
 	httpReq.Header.Set("User-Agent", "Yunque-PackRuntime")
 	res, err := http.DefaultClient.Do(httpReq)
 	if err != nil {
-		return packruntime.YqpackInspectReport{}, fmt.Errorf("download yqpack: %w", err)
+		return nil, fmt.Errorf("download yqpack: %w", err)
 	}
 	defer res.Body.Close()
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return packruntime.YqpackInspectReport{}, fmt.Errorf("download yqpack: http %d", res.StatusCode)
+		return nil, fmt.Errorf("download yqpack: http %d", res.StatusCode)
 	}
 	data, err := io.ReadAll(io.LimitReader(res.Body, 64<<20))
 	if err != nil {
-		return packruntime.YqpackInspectReport{}, fmt.Errorf("read yqpack: %w", err)
+		return nil, fmt.Errorf("read yqpack: %w", err)
 	}
 	if len(bytes.TrimSpace(data)) == 0 {
-		return packruntime.YqpackInspectReport{}, fmt.Errorf("downloaded yqpack is empty")
+		return nil, fmt.Errorf("downloaded yqpack is empty")
 	}
-	return packruntime.InspectYqpackBytes(data, packageURL, req.SHA256, req.Goal)
+	return data, nil
 }
 
 func (g *Gateway) resolvePackStudioTarget(req packruntime.PackStudioPlanRequest) (packruntime.Manifest, packruntime.PackStudioPlanOptions, bool) {
