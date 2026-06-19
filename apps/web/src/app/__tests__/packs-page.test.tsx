@@ -321,6 +321,16 @@ describe("PacksPageOptimized", () => {
     expect(screen.getByText("补肉优先队列")).toBeInTheDocument();
     expect(screen.getByText("按体检缺口自动挑出最需要小羽补用途、入口、示例或能力边界的能力包。")).toBeInTheDocument();
     expect(screen.getByText("还缺：使用示例、用户感知位置、打开/使用入口、后端能力声明")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "复制批量补肉任务" })).toBeInTheDocument();
+    const batchChatLink = screen.getByRole("link", { name: /交给 Chat 批量补肉/ });
+    expect(batchChatLink).toHaveAttribute("href", expect.stringContaining("/chat?q="));
+    const batchPrompt = new URL(batchChatLink.getAttribute("href")!, "http://localhost").searchParams.get("q") || "";
+    expect(batchPrompt).toContain("yunque.pack_studio.batch_draft_request.v1");
+    expect(batchPrompt).toContain("yunque.pack.needs-entry");
+    expect(batchPrompt).toContain("yunque.pack.needs-context");
+    expect(batchPrompt).toContain("不要自动应用改动");
+    expect(batchPrompt).toContain("预览 diff");
+    expect(batchPrompt).toContain("studio_url");
     const queueStudioLink = screen.getAllByRole("link", { name: /交给小羽补齐/ })
       .find((link) => link.getAttribute("href")?.includes("yunque.pack.needs-entry"));
     expect(queueStudioLink).toHaveAttribute("href", expect.stringContaining("/packs/studio?"));

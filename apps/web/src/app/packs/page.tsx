@@ -174,6 +174,43 @@ function packStudioHref(manifest: PackManifest, options?: { packageUrl?: string;
   return `/packs/studio?${params.toString()}`;
 }
 
+function buildBatchReadinessPrompt(items: ReadinessQueueItem[]): string {
+  const request = {
+    kind: "yunque.pack_studio.batch_draft_request.v1",
+    goal: "批量把这些能力包从“看得到但不知道怎么用”推进到用户能理解、能打开、能验证、能回滚的状态。",
+    rules: [
+      "不要自动应用改动。",
+      "每个包先给独立 Patch Draft Request，再回到 Pack Studio 只读检查、准备工作区、预览 diff、运行审计、重新打包和复检 SHA。",
+      "缺后端能力声明时，不要伪造能力；如果需要新增 routeSpecs、权限或源码测试，请明确列为待办。",
+      "实验能力不能包装成稳定承诺，高风险权限必须保留授权和回滚说明。",
+    ],
+    packs: items.map((item) => {
+      const readiness = packReadiness(item.manifest);
+      return {
+        id: item.manifest.id,
+        name: item.manifest.name,
+        version: item.manifest.version,
+        status: item.manifest.status,
+        source: item.sourceLabel,
+        missing: readiness.missing,
+        readiness: readiness.label,
+        studio_url: packStudioHref(item.manifest, { packageUrl: item.packageUrl, sha256: item.sha256 }),
+        package_url: item.packageUrl,
+        sha256: item.sha256,
+      };
+    }),
+  };
+  return [
+    "请以“小羽改包”的方式批量处理下面这些能力包。",
+    "目标是先补齐用户可感知的用途、入口、示例、权限边界和回滚说明，而不是直接扩大能力或绕过 Pack Studio。",
+    "请按优先级逐包输出计划；需要具体改单文件时，只输出 yunque.pack_studio.patch_draft_request.v1 或 patch_draft.v1，并要求用户回到 Pack Studio 预览 diff / 审计 / 重打包。",
+    "",
+    "```json",
+    JSON.stringify(request, null, 2),
+    "```",
+  ].join("\n");
+}
+
 function packSearchText(manifest: PackManifest): string {
   return [
     manifest.id,
@@ -406,6 +443,8 @@ export default function PacksPageOptimized() {
   const privatePageCount = pageCountFor(filteredPrivateCatalogEntries.length);
   const currentPrivatePage = Math.min(privatePage, privatePageCount);
   const pagedPrivateCatalogEntries = paginate(filteredPrivateCatalogEntries, currentPrivatePage);
+  const batchReadinessPrompt = useMemo(() => buildBatchReadinessPrompt(readinessQueue), [readinessQueue]);
+  const batchReadinessChatHref = readinessQueue.length > 0 ? `/chat?q=${encodeURIComponent(batchReadinessPrompt)}` : "";
 
   useEffect(() => {
     setInstalledPage(1);
@@ -415,6 +454,12 @@ export default function PacksPageOptimized() {
 
   const refreshAll = async () => {
     await Promise.all([refresh(), refreshCatalog(), refreshReleaseCatalog()]);
+  };
+
+  const copyBatchReadinessPrompt = async () => {
+    if (readinessQueue.length === 0) return;
+    await navigator.clipboard?.writeText(batchReadinessPrompt);
+    showToast("已复制批量补肉任务", "success");
   };
 
   const run = async (label: string, op: () => Promise<unknown>, successMsg = "操作成功") => {
@@ -611,6 +656,14 @@ export default function PacksPageOptimized() {
               }}>
                 只看需补入口
               </Button>
+              <Button size="sm" variant="outline" onPress={copyBatchReadinessPrompt}>
+                复制批量补肉任务
+              </Button>
+              <Link href={batchReadinessChatHref}>
+                <Button size="sm" className="btn-accent">
+                  交给 Chat 批量补肉 <ArrowRight size={14} />
+                </Button>
+              </Link>
             </div>
             <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
               {readinessQueue.map((item) => {
