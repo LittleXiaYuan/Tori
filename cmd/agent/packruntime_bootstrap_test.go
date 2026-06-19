@@ -449,6 +449,20 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 		t.Fatal("expected Desktop Shell autostart routeSpec")
 	}
 
+	cognitiveLayerPack, ok := registry.Get("yunque.pack.cognitive-layer")
+	if !ok {
+		t.Fatal("expected Cognitive Layer builtin pack to be installed")
+	}
+	if cognitiveLayerPack.Status != packruntime.PackStatusEnabled {
+		t.Fatalf("expected Cognitive Layer default enabled, got %s", cognitiveLayerPack.Status)
+	}
+	if cognitiveLayerPack.Manifest.SDK.TypeScript != "yunque-client/cognitive-layer" {
+		t.Fatalf("unexpected Cognitive Layer SDK import: %s", cognitiveLayerPack.Manifest.SDK.TypeScript)
+	}
+	if !hasRouteSpec(cognitiveLayerPack.Manifest.Backend.RouteSpecs, "POST", "/v1/cognitive-layer") {
+		t.Fatal("expected Cognitive Layer toggle routeSpec")
+	}
+
 	cronPack, ok := registry.Get("yunque.pack.cron")
 	if !ok {
 		t.Fatal("expected Cron builtin pack to be installed")

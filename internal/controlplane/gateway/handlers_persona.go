@@ -29,7 +29,7 @@ func (g *Gateway) ModeManager() *modes.ModeManager { return g.modeManager }
 
 // Reverie HTTP handlers were de-shelled into the reverie pack
 // (internal/packs/reverie). The gateway only exposes the accessors below; the
-// admin-only /v1/cognitive-layer safety valve stays on the gateway.
+// cognitive-layer safety valve is owned by internal/packs/cognitivelayer.
 
 // Reverie exposes the inner-monologue engine to backend packs (the reverie pack).
 func (g *Gateway) Reverie() *planner.Reverie { return g.reverie }

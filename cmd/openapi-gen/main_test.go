@@ -121,7 +121,7 @@ func TestExtractPathsFromDirsScansPackRoutes(t *testing.T) {
 	for _, p := range paths {
 		seen[p] = true
 	}
-	for _, want := range []string{"/api/connectors", "/api/notify/channels", "/api/skillhub/search", "/mcp/v1", "/v1/channels/groups", "/v1/desktop/console", "/v1/federation/peers", "/v1/fork", "/v1/heartbeat", "/v1/identity/profiles", "/v1/market/search", "/v1/modules", "/v1/orchestrator/status", "/v1/persona", "/v1/planner/checkpoints", "/v1/rbac/check", "/v1/reflect/experiences", "/v1/reverie/dream/status", "/v1/scheduler/jobs", "/v1/search/providers", "/v1/sessions/queue", "/v1/speech/voices", "/v1/subagent", "/v1/tori/status", "/v1/trace/recent"} {
+	for _, want := range []string{"/api/connectors", "/api/notify/channels", "/api/skillhub/search", "/mcp/v1", "/v1/channels/groups", "/v1/cognitive-layer", "/v1/desktop/console", "/v1/federation/peers", "/v1/fork", "/v1/heartbeat", "/v1/identity/profiles", "/v1/market/search", "/v1/modules", "/v1/orchestrator/status", "/v1/persona", "/v1/planner/checkpoints", "/v1/rbac/check", "/v1/reflect/experiences", "/v1/reverie/dream/status", "/v1/scheduler/jobs", "/v1/search/providers", "/v1/sessions/queue", "/v1/speech/voices", "/v1/subagent", "/v1/tori/status", "/v1/trace/recent"} {
 		if !seen[want] {
 			t.Fatalf("expected pack route scan to include %s", want)
 		}

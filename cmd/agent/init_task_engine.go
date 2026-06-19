@@ -40,6 +40,7 @@ import (
 	iledger "yunque-agent/internal/ledger"
 	"yunque-agent/internal/observe"
 	channelspack "yunque-agent/internal/packs/channels"
+	cognitivelayerpack "yunque-agent/internal/packs/cognitivelayer"
 	connectorspack "yunque-agent/internal/packs/connectors"
 	controlplanepack "yunque-agent/internal/packs/controlplane"
 	costpack "yunque-agent/internal/packs/cost"
@@ -486,6 +487,10 @@ func initTaskEngine(
 	// requireAuth+requireAdmin composition inside the pack while Pack Runtime owns
 	// enablement.
 	_ = gw.RegisterModule(rbacpack.New(gw))
+
+	// Cognitive Layer pack — owns the admin-only /v1/cognitive-layer safety
+	// switch while Pack Runtime owns enablement and method gates.
+	_ = gw.RegisterModule(cognitivelayerpack.New(gw))
 
 	// ── Approval + SSE ──
 	approvalMgr := approval.NewManager(approval.DefaultPolicy())
