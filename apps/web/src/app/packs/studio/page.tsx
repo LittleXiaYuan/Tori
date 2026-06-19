@@ -32,6 +32,7 @@ import {
 } from "@/lib/pack-presentation";
 import {
   packStudioWorkspaceMatches,
+  parsePackStudioBatchDraftRequestPrompt,
   parsePackStudioPatchDraftRequestPrompt,
   parsePackStudioPatchDraftPrompt,
   parsePackStudioPatchPlanPrompt,
@@ -673,6 +674,7 @@ export default function PackStudioPage() {
   const [workspaceReport, setWorkspaceReport] = useState<PackStudioWorkspaceReport | null>(null);
   const [patchFile, setPatchFile] = useState("");
   const [patchContent, setPatchContent] = useState("");
+  const [importedBatchText, setImportedBatchText] = useState("");
   const [importedPatchPlanText, setImportedPatchPlanText] = useState("");
   const [importedPatchDraftText, setImportedPatchDraftText] = useState("");
   const [patching, setPatching] = useState(false);
@@ -717,6 +719,25 @@ export default function PackStudioPage() {
     setInstalledRepack(null);
   };
 
+  const selectBatchPack = (pack: { id: string; name: string; studioUrl: string; packageUrl: string; sha256: string }) => {
+    const candidate = candidates.find((item) => item.manifest.id === pack.id);
+    if (candidate) selectCandidate(candidate);
+    if (pack.packageUrl) {
+      setPackagePath("");
+      setPackageUrl(pack.packageUrl);
+    }
+    if (pack.sha256) setPackageSHA(pack.sha256);
+    if (pack.studioUrl) {
+      try {
+        const url = new URL(pack.studioUrl, window.location.origin);
+        const linkedGoal = url.searchParams.get("goal");
+        if (linkedGoal) setGoal(linkedGoal);
+      } catch {
+        // Keep the pasted batch visible even if a generated URL is malformed.
+      }
+    }
+  };
+
   const manifest = selected?.manifest;
   const readiness = manifest ? packReadiness(manifest) : null;
   const { data: studioPlan, refresh: refreshStudioPlan } = useApiData(async () => {
@@ -745,6 +766,10 @@ export default function PackStudioPage() {
     [workspaceReport, draftCandidates, goal],
   );
   const patchPlanChatHref = patchPlan ? `/chat?q=${encodeURIComponent(buildPatchPlanPrompt(prompt, patchPlan))}` : "";
+  const importedBatchRequest = useMemo(
+    () => parsePackStudioBatchDraftRequestPrompt(importedBatchText),
+    [importedBatchText],
+  );
   const importedPatchPlan = useMemo(
     () => parsePackStudioPatchPlanPrompt(importedPatchPlanText),
     [importedPatchPlanText],
@@ -1208,6 +1233,99 @@ export default function PackStudioPage() {
                   </button>
                 );
               })}
+            </div>
+          )}
+        </Card>
+
+        <Card className="section-card p-4">
+          <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+            <div className="flex items-start gap-2">
+              <ClipboardCheck size={16} style={{ color: "var(--yunque-accent)" }} />
+              <div>
+                <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>导入批量补肉任务</div>
+                <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
+                  从能力包中心或 Chat 粘贴 yunque.pack_studio.batch_draft_request.v1；Studio 会拆成逐包处理入口，不会批量自动改包。
+                </div>
+              </div>
+            </div>
+            {importedBatchRequest && (
+              <div className="flex flex-wrap gap-2">
+                <Chip size="sm" color="success">{importedBatchRequest.packs.length} 个包</Chip>
+                <Chip size="sm" variant="soft">逐包处理</Chip>
+              </div>
+            )}
+          </div>
+          <TextArea
+            aria-label="导入批量补肉任务 JSON"
+            value={importedBatchText}
+            onChange={(event) => setImportedBatchText(event.target.value)}
+            rows={4}
+          >
+            <Label>批量任务 JSON 或 Chat 消息</Label>
+          </TextArea>
+          {importedBatchText.trim() && !importedBatchRequest && (
+            <div className="mt-2 rounded px-2 py-1 text-[11px]" style={{ background: "rgba(248,113,113,0.08)", color: "var(--yunque-danger)" }}>
+              未识别到 yunque.pack_studio.batch_draft_request.v1。请粘贴能力包中心生成的完整 JSON fenced block 或原始 Chat 消息。
+            </div>
+          )}
+          {importedBatchRequest && (
+            <div className="mt-3 space-y-3">
+              <div className="grid gap-2 text-[11px] lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]" style={{ color: "var(--yunque-text-muted)" }}>
+                <div className="rounded px-2 py-2" style={{ background: "var(--yunque-bg-hover)" }}>
+                  目标：{importedBatchRequest.goal || "逐包补齐用途、入口、示例、权限边界和回滚说明。"}
+                </div>
+                <div className="rounded px-2 py-2" style={{ background: "var(--yunque-bg-hover)" }}>
+                  规则：{importedBatchRequest.rules.slice(0, 2).join("；") || "不要自动应用改动，先回到 Studio 预览 diff / 审计 / 重新打包。"}
+                </div>
+              </div>
+              <div className="grid gap-2 lg:grid-cols-2">
+                {importedBatchRequest.packs.map((pack) => {
+                  const candidate = candidates.find((item) => item.manifest.id === pack.id);
+                  const href = pack.studioUrl || `/packs/studio?packId=${encodeURIComponent(pack.id)}`;
+                  return (
+                    <div key={`${pack.id}:${pack.studioUrl}`} className="rounded-md border p-3" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-surface)" }}>
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="truncate text-xs font-medium" style={{ color: "var(--yunque-text)" }}>{pack.name || pack.id}</div>
+                          <div className="mt-1 truncate font-mono text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>{pack.id}</div>
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {pack.readiness && <Chip size="sm" color={pack.readiness.includes("入口") ? "danger" : "warning"}>{pack.readiness}</Chip>}
+                          <Chip size="sm" variant="soft">{pack.source || "来源未知"}</Chip>
+                        </div>
+                      </div>
+                      {pack.missing.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {pack.missing.map((gap) => (
+                            <Chip key={`${pack.id}:${gap}`} size="sm" variant="soft">补：{gap}</Chip>
+                          ))}
+                        </div>
+                      )}
+                      {(pack.packageUrl || pack.sha256) && (
+                        <div className="mt-2 space-y-1 text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
+                          {pack.packageUrl && <div className="truncate">yqpack：{pack.packageUrl}</div>}
+                          {pack.sha256 && <div className="truncate font-mono">SHA：{pack.sha256}</div>}
+                        </div>
+                      )}
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Button size="sm" variant="outline" onPress={() => selectBatchPack(pack)} isDisabled={!candidate}>
+                          载入本页
+                        </Button>
+                        <Link href={href}>
+                          <Button size="sm" variant="ghost">
+                            打开 Studio <ArrowRight size={13} />
+                          </Button>
+                        </Link>
+                      </div>
+                      {!candidate && (
+                        <div className="mt-2 text-[11px]" style={{ color: "var(--yunque-warning)" }}>
+                          当前候选列表未找到这个包；请先安装或刷新官方/私有源。
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
         </Card>

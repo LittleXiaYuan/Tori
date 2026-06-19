@@ -392,6 +392,61 @@ describe("PackStudioPage", () => {
     expect(task.value).toContain("请以“小羽改包”的方式改造能力包 WASM 能力包");
   });
 
+  it("imports a batch readiness request and lets users continue pack by pack", async () => {
+    render(<PackStudioPage />);
+
+    expect(await screen.findByText("导入批量补肉任务")).toBeInTheDocument();
+    const batchRequest = {
+      kind: "yunque.pack_studio.batch_draft_request.v1",
+      goal: "批量把这些能力包补齐用途和入口。",
+      rules: ["不要自动应用改动。", "回到 Pack Studio 预览 diff / 审计 / 重新打包。"],
+      packs: [
+        {
+          id: "yunque.pack.wasm-plugin",
+          name: "WASM 能力包",
+          version: "0.1.0",
+          status: "alpha",
+          source: "官方源",
+          missing: ["使用示例", "用户感知位置"],
+          readiness: "需补说明",
+          studio_url: "/packs/studio?packId=yunque.pack.wasm-plugin&goal=%E8%A1%A5%E9%BD%90%20WASM%20%E7%94%A8%E9%80%94",
+          package_url: "https://oss.example.com/wasm-plugin.yqpack",
+          sha256: "9".repeat(64),
+        },
+        {
+          id: "yunque.pack.documents",
+          name: "Documents",
+          version: "0.1.0",
+          status: "beta",
+          source: "已安装",
+          missing: ["用户感知位置"],
+          readiness: "需补说明",
+          studio_url: "/packs/studio?packId=yunque.pack.documents",
+        },
+      ],
+    };
+    fireEvent.change(screen.getByLabelText("导入批量补肉任务 JSON"), {
+      target: { value: `小羽收到批量补肉任务。\n\n\`\`\`json\n${JSON.stringify(batchRequest, null, 2)}\n\`\`\`` },
+    });
+
+    expect(screen.getByText("2 个包")).toBeInTheDocument();
+    expect(screen.getByText("逐包处理")).toBeInTheDocument();
+    expect(screen.getByText("目标：批量把这些能力包补齐用途和入口。")).toBeInTheDocument();
+    expect(screen.getByText("规则：不要自动应用改动。；回到 Pack Studio 预览 diff / 审计 / 重新打包。")).toBeInTheDocument();
+    expect(screen.getByText("补：使用示例")).toBeInTheDocument();
+    expect(screen.getAllByText("补：用户感知位置")).toHaveLength(2);
+    expect(screen.getByText("yqpack：https://oss.example.com/wasm-plugin.yqpack")).toBeInTheDocument();
+    expect(screen.getByText(`SHA：${"9".repeat(64)}`)).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: /打开 Studio/ })[0]).toHaveAttribute("href", expect.stringContaining("packId=yunque.pack.wasm-plugin"));
+
+    fireEvent.click(screen.getAllByRole("button", { name: "载入本页" })[0]);
+
+    expect((screen.getByLabelText("这次想补强什么") as HTMLInputElement).value).toBe("补齐 WASM 用途");
+    expect((screen.getByLabelText("OSS / Release URL") as HTMLInputElement).value).toBe("https://oss.example.com/wasm-plugin.yqpack");
+    expect((screen.getByLabelText("SHA256") as HTMLInputElement).value).toBe("9".repeat(64));
+    expect(screen.getByText("已从能力包中心接入这个 yqpack")).toBeInTheDocument();
+  });
+
   it("turns real pack metadata into a guarded Xiaoyu modification task", async () => {
     render(<PackStudioPage />);
 
