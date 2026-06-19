@@ -1,0 +1,56 @@
+{
+  "id": "yunque.pack.missions",
+  "name": "Missions (任务意图)",
+  "version": "0.1.0",
+  "description": "任务意图能力：把自然语言目标解析成任务结构，支撑 Chat 到任务中心的闭环。默认预装。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": [
+      "missions.parse"
+    ],
+    "routes": [
+      "/v1/missions/parse"
+    ],
+    "permissions": [
+      "missions:read",
+      "planner:read"
+    ],
+    "routeSpecs": [
+      {
+        "method": "POST",
+        "path": "/v1/missions/parse",
+        "description": "Parse a natural-language goal into a mission intent."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [
+      {
+        "key": "missions",
+        "label": "任务中心",
+        "path": "/missions",
+        "icon": "zap",
+        "order": 150
+      }
+    ],
+    "assets": {
+      "type": "builtin"
+    }
+  },
+  "sdk": {
+    "typescript": "yunque-client/missions"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "group": "work",
+    "phase": "A4",
+    "preload": "true",
+    "note": "Natively owns /v1/missions/* through Pack Runtime. The UI route is built into the web shell while this pack owns the parsing API."
+  },
+  "status": "beta"
+}

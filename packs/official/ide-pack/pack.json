@@ -1,0 +1,56 @@
+{
+  "id": "yunque.pack.ide",
+  "name": "IDE (代码审查)",
+  "version": "0.1.0",
+  "description": "IDE 辅助能力：为编辑器插件提供代码审查和连接状态查询。默认预装，由 IDE 插件或任务编排界面调用。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": [
+      "ide.review",
+      "ide.status"
+    ],
+    "routes": [
+      "/v1/ide/review",
+      "/v1/ide/status"
+    ],
+    "permissions": [
+      "ide:read",
+      "ide:write",
+      "llm:call"
+    ],
+    "routeSpecs": [
+      {
+        "method": "POST",
+        "path": "/v1/ide/review",
+        "description": "Run a structured code review through the host LLM pipeline."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/ide/status",
+        "description": "Read IDE plugin connection and server capability status."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [],
+    "assets": {
+      "type": "builtin"
+    }
+  },
+  "sdk": {
+    "typescript": "yunque-client/ide"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "group": "developer",
+    "phase": "A4",
+    "preload": "true",
+    "note": "Natively owns /v1/ide/* through Pack Runtime. Review is LLM-backed and bounded by request-size limits in the pack handler."
+  },
+  "status": "beta"
+}

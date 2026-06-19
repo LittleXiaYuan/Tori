@@ -1,0 +1,61 @@
+{
+  "id": "yunque.pack.persona-modes",
+  "name": "Persona Modes (人格模式)",
+  "version": "0.1.0",
+  "description": "人格模式能力：列出、切换并读取当前会话的人格模式。默认预装，和 Persona 基础能力包分离。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": [
+      "persona.modes.read",
+      "persona.modes.write"
+    ],
+    "routes": [
+      "/v1/persona/modes",
+      "/v1/persona/mode",
+      "/v1/persona/mode/current"
+    ],
+    "permissions": [
+      "persona:read",
+      "persona:write"
+    ],
+    "routeSpecs": [
+      {
+        "method": "GET",
+        "path": "/v1/persona/modes",
+        "description": "List available persona modes."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/persona/mode",
+        "description": "Switch the active persona mode."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/persona/mode/current",
+        "description": "Read the active persona mode."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [],
+    "assets": {
+      "type": "builtin"
+    }
+  },
+  "sdk": {
+    "typescript": "yunque-client/persona-modes"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "group": "cogni",
+    "phase": "A4",
+    "preload": "true",
+    "note": "Natively owns /v1/persona/mode* through Pack Runtime. Base persona CRUD remains in yunque.pack.persona."
+  },
+  "status": "beta"
+}

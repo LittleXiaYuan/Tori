@@ -1,0 +1,88 @@
+{
+  "id": "yunque.pack.graph",
+  "name": "Graph (知识图谱)",
+  "version": "0.1.0",
+  "description": "知识图谱能力：读取、写入和删除实体关系，并为记忆和知识召回提供图谱上下文。默认预装。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": [
+      "graph.entities.read",
+      "graph.entities.write",
+      "graph.relations.read",
+      "graph.relations.write",
+      "graph.context.read",
+      "graph.stats.read"
+    ],
+    "routes": [
+      "/v1/graph/entities",
+      "/v1/graph/relations",
+      "/v1/graph/context",
+      "/v1/graph/stats"
+    ],
+    "permissions": [
+      "graph:read",
+      "graph:write",
+      "memory:read",
+      "memory:write"
+    ],
+    "routeSpecs": [
+      {
+        "method": "GET",
+        "path": "/v1/graph/entities",
+        "description": "List or search graph entities."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/graph/entities",
+        "description": "Create or update a graph entity."
+      },
+      {
+        "method": "DELETE",
+        "path": "/v1/graph/entities",
+        "description": "Delete a graph entity."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/graph/relations",
+        "description": "List graph relations."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/graph/relations",
+        "description": "Create or update a graph relation."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/graph/context",
+        "description": "Read graph context for one entity or name."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/graph/stats",
+        "description": "Read graph entity and relation counts."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [],
+    "assets": {
+      "type": "builtin"
+    }
+  },
+  "sdk": {
+    "typescript": "yunque-client/graph"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "group": "memory",
+    "phase": "A4",
+    "preload": "true",
+    "note": "Natively owns /v1/graph/* through Pack Runtime. It uses the memory pipeline graph through a narrow accessor."
+  },
+  "status": "beta"
+}

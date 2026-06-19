@@ -1,0 +1,108 @@
+{
+  "id": "yunque.pack.triggers",
+  "name": "Triggers (触发器)",
+  "version": "0.1.0",
+  "description": "触发器能力：管理旧版和新版触发器、发出事件并查看运行记录。默认预装，由任务自动化和事件流调用。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": [
+      "triggers.read",
+      "triggers.write",
+      "triggers.emit",
+      "triggers.runs.read",
+      "triggers.events.read"
+    ],
+    "routes": [
+      "/v1/triggers",
+      "/v1/triggers/emit",
+      "/v1/triggers/v2",
+      "/v1/triggers/v2/emit",
+      "/v1/triggers/v2/runs",
+      "/v1/triggers/v2/events"
+    ],
+    "permissions": [
+      "triggers:read",
+      "triggers:write",
+      "events:emit"
+    ],
+    "routeSpecs": [
+      {
+        "method": "GET",
+        "path": "/v1/triggers",
+        "description": "List legacy triggers."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/triggers",
+        "description": "Create a legacy trigger."
+      },
+      {
+        "method": "DELETE",
+        "path": "/v1/triggers",
+        "description": "Delete a legacy trigger."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/triggers/emit",
+        "description": "Emit an event to the legacy trigger runtime."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/triggers/v2",
+        "description": "List unified trigger definitions."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/triggers/v2",
+        "description": "Create a unified trigger definition."
+      },
+      {
+        "method": "PUT",
+        "path": "/v1/triggers/v2",
+        "description": "Update a unified trigger definition."
+      },
+      {
+        "method": "DELETE",
+        "path": "/v1/triggers/v2",
+        "description": "Delete a unified trigger definition."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/triggers/v2/emit",
+        "description": "Emit an event to the unified trigger manager."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/triggers/v2/runs",
+        "description": "List recent trigger runs."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/triggers/v2/events",
+        "description": "List recent trigger events."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [],
+    "assets": {
+      "type": "builtin"
+    }
+  },
+  "sdk": {
+    "typescript": "yunque-client/triggers"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "group": "automation",
+    "phase": "A4",
+    "preload": "true",
+    "note": "Natively owns /v1/triggers* through Pack Runtime. It covers both legacy Runtime triggers and unified Manager triggers."
+  },
+  "status": "beta"
+}

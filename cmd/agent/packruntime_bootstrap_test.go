@@ -449,6 +449,76 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 		t.Fatal("expected Desktop Shell autostart routeSpec")
 	}
 
+	cronPack, ok := registry.Get("yunque.pack.cron")
+	if !ok {
+		t.Fatal("expected Cron builtin pack to be installed")
+	}
+	if cronPack.Status != packruntime.PackStatusEnabled {
+		t.Fatalf("expected Cron default enabled, got %s", cronPack.Status)
+	}
+	if cronPack.Manifest.SDK.TypeScript != "yunque-client/cron" {
+		t.Fatalf("unexpected Cron SDK import: %s", cronPack.Manifest.SDK.TypeScript)
+	}
+	if !hasRouteSpec(cronPack.Manifest.Backend.RouteSpecs, "POST", "/v1/cron/add") {
+		t.Fatal("expected Cron add routeSpec")
+	}
+
+	filesPack, ok := registry.Get("yunque.pack.files")
+	if !ok {
+		t.Fatal("expected Files builtin pack to be installed")
+	}
+	if filesPack.Status != packruntime.PackStatusEnabled {
+		t.Fatalf("expected Files default enabled, got %s", filesPack.Status)
+	}
+	if filesPack.Manifest.SDK.TypeScript != "yunque-client/files" {
+		t.Fatalf("unexpected Files SDK import: %s", filesPack.Manifest.SDK.TypeScript)
+	}
+	if !hasRouteSpec(filesPack.Manifest.Backend.RouteSpecs, "GET", "/api/files/preview") {
+		t.Fatal("expected Files preview routeSpec")
+	}
+
+	personaModesPack, ok := registry.Get("yunque.pack.persona-modes")
+	if !ok {
+		t.Fatal("expected Persona Modes builtin pack to be installed")
+	}
+	if personaModesPack.Status != packruntime.PackStatusEnabled {
+		t.Fatalf("expected Persona Modes default enabled, got %s", personaModesPack.Status)
+	}
+	if personaModesPack.Manifest.SDK.TypeScript != "yunque-client/persona-modes" {
+		t.Fatalf("unexpected Persona Modes SDK import: %s", personaModesPack.Manifest.SDK.TypeScript)
+	}
+	if !hasRouteSpec(personaModesPack.Manifest.Backend.RouteSpecs, "GET", "/v1/persona/mode/current") {
+		t.Fatal("expected Persona Modes current routeSpec")
+	}
+
+	instructionsPack, ok := registry.Get("yunque.pack.instructions")
+	if !ok {
+		t.Fatal("expected Instructions builtin pack to be installed")
+	}
+	if instructionsPack.Status != packruntime.PackStatusEnabled {
+		t.Fatalf("expected Instructions default enabled, got %s", instructionsPack.Status)
+	}
+	if instructionsPack.Manifest.SDK.TypeScript != "yunque-client/instructions" {
+		t.Fatalf("unexpected Instructions SDK import: %s", instructionsPack.Manifest.SDK.TypeScript)
+	}
+	if !hasRouteSpec(instructionsPack.Manifest.Backend.RouteSpecs, "POST", "/v1/instructions/reorder") {
+		t.Fatal("expected Instructions reorder routeSpec")
+	}
+
+	graphPack, ok := registry.Get("yunque.pack.graph")
+	if !ok {
+		t.Fatal("expected Graph builtin pack to be installed")
+	}
+	if graphPack.Status != packruntime.PackStatusEnabled {
+		t.Fatalf("expected Graph default enabled, got %s", graphPack.Status)
+	}
+	if graphPack.Manifest.SDK.TypeScript != "yunque-client/graph" {
+		t.Fatalf("unexpected Graph SDK import: %s", graphPack.Manifest.SDK.TypeScript)
+	}
+	if !hasRouteSpec(graphPack.Manifest.Backend.RouteSpecs, "GET", "/v1/graph/context") {
+		t.Fatal("expected Graph context routeSpec")
+	}
+
 	computerUse, ok := registry.Get("yunque.pack.computer-use")
 	if !ok {
 		t.Fatal("expected Computer Use builtin pack to be installed")
@@ -659,10 +729,9 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 	}
 
 	ensureBuiltinPacks(registry)
-	// Count reflects the current packs/official/ set (incl. the newer
-	// console/control-plane/knowledge/memory/skills/work/workspace packs and the
-	// cognitive-layer/state packs). Adjust if the builtin pack set changes.
-	if got := len(registry.List()); got != 53 {
+	// Count reflects the current auto-seeded packs/official/ set. Adjust if the
+	// builtin pack set changes (dlc-demo stays excluded by design).
+	if got := len(registry.List()); got != 63 {
 		t.Fatalf("expected idempotent builtin install, got %d packs", got)
 	}
 }

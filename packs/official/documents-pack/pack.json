@@ -1,0 +1,57 @@
+{
+  "id": "yunque.pack.documents",
+  "name": "Documents (文档生成)",
+  "version": "0.1.0",
+  "description": "文档生成能力：通过技能生成 docx/xlsx/html/pptx，并读取文档模板目录。默认预装，由任务产物和文档生成入口调用。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": [
+      "documents.generate",
+      "documents.templates.read"
+    ],
+    "routes": [
+      "/v1/documents/generate",
+      "/v1/documents/templates"
+    ],
+    "permissions": [
+      "documents:read",
+      "documents:write",
+      "skills:execute",
+      "filesystem:write"
+    ],
+    "routeSpecs": [
+      {
+        "method": "POST",
+        "path": "/v1/documents/generate",
+        "description": "Generate a document through the registered document skills."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/documents/templates",
+        "description": "Read the document template catalog."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [],
+    "assets": {
+      "type": "builtin"
+    }
+  },
+  "sdk": {
+    "typescript": "yunque-client/documents"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "group": "work",
+    "phase": "A4",
+    "preload": "true",
+    "note": "Natively owns /v1/documents/* through Pack Runtime. It reaches document skills through a narrow SkillsRegistry accessor."
+  },
+  "status": "beta"
+}

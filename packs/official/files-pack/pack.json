@@ -1,0 +1,62 @@
+{
+  "id": "yunque.pack.files",
+  "name": "Files (产物文件)",
+  "version": "0.1.0",
+  "description": "产物文件能力：列出、预览和下载云雀生成的输出文件。默认预装，由 Chat 产物区和任务结果界面调用。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": [
+      "files.list",
+      "files.preview",
+      "files.download"
+    ],
+    "routes": [
+      "/api/files",
+      "/api/files/preview",
+      "/api/files/download"
+    ],
+    "permissions": [
+      "files:read",
+      "filesystem:read"
+    ],
+    "routeSpecs": [
+      {
+        "method": "GET",
+        "path": "/api/files",
+        "description": "List generated output files below the configured output directory."
+      },
+      {
+        "method": "GET",
+        "path": "/api/files/preview",
+        "description": "Preview a generated output file with path traversal protection."
+      },
+      {
+        "method": "GET",
+        "path": "/api/files/download",
+        "description": "Download a generated output file with path traversal protection."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [],
+    "assets": {
+      "type": "builtin"
+    }
+  },
+  "sdk": {
+    "typescript": "yunque-client/files"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "group": "work",
+    "phase": "A4",
+    "preload": "true",
+    "note": "Natively owns /api/files* through Pack Runtime. It only resolves paths inside the configured output directory."
+  },
+  "status": "beta"
+}

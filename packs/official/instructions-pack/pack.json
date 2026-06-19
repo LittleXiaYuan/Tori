@@ -1,0 +1,72 @@
+{
+  "id": "yunque.pack.instructions",
+  "name": "Instructions (用户指令)",
+  "version": "0.1.0",
+  "description": "用户指令能力：管理长期偏好、工作规则和指令排序。默认预装，由设置、记忆和 Chat 上下文使用。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": [
+      "instructions.read",
+      "instructions.write",
+      "instructions.reorder"
+    ],
+    "routes": [
+      "/v1/instructions",
+      "/v1/instructions/reorder"
+    ],
+    "permissions": [
+      "instructions:read",
+      "instructions:write",
+      "memory:write"
+    ],
+    "routeSpecs": [
+      {
+        "method": "GET",
+        "path": "/v1/instructions",
+        "description": "List user instructions."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/instructions",
+        "description": "Create a user instruction."
+      },
+      {
+        "method": "PUT",
+        "path": "/v1/instructions",
+        "description": "Update a user instruction."
+      },
+      {
+        "method": "DELETE",
+        "path": "/v1/instructions",
+        "description": "Delete a user instruction."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/instructions/reorder",
+        "description": "Reorder user instructions."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [],
+    "assets": {
+      "type": "builtin"
+    }
+  },
+  "sdk": {
+    "typescript": "yunque-client/instructions"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "group": "memory",
+    "phase": "A4",
+    "preload": "true",
+    "note": "Natively owns /v1/instructions* through Pack Runtime. It stores user-facing instruction records through a narrow store accessor."
+  },
+  "status": "beta"
+}

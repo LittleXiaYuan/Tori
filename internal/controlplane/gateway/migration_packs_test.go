@@ -24,11 +24,15 @@ import (
 	cronpack "yunque-agent/internal/packs/cron"
 	desktoppack "yunque-agent/internal/packs/desktop"
 	documentspack "yunque-agent/internal/packs/documents"
+	emotionpack "yunque-agent/internal/packs/emotion"
 	federationpack "yunque-agent/internal/packs/federation"
+	filespack "yunque-agent/internal/packs/files"
 	forkspack "yunque-agent/internal/packs/forks"
+	graphpack "yunque-agent/internal/packs/graph"
 	heartbeatpack "yunque-agent/internal/packs/heartbeat"
 	idepack "yunque-agent/internal/packs/ide"
 	identitypack "yunque-agent/internal/packs/identity"
+	instructionspack "yunque-agent/internal/packs/instructions"
 	knowledgepack "yunque-agent/internal/packs/knowledge"
 	marketpack "yunque-agent/internal/packs/market"
 	mcpdispatchpack "yunque-agent/internal/packs/mcpdispatch"
@@ -118,7 +122,13 @@ var migrationPackPaths = map[string][]string{
 	idepack.PackID:       {"/v1/ide/review", "/v1/ide/status"},
 	cronpack.PackID:      {"/v1/cron/list", "/v1/cron/add", "/v1/cron/remove", "/v1/cron/run"},
 	documentspack.PackID: {"/v1/documents/generate", "/v1/documents/templates"},
-	missionspack.PackID:  {"/v1/missions/parse"},
+	emotionpack.PackID:   {"/v1/emotion/stickers", "/v1/emotion/history"},
+	filespack.PackID:     {"/api/files", "/api/files/preview", "/api/files/download"},
+	graphpack.PackID: {
+		"/v1/graph/entities", "/v1/graph/relations", "/v1/graph/context", "/v1/graph/stats",
+	},
+	instructionspack.PackID: {"/v1/instructions", "/v1/instructions/reorder"},
+	missionspack.PackID:     {"/v1/missions/parse"},
 	triggerspack.PackID: {
 		"/v1/triggers", "/v1/triggers/emit", "/v1/triggers/v2",
 		"/v1/triggers/v2/emit", "/v1/triggers/v2/runs", "/v1/triggers/v2/events",
@@ -165,6 +175,10 @@ var migrationPackNames = map[string]string{
 	cronpack.PackID:            "Cron",
 	triggerspack.PackID:        "Triggers",
 	documentspack.PackID:       "Documents",
+	emotionpack.PackID:         "Emotion",
+	filespack.PackID:           "Files",
+	graphpack.PackID:           "Graph",
+	instructionspack.PackID:    "Instructions",
 	missionspack.PackID:        "Missions",
 	statepack.PackID:           "State Kernel",
 }
@@ -237,6 +251,10 @@ func registerMigrationPacks(gw *Gateway) {
 	_ = gw.RegisterModule(cronpack.New(gw))
 	_ = gw.RegisterModule(triggerspack.New(gw))
 	_ = gw.RegisterModule(documentspack.New(gw))
+	_ = gw.RegisterModule(emotionpack.New(gw))
+	_ = gw.RegisterModule(filespack.New(gw))
+	_ = gw.RegisterModule(graphpack.New(gw))
+	_ = gw.RegisterModule(instructionspack.New(gw))
 	_ = gw.RegisterModule(missionspack.New(gw))
 	_ = gw.RegisterModule(statepack.New(gw))
 }
@@ -339,6 +357,26 @@ func newTestGatewayWithMigrationPack(t *testing.T, packID string, status packrun
 		_ = gw.RegisterModule(toripack.New(gw))
 	case tracepack.PackID:
 		_ = gw.RegisterModule(tracepack.New(gw))
+	case modespack.PackID:
+		_ = gw.RegisterModule(modespack.New(gw))
+	case idepack.PackID:
+		_ = gw.RegisterModule(idepack.New(gw))
+	case cronpack.PackID:
+		_ = gw.RegisterModule(cronpack.New(gw))
+	case triggerspack.PackID:
+		_ = gw.RegisterModule(triggerspack.New(gw))
+	case documentspack.PackID:
+		_ = gw.RegisterModule(documentspack.New(gw))
+	case emotionpack.PackID:
+		_ = gw.RegisterModule(emotionpack.New(gw))
+	case filespack.PackID:
+		_ = gw.RegisterModule(filespack.New(gw))
+	case graphpack.PackID:
+		_ = gw.RegisterModule(graphpack.New(gw))
+	case instructionspack.PackID:
+		_ = gw.RegisterModule(instructionspack.New(gw))
+	case missionspack.PackID:
+		_ = gw.RegisterModule(missionspack.New(gw))
 	case statepack.PackID:
 		_ = gw.RegisterModule(statepack.New(gw))
 	}
@@ -354,45 +392,56 @@ func TestMigrationPackRouteGating(t *testing.T) {
 	cases := []struct {
 		name   string
 		packID string
+		method string
 		probe  string
 	}{
-		{"knowledge", knowledgepack.PackID, "/v1/knowledge/stats"},
-		{"memory", memorypack.PackID, "/v1/memory/stats"},
-		{"skills", skillspack.PackID, "/v1/skills"},
-		{"channels", channelspack.PackID, "/v1/channels/groups"},
-		{"work", workpack.PackID, "/v1/tasks"},
-		{"connectors", connectorspack.PackID, "/api/connectors"},
-		{"cost", costpack.PackID, "/v1/cost/summary"},
-		{"desktop", desktoppack.PackID, "/v1/desktop/console"},
-		{"federation", federationpack.PackID, "/v1/federation/peers"},
-		{"forks", forkspack.PackID, "/v1/fork/list"},
-		{"heartbeat", heartbeatpack.PackID, "/v1/heartbeat"},
-		{"identity", identitypack.PackID, "/v1/identity/profiles"},
-		{"market", marketpack.PackID, "/v1/market/search"},
-		{"mcp-dispatch", mcpdispatchpack.PackID, "/v1/workers"},
-		{"modules", modulespack.PackID, "/v1/modules"},
-		{"notifications", notificationspack.PackID, "/api/notify/channels"},
-		{"orchestrator", orchestratorpack.PackID, "/v1/orchestrator/status"},
-		{"persona", personapack.PackID, "/v1/persona"},
-		{"planner-recovery", plannerrecoverypack.PackID, "/v1/planner/checkpoints"},
-		{"rbac", rbacpack.PackID, "/v1/rbac/my-roles"},
-		{"reflection", reflectionpack.PackID, "/v1/reflect/experiences"},
-		{"retrieval", retrievalpack.PackID, "/v1/search/providers"},
-		{"reverie", reveriepack.PackID, "/v1/reverie/dream/status"},
-		{"scheduler", schedulerpack.PackID, "/v1/scheduler/jobs"},
-		{"session-queue", sessionqueuepack.PackID, "/v1/sessions/queue"},
-		{"skillhub", skillhubpack.PackID, "/api/skillhub/search"},
-		{"speech", speechpack.PackID, "/v1/speech/voices"},
-		{"subagents", subagentspack.PackID, "/v1/subagent"},
-		{"tori", toripack.PackID, "/v1/tori/status"},
-		{"trace", tracepack.PackID, "/v1/trace/recent"},
-		{"state", statepack.PackID, "/v1/state"},
+		{"knowledge", knowledgepack.PackID, http.MethodGet, "/v1/knowledge/stats"},
+		{"memory", memorypack.PackID, http.MethodGet, "/v1/memory/stats"},
+		{"skills", skillspack.PackID, http.MethodGet, "/v1/skills"},
+		{"channels", channelspack.PackID, http.MethodGet, "/v1/channels/groups"},
+		{"work", workpack.PackID, http.MethodGet, "/v1/tasks"},
+		{"connectors", connectorspack.PackID, http.MethodGet, "/api/connectors"},
+		{"cost", costpack.PackID, http.MethodGet, "/v1/cost/summary"},
+		{"desktop", desktoppack.PackID, http.MethodGet, "/v1/desktop/console"},
+		{"federation", federationpack.PackID, http.MethodGet, "/v1/federation/peers"},
+		{"forks", forkspack.PackID, http.MethodGet, "/v1/fork/list"},
+		{"heartbeat", heartbeatpack.PackID, http.MethodGet, "/v1/heartbeat"},
+		{"identity", identitypack.PackID, http.MethodGet, "/v1/identity/profiles"},
+		{"market", marketpack.PackID, http.MethodGet, "/v1/market/search"},
+		{"mcp-dispatch", mcpdispatchpack.PackID, http.MethodGet, "/v1/workers"},
+		{"modules", modulespack.PackID, http.MethodGet, "/v1/modules"},
+		{"notifications", notificationspack.PackID, http.MethodGet, "/api/notify/channels"},
+		{"orchestrator", orchestratorpack.PackID, http.MethodGet, "/v1/orchestrator/status"},
+		{"persona", personapack.PackID, http.MethodGet, "/v1/persona"},
+		{"planner-recovery", plannerrecoverypack.PackID, http.MethodGet, "/v1/planner/checkpoints"},
+		{"rbac", rbacpack.PackID, http.MethodGet, "/v1/rbac/my-roles"},
+		{"reflection", reflectionpack.PackID, http.MethodGet, "/v1/reflect/experiences"},
+		{"retrieval", retrievalpack.PackID, http.MethodGet, "/v1/search/providers"},
+		{"reverie", reveriepack.PackID, http.MethodGet, "/v1/reverie/dream/status"},
+		{"scheduler", schedulerpack.PackID, http.MethodGet, "/v1/scheduler/jobs"},
+		{"session-queue", sessionqueuepack.PackID, http.MethodGet, "/v1/sessions/queue"},
+		{"skillhub", skillhubpack.PackID, http.MethodGet, "/api/skillhub/search"},
+		{"speech", speechpack.PackID, http.MethodGet, "/v1/speech/voices"},
+		{"subagents", subagentspack.PackID, http.MethodGet, "/v1/subagent"},
+		{"tori", toripack.PackID, http.MethodGet, "/v1/tori/status"},
+		{"trace", tracepack.PackID, http.MethodGet, "/v1/trace/recent"},
+		{"persona-modes", modespack.PackID, http.MethodGet, "/v1/persona/modes"},
+		{"ide", idepack.PackID, http.MethodGet, "/v1/ide/status"},
+		{"cron", cronpack.PackID, http.MethodGet, "/v1/cron/list"},
+		{"triggers", triggerspack.PackID, http.MethodGet, "/v1/triggers"},
+		{"documents", documentspack.PackID, http.MethodGet, "/v1/documents/templates"},
+		{"emotion", emotionpack.PackID, http.MethodGet, "/v1/emotion/history"},
+		{"files", filespack.PackID, http.MethodGet, "/api/files"},
+		{"graph", graphpack.PackID, http.MethodGet, "/v1/graph/stats"},
+		{"instructions", instructionspack.PackID, http.MethodGet, "/v1/instructions"},
+		{"missions", missionspack.PackID, http.MethodPost, "/v1/missions/parse"},
+		{"state", statepack.PackID, http.MethodGet, "/v1/state"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Enabled but unauthenticated → 401 (auth gate precedes enable gate).
 			gw, _ := newTestGatewayWithMigrationPack(t, tc.packID, packruntime.PackStatusEnabled)
-			req := httptest.NewRequest(http.MethodGet, tc.probe, nil)
+			req := httptest.NewRequest(tc.method, tc.probe, nil)
 			w := httptest.NewRecorder()
 			gw.ServeHTTP(w, req)
 			if w.Code != http.StatusUnauthorized {
@@ -402,7 +451,7 @@ func TestMigrationPackRouteGating(t *testing.T) {
 			// Disabled but authenticated → 404 (enable gate removes the surface).
 			gwD, tmD := newTestGatewayWithMigrationPack(t, tc.packID, packruntime.PackStatusDisabled)
 			key := tmD.Register(tc.name + "-org").APIKey
-			reqD := httptest.NewRequest(http.MethodGet, tc.probe, nil)
+			reqD := httptest.NewRequest(tc.method, tc.probe, nil)
 			reqD.Header.Set("X-API-Key", key)
 			wD := httptest.NewRecorder()
 			gwD.ServeHTTP(wD, reqD)
