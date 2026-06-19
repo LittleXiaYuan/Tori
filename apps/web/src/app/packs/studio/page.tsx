@@ -2535,44 +2535,54 @@ export default function PackStudioPage() {
                             <span>{reinspectReport.entry_count} 个文件 · {reinspectReport.editable_count} 可改 · {reinspectReport.guarded_count} 需审计</span>
                           </div>
                         )}
-                        {installedRepack && (
-                          <div className="mt-3 rounded-md border p-3" style={{ borderColor: "var(--yunque-border)" }}>
-                            <div className="mb-2 flex flex-wrap items-center gap-2">
-                              <Chip size="sm" color={installedRepack.status === "enabled" ? "success" : "warning"}>
-                                {installedRepack.status === "enabled" ? "已启用" : "已安装未启用"}
-                              </Chip>
-                              <span className="font-medium" style={{ color: "var(--yunque-text)" }}>{installedRepack.manifest.name}</span>
-                              <span className="font-mono">{installedRepack.manifest.version}</span>
-                            </div>
-                            <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>
-                              启用前再次确认权限；出问题可在这里禁用或回滚，也可以回到能力包中心继续管理。
-                            </div>
-                            <div className="mt-3 flex flex-wrap gap-2">
-                              {packPrimaryPath(installedRepack.manifest) && (
-                                <Link href={packPrimaryPath(installedRepack.manifest)!}>
-                                  <Button size="sm" variant="outline">
-                                    <ExternalLink size={14} /> 打开入口
-                                  </Button>
+                        {installedRepack && (() => {
+                          const installedRisk = riskProfileForPack(installedRepack.manifest);
+                          const installedPermissionSummary = packPermissionSummary(installedRepack.manifest);
+                          return (
+                            <div className="mt-3 rounded-md border p-3" style={{ borderColor: "var(--yunque-border)" }}>
+                              <div className="mb-2 flex flex-wrap items-center gap-2">
+                                <Chip size="sm" color={installedRepack.status === "enabled" ? "success" : "warning"}>
+                                  {installedRepack.status === "enabled" ? "已启用" : "已安装未启用"}
+                                </Chip>
+                                <Chip size="sm" color={installedRisk.level === "high" ? "danger" : installedRisk.level === "medium" ? "warning" : "success"}>
+                                  {installedRisk.label}
+                                </Chip>
+                                <span className="font-medium" style={{ color: "var(--yunque-text)" }}>{installedRepack.manifest.name}</span>
+                                <span className="font-mono">{installedRepack.manifest.version}</span>
+                              </div>
+                              <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+                                启用前再次确认权限；出问题可在这里禁用或回滚，也可以回到能力包中心继续管理。
+                              </div>
+                              <div className="mt-2 text-xs font-medium" style={{ color: installedRisk.requiresAuthorization ? "var(--yunque-warning)" : "var(--yunque-text-muted)" }}>
+                                {installedPermissionSummary}
+                              </div>
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                {packPrimaryPath(installedRepack.manifest) && (
+                                  <Link href={packPrimaryPath(installedRepack.manifest)!}>
+                                    <Button size="sm" variant="outline">
+                                      <ExternalLink size={14} /> 打开入口
+                                    </Button>
+                                  </Link>
+                                )}
+                                <Button size="sm" variant="outline" onPress={() => mutateInstalledRepack("enable")} isDisabled={postInstallBusy === "enable" || installedRepack.status === "enabled"}>
+                                  {postInstallBusy === "enable" ? <Spinner size="sm" /> : <Sparkles size={14} />} 启用
+                                </Button>
+                                <Button size="sm" variant="outline" onPress={() => mutateInstalledRepack("disable")} isDisabled={postInstallBusy === "disable" || installedRepack.status !== "enabled"}>
+                                  {postInstallBusy === "disable" ? <Spinner size="sm" /> : <ShieldCheck size={14} />} 禁用
+                                </Button>
+                                <Button size="sm" variant="ghost" onPress={() => mutateInstalledRepack("rollback")} isDisabled={postInstallBusy === "rollback"}>
+                                  {postInstallBusy === "rollback" ? <Spinner size="sm" /> : <RotateCcw size={14} />} 回滚
+                                </Button>
+                                <Link href={`/packs/detail?id=${encodeURIComponent(installedRepack.manifest.id)}`}>
+                                  <Button size="sm" variant="ghost">查看权限与来源 <ArrowRight size={14} /></Button>
                                 </Link>
-                              )}
-                              <Button size="sm" variant="outline" onPress={() => mutateInstalledRepack("enable")} isDisabled={postInstallBusy === "enable" || installedRepack.status === "enabled"}>
-                                {postInstallBusy === "enable" ? <Spinner size="sm" /> : <Sparkles size={14} />} 启用
-                              </Button>
-                              <Button size="sm" variant="outline" onPress={() => mutateInstalledRepack("disable")} isDisabled={postInstallBusy === "disable" || installedRepack.status !== "enabled"}>
-                                {postInstallBusy === "disable" ? <Spinner size="sm" /> : <ShieldCheck size={14} />} 禁用
-                              </Button>
-                              <Button size="sm" variant="ghost" onPress={() => mutateInstalledRepack("rollback")} isDisabled={postInstallBusy === "rollback"}>
-                                {postInstallBusy === "rollback" ? <Spinner size="sm" /> : <RotateCcw size={14} />} 回滚
-                              </Button>
-                              <Link href={`/packs/detail?id=${encodeURIComponent(installedRepack.manifest.id)}`}>
-                                <Button size="sm" variant="ghost">查看权限与来源 <ArrowRight size={14} /></Button>
-                              </Link>
-                              <Link href={packCenterFocusHref(installedRepack.manifest.id)}>
-                                <Button size="sm" variant="ghost">回中心管理 <ArrowRight size={14} /></Button>
-                              </Link>
+                                <Link href={packCenterFocusHref(installedRepack.manifest.id)}>
+                                  <Button size="sm" variant="ghost">回中心管理 <ArrowRight size={14} /></Button>
+                                </Link>
+                              </div>
                             </div>
-                          </div>
-                        )}
+                          );
+                        })()}
                         <div className="mt-2 space-y-1">
                           {repackReport.next_steps.map((step) => (
                             <div key={step}>{step}</div>

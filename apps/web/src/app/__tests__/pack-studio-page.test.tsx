@@ -1010,6 +1010,8 @@ describe("PackStudioPage", () => {
     expect((await screen.findAllByText("已安装未启用")).length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText("WASM 能力包 · 已安装未启用").length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText("已安装").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("需要授权").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("权限：沙箱、联网、写入；需要授权后使用").length).toBeGreaterThanOrEqual(2);
     expect(screen.getByRole("link", { name: /打开入口/ })).toHaveAttribute("href", "/packs/wasm-plugin");
     expect(screen.getByRole("link", { name: /查看权限与来源/ })).toHaveAttribute("href", "/packs/detail?id=yunque.pack.wasm-plugin");
     expect(screen.getByRole("link", { name: /回中心管理/ })).toHaveAttribute("href", "/packs?q=yunque.pack.wasm-plugin");
