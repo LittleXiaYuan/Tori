@@ -60,6 +60,10 @@ type StudioDraftCandidate = {
   filePath: string;
   content: string;
   summary: string;
+  reason: string;
+  riskLevel: "low" | "medium" | "high";
+  gates: string[];
+  applyable: boolean;
 };
 
 function packSlug(manifest: PackManifest): string {
@@ -164,6 +168,10 @@ function buildStudioDraftCandidates(workspace: PackStudioWorkspaceReport, goal: 
         filePath,
         content: buildManifestDraftContent(workspace.manifest, goal),
         summary: "补用途、入口、示例、限制和 Studio 目标。",
+        reason: "manifest 是能力包契约入口，适合先补用户能理解的用途、入口、限制和回滚提示。",
+        riskLevel: "low",
+        gates: ["预览 diff", "内置审计", "Pack 可用性扫描"],
+        applyable: true,
       });
       continue;
     }
@@ -174,6 +182,10 @@ function buildStudioDraftCandidates(workspace: PackStudioWorkspaceReport, goal: 
         filePath,
         content: buildFrontendDraftContent(workspace.manifest, goal),
         summary: "补一个可感知的沙箱界面草稿。",
+        reason: "HTML 前端资源可在 yqpack 工作区内预览和替换，适合补独立界面、权限说明和结果区。",
+        riskLevel: "medium",
+        gates: ["预览 diff", "内置审计", "重新打包", "复检 yqpack"],
+        applyable: true,
       });
     }
   }
@@ -894,17 +906,29 @@ export default function PackStudioPage() {
                     {draftCandidates.length > 0 && (
                       <div className="mt-3 rounded-md p-2" style={{ background: "var(--yunque-bg-hover)" }}>
                         <div className="mb-2 text-xs font-medium" style={{ color: "var(--yunque-text)" }}>小羽改造草稿队列</div>
-                        <div className="flex flex-wrap gap-2">
+                        <div className="grid gap-2 lg:grid-cols-2">
                           {draftCandidates.map((candidate) => (
-                            <Button key={candidate.key} size="sm" variant="outline" onPress={() => fillDraftCandidate(candidate)}>
-                              <Sparkles size={13} /> {candidate.label}
-                            </Button>
-                          ))}
-                        </div>
-                        <div className="mt-2 space-y-1">
-                          {draftCandidates.map((candidate) => (
-                            <div key={`${candidate.key}:summary`} className="truncate text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
-                              <span className="font-mono">{candidate.filePath}</span> · {candidate.summary}
+                            <div key={candidate.key} className="rounded-md border p-2" style={{ borderColor: "var(--yunque-border)" }}>
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>{candidate.label}</span>
+                                  <Chip size="sm" color={candidate.riskLevel === "high" ? "danger" : candidate.riskLevel === "medium" ? "warning" : "success"}>
+                                    风险：{candidate.riskLevel}
+                                  </Chip>
+                                  <Chip size="sm" variant="soft">{candidate.applyable ? "可预览应用" : "只读说明"}</Chip>
+                                </div>
+                                <Button size="sm" variant="outline" onPress={() => fillDraftCandidate(candidate)} isDisabled={!candidate.applyable}>
+                                  <Sparkles size={13} /> 载入草稿
+                                </Button>
+                              </div>
+                              <div className="mt-1 truncate font-mono text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>{candidate.filePath}</div>
+                              <div className="mt-1 text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>{candidate.summary}</div>
+                              <div className="mt-1 text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>原因：{candidate.reason}</div>
+                              <div className="mt-2 flex flex-wrap gap-1">
+                                {candidate.gates.map((gate) => (
+                                  <Chip key={`${candidate.key}:${gate}`} size="sm" variant="soft">{gate}</Chip>
+                                ))}
+                              </div>
                             </div>
                           ))}
                         </div>

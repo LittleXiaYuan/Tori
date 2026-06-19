@@ -361,8 +361,13 @@ describe("PackStudioPage", () => {
 
     expect(screen.getByText("小羽改造草稿队列")).toBeInTheDocument();
     expect(screen.getByText("C:\\yunque\\packs\\studio\\frontend\\index.html")).toBeInTheDocument();
+    expect(screen.getByText("原因：manifest 是能力包契约入口，适合先补用户能理解的用途、入口、限制和回滚提示。")).toBeInTheDocument();
+    expect(screen.getByText("原因：HTML 前端资源可在 yqpack 工作区内预览和替换，适合补独立界面、权限说明和结果区。")).toBeInTheDocument();
+    expect(screen.getByText("Pack 可用性扫描")).toBeInTheDocument();
+    expect(screen.getByText("复检 yqpack")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "manifest 草稿" }));
+    const draftButtons = screen.getAllByRole("button", { name: "载入草稿" });
+    fireEvent.click(draftButtons[0]);
     const manifestDraft = screen.getByLabelText("新的文件内容") as HTMLTextAreaElement;
     const draftJSON = JSON.parse(manifestDraft.value);
     expect(draftJSON.description).toBe("增加一个可查看运行结果的界面");
@@ -372,14 +377,14 @@ describe("PackStudioPage", () => {
     expect(toastMock).toHaveBeenCalledWith("已生成 manifest 草稿，请先预览 diff 再应用", "success");
     expect(screen.getByText("草稿只会填入工作区改动框；真正写入仍需先预览 diff，并在应用后运行内置审计。")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "前端界面草稿" }));
+    fireEvent.click(draftButtons[1]);
     const frontendDraft = screen.getByLabelText("新的文件内容") as HTMLTextAreaElement;
     expect(screen.getByDisplayValue("C:\\yunque\\packs\\studio\\frontend\\index.html")).toBeInTheDocument();
     expect(frontendDraft.value).toContain("<title>WASM 能力包</title>");
     expect(frontendDraft.value).toContain("能力包界面草稿 · yunque.pack.wasm-plugin");
     expect(frontendDraft.value).toContain("接入真实 bridge/API 前必须先预览 diff、运行审计并重新打包");
 
-    fireEvent.click(screen.getByRole("button", { name: "manifest 草稿" }));
+    fireEvent.click(draftButtons[0]);
     fireEvent.change(screen.getByLabelText("新的文件内容"), { target: { value: "{\n  \"description\": \"更清楚\"\n}" } });
     fireEvent.click(screen.getByRole("button", { name: "预览 diff" }));
     await waitFor(() => {
