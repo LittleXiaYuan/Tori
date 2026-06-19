@@ -25,6 +25,7 @@ import { useApiData } from "@/lib/use-api-data";
 import {
   capabilitySurfaceLabels,
   groupPackPermissions,
+  packDeliveryProfile,
   packFeatureFlags,
   packReadiness,
   packUsability,
@@ -83,6 +84,13 @@ type StudioDraftCandidate = {
   gates: string[];
   applyable: boolean;
 };
+
+function deliveryChipColor(tone: ReturnType<typeof packDeliveryProfile>["tone"]): "success" | "default" | "warning" | "danger" {
+  if (tone === "success") return "success";
+  if (tone === "warning") return "warning";
+  if (tone === "danger") return "danger";
+  return "default";
+}
 
 type StudioWorkflowStep = {
   key: string;
@@ -270,8 +278,14 @@ function buildStudioDraftCandidates(workspace: PackStudioWorkspaceReport, goal: 
   const seen = new Set<string>();
   const candidates: StudioDraftCandidate[] = [];
   const readiness = packReadiness(workspace.manifest);
+  const delivery = packDeliveryProfile(workspace.manifest);
   const manifestGaps = readiness.missing;
   const frontendGaps = readiness.missing.filter((gap) => ["使用示例", "用户感知位置", "打开/使用入口"].includes(gap));
+  const deliveryGate = delivery.level === "plan_only"
+    ? "保留实验边界"
+    : delivery.level === "needs_meat"
+      ? "复跑交付状态"
+      : "";
   for (const filePath of workspace.editable_files || []) {
     const normalized = filePath.replace(/\\/g, "/").toLowerCase();
     if (seen.has(normalized)) continue;
@@ -284,11 +298,11 @@ function buildStudioDraftCandidates(workspace: PackStudioWorkspaceReport, goal: 
         content: buildManifestDraftContent(workspace.manifest, goal, manifestGaps),
         summary: manifestGaps.length > 0
           ? `按体检缺口补 ${manifestGaps.join("、")}。`
-          : "补用途、入口、示例、限制和 Studio 目标。",
+          : `按交付状态「${delivery.label}」补用途、入口、示例、限制和 Studio 目标。`,
         reason: "manifest 是能力包契约入口，适合先补用户能理解的用途、入口、限制和回滚提示。",
         readinessGaps: manifestGaps,
         riskLevel: "low",
-        gates: ["预览 diff", "内置审计", "Pack 可用性扫描", ...(manifestGaps.length > 0 ? ["复跑体检缺口"] : [])],
+        gates: ["预览 diff", "内置审计", "Pack 可用性扫描", ...(manifestGaps.length > 0 ? ["复跑体检缺口"] : []), ...(deliveryGate ? [deliveryGate] : [])],
         applyable: true,
       });
       continue;
@@ -301,11 +315,11 @@ function buildStudioDraftCandidates(workspace: PackStudioWorkspaceReport, goal: 
         content: buildFrontendDraftContent(workspace.manifest, goal, frontendGaps),
         summary: frontendGaps.length > 0
           ? `把 ${frontendGaps.join("、")} 落到可见界面里。`
-          : "补一个可感知的沙箱界面草稿。",
+          : `补一个可感知的沙箱界面草稿，并说明交付状态「${delivery.label}」。`,
         reason: "HTML 前端资源可在 yqpack 工作区内预览和替换，适合补独立界面、权限说明和结果区。",
         readinessGaps: frontendGaps,
         riskLevel: "medium",
-        gates: ["预览 diff", "内置审计", "重新打包", "复检 yqpack", ...(frontendGaps.length > 0 ? ["复跑体检缺口"] : [])],
+        gates: ["预览 diff", "内置审计", "重新打包", "复检 yqpack", ...(frontendGaps.length > 0 ? ["复跑体检缺口"] : []), ...(deliveryGate ? [deliveryGate] : [])],
         applyable: true,
       });
     }
@@ -372,6 +386,7 @@ function buildPatchPlanPrompt(prompt: string, patchPlan: ReturnType<typeof build
 }
 
 function buildPatchDraftRequestPrompt(prompt: string, workspace: PackStudioWorkspaceReport, candidate: StudioDraftCandidate, goal: string): string {
+  const delivery = packDeliveryProfile(workspace.manifest);
   const request = {
     kind: "yunque.pack_studio.patch_draft_request.v1",
     pack: {
@@ -397,6 +412,12 @@ function buildPatchDraftRequestPrompt(prompt: string, workspace: PackStudioWorks
         hash: stableStringHash(candidate.content),
       },
     },
+    delivery: {
+      level: delivery.level,
+      label: delivery.label,
+      description: delivery.description,
+      next_step: delivery.nextStep,
+    },
     starter_content: candidate.content,
     expected_output: {
       kind: "yunque.pack_studio.patch_draft.v1",
@@ -414,6 +435,9 @@ function buildPatchDraftRequestPrompt(prompt: string, workspace: PackStudioWorks
     candidate.readinessGaps.length > 0
       ? `这次必须优先补齐体检缺口：${candidate.readinessGaps.join("、")}。如果某个缺口需要后端源码或新 route，请明确写成限制/待办，不要伪造能力。`
       : "这次没有强制体检缺口；请继续打磨真实可用路径和用户反馈。",
+    delivery.level === "plan_only"
+      ? "本包交付状态仍是实验/计划：不要把计划、演示或 dry-run 包装成稳定执行能力；必须写清结果位置、限制、验证和回滚。"
+      : `本包交付状态：${delivery.label}。请让草稿服务于下一步：${delivery.nextStep}`,
     "输出必须只包含一段 fenced JSON，kind 必须是 yunque.pack_studio.patch_draft.v1。",
     "content 必须是完整的新文件内容，不要输出 diff、片段或解释文本。",
     "不要声称已经应用改动；用户回到 Studio 导入后仍要预览 diff、运行内置审计、重新打包和复检 SHA。",
@@ -481,6 +505,7 @@ function buildStudioAnalysis(manifest: PackManifest, goal = ""): StudioAnalysis 
   const risk = riskProfileForPack(manifest);
   const usability = packUsability(manifest);
   const readiness = packReadiness(manifest);
+  const delivery = packDeliveryProfile(manifest);
   const routes = packRoutes(manifest);
   const paths = packPaths(manifest);
   const permissions = manifest.backend?.permissions || [];
@@ -492,6 +517,7 @@ function buildStudioAnalysis(manifest: PackManifest, goal = ""): StudioAnalysis 
   if (readiness.missing.length > 0) {
     editable.push(`能力包体检缺口：${readiness.missing.join("、")}，优先补齐这些用户可感知信息。`);
   }
+  editable.push(`交付状态：${delivery.label}。${delivery.description} 下一步：${delivery.nextStep}`);
   if (paths.length > 0) editable.push("已有前端入口，可优先改页面文案、交互提示、空态、结果区和任务入口。");
   if (flags.isIframeBundle) editable.push("这是独立界面包；若 yqpack 内含 iframe 静态资源，可在沙箱边界内优化界面。");
   if (flags.hasWasm) editable.push("WASM 能力可以扩展 host 调用说明、输入输出 schema 和审计提示；改二进制逻辑需要源码。");
@@ -515,6 +541,8 @@ function buildStudioAnalysis(manifest: PackManifest, goal = ""): StudioAnalysis 
   if (flags.hasWasm) tests.push("go test ./internal/packs/wasmplugin ./internal/controlplane/gateway -run WASM -count=1");
 
   const warnings = [];
+  if (delivery.level === "plan_only") warnings.push("交付状态仍是实验/计划：不要伪装成稳定执行能力，必须补真实结果位置、限制、验证证据和回滚说明。");
+  if (delivery.level === "needs_meat") warnings.push(`交付状态仍是待补肉：${delivery.nextStep}`);
   if (usability.kind === "infrastructure") warnings.push("这个包主要是基础能力，改造目标应落到 Chat/任务/知识等实际使用面。");
   if (usability.kind === "experimental") warnings.push("这个包仍是实验能力，改造时不要把它包装成稳定承诺。");
   if (readiness.missing.length > 0) warnings.push(`能力包体检：${readiness.label}，还缺 ${readiness.missing.join("、")}。`);
@@ -548,6 +576,7 @@ function buildXiaoyuPrompt(manifest: PackManifest, goal: string): string {
   const permissions = manifest.backend?.permissions || [];
   const capabilities = manifest.backend?.capabilities || [];
   const readiness = packReadiness(manifest);
+  const delivery = packDeliveryProfile(manifest);
   const analysis = buildStudioAnalysis(manifest, goal);
   return [
     `请以“小羽改包”的方式改造能力包 ${manifest.name} (${manifest.id}) v${manifest.version}。`,
@@ -562,12 +591,17 @@ function buildXiaoyuPrompt(manifest: PackManifest, goal: string): string {
     `- 权限声明：${permissions.length > 0 ? permissions.join(", ") : "无"}`,
     `- 形态：${flags.isIframeBundle ? "iframe-bundle " : ""}${flags.hasWasm ? "WASM " : ""}${flags.hasBackend ? "backend " : ""}${flags.hasFrontend ? "frontend" : ""}`.trim(),
     `- 能力包体检：${readiness.label}${readiness.missing.length > 0 ? `；还缺 ${readiness.missing.join("、")}` : "；说明已基本完整"}`,
+    `- 交付状态：${delivery.label}；${delivery.description}`,
+    `- 交付下一步：${delivery.nextStep}`,
     "",
     "请按这个安全流程执行：",
     "1. 先只读检查 yqpack/pack.json/前端入口/SDK/后端 routeSpecs，列出真实可改文件。",
     "2. 明确哪些能直接改，哪些需要源码，哪些属于已编译 WASM/native Go 不能硬改。",
     "3. 先给 diff 预览和风险说明，不要直接扩大权限或绕过签名。",
     "4. 用户确认后再修改、跑测试、重新打包为新的 yqpack，并保留旧版本回滚。",
+    delivery.level === "plan_only"
+      ? "5. 本包仍是实验/计划能力，不能把“会规划/会演示”写成“已稳定执行”；必须写清结果位置、限制、验证和回滚。"
+      : "5. 改造完成后要能回到能力包详情或主路径验证交付状态是否改善。",
     "",
     "本包建议优先改：",
     ...analysis.editable.map((item) => `- ${item}`),
@@ -596,15 +630,31 @@ function buildXiaoyuPrompt(manifest: PackManifest, goal: string): string {
 }
 
 function withReadinessPrompt(prompt: string, manifest: PackManifest): string {
-  if (prompt.includes("能力包体检：")) return prompt;
   const readiness = packReadiness(manifest);
+  const delivery = packDeliveryProfile(manifest);
+  const additions: string[] = [];
+  if (!prompt.includes("能力包体检：")) {
+    additions.push(
+      `能力包体检：${readiness.label}${readiness.missing.length > 0 ? `；还缺 ${readiness.missing.join("、")}` : "；说明已基本完整"}`,
+      readiness.missing.length > 0
+        ? "请优先把这些缺口落实到 pack.json metadata、前端入口文案、示例或能力边界说明里。"
+        : "可以继续打磨更具体的用户路径、结果反馈和回滚提示。",
+    );
+  }
+  if (!prompt.includes("交付状态：")) {
+    additions.push(
+      `交付状态：${delivery.label}；${delivery.description}`,
+      `交付下一步：${delivery.nextStep}`,
+      delivery.level === "plan_only"
+        ? "不要把计划、演示或 dry-run 包装成稳定执行能力；必须写清结果位置、限制、验证和回滚。"
+        : "改造完成后要能回到能力包详情或主路径验证交付状态是否改善。",
+    );
+  }
+  if (additions.length === 0) return prompt;
   return [
     prompt,
     "",
-    `能力包体检：${readiness.label}${readiness.missing.length > 0 ? `；还缺 ${readiness.missing.join("、")}` : "；说明已基本完整"}`,
-    readiness.missing.length > 0
-      ? "请优先把这些缺口落实到 pack.json metadata、前端入口文案、示例或能力边界说明里。"
-      : "可以继续打磨更具体的用户路径、结果反馈和回滚提示。",
+    ...additions,
   ].join("\n");
 }
 
@@ -804,6 +854,7 @@ export default function PackStudioPage() {
     return sourceLabel(contextCandidate);
   }, [candidates, contextCandidate, inspectReport]);
   const readiness = manifest ? packReadiness(manifest) : null;
+  const delivery = manifest ? packDeliveryProfile(manifest) : null;
   const { data: studioPlan, refresh: refreshStudioPlan } = useApiData(async () => {
     if (!manifest) return null;
     try {
@@ -1553,10 +1604,15 @@ export default function PackStudioPage() {
                     <Chip size="sm" color={batchActiveIndex >= 0 ? "success" : "warning"}>
                       批量进度：{batchActiveIndex >= 0 ? batchActiveIndex + 1 : 0} / {importedBatchRequest.packs.length}
                     </Chip>
+                  <Chip size="sm" variant="soft">
+                    本页状态：{batchActiveStage}
+                  </Chip>
+                  {batchActivePack?.delivery && (
                     <Chip size="sm" variant="soft">
-                      本页状态：{batchActiveStage}
+                      交付：{batchActivePack.delivery.label || batchActivePack.delivery.level}
                     </Chip>
-                  </div>
+                  )}
+                </div>
                 </div>
                 <div className="mt-2 grid gap-2 md:grid-cols-2">
                   <div className="rounded px-2 py-2 text-[11px]" style={{ background: "var(--yunque-surface)", color: "var(--yunque-text-secondary)" }}>
@@ -1594,9 +1650,20 @@ export default function PackStudioPage() {
                         <div className="flex flex-wrap gap-1">
                           <Chip size="sm" color={active ? "success" : "default"}>{active ? batchActiveStage : "待载入"}</Chip>
                           {pack.readiness && <Chip size="sm" color={pack.readiness.includes("入口") ? "danger" : "warning"}>{pack.readiness}</Chip>}
+                          {pack.delivery && (
+                            <Chip size="sm" variant="soft">
+                              {pack.delivery.label || pack.delivery.level}
+                            </Chip>
+                          )}
                           <Chip size="sm" variant="soft">{pack.source || "来源未知"}</Chip>
                         </div>
                       </div>
+                      {pack.delivery && (
+                        <div className="mt-2 rounded px-2 py-2 text-[11px] leading-5" style={{ background: "var(--yunque-bg-hover)", color: "var(--yunque-text-secondary)" }}>
+                          交付状态：{pack.delivery.description || pack.delivery.label || pack.delivery.level}
+                          {pack.delivery.nextStep ? ` 下一步：${pack.delivery.nextStep}` : ""}
+                        </div>
+                      )}
                       {pack.missing.length > 0 && (
                         <div className="mt-2 flex flex-wrap gap-1">
                           {pack.missing.map((gap) => (
@@ -1759,11 +1826,30 @@ export default function PackStudioPage() {
                   <div className="mt-1 text-xs font-mono" style={{ color: "var(--yunque-text-muted)" }}>{manifest.id}</div>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
+                  {delivery && (
+                    <Chip size="sm" color={deliveryChipColor(delivery.tone)}>
+                      {delivery.label}
+                    </Chip>
+                  )}
                   {capabilitySurfaceLabels(manifest).map((label) => (
                     <Chip key={label} size="sm" variant="soft">{label}</Chip>
                   ))}
                 </div>
               </div>
+              {delivery && (
+                <div className="mt-3 rounded-md border p-3 text-xs" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-bg-hover)", color: "var(--yunque-text-secondary)" }}>
+                  <div className="mb-1 flex flex-wrap items-center gap-2">
+                    <span className="font-medium" style={{ color: "var(--yunque-text)" }}>交付状态</span>
+                    <Chip size="sm" color={deliveryChipColor(delivery.tone)}>
+                      {delivery.label}
+                    </Chip>
+                  </div>
+                  <div>{delivery.description}</div>
+                  <div className="mt-1" style={{ color: "var(--yunque-text-muted)" }}>
+                    下一步：{delivery.nextStep}
+                  </div>
+                </div>
+              )}
               {readiness && (
                 <div className="mt-3 rounded-md border p-3 text-xs" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-bg-hover)", color: "var(--yunque-text-secondary)" }}>
                   <div className="mb-1 flex flex-wrap items-center gap-2">

@@ -41,6 +41,7 @@ import {
   formatPackInstallError,
   groupPackPermissions,
   packInstallChecklist,
+  packDeliveryProfile,
   packFeatureFlags,
   packReadiness,
   packUsageExplanation,
@@ -73,6 +74,13 @@ function packStatusBadge(packStatus?: string): { icon: string; label: string; co
   if (packStatus === "beta") return { icon: "⚠️", label: "部分可用", color: "var(--yunque-warning)", bg: "rgba(245,158,11,0.12)" };
   if (packStatus === "alpha") return { icon: "🚧", label: "开发中", color: "var(--yunque-text-muted)", bg: "rgba(255,255,255,0.05)" };
   return { icon: "❓", label: "未知", color: "var(--yunque-text-muted)", bg: "rgba(255,255,255,0.05)" };
+}
+
+function deliveryToneStyle(tone: ReturnType<typeof packDeliveryProfile>["tone"]): { background: string; borderColor: string; color: string } {
+  if (tone === "success") return { background: "rgba(34,197,94,0.10)", borderColor: "rgba(34,197,94,0.28)", color: "var(--yunque-success)" };
+  if (tone === "primary") return { background: "rgba(59,130,246,0.10)", borderColor: "rgba(59,130,246,0.24)", color: "var(--yunque-primary)" };
+  if (tone === "warning") return { background: "rgba(245,158,11,0.12)", borderColor: "rgba(245,158,11,0.28)", color: "var(--yunque-warning)" };
+  return { background: "rgba(239,68,68,0.10)", borderColor: "rgba(239,68,68,0.26)", color: "var(--yunque-danger)" };
 }
 
 function formatTime(value?: string): string {
@@ -276,6 +284,8 @@ export default function PackDetailClientPage() {
   const usageExplanation = packUsageExplanation(manifest);
   const usability = packUsability(manifest);
   const readiness = packReadiness(manifest);
+  const delivery = packDeliveryProfile(manifest);
+  const deliveryStyle = deliveryToneStyle(delivery.tone);
   const openPath = usability.primaryActionPath || menus[0]?.path || routesFrontend[0]?.path;
   const installSource = installSourceForPack({ manifest, catalogEntry, releaseEntry });
   const installChecklist = packInstallChecklist(manifest, {
@@ -288,12 +298,18 @@ export default function PackDetailClientPage() {
     "请用普通用户能理解的话告诉我：它能做什么、适合哪些任务、第一句话该怎么说、启用前要注意什么。",
     `能力包说明：${manifest.description || "暂无说明"}`,
     `可用性：${usability.label}；${usability.description}`,
+    `交付状态：${delivery.label}；${delivery.description}`,
+    `建议下一步：${delivery.nextStep}`,
     readiness.missing.length > 0 ? `当前还缺：${readiness.missing.join("、")}` : "当前体检：说明基本完整",
     usability.limitation ? `当前限制：${usability.limitation}` : "",
     examples.length > 0 ? `已有示例：${examples.join(" / ")}` : "",
     "如果它只是后台支撑能力，请告诉我应该从 Chat、任务、记忆、知识或能力包详情哪里感知它，不要把实验能力说成稳定能力。",
   ].filter(Boolean).join("\n");
-  const studioGoal = `让 ${manifest.name} 更像一个用户能直接理解和使用的能力包，补齐用途、入口、示例、权限边界和回滚说明。`;
+  const studioGoal = delivery.level === "plan_only"
+    ? `把 ${manifest.name} 从实验/计划能力打磨到用户能验证的路径：明确当前不执行什么、结果在哪里看、如何验证和回滚。`
+    : delivery.level === "needs_meat"
+      ? `让 ${manifest.name} 更像一个用户能直接理解和使用的能力包，优先补齐 ${readiness.missing.join("、") || "用途、入口、示例、权限边界和回滚说明"}。`
+      : `让 ${manifest.name} 更像一个用户能直接理解和使用的能力包，补齐用途、入口、示例、权限边界和回滚说明。`;
   const studioHref = studioHrefForPack({ manifest, goal: studioGoal, catalogEntry, releaseEntry });
 
   const installFromCatalog = () => {
@@ -410,6 +426,9 @@ export default function PackDetailClientPage() {
               未安装
             </Chip>
           )}
+          <Chip size="sm" style={{ background: deliveryStyle.background, color: deliveryStyle.color }}>
+            {delivery.label}
+          </Chip>
           <Chip size="sm" variant="soft">v{manifest.version}</Chip>
           <Chip size="sm" style={{ background: "rgba(59,130,246,0.08)", color: "var(--yunque-primary)" }}>
             {usability.label}
@@ -504,6 +523,17 @@ export default function PackDetailClientPage() {
           </div>
           <div className="text-sm" style={{ color: "var(--yunque-text-secondary)" }}>
             {usability.description}
+          </div>
+          <div className="mt-3 rounded-md border p-3" style={{ borderColor: deliveryStyle.borderColor, background: deliveryStyle.background }}>
+            <div className="mb-1 text-xs font-medium" style={{ color: deliveryStyle.color }}>
+              交付状态：{delivery.label}
+            </div>
+            <div className="text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
+              {delivery.description}
+            </div>
+            <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
+              下一步：{delivery.nextStep}
+            </div>
           </div>
           {openPath && (
             <div className="flex items-center gap-2 mt-3">

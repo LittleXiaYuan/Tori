@@ -12,7 +12,7 @@ import { buildPackSdkEntrypoints, fetchEnabledPacks, findPackRouteBinding, forma
 import { PackDlcHost } from "@/lib/pack-dlc-host";
 import { eventPathsFromPermissions } from "@/lib/pack-bridge";
 import { chatPromptHref } from "@/lib/pack-action-links";
-import { packExamples, packFeatureFlags, packReadiness, packUsability, riskProfileForPack } from "@/lib/pack-presentation";
+import { packDeliveryProfile, packExamples, packFeatureFlags, packReadiness, packUsability, riskProfileForPack } from "@/lib/pack-presentation";
 
 const dlcBoundaryItems = [
   "iframe 没有宿主 token，不能读取云雀本地登录态。",
@@ -21,6 +21,13 @@ const dlcBoundaryItems = [
   "nav.push 只能跳转到该能力包声明的前端路径。",
   "越权 bridge 调用会被拒绝并写入审计线索。",
 ];
+
+function deliveryColor(tone: ReturnType<typeof packDeliveryProfile>["tone"]): "success" | "default" | "warning" | "danger" {
+  if (tone === "success") return "success";
+  if (tone === "warning") return "warning";
+  if (tone === "danger") return "danger";
+  return "default";
+}
 
 export default function PackRuntimeRouteClientPage() {
   const pathname = usePathname() || "/packs";
@@ -86,6 +93,7 @@ export default function PackRuntimeRouteClientPage() {
   const isIframeBundle = assets?.type === "iframe-bundle";
   const usability = packUsability(manifest);
   const readiness = packReadiness(manifest);
+  const delivery = packDeliveryProfile(manifest);
   const risk = riskProfileForPack(manifest);
   const flags = packFeatureFlags(manifest);
   const examples = packExamples(manifest, 3);
@@ -94,6 +102,8 @@ export default function PackRuntimeRouteClientPage() {
     `请告诉我它现在能帮我做什么、适合放在哪个工作流里、我可以怎么下第一条指令。`,
     `能力包说明：${manifest.description || "暂无说明"}`,
     `可用性：${usability.label}；${usability.description}`,
+    `交付状态：${delivery.label}；${delivery.description}`,
+    `建议下一步：${delivery.nextStep}`,
     readiness.missing.length > 0 ? `当前还缺：${readiness.missing.join("、")}` : "当前体检：说明基本完整",
     usability.limitation ? `当前限制：${usability.limitation}` : "",
     examples.length > 0 ? `已有示例：${examples.join(" / ")}` : "",
@@ -123,6 +133,9 @@ export default function PackRuntimeRouteClientPage() {
               <Chip size="sm" color={readiness.level === "complete" ? "success" : readiness.level === "needs_context" ? "warning" : "danger"}>
                 {readiness.label}
               </Chip>
+              <Chip size="sm" color={deliveryColor(delivery.tone)}>
+                {delivery.label}
+              </Chip>
               <Chip size="sm" color={risk.level === "high" ? "danger" : risk.level === "medium" ? "warning" : "success"}>
                 {risk.label}
               </Chip>
@@ -136,6 +149,9 @@ export default function PackRuntimeRouteClientPage() {
             <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
               {usability.description}
               {usability.limitation ? ` 当前限制：${usability.limitation}` : ""}
+            </div>
+            <div className="mt-3 rounded-lg px-3 py-2 text-xs leading-5" style={{ background: "var(--yunque-bg-hover)", color: "var(--yunque-text-secondary)" }}>
+              交付状态：{delivery.label}。{delivery.description} 下一步：{delivery.nextStep}
             </div>
             <div className="mt-3 grid gap-2 md:grid-cols-3">
               {(examples.length > 0 ? examples : ["还没有写清使用示例，可以交给小羽补齐。"]).map((example) => (

@@ -501,6 +501,12 @@ describe("PackStudioPage", () => {
           source: "官方源",
           missing: ["使用示例", "用户感知位置"],
           readiness: "需补说明",
+          delivery: {
+            level: "plan_only",
+            label: "实验/计划",
+            description: "可以体验、验证边界或生成计划，但不应包装成稳定可交付能力。",
+            next_step: "先保留限制说明。",
+          },
           studio_url: "/packs/studio?packId=yunque.pack.wasm-plugin&goal=%E8%A1%A5%E9%BD%90%20WASM%20%E7%94%A8%E9%80%94",
           package_url: "https://oss.example.com/wasm-plugin.yqpack",
           sha256: "9".repeat(64),
@@ -541,6 +547,9 @@ describe("PackStudioPage", () => {
     expect(screen.getByRole("link", { name: /跳到下一步/ })).toHaveAttribute("href", "#yqpack-check");
     expect(screen.getByText("补：使用示例")).toBeInTheDocument();
     expect(screen.getAllByText("补：用户感知位置")).toHaveLength(2);
+    expect(screen.getAllByText("实验/计划").length).toBeGreaterThan(0);
+    expect(screen.getByText(/交付状态：可以体验、验证边界或生成计划/)).toBeInTheDocument();
+    expect(screen.getByText(/下一步：先保留限制说明/)).toBeInTheDocument();
     expect(screen.getAllByText("待载入").length).toBeGreaterThan(0);
     expect(screen.getByText("yqpack：https://oss.example.com/wasm-plugin.yqpack")).toBeInTheDocument();
     expect(screen.getByText(`SHA：${"9".repeat(64)}`)).toBeInTheDocument();
@@ -626,8 +635,11 @@ describe("PackStudioPage", () => {
     expect(screen.getByText("可以让小羽优先优化")).toBeInTheDocument();
     expect(screen.getByText("需要守住的边界")).toBeInTheDocument();
     expect(screen.getByText("能力包体检")).toBeInTheDocument();
+    expect(screen.getByText("交付状态")).toBeInTheDocument();
+    expect(screen.getAllByText("待补肉").length).toBeGreaterThan(0);
     expect(screen.getByText("小羽会优先补齐：使用示例、用户感知位置。")).toBeInTheDocument();
     expect(screen.getByText("能力包体检缺口：使用示例、用户感知位置，优先补齐这些用户可感知信息。")).toBeInTheDocument();
+    expect(screen.getByText(/交付状态仍是待补肉/)).toBeInTheDocument();
     expect(screen.getByText("不要反编译后硬改 WASM；需要源码、ABI 说明和 wasm-plugin 回归测试。")).toBeInTheDocument();
     expect(screen.getByText(/这个包仍是实验能力，改造时不要把它包装成稳定承诺。/)).toBeInTheDocument();
 
@@ -643,6 +655,8 @@ describe("PackStudioPage", () => {
     const task = screen.getByLabelText("小羽改包任务") as HTMLTextAreaElement;
     expect(task.value).toContain("用户目标：增加一个可查看运行结果的界面");
     expect(task.value).toContain("能力包体检：需补说明；还缺 使用示例、用户感知位置");
+    expect(task.value).toContain("交付状态：待补肉");
+    expect(task.value).toContain("验证交付状态是否改善");
     expect(task.value).toContain("POST /v1/wasm-plugin/run");
     expect(task.value).toContain("可改文件候选：");
     expect(task.value).toContain("diff 预览草案：");
@@ -764,6 +778,8 @@ describe("PackStudioPage", () => {
     expect(draftRequestPrompt).toContain("yunque.pack_studio.patch_draft_request.v1");
     expect(draftRequestPrompt).toContain("yunque.pack_studio.patch_draft.v1");
     expect(draftRequestPrompt).toContain("这次必须优先补齐体检缺口：使用示例、用户感知位置");
+    expect(draftRequestPrompt).toContain("\"delivery\"");
+    expect(draftRequestPrompt).toContain("本包交付状态：待补肉");
     expect(draftRequestPrompt).toContain("readiness_gaps");
     expect(draftRequestPrompt).toContain("content 必须是完整的新文件内容，不要输出 diff、片段或解释文本");
     expect(draftRequestPrompt).toContain("starter_content");

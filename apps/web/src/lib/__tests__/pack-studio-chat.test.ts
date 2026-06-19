@@ -160,6 +160,12 @@ describe("parsePackStudioBatchDraftRequestPrompt", () => {
             source: "已安装",
             missing: ["使用示例", "打开/使用入口"],
             readiness: "需补入口",
+            delivery: {
+              level: "needs_meat",
+              label: "待补肉",
+              description: "用户装上后容易不知道怎么验证。",
+              next_step: "交给小羽先补入口。",
+            },
             studio_url: "/packs/studio?pack=yunque.pack.needs-entry",
             package_url: "https://example.com/yunque.pack.needs-entry.yqpack",
             sha256: "a".repeat(64),
@@ -178,6 +184,12 @@ describe("parsePackStudioBatchDraftRequestPrompt", () => {
       readiness: "需补入口",
       studioUrl: "/packs/studio?pack=yunque.pack.needs-entry",
       packageUrl: "https://example.com/yunque.pack.needs-entry.yqpack",
+      delivery: {
+        level: "needs_meat",
+        label: "待补肉",
+        description: "用户装上后容易不知道怎么验证。",
+        nextStep: "交给小羽先补入口。",
+      },
     });
     expect(parsed?.packs[0].missing).toEqual(["使用示例", "打开/使用入口"]);
     expect(parsed?.displayText).toBe("请批量补肉这些能力包。");

@@ -85,6 +85,8 @@ describe("PackDetailClientPage", () => {
     expect(screen.getAllByText("回中心管理和固定").length).toBeGreaterThan(0);
     expect(screen.getByText(/如果用户觉得它像空壳/)).toBeInTheDocument();
     expect(screen.getByText("用户能拿它做什么")).toBeInTheDocument();
+    expect(screen.getAllByText("待补肉").length).toBeGreaterThan(0);
+    expect(screen.getByText(/交付状态：待补肉/)).toBeInTheDocument();
     expect(screen.getByText("能力包体检")).toBeInTheDocument();
     expect(screen.getByText(/还缺：使用示例/)).toBeInTheDocument();
     expect(screen.getByText("确认来源")).toBeInTheDocument();
@@ -96,12 +98,14 @@ describe("PackDetailClientPage", () => {
     const chatLink = screen.getByRole("link", { name: /问云雀怎么用/ });
     expect(chatLink).toHaveAttribute("href", expect.stringContaining("/chat?q="));
     expect(decodeURIComponent(chatLink.getAttribute("href") || "")).toContain("Needs Context Pack");
+    expect(decodeURIComponent(chatLink.getAttribute("href") || "")).toContain("交付状态：待补肉");
     expect(decodeURIComponent(chatLink.getAttribute("href") || "")).toContain("不要把实验能力说成稳定能力");
 
     const studioLinks = screen.getAllByRole("link", { name: /交给小羽补齐/ });
     expect(studioLinks.length).toBeGreaterThan(0);
     expect(studioLinks[0]).toHaveAttribute("href", expect.stringContaining("/packs/studio?packId=yunque.pack.needs-context"));
     expect(studioLinks[0]).toHaveAttribute("href", expect.stringContaining("goal="));
+    expect(decodeURIComponent(studioLinks[0].getAttribute("href") || "")).toContain("优先补齐+使用示例");
     expect(screen.getByRole("link", { name: /打开能力入口/ })).toHaveAttribute("href", "/packs/needs-context");
   });
 

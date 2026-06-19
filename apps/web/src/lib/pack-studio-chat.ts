@@ -88,6 +88,12 @@ export type PackStudioBatchDraftRequest = {
     source: string;
     missing: string[];
     readiness: string;
+    delivery?: {
+      level: string;
+      label: string;
+      description: string;
+      nextStep: string;
+    };
     studioUrl: string;
     packageUrl: string;
     sha256: string;
@@ -122,6 +128,17 @@ function contentSummary(value: unknown): { length: number; hash: string } | unde
   const hash = stringValue(record.hash);
   if (!length || !hash) return undefined;
   return { length, hash };
+}
+
+function deliverySummary(value: unknown): PackStudioBatchDraftRequest["packs"][number]["delivery"] | undefined {
+  const record = asRecord(value);
+  if (!record) return undefined;
+  const level = stringValue(record.level);
+  const label = stringValue(record.label);
+  const description = stringValue(record.description);
+  const nextStep = stringValue(record.next_step) || stringValue(record.nextStep);
+  if (!level && !label && !description && !nextStep) return undefined;
+  return { level, label, description, nextStep };
 }
 
 function displayTextWithoutJsonBlocks(text: string, marker?: string): string {
@@ -297,6 +314,7 @@ export function parsePackStudioBatchDraftRequestPrompt(text?: string): PackStudi
       } : {}),
       packs: packs.map((item) => {
         const pack = asRecord(item) || {};
+        const delivery = deliverySummary(pack.delivery);
         return {
           id: stringValue(pack.id),
           name: stringValue(pack.name),
@@ -305,6 +323,7 @@ export function parsePackStudioBatchDraftRequestPrompt(text?: string): PackStudi
           source: stringValue(pack.source),
           missing: stringList(pack.missing),
           readiness: stringValue(pack.readiness),
+          ...(delivery ? { delivery } : {}),
           studioUrl: stringValue(pack.studio_url),
           packageUrl: stringValue(pack.package_url),
           sha256: stringValue(pack.sha256),
