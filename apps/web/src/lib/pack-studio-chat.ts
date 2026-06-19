@@ -47,6 +47,30 @@ export type PackStudioPatchDraft = {
   displayText: string;
 };
 
+export type PackStudioPatchDraftRequest = {
+  pack: {
+    id: string;
+    name: string;
+    version: string;
+  };
+  goal: string;
+  workspace: PackStudioWorkspaceRef;
+  target: {
+    filePath: string;
+    label: string;
+    reason: string;
+    riskLevel: string;
+    gates: string[];
+    contentSummary?: {
+      length: number;
+      hash: string;
+    };
+  };
+  starterContentLength: number;
+  expectedKind: string;
+  displayText: string;
+};
+
 type PackStudioPatchPlanCandidate = PackStudioPatchPlanSummary["candidates"][number];
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -177,6 +201,48 @@ export function parsePackStudioPatchDraftPrompt(text?: string): PackStudioPatchD
       riskLevel: stringValue(root.risk_level),
       gates: stringList(root.gates),
       displayText: displayTextWithoutJsonBlocks(text),
+    };
+  }
+  return null;
+}
+
+export function parsePackStudioPatchDraftRequestPrompt(text?: string): PackStudioPatchDraftRequest | null {
+  if (!text?.includes("yunque.pack_studio.patch_draft_request.v1")) return null;
+  for (const parsed of parseJsonBlocks(text)) {
+    const root = asRecord(parsed);
+    if (!root || root.kind !== "yunque.pack_studio.patch_draft_request.v1") continue;
+    const pack = asRecord(root.pack);
+    const workspace = asRecord(root.workspace);
+    const target = asRecord(root.target);
+    const expectedOutput = asRecord(root.expected_output);
+    if (!pack || !workspace || !target) continue;
+    const filePath = stringValue(target.file_path);
+    if (!filePath) continue;
+    const summary = contentSummary(target.content_summary);
+    const starterContent = stringValue(root.starter_content);
+    return {
+      pack: {
+        id: stringValue(pack.id),
+        name: stringValue(pack.name),
+        version: stringValue(pack.version),
+      },
+      goal: stringValue(root.goal),
+      workspace: {
+        id: stringValue(workspace.id),
+        path: stringValue(workspace.path),
+        originalSha256: stringValue(workspace.original_sha256),
+      },
+      target: {
+        filePath,
+        label: stringValue(target.label),
+        reason: stringValue(target.reason),
+        riskLevel: stringValue(target.risk_level),
+        gates: stringList(target.gates),
+        ...(summary ? { contentSummary: summary } : {}),
+      },
+      starterContentLength: starterContent.length,
+      expectedKind: stringValue(expectedOutput?.kind),
+      displayText: displayTextWithoutJsonBlocks(text, "下面是 Pack Studio 的 Patch Draft Request"),
     };
   }
   return null;

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   packStudioWorkspaceMatches,
+  parsePackStudioPatchDraftRequestPrompt,
   parsePackStudioPatchDraftPrompt,
   parsePackStudioPatchPlanPrompt,
 } from "../pack-studio-chat";
@@ -90,6 +91,51 @@ describe("parsePackStudioPatchDraftPrompt", () => {
 
   it("requires a real file path and content", () => {
     expect(parsePackStudioPatchDraftPrompt("```json\n{\"kind\":\"yunque.pack_studio.patch_draft.v1\"}\n```")).toBeNull();
+  });
+});
+
+describe("parsePackStudioPatchDraftRequestPrompt", () => {
+  it("extracts a draft generation request without exposing starter content as display text", () => {
+    const starterContent = "<!doctype html>\n<p>完整草稿内容不应该直接展示</p>\n";
+    const parsed = parsePackStudioPatchDraftRequestPrompt([
+      "请让小羽生成单文件 Draft。",
+      "",
+      "下面是 Pack Studio 的 Patch Draft Request。",
+      "```json",
+      JSON.stringify({
+        kind: "yunque.pack_studio.patch_draft_request.v1",
+        pack: { id: "yunque.pack.wasm-plugin", name: "WASM 能力包", version: "0.1.0" },
+        goal: "增加结果界面",
+        workspace: {
+          id: "yunque.pack.wasm-plugin-0.1.0-aaaaaaaaaaaa",
+          path: "C:\\yunque\\packs\\studio\\yunque.pack.wasm-plugin-0.1.0-aaaaaaaaaaaa",
+          original_sha256: "a".repeat(64),
+        },
+        target: {
+          file_path: "C:\\yunque\\packs\\studio\\frontend\\index.html",
+          label: "前端界面草稿",
+          reason: "补结果界面",
+          risk_level: "medium",
+          gates: ["预览 diff", "内置审计"],
+          content_summary: { length: starterContent.length, hash: "feedbeef" },
+        },
+        starter_content: starterContent,
+        expected_output: { kind: "yunque.pack_studio.patch_draft.v1" },
+      }, null, 2),
+      "```",
+    ].join("\n"));
+
+    expect(parsed?.pack.id).toBe("yunque.pack.wasm-plugin");
+    expect(parsed?.target.filePath).toBe("C:\\yunque\\packs\\studio\\frontend\\index.html");
+    expect(parsed?.target.contentSummary).toEqual({ length: starterContent.length, hash: "feedbeef" });
+    expect(parsed?.starterContentLength).toBe(starterContent.length);
+    expect(parsed?.expectedKind).toBe("yunque.pack_studio.patch_draft.v1");
+    expect(parsed?.displayText).toBe("请让小羽生成单文件 Draft。");
+    expect(parsed?.displayText).not.toContain("完整草稿内容不应该直接展示");
+  });
+
+  it("requires a target file path", () => {
+    expect(parsePackStudioPatchDraftRequestPrompt("```json\n{\"kind\":\"yunque.pack_studio.patch_draft_request.v1\"}\n```")).toBeNull();
   });
 });
 

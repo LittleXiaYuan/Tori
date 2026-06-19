@@ -210,6 +210,61 @@ describe("ChatMessageList file preview", () => {
     expect(onCopy.mock.calls[0][1]).not.toContain("这段完整内容不应该直接展示");
   });
 
+  it("renders Pack Studio draft requests without exposing starter content", () => {
+    const onCopy = vi.fn();
+    const starterContent = "<!doctype html>\n<p>starter 内容不应该直接展示在 Chat 气泡里</p>\n";
+    const requestMessage = [
+      "请生成这个能力包界面的 Draft。",
+      "",
+      "下面是 Pack Studio 的 Patch Draft Request。",
+      "```json",
+      JSON.stringify({
+        kind: "yunque.pack_studio.patch_draft_request.v1",
+        pack: { id: "yunque.pack.wasm-plugin", name: "WASM 能力包", version: "0.1.0" },
+        goal: "增加结果界面",
+        workspace: {
+          id: "yunque.pack.wasm-plugin-0.1.0-aaaaaaaaaaaa",
+          path: "C:\\yunque\\packs\\studio\\yunque.pack.wasm-plugin-0.1.0-aaaaaaaaaaaa",
+          original_sha256: "a".repeat(64),
+        },
+        target: {
+          file_path: "C:\\yunque\\packs\\studio\\frontend\\index.html",
+          label: "前端界面草稿",
+          reason: "补结果界面",
+          risk_level: "medium",
+          gates: ["预览 diff", "内置审计", "重新打包"],
+          content_summary: { length: starterContent.length, hash: "feedbeef" },
+        },
+        starter_content: starterContent,
+        expected_output: { kind: "yunque.pack_studio.patch_draft.v1" },
+      }, null, 2),
+      "```",
+    ].join("\n");
+
+    render(<ChatMessageList {...props({
+      onCopy,
+      messages: [{ role: "assistant", content: requestMessage, id: "a-request" }],
+    })} />);
+
+    expect(screen.getByText("Pack Studio Draft 请求")).toBeInTheDocument();
+    expect(screen.getByText(/WASM 能力包/)).toBeInTheDocument();
+    expect(screen.getByText(/C:\\yunque\\packs\\studio\\frontend\\index\.html/)).toBeInTheDocument();
+    expect(screen.getByText("风险：medium")).toBeInTheDocument();
+    expect(screen.getByText("摘要：feedbeef")).toBeInTheDocument();
+    expect(screen.getByText("重新打包")).toBeInTheDocument();
+    expect(screen.getByText(/小羽应只返回 yunque\.pack_studio\.patch_draft\.v1/)).toBeInTheDocument();
+    expect(screen.getByText("请生成这个能力包界面的 Draft。")).toBeInTheDocument();
+    expect(screen.queryByText(/yunque.pack_studio.patch_draft_request.v1/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/starter 内容不应该直接展示/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("copy").closest("button")!);
+    expect(onCopy).toHaveBeenCalledTimes(1);
+    expect(onCopy.mock.calls[0][1]).toContain("Pack Studio Draft Request");
+    expect(onCopy.mock.calls[0][1]).toContain("starter 内容长度");
+    expect(onCopy.mock.calls[0][1]).not.toContain("yunque.pack_studio.patch_draft_request.v1");
+    expect(onCopy.mock.calls[0][1]).not.toContain("starter 内容不应该直接展示");
+  });
+
   it("does not fall back to raw JSON when a structured Pack Studio user message has no prose", () => {
     const rawPlanOnly = [
       "```json",

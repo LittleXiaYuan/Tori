@@ -22,9 +22,11 @@ import type { ChatSharePayload, Message } from "@/lib/chat-types";
 import { collectGeneratedFiles } from "@/lib/chat-utils";
 import { formatErrorMessage } from "@/lib/error-utils";
 import {
+  parsePackStudioPatchDraftRequestPrompt,
   parsePackStudioPatchDraftPrompt,
   parsePackStudioPatchPlanPrompt,
   type PackStudioPatchDraft,
+  type PackStudioPatchDraftRequest,
   type PackStudioPatchPlanSummary,
 } from "@/lib/pack-studio-chat";
 import type { BrowserBridgeState, BrowserSessionNotice } from "@/components/browser-session-card";
@@ -110,6 +112,19 @@ function displayMessageContent(msg: Message): string {
 }
 
 function packStudioToolSummary(content: string): string | null {
+  const request = parsePackStudioPatchDraftRequestPrompt(content);
+  if (request) {
+    return [
+      request.displayText,
+      `Pack Studio Draft Request: ${request.pack.name || request.pack.id} ${request.pack.version || ""}`.trim(),
+      `目标文件：${request.target.filePath}`,
+      `风险：${request.target.riskLevel || "未标注"}`,
+      `starter 内容长度：${request.starterContentLength.toLocaleString()} chars`,
+      request.target.gates.length ? `门禁：${request.target.gates.join(" / ")}` : "",
+      request.target.reason ? `原因：${request.target.reason}` : "",
+      "请让小羽只返回 yunque.pack_studio.patch_draft.v1 JSON；不要跳过 Studio 的 diff / audit / repack。",
+    ].filter(Boolean).join("\n");
+  }
   const draft = parsePackStudioPatchDraftPrompt(content);
   if (draft) {
     return [
@@ -244,7 +259,65 @@ function renderPackStudioDraft(draft: PackStudioPatchDraft) {
   );
 }
 
+function renderPackStudioDraftRequest(request: PackStudioPatchDraftRequest) {
+  return (
+    <div
+      className="mb-3 rounded-xl border p-3 text-xs"
+      style={{
+        background: "rgba(168,85,247,0.08)",
+        borderColor: "rgba(168,85,247,0.22)",
+        color: "var(--yunque-text)",
+      }}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 font-semibold">
+            <Sparkles size={14} style={{ color: "var(--yunque-accent)" }} />
+            <span>Pack Studio Draft 请求</span>
+          </div>
+          <div className="mt-1 truncate" style={{ color: "var(--yunque-text-muted)" }}>
+            {request.pack.name || request.pack.id} · {request.pack.version || "unknown"} · 让小羽生成单文件 Draft
+          </div>
+        </div>
+        <a
+          href="/packs/studio"
+          className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1.5 text-[11px] font-medium"
+          style={{ background: "var(--yunque-accent-muted)", color: "var(--yunque-accent)" }}
+        >
+          回到 Studio <ArrowRight size={11} />
+        </a>
+      </div>
+      <div className="mt-2 break-all font-mono text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
+        目标文件：{request.target.filePath}
+      </div>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {request.target.riskLevel && <Chip size="sm" variant="soft">风险：{request.target.riskLevel}</Chip>}
+        <Chip size="sm" variant="soft">starter {request.starterContentLength.toLocaleString()} chars</Chip>
+        {request.target.contentSummary && <Chip size="sm" variant="soft">摘要：{request.target.contentSummary.hash}</Chip>}
+        {request.target.gates.map((gate) => (
+          <Chip key={`draft-request:${gate}`} size="sm" variant="soft">{gate}</Chip>
+        ))}
+      </div>
+      {request.target.reason && (
+        <div className="mt-2 leading-5" style={{ color: "var(--yunque-text-muted)" }}>
+          原因：{request.target.reason}
+        </div>
+      )}
+      <div className="mt-2 leading-5" style={{ color: "var(--yunque-text-muted)" }}>
+        这是一条生成请求，不是已应用改动。小羽应只返回 {request.expectedKind || "yunque.pack_studio.patch_draft.v1"}，用户再回到 Studio 导入、预览 diff、审计、重新打包。
+      </div>
+    </div>
+  );
+}
+
 function structuredPackStudioMessage(content: string) {
+  const request = parsePackStudioPatchDraftRequestPrompt(content);
+  if (request) {
+    return {
+      card: renderPackStudioDraftRequest(request),
+      text: request.displayText,
+    };
+  }
   const draft = parsePackStudioPatchDraftPrompt(content);
   if (draft) {
     return {
