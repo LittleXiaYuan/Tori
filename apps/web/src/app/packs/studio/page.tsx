@@ -69,6 +69,7 @@ type StudioDraftCandidate = {
   content: string;
   summary: string;
   reason: string;
+  readinessGaps: string[];
   riskLevel: "low" | "medium" | "high";
   gates: string[];
   applyable: boolean;
@@ -183,7 +184,7 @@ function packPrimaryPath(manifest: PackManifest): string | undefined {
   return packUsability(manifest).primaryActionPath || manifest.frontend?.menus?.[0]?.path || manifest.frontend?.routes?.[0]?.path;
 }
 
-function buildManifestDraftContent(manifest: PackManifest, goal: string): string {
+function buildManifestDraftContent(manifest: PackManifest, goal: string, readinessGaps: string[] = []): string {
   const draft = JSON.parse(JSON.stringify(manifest)) as PackManifest;
   const safeGoal = goal.trim() || "让这个能力包更像一个用户能直接理解和使用的功能，而不是只看到存在。";
   const primaryPath = packPrimaryPath(manifest) || "/chat";
@@ -197,17 +198,22 @@ function buildManifestDraftContent(manifest: PackManifest, goal: string): string
   metadata.example2 ||= "在能力界面查看执行状态、产物、限制与下一步操作。";
   metadata.example3 ||= "完成后把结果保存到记忆或知识，方便下次复用。";
   metadata.limitation ||= "改包前必须经过 diff 预览、内置审计和重新打包，不直接修改已安装版本。";
+  if (readinessGaps.includes("用户感知位置")) metadata.usageSurface ||= `用户可在 ${primaryPath} 感知和使用这个能力。`;
+  if (readinessGaps.includes("后端能力声明")) {
+    metadata.backendCapabilityNote ||= "当前未声明后端能力。若实际没有后端执行，请明确标注为前端/说明型能力；若要新增后端能力，必须补 routeSpecs、权限和对应测试，不能只改文案伪造能力。";
+  }
   metadata.studioGoal = safeGoal;
   draft.metadata = metadata;
 
   return `${JSON.stringify(draft, null, 2)}\n`;
 }
 
-function buildFrontendDraftContent(manifest: PackManifest, goal: string): string {
+function buildFrontendDraftContent(manifest: PackManifest, goal: string, readinessGaps: string[] = []): string {
   const safeGoal = goal.trim() || "让这个能力包更像一个用户能直接理解和使用的功能，而不是只看到存在。";
   const primaryPath = packPrimaryPath(manifest) || "/chat";
   const capabilities = (manifest.backend?.capabilities || []).join(", ") || "无";
   const permissions = (manifest.backend?.permissions || []).join(", ") || "无";
+  const gapText = readinessGaps.length > 0 ? readinessGaps.join("、") : "无";
 
   return [
     "<!doctype html>",
@@ -239,6 +245,10 @@ function buildFrontendDraftContent(manifest: PackManifest, goal: string): string
     `      <span class=\"pill\">权限：${permissions}</span>`,
     "      <p class=\"muted\">这只是 Pack Studio 草稿；接入真实 bridge/API 前必须先预览 diff、运行审计并重新打包。</p>",
     "    </section>",
+    "    <section>",
+    "      <h2>这次补齐的体检缺口</h2>",
+    `      <p>${gapText}</p>`,
+    "    </section>",
     "  </main>",
     "</body>",
     "</html>",
@@ -249,6 +259,9 @@ function buildFrontendDraftContent(manifest: PackManifest, goal: string): string
 function buildStudioDraftCandidates(workspace: PackStudioWorkspaceReport, goal: string): StudioDraftCandidate[] {
   const seen = new Set<string>();
   const candidates: StudioDraftCandidate[] = [];
+  const readiness = packReadiness(workspace.manifest);
+  const manifestGaps = readiness.missing;
+  const frontendGaps = readiness.missing.filter((gap) => ["使用示例", "用户感知位置", "打开/使用入口"].includes(gap));
   for (const filePath of workspace.editable_files || []) {
     const normalized = filePath.replace(/\\/g, "/").toLowerCase();
     if (seen.has(normalized)) continue;
@@ -256,13 +269,16 @@ function buildStudioDraftCandidates(workspace: PackStudioWorkspaceReport, goal: 
     if (normalized.endsWith("/pack.json") || normalized.endsWith("pack.json")) {
       candidates.push({
         key: `manifest:${filePath}`,
-        label: "manifest 草稿",
+        label: manifestGaps.length > 0 ? "体检缺口 manifest 草稿" : "manifest 草稿",
         filePath,
-        content: buildManifestDraftContent(workspace.manifest, goal),
-        summary: "补用途、入口、示例、限制和 Studio 目标。",
+        content: buildManifestDraftContent(workspace.manifest, goal, manifestGaps),
+        summary: manifestGaps.length > 0
+          ? `按体检缺口补 ${manifestGaps.join("、")}。`
+          : "补用途、入口、示例、限制和 Studio 目标。",
         reason: "manifest 是能力包契约入口，适合先补用户能理解的用途、入口、限制和回滚提示。",
+        readinessGaps: manifestGaps,
         riskLevel: "low",
-        gates: ["预览 diff", "内置审计", "Pack 可用性扫描"],
+        gates: ["预览 diff", "内置审计", "Pack 可用性扫描", ...(manifestGaps.length > 0 ? ["复跑体检缺口"] : [])],
         applyable: true,
       });
       continue;
@@ -270,13 +286,16 @@ function buildStudioDraftCandidates(workspace: PackStudioWorkspaceReport, goal: 
     if (normalized.includes("/frontend/") && normalized.endsWith(".html")) {
       candidates.push({
         key: `frontend:${filePath}`,
-        label: "前端界面草稿",
+        label: frontendGaps.length > 0 ? "体检缺口前端草稿" : "前端界面草稿",
         filePath,
-        content: buildFrontendDraftContent(workspace.manifest, goal),
-        summary: "补一个可感知的沙箱界面草稿。",
+        content: buildFrontendDraftContent(workspace.manifest, goal, frontendGaps),
+        summary: frontendGaps.length > 0
+          ? `把 ${frontendGaps.join("、")} 落到可见界面里。`
+          : "补一个可感知的沙箱界面草稿。",
         reason: "HTML 前端资源可在 yqpack 工作区内预览和替换，适合补独立界面、权限说明和结果区。",
+        readinessGaps: frontendGaps,
         riskLevel: "medium",
-        gates: ["预览 diff", "内置审计", "重新打包", "复检 yqpack"],
+        gates: ["预览 diff", "内置审计", "重新打包", "复检 yqpack", ...(frontendGaps.length > 0 ? ["复跑体检缺口"] : [])],
         applyable: true,
       });
     }
@@ -360,6 +379,7 @@ function buildPatchDraftRequestPrompt(prompt: string, workspace: PackStudioWorks
       file_path: candidate.filePath,
       label: candidate.label,
       reason: candidate.reason,
+      readiness_gaps: candidate.readinessGaps,
       risk_level: candidate.riskLevel,
       gates: candidate.gates,
       content_summary: {
@@ -381,6 +401,9 @@ function buildPatchDraftRequestPrompt(prompt: string, workspace: PackStudioWorks
     prompt,
     "",
     "下面是 Pack Studio 的 Patch Draft Request。请基于 starter_content 和目标，生成一个单文件 Patch Draft。",
+    candidate.readinessGaps.length > 0
+      ? `这次必须优先补齐体检缺口：${candidate.readinessGaps.join("、")}。如果某个缺口需要后端源码或新 route，请明确写成限制/待办，不要伪造能力。`
+      : "这次没有强制体检缺口；请继续打磨真实可用路径和用户反馈。",
     "输出必须只包含一段 fenced JSON，kind 必须是 yunque.pack_studio.patch_draft.v1。",
     "content 必须是完整的新文件内容，不要输出 diff、片段或解释文本。",
     "不要声称已经应用改动；用户回到 Studio 导入后仍要预览 diff、运行内置审计、重新打包和复检 SHA。",
@@ -664,6 +687,10 @@ export default function PackStudioPage() {
   const draftCandidates = useMemo(
     () => workspaceReport ? buildStudioDraftCandidates(workspaceReport, goal) : [],
     [workspaceReport, goal],
+  );
+  const readinessDraftCandidate = useMemo(
+    () => draftCandidates.find((candidate) => candidate.readinessGaps.length > 0) || draftCandidates[0],
+    [draftCandidates],
   );
   const patchPlan = useMemo(
     () => workspaceReport && draftCandidates.length > 0 ? buildPatchPlan(workspaceReport, draftCandidates, goal) : null,
@@ -1350,6 +1377,13 @@ export default function PackStudioPage() {
                         <Button size="sm" variant="outline" onPress={copyDeliverySummary}>
                           <Copy size={13} /> 复制交付摘要
                         </Button>
+                        {workspaceReport && readinessDraftCandidate && readinessDraftCandidate.readinessGaps.length > 0 && (
+                          <Link href={`/chat?q=${encodeURIComponent(buildPatchDraftRequestPrompt(prompt, workspaceReport, readinessDraftCandidate, goal))}`}>
+                            <Button size="sm" className="btn-accent">
+                              <Sparkles size={13} /> 按体检缺口交给小羽生成 Draft
+                            </Button>
+                          </Link>
+                        )}
                       </div>
                     </div>
                     <div className="grid gap-2 lg:grid-cols-4">
@@ -1574,6 +1608,13 @@ export default function PackStudioPage() {
                               <div className="mt-1 truncate font-mono text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>{candidate.filePath}</div>
                               <div className="mt-1 text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>{candidate.summary}</div>
                               <div className="mt-1 text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>原因：{candidate.reason}</div>
+                              {candidate.readinessGaps.length > 0 && (
+                                <div className="mt-2 flex flex-wrap gap-1">
+                                  {candidate.readinessGaps.map((gap) => (
+                                    <Chip key={`${candidate.key}:gap:${gap}`} size="sm" color="warning">补：{gap}</Chip>
+                                  ))}
+                                </div>
+                              )}
                               <div className="mt-2 flex flex-wrap gap-1">
                                 {candidate.gates.map((gate) => (
                                   <Chip key={`${candidate.key}:${gate}`} size="sm" variant="soft">{gate}</Chip>

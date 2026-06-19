@@ -424,11 +424,13 @@ describe("PackStudioPage", () => {
     expect(patchPlan.workspace.id).toBe("yunque.pack.wasm-plugin-0.1.0-aaaaaaaaaaaa");
     expect(patchPlan.candidates).toHaveLength(2);
     expect(patchPlan.candidates[0]).toMatchObject({
-      label: "manifest 草稿",
+      label: "体检缺口 manifest 草稿",
       risk_level: "low",
       applyable: true,
     });
+    expect(patchPlan.candidates[0].gates).toContain("复跑体检缺口");
     expect(patchPlan.candidates[1].gates).toContain("复检 yqpack");
+    expect(patchPlan.candidates[1].gates).toContain("复跑体检缺口");
     expect(patchPlan.candidates[1].content_summary.length).toBeGreaterThan(100);
     expect(patchPlanText).not.toContain("<!doctype html>");
     await waitFor(() => {
@@ -439,7 +441,7 @@ describe("PackStudioPage", () => {
     expect(patchPlanLink).toHaveAttribute("href", expect.stringContaining("/chat?q="));
     const patchPlanQuery = new URL(patchPlanLink.getAttribute("href")!, "http://localhost").searchParams.get("q") || "";
     expect(patchPlanQuery).toContain("yunque.pack_studio.patch_plan.v1");
-    expect(patchPlanQuery).toContain("manifest 草稿");
+    expect(patchPlanQuery).toContain("体检缺口 manifest 草稿");
     expect(patchPlanQuery).toContain("预览 diff");
     expect(patchPlanQuery).toContain("运行内置审计");
     expect(patchPlanQuery).not.toContain("<!doctype html>");
@@ -453,6 +455,8 @@ describe("PackStudioPage", () => {
     const draftRequestPrompt = vi.mocked(navigator.clipboard.writeText).mock.calls.at(-1)?.[0] || "";
     expect(draftRequestPrompt).toContain("yunque.pack_studio.patch_draft_request.v1");
     expect(draftRequestPrompt).toContain("yunque.pack_studio.patch_draft.v1");
+    expect(draftRequestPrompt).toContain("这次必须优先补齐体检缺口：使用示例、用户感知位置");
+    expect(draftRequestPrompt).toContain("readiness_gaps");
     expect(draftRequestPrompt).toContain("content 必须是完整的新文件内容，不要输出 diff、片段或解释文本");
     expect(draftRequestPrompt).toContain("starter_content");
     expect(draftRequestPrompt).toContain("<!doctype html>");
@@ -461,7 +465,8 @@ describe("PackStudioPage", () => {
       expect(toastMock).toHaveBeenCalledWith("已复制 Patch Draft 请求", "success");
     });
 
-    const draftRequestLink = screen.getAllByRole("link", { name: /交给小羽生成 Draft/ })[1];
+    const draftRequestLinks = screen.getAllByRole("link", { name: /交给小羽生成 Draft/ });
+    const draftRequestLink = draftRequestLinks[draftRequestLinks.length - 1];
     expect(draftRequestLink).toHaveAttribute("href", expect.stringContaining("/chat?q="));
     const draftRequestQuery = new URL(draftRequestLink.getAttribute("href")!, "http://localhost").searchParams.get("q") || "";
     expect(draftRequestQuery).toContain("yunque.pack_studio.patch_draft_request.v1");
@@ -469,7 +474,13 @@ describe("PackStudioPage", () => {
     const draftRequestJson = draftRequestQuery.match(/```json\n([\s\S]+?)\n```/)?.[1] || "";
     const linkedDraftRequest = JSON.parse(draftRequestJson);
     expect(linkedDraftRequest.target.file_path).toBe("C:\\yunque\\packs\\studio\\frontend\\index.html");
+    expect(linkedDraftRequest.target.readiness_gaps).toEqual(["使用示例", "用户感知位置"]);
     expect(linkedDraftRequest.expected_output.kind).toBe("yunque.pack_studio.patch_draft.v1");
+    const readinessDraftLink = screen.getByRole("link", { name: /按体检缺口交给小羽生成 Draft/ });
+    expect(readinessDraftLink).toHaveAttribute("href", expect.stringContaining("/chat?q="));
+    const readinessDraftQuery = new URL(readinessDraftLink.getAttribute("href")!, "http://localhost").searchParams.get("q") || "";
+    expect(readinessDraftQuery).toContain("这次必须优先补齐体检缺口：使用示例、用户感知位置");
+    expect(readinessDraftQuery).toContain("体检缺口 manifest 草稿");
 
     const importedChatMessage = [
       "小羽整理好了 Pack Studio Patch Plan。",
@@ -553,9 +564,10 @@ describe("PackStudioPage", () => {
     const draftJSON = JSON.parse(manifestDraft.value);
     expect(draftJSON.description).toBe("增加一个可查看运行结果的界面");
     expect(draftJSON.metadata.primaryActionPath).toBe("/packs/wasm-plugin");
+    expect(draftJSON.metadata.usageSurface).toContain("/packs/wasm-plugin");
     expect(draftJSON.metadata.example3).toContain("保存到记忆或知识");
     expect(draftJSON.metadata.studioGoal).toBe("增加一个可查看运行结果的界面");
-    expect(toastMock).toHaveBeenCalledWith("已生成 manifest 草稿，请先预览 diff 再应用", "success");
+    expect(toastMock).toHaveBeenCalledWith("已生成 体检缺口 manifest 草稿，请先预览 diff 再应用", "success");
     expect(screen.getByText("草稿只会填入工作区改动框；真正写入仍需先预览 diff，并在应用后运行内置审计。")).toBeInTheDocument();
 
     fireEvent.click(draftButtons[1]);
@@ -563,6 +575,7 @@ describe("PackStudioPage", () => {
     expect(screen.getByDisplayValue("C:\\yunque\\packs\\studio\\frontend\\index.html")).toBeInTheDocument();
     expect(frontendDraft.value).toContain("<title>WASM 能力包</title>");
     expect(frontendDraft.value).toContain("能力包界面草稿 · yunque.pack.wasm-plugin");
+    expect(frontendDraft.value).toContain("这次补齐的体检缺口");
     expect(frontendDraft.value).toContain("接入真实 bridge/API 前必须先预览 diff、运行审计并重新打包");
     expect(screen.getAllByText("下一步：点击预览 diff").length).toBeGreaterThan(0);
 
