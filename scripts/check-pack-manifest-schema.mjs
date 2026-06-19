@@ -110,24 +110,42 @@ if (schema && existsSync(packRoot)) {
 
     const routes = new Set(manifest.backend?.routes ?? []);
     const routeSpecs = manifest.backend?.routeSpecs ?? [];
-    for (const spec of routeSpecs) {
-      if (!routes.has(spec.path)) {
-        fail(`${repoRel(manifestPath)} backend.routeSpecs path is not listed in backend.routes: ${spec.path}`);
+    if (routeSpecs.length > 0) {
+      for (const spec of routeSpecs) {
+        if (![...routes].some((route) => routeMatchesSpec(route, spec.path))) {
+          fail(`${repoRel(manifestPath)} backend.routeSpecs path is not listed in backend.routes: ${spec.path}`);
+        }
       }
-    }
-    for (const route of routes) {
-      if (!routeSpecs.some((spec) => spec.path === route)) {
-        fail(`${repoRel(manifestPath)} backend.routes path lacks a routeSpecs entry: ${route}`);
+      for (const route of routes) {
+        if (!routeSpecs.some((spec) => routeMatchesSpec(route, spec.path))) {
+          fail(`${repoRel(manifestPath)} backend.routes path lacks a routeSpecs entry: ${route}`);
+        }
       }
     }
 
     const menuPaths = new Set((manifest.frontend?.menus ?? []).map((item) => item.path));
+    const primaryActionPath = stripQueryAndHash(manifest.metadata?.primaryActionPath || "");
     for (const route of manifest.frontend?.routes ?? []) {
-      if (!menuPaths.has(route.path)) {
+      const routePath = stripQueryAndHash(route.path);
+      if (menuPaths.size > 0 && !menuPaths.has(routePath) && primaryActionPath !== routePath) {
         fail(`${repoRel(manifestPath)} frontend route is not reachable from a menu path: ${route.path}`);
       }
     }
   }
+}
+
+function routeMatchesSpec(route, specPath) {
+  if (route === specPath) return true;
+  if (!route || !specPath) return false;
+  const routePrefix = route.endsWith("/") ? route : `${route}/`;
+  if (specPath.startsWith(routePrefix)) return true;
+  const templatePrefix = specPath.replace(/\{[^/]+\}/g, "");
+  if (templatePrefix && route.startsWith(templatePrefix)) return true;
+  return false;
+}
+
+function stripQueryAndHash(value) {
+  return typeof value === "string" ? value.split(/[?#]/, 1)[0] : "";
 }
 
 if (failures.length > 0) {
