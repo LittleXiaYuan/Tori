@@ -25,6 +25,28 @@ function defaultSnapshotId() {
   return `baseline-${new Date().toISOString().slice(0, 10).replaceAll("-", "")}`;
 }
 
+const userFacingSteps = [
+  {
+    title: "1. 建一个依赖基线",
+    body: "保存当前 Go/npm 依赖快照，作为以后发版或升级前的对比点。",
+  },
+  {
+    title: "2. 看依赖漂移",
+    body: "对比当前工作树，找出新增、移除、版本变化和风险等级。",
+  },
+  {
+    title: "3. 生成 CI 交接计划",
+    body: "把漂移报告、CycloneDX 和 CI gate 计划导出给后续流水线审核。",
+  },
+];
+
+const boundaryItems = [
+  "不会修改 GitHub Actions 或 CI 配置。",
+  "不会联网拉取漏洞库或执行 govulncheck。",
+  "不会把计划结果写成真实发布阻断。",
+  "不会替代正式供应链安全扫描。",
+];
+
 export default function SBOMDriftPackPage() {
   const [status, setStatus] = useState<SBOMDriftStatus | null>(null);
   const [snapshots, setSnapshots] = useState<SBOMDriftSnapshotSummary[]>([]);
@@ -224,9 +246,42 @@ export default function SBOMDriftPackPage() {
     <div className="page-root space-y-6 animate-fade-in-up">
       <PageHeader icon={<ShieldCheck size={20} />} title="SBOM 依赖漂移" />
 
+      <Card className="section-card overflow-hidden p-0">
+        <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="p-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <Chip size="sm" style={{ background: "rgba(245,158,11,0.12)", color: "var(--yunque-warning)" }}>实验中</Chip>
+              <Chip size="sm" variant="soft">可保存基线</Chip>
+              <Chip size="sm" variant="soft">CI 只生成计划</Chip>
+            </div>
+            <div className="mt-3 text-base font-semibold" style={{ color: "var(--yunque-text)" }}>
+              这个能力包现在适合做什么
+            </div>
+            <div className="mt-2 max-w-3xl text-sm leading-6" style={{ color: "var(--yunque-text-secondary)" }}>
+              它用于在发版、升级依赖或接入第三方包之前，先记录依赖基线，再对比当前工作树的变化。当前可以保存快照、生成漂移报告、导出 CycloneDX 和证据包；CI gate / workflow 写回仍是交接计划，不会直接改你的仓库或阻断发布。
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              {userFacingSteps.map((item) => (
+                <div key={item.title} className="rounded-lg p-3" style={{ background: "var(--yunque-bg-hover)", border: "1px solid var(--yunque-border)" }}>
+                  <div className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>{item.title}</div>
+                  <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>{item.body}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="p-5" style={{ background: "rgba(245,158,11,0.08)", borderLeft: "1px solid var(--yunque-border)" }}>
+            <div className="mb-3 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>当前不会做什么</div>
+            <div className="space-y-2 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
+              {boundaryItems.map((item) => <div key={item}>{item}</div>)}
+            </div>
+          </div>
+        </div>
+      </Card>
+
       <Card className="section-card p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
+            <div className="mb-3 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>技术状态</div>
             <div className="mb-1 flex items-center gap-2">
               <Chip size="sm" style={{ background: status?.scanner_ready ? "rgba(34,197,94,0.12)" : "rgba(250,204,21,0.12)", color: status?.scanner_ready ? "#22c55e" : "#facc15" }}>
                 {status?.scanner_ready ? "Snapshot scanner" : "Pack shell"}
