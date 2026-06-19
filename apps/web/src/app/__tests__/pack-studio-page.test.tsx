@@ -324,8 +324,11 @@ describe("PackStudioPage", () => {
 
     expect(screen.getByText("可以让小羽优先优化")).toBeInTheDocument();
     expect(screen.getByText("需要守住的边界")).toBeInTheDocument();
+    expect(screen.getByText("能力包体检")).toBeInTheDocument();
+    expect(screen.getByText("小羽会优先补齐：使用示例、用户感知位置。")).toBeInTheDocument();
+    expect(screen.getByText("能力包体检缺口：使用示例、用户感知位置，优先补齐这些用户可感知信息。")).toBeInTheDocument();
     expect(screen.getByText("不要反编译后硬改 WASM；需要源码、ABI 说明和 wasm-plugin 回归测试。")).toBeInTheDocument();
-    expect(screen.getByText("这个包仍是实验能力，改造时不要把它包装成稳定承诺。")).toBeInTheDocument();
+    expect(screen.getByText(/这个包仍是实验能力，改造时不要把它包装成稳定承诺。/)).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("这次想补强什么"), { target: { value: "增加一个可查看运行结果的界面" } });
 
@@ -338,6 +341,7 @@ describe("PackStudioPage", () => {
 
     const task = screen.getByLabelText("小羽改包任务") as HTMLTextAreaElement;
     expect(task.value).toContain("用户目标：增加一个可查看运行结果的界面");
+    expect(task.value).toContain("能力包体检：需补说明；还缺 使用示例、用户感知位置");
     expect(task.value).toContain("POST /v1/wasm-plugin/run");
     expect(task.value).toContain("可改文件候选：");
     expect(task.value).toContain("diff 预览草案：");

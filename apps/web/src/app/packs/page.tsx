@@ -133,7 +133,11 @@ function sourceName(url: string): string {
 }
 
 function packStudioHref(manifest: PackManifest, options?: { packageUrl?: string; sha256?: string }): string {
-  const goal = `让 ${manifest.name} 更像一个用户能直接理解和使用的能力包，补齐用途、入口、权限说明和可回滚改造建议。`;
+  const readiness = packReadiness(manifest);
+  const gap = readiness.missing.length > 0
+    ? `重点补齐：${readiness.missing.join("、")}。`
+    : "继续打磨更具体的用户场景和入口反馈。";
+  const goal = `让 ${manifest.name} 更像一个用户能直接理解和使用的能力包，${gap}补齐用途、入口、权限说明和可回滚改造建议。`;
   const params = new URLSearchParams({
     packId: manifest.id,
     goal,

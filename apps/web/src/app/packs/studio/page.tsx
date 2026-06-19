@@ -26,6 +26,7 @@ import {
   capabilitySurfaceLabels,
   groupPackPermissions,
   packFeatureFlags,
+  packReadiness,
   packUsability,
   riskProfileForPack,
 } from "@/lib/pack-presentation";
@@ -444,6 +445,7 @@ function buildStudioAnalysis(manifest: PackManifest, goal = ""): StudioAnalysis 
   const flags = packFeatureFlags(manifest);
   const risk = riskProfileForPack(manifest);
   const usability = packUsability(manifest);
+  const readiness = packReadiness(manifest);
   const routes = packRoutes(manifest);
   const paths = packPaths(manifest);
   const permissions = manifest.backend?.permissions || [];
@@ -452,6 +454,9 @@ function buildStudioAnalysis(manifest: PackManifest, goal = ""): StudioAnalysis 
   const editable = [
     "用途说明、起手示例、入口文案、可用度分层和权限解释可以从 manifest/前端展示层优化。",
   ];
+  if (readiness.missing.length > 0) {
+    editable.push(`能力包体检缺口：${readiness.missing.join("、")}，优先补齐这些用户可感知信息。`);
+  }
   if (paths.length > 0) editable.push("已有前端入口，可优先改页面文案、交互提示、空态、结果区和任务入口。");
   if (flags.isIframeBundle) editable.push("这是独立界面包；若 yqpack 内含 iframe 静态资源，可在沙箱边界内优化界面。");
   if (flags.hasWasm) editable.push("WASM 能力可以扩展 host 调用说明、输入输出 schema 和审计提示；改二进制逻辑需要源码。");
@@ -477,6 +482,7 @@ function buildStudioAnalysis(manifest: PackManifest, goal = ""): StudioAnalysis 
   const warnings = [];
   if (usability.kind === "infrastructure") warnings.push("这个包主要是基础能力，改造目标应落到 Chat/任务/知识等实际使用面。");
   if (usability.kind === "experimental") warnings.push("这个包仍是实验能力，改造时不要把它包装成稳定承诺。");
+  if (readiness.missing.length > 0) warnings.push(`能力包体检：${readiness.label}，还缺 ${readiness.missing.join("、")}。`);
   if (permissions.length === 0) warnings.push("manifest 未声明权限，若新增能力必须先补权限与风险说明。");
 
   const editableFiles = buildEditableFiles(manifest);
@@ -506,6 +512,7 @@ function buildXiaoyuPrompt(manifest: PackManifest, goal: string): string {
   const flags = packFeatureFlags(manifest);
   const permissions = manifest.backend?.permissions || [];
   const capabilities = manifest.backend?.capabilities || [];
+  const readiness = packReadiness(manifest);
   const analysis = buildStudioAnalysis(manifest, goal);
   return [
     `请以“小羽改包”的方式改造能力包 ${manifest.name} (${manifest.id}) v${manifest.version}。`,
@@ -519,6 +526,7 @@ function buildXiaoyuPrompt(manifest: PackManifest, goal: string): string {
     `- 能力声明：${capabilities.length > 0 ? capabilities.join(", ") : "无"}`,
     `- 权限声明：${permissions.length > 0 ? permissions.join(", ") : "无"}`,
     `- 形态：${flags.isIframeBundle ? "iframe-bundle " : ""}${flags.hasWasm ? "WASM " : ""}${flags.hasBackend ? "backend " : ""}${flags.hasFrontend ? "frontend" : ""}`.trim(),
+    `- 能力包体检：${readiness.label}${readiness.missing.length > 0 ? `；还缺 ${readiness.missing.join("、")}` : "；说明已基本完整"}`,
     "",
     "请按这个安全流程执行：",
     "1. 先只读检查 yqpack/pack.json/前端入口/SDK/后端 routeSpecs，列出真实可改文件。",
@@ -549,6 +557,19 @@ function buildXiaoyuPrompt(manifest: PackManifest, goal: string): string {
     "",
     "建议门禁：",
     ...analysis.tests.map((item) => `- ${item}`),
+  ].join("\n");
+}
+
+function withReadinessPrompt(prompt: string, manifest: PackManifest): string {
+  if (prompt.includes("能力包体检：")) return prompt;
+  const readiness = packReadiness(manifest);
+  return [
+    prompt,
+    "",
+    `能力包体检：${readiness.label}${readiness.missing.length > 0 ? `；还缺 ${readiness.missing.join("、")}` : "；说明已基本完整"}`,
+    readiness.missing.length > 0
+      ? "请优先把这些缺口落实到 pack.json metadata、前端入口文案、示例或能力边界说明里。"
+      : "可以继续打磨更具体的用户路径、结果反馈和回滚提示。",
   ].join("\n");
 }
 
@@ -626,6 +647,7 @@ export default function PackStudioPage() {
     [candidates, selectedId],
   );
   const manifest = selected?.manifest;
+  const readiness = manifest ? packReadiness(manifest) : null;
   const { data: studioPlan, refresh: refreshStudioPlan } = useApiData(async () => {
     if (!manifest) return null;
     try {
@@ -637,7 +659,7 @@ export default function PackStudioPage() {
   }, null as StudioAnalysis | null, [manifest?.id, goal]);
   const fallbackAnalysis = manifest ? buildStudioAnalysis(manifest, goal) : null;
   const analysis = studioPlan && studioPlan.packId === manifest?.id && studioPlan.goal === goal ? studioPlan : fallbackAnalysis;
-  const prompt = manifest ? (analysis?.prompt || buildXiaoyuPrompt(manifest, goal)) : "";
+  const prompt = manifest ? withReadinessPrompt(analysis?.prompt || buildXiaoyuPrompt(manifest, goal), manifest) : "";
   const chatHref = `/chat?q=${encodeURIComponent(prompt)}`;
   const draftCandidates = useMemo(
     () => workspaceReport ? buildStudioDraftCandidates(workspaceReport, goal) : [],
@@ -1125,6 +1147,19 @@ export default function PackStudioPage() {
                   ))}
                 </div>
               </div>
+              {readiness && (
+                <div className="mt-3 rounded-md border p-3 text-xs" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-bg-hover)", color: "var(--yunque-text-secondary)" }}>
+                  <div className="mb-1 flex flex-wrap items-center gap-2">
+                    <span className="font-medium" style={{ color: "var(--yunque-text)" }}>能力包体检</span>
+                    <Chip size="sm" color={readiness.level === "complete" ? "success" : readiness.level === "needs_context" ? "warning" : "danger"}>
+                      {readiness.label}
+                    </Chip>
+                  </div>
+                  {readiness.missing.length > 0
+                    ? `小羽会优先补齐：${readiness.missing.join("、")}。`
+                    : "说明、入口、示例与能力边界已基本完整，可继续打磨更具体的用户路径。"}
+                </div>
+              )}
               <div className="mt-3 grid gap-3 md:grid-cols-2">
                 <div className="rounded-md border p-3" style={{ borderColor: "var(--yunque-border)" }}>
                   <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>可以让小羽优先优化</div>

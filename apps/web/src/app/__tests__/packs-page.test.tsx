@@ -162,6 +162,7 @@ describe("PacksPageOptimized", () => {
     const studioLinks = screen.getAllByRole("link", { name: /小羽优化/ });
     expect(studioLinks[0]).toHaveAttribute("href", expect.stringContaining("/packs/studio?packId=yunque.pack.documents"));
     expect(decodeURIComponent(studioLinks[0].getAttribute("href") || "").replace(/\+/g, " ")).toContain("让 Documents (文档生成) 更像一个用户能直接理解和使用的能力包");
+    expect(decodeURIComponent(studioLinks[0].getAttribute("href") || "").replace(/\+/g, " ")).toContain("继续打磨更具体的用户场景和入口反馈");
   });
 
   it("filters installed packs by search and resets the store filters", async () => {
