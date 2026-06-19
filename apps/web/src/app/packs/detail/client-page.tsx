@@ -124,6 +124,10 @@ function studioHrefForPack(params: {
   return `/packs/studio?${query.toString()}`;
 }
 
+function packCenterFocusHref(packId: string): string {
+  return `/packs?q=${encodeURIComponent(packId)}`;
+}
+
 function installSourceForPack(params: {
   manifest: PackManifest;
   catalogEntry?: PackCatalogEntry;
@@ -353,9 +357,9 @@ export default function PackDetailClientPage() {
         },
         {
           key: "after-install",
-          label: "安装后回中心启用",
-          detail: "安装成功后状态会刷新；回能力包中心或留在详情页启用，再打开入口或让云雀在 Chat/任务里调用它。",
-          href: "/packs",
+          label: "安装后启用和管理",
+          detail: "安装成功后状态会刷新；可以留在详情页启用，也可以回能力包中心并自动聚焦这个包。",
+          href: packCenterFocusHref(manifest.id),
         },
       ]
     : !enabled
@@ -377,7 +381,7 @@ export default function PackDetailClientPage() {
             key: "open-later",
             label: "启用后打开入口",
             detail: openPath ? "如果它有界面入口，启用后可以直接打开；没有入口的包会在 Chat、任务、记忆或知识流程中被感知。" : "这个包没有独立界面入口，启用后主要由 Chat、任务、记忆或知识流程感知。",
-            href: openPath || "/packs",
+            href: openPath || packCenterFocusHref(manifest.id),
           },
         ]
       : [
@@ -385,13 +389,13 @@ export default function PackDetailClientPage() {
             key: "open",
             label: openPath ? "打开能力入口" : "回能力包中心管理",
             detail: openPath ? "进入它的界面开始使用；没有界面的后台能力，也可以从 Chat 或任务里自然调用。" : "这个包没有独立界面入口，可以回中心查看状态、禁用或继续管理。",
-            href: openPath || "/packs",
+            href: openPath || packCenterFocusHref(manifest.id),
           },
           {
             key: "manage",
             label: "回中心管理和固定",
             detail: "回能力包中心查看启用状态、入口提示、侧栏固定建议和可回滚信息。",
-            href: "/packs",
+            href: packCenterFocusHref(manifest.id),
           },
           {
             key: "improve",
@@ -639,7 +643,7 @@ export default function PackDetailClientPage() {
                   <Sparkles size={14} /> 先在 Studio 只读检查
                 </Button>
               </Link>
-              <Link href="/packs">
+              <Link href={packCenterFocusHref(manifest.id)}>
                 <Button size="sm" variant="ghost">
                   回能力包中心 <ArrowRight size={14} />
                 </Button>
