@@ -7,25 +7,10 @@ import (
 	"yunque-agent/internal/apperror"
 )
 
-// handleCognis serves both /v1/cognis (collection) and /v1/cognis/ (with
-// optional sub-resource).
-//
-// Routes:
-//
-//	GET    /v1/cognis              → list every registered declaration
-//	POST   /v1/cognis              → add an inline declaration (JSON body)
-//	GET    /v1/cognis/{id}         → fetch one declaration
-//	DELETE /v1/cognis/{id}         → remove one declaration
-//	POST   /v1/cognis/{id}/enable  → enable
-//	POST   /v1/cognis/{id}/disable → disable
-//	POST   /v1/cognis/reload       → re-scan the cognis directory on disk
-//	POST   /v1/cognis/import       → import a bundle (persists added/updated to disk)
-//	GET    /v1/cognis/export       → export declarations as a bundle
-//	GET    /v1/cognis/traces       → recent per-turn evaluation traces
-//	GET    /v1/cognis/stats        → activation counts per cogni
-//	GET    /v1/cognis/health       → health metrics for every cogni seen recently
-//	GET    /v1/cognis/{id}/trace   → traces filtered to one cogni id
-//	GET    /v1/cognis/{id}/health  → health rollup for one cogni
+// handleCognis is the legacy Cogni Kernel adapter. Pack Runtime owns the
+// method-aware /v1/cognis* route mounting and the cognikernel pack owns the
+// business handlers. This adapter is intentionally kept as a defensive fallback
+// for stale direct registrations and should not regain Cogni business logic.
 func (g *Gateway) handleCognis(w http.ResponseWriter, r *http.Request) {
 	if g.cogniRegistry == nil {
 		apperror.WriteCode(w, apperror.CodeInternal, "cogni registry not configured")
@@ -56,7 +41,6 @@ func (g *Gateway) handleCognis(w http.ResponseWriter, r *http.Request) {
 		apperror.WriteCode(w, apperror.CodeNotFound, "cogni evolution is owned by cogni-kernel pack")
 	default:
 		segs := strings.SplitN(path, "/", 3)
-		id := segs[0]
 		switch {
 		case len(segs) == 1:
 			apperror.WriteCode(w, apperror.CodeNotFound, "cogni declaration route is owned by cogni-kernel pack")
@@ -69,9 +53,9 @@ func (g *Gateway) handleCognis(w http.ResponseWriter, r *http.Request) {
 		case len(segs) == 2 && segs[1] == "evolution":
 			apperror.WriteCode(w, apperror.CodeNotFound, "cogni evolution route is owned by cogni-kernel pack")
 		case len(segs) == 2 && segs[1] == "expose":
-			g.cogniFederationExpose(w, r, id, true)
+			apperror.WriteCode(w, apperror.CodeNotFound, "cogni federation expose route is owned by cogni-kernel pack")
 		case len(segs) == 2 && segs[1] == "unexpose":
-			g.cogniFederationExpose(w, r, id, false)
+			apperror.WriteCode(w, apperror.CodeNotFound, "cogni federation unexpose route is owned by cogni-kernel pack")
 		default:
 			apperror.WriteCode(w, apperror.CodeNotFound, "unknown cogni sub-resource")
 		}

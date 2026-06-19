@@ -332,6 +332,12 @@ func (r *Router) serveRegistry(w http.ResponseWriter, req *http.Request) bool {
 		case "evolution":
 			r.HandleEvolutionByID(w, req, segs[0])
 			return true
+		case "expose":
+			r.HandleFederationExpose(w, req, segs[0], true)
+			return true
+		case "unexpose":
+			r.HandleFederationExpose(w, req, segs[0], false)
+			return true
 		}
 	}
 	return false
@@ -726,6 +732,31 @@ func (r *Router) HandleFederationDiscover(w http.ResponseWriter, req *http.Reque
 		"skills": skills,
 		"count":  len(skills),
 	})
+}
+
+func (r *Router) HandleFederationExpose(w http.ResponseWriter, req *http.Request, id string, expose bool) {
+	if req.Method != http.MethodPost {
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "POST only")
+		return
+	}
+	federation := r.cogniFederation()
+	if federation == nil {
+		apperror.WriteCode(w, apperror.CodeInternal, "federation not configured")
+		return
+	}
+	if expose {
+		if err := federation.Expose(id); err != nil {
+			apperror.WriteCode(w, apperror.CodeNotFound, err.Error())
+			return
+		}
+	} else {
+		federation.Unexpose(id)
+	}
+	action := "unexposed"
+	if expose {
+		action = "exposed"
+	}
+	writeJSON(w, map[string]any{"status": action, "id": id})
 }
 
 func (r *Router) HandleEconomics(w http.ResponseWriter, req *http.Request) {

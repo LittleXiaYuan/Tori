@@ -204,7 +204,7 @@ func TestCogniKernelRouterOwnsRuntimeStateBeforeAPIDelegation(t *testing.T) {
 		t.Fatalf("runtime pack-state should not delegate to API adapter, called=%d", api.called)
 	}
 
-	req = httptest.NewRequest(http.MethodPost, SubResourceRoute+"reviewer/expose", nil)
+	req = httptest.NewRequest(http.MethodPost, SubResourceRoute+"reviewer/legacy-only", nil)
 	w = httptest.NewRecorder()
 	router.ServeCogniKernel(w, req)
 	if w.Code != http.StatusNoContent || api.called != 1 {
@@ -766,6 +766,26 @@ func TestCogniKernelRouterOwnsFederationAndEconomics(t *testing.T) {
 		t.Fatalf("expected one peer, got %#v", peers)
 	}
 
+	req = httptest.NewRequest(http.MethodPost, "/v1/cognis/reviewer/expose", nil)
+	w = httptest.NewRecorder()
+	router.ServeCogniKernel(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expose status=%d body=%s", w.Code, w.Body.String())
+	}
+	if exposed := federation.ExposedCognis(); len(exposed) != 1 || exposed[0].ID != "reviewer" {
+		t.Fatalf("expected reviewer to be exposed, got %+v", exposed)
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/cognis/reviewer/unexpose", nil)
+	w = httptest.NewRecorder()
+	router.ServeCogniKernel(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("unexpose status=%d body=%s", w.Code, w.Body.String())
+	}
+	if exposed := federation.ExposedCognis(); len(exposed) != 0 {
+		t.Fatalf("expected no exposed cognis after unexpose, got %+v", exposed)
+	}
+
 	req = httptest.NewRequest(http.MethodGet, EconomicsRoute, nil)
 	w = httptest.NewRecorder()
 	router.HandleEconomics(w, req)
@@ -1172,7 +1192,7 @@ func TestCogniKernelRouterRouteDecisionRequiresBus(t *testing.T) {
 func TestCogniKernelRouterReportsMissingAPIAdapter(t *testing.T) {
 	router := NewRouter(nil, fakeRuntimeReporter{})
 
-	req := httptest.NewRequest(http.MethodPost, SubResourceRoute+"reviewer/expose", nil)
+	req := httptest.NewRequest(http.MethodPost, SubResourceRoute+"reviewer/legacy-only", nil)
 	w := httptest.NewRecorder()
 	router.ServeCogniKernel(w, req)
 	if w.Code != http.StatusServiceUnavailable {
