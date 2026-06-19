@@ -38,6 +38,7 @@ import {
   groupPackPermissions,
   packExamples,
   packFeatureFlags,
+  packUsageExplanation,
   packUsability,
   riskProfileForPack,
 } from "@/lib/pack-presentation";
@@ -413,6 +414,7 @@ export default function PacksPageOptimized() {
     const permissionGroups = groupPackPermissions(manifest.backend?.permissions || []);
     const labels = capabilitySurfaceLabels(manifest);
     const usability = packUsability(manifest);
+    const usageLines = packUsageExplanation(manifest).slice(0, 3);
     const actionBusyKey = options.action.kind === "enable" ? `enable:${manifest.id}` : options.busyKey;
     const disabled = options.action.disabled || busy === actionBusyKey;
     const primaryPath = usability.primaryActionPath || manifest.frontend?.menus?.[0]?.path || manifest.frontend?.routes?.[0]?.path;
@@ -475,6 +477,20 @@ export default function PacksPageOptimized() {
           {usability.limitation ? ` 当前限制：${usability.limitation}` : ""}
         </div>
 
+        {usageLines.length > 0 && (
+          <div className="mb-3 rounded-md p-3" style={{ background: "var(--yunque-bg-hover)", border: "1px solid var(--yunque-border)" }}>
+            <div className="mb-2 text-xs font-medium" style={{ color: "var(--yunque-text)" }}>怎么用它</div>
+            <div className="space-y-1">
+              {usageLines.map((line) => (
+                <div key={line} className="flex items-start gap-2 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
+                  <span style={{ color: "var(--yunque-accent)" }}>•</span>
+                  <span>{line}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {permissionGroups.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mb-3">
             {permissionGroups.slice(0, 4).map((group) => (
@@ -517,6 +533,7 @@ export default function PacksPageOptimized() {
     const labels = capabilitySurfaceLabels(manifest);
     const permissionGroups = groupPackPermissions(manifest.backend?.permissions || []);
     const usability = packUsability(manifest);
+    const usageLines = packUsageExplanation(manifest).slice(0, 3);
     const navItems = navItemsForPack(pack);
     const openPath = usability.primaryActionPath || manifest.frontend?.menus?.[0]?.path || manifest.frontend?.routes?.[0]?.path;
 
@@ -571,6 +588,20 @@ export default function PacksPageOptimized() {
             {usability.description}
             {usability.limitation ? ` 当前限制：${usability.limitation}` : ""}
           </div>
+
+          {usageLines.length > 0 && (
+            <div className="mb-3 rounded-md p-3" style={{ background: "var(--yunque-bg-hover)", border: "1px solid var(--yunque-border)" }}>
+              <div className="mb-2 text-xs font-medium" style={{ color: "var(--yunque-text)" }}>怎么用它</div>
+              <div className="space-y-1">
+                {usageLines.map((line) => (
+                  <div key={line} className="flex items-start gap-2 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
+                    <span style={{ color: "var(--yunque-accent)" }}>•</span>
+                    <span>{line}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {permissionGroups.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mb-3">
