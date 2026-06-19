@@ -210,11 +210,10 @@ func (g *Gateway) registerReverieRoutes() {
 // ──────────────────────────────────────────────
 
 func (g *Gateway) registerRBACRoutes() {
-	g.mux.HandleFunc("/v1/rbac/roles", g.requireAuth(g.requireAdmin(g.handleRBACRolesSwitch)))
-	g.mux.HandleFunc("/v1/rbac/assign", g.requireAuth(g.requireAdmin(g.handleRBACAssign)))
-	g.mux.HandleFunc("/v1/rbac/revoke", g.requireAuth(g.requireAdmin(g.handleRBACRevoke)))
-	g.mux.HandleFunc("/v1/rbac/check", g.requireAuth(g.handleRBACCheck))
-	g.mux.HandleFunc("/v1/rbac/my-roles", g.requireAuth(g.handleRBACMyRoles))
+	// RBAC routes (/v1/rbac/*) are owned by the RBAC pack
+	// (internal/packs/rbac), mounted via gw.RegisterModule. Admin-only mutation
+	// routes preserve requireAuth+requireAdmin inside the pack while Pack Runtime
+	// owns enablement.
 }
 
 func (g *Gateway) registerApprovalRoutes() {

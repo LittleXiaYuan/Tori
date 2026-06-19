@@ -68,6 +68,7 @@ import (
 	notificationspack "yunque-agent/internal/packs/notifications"
 	orchestratorpack "yunque-agent/internal/packs/orchestrator"
 	personapack "yunque-agent/internal/packs/persona"
+	rbacpack "yunque-agent/internal/packs/rbac"
 	reflectionpack "yunque-agent/internal/packs/reflection"
 	retrievalpack "yunque-agent/internal/packs/retrieval"
 	reveriepack "yunque-agent/internal/packs/reverie"
@@ -469,6 +470,10 @@ func initTaskEngine(
 	rbacEnforcer := rbac.NewEnforcer()
 	gw.SetRBACEnforcer(rbacEnforcer)
 	slog.Info("rbac enforcer initialized", "roles", len(rbacEnforcer.ListRoles()))
+	// RBAC pack — owns /v1/rbac/* natively. Mutating routes preserve the original
+	// requireAuth+requireAdmin composition inside the pack while Pack Runtime owns
+	// enablement.
+	_ = gw.RegisterModule(rbacpack.New(gw))
 
 	// ── Approval + SSE ──
 	approvalMgr := approval.NewManager(approval.DefaultPolicy())

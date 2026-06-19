@@ -1,0 +1,87 @@
+{
+  "id": "yunque.pack.rbac",
+  "name": "RBAC (角色与权限)",
+  "version": "0.1.0",
+  "description": "角色与权限管理能力：查看/创建角色，分配/撤销角色，并检查主体是否拥有指定权限。管理路由保持管理员授权。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": [
+      "rbac.roles.read",
+      "rbac.roles.write",
+      "rbac.assign",
+      "rbac.revoke",
+      "rbac.check"
+    ],
+    "routes": [
+      "/v1/rbac/roles",
+      "/v1/rbac/assign",
+      "/v1/rbac/revoke",
+      "/v1/rbac/check",
+      "/v1/rbac/my-roles"
+    ],
+    "permissions": [
+      "rbac:read",
+      "rbac:write",
+      "rbac:admin"
+    ],
+    "routeSpecs": [
+      {
+        "method": "GET",
+        "path": "/v1/rbac/roles",
+        "description": "List RBAC roles."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/rbac/roles",
+        "description": "Create a custom RBAC role."
+      },
+      {
+        "method": "DELETE",
+        "path": "/v1/rbac/roles",
+        "description": "Delete a custom RBAC role."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/rbac/assign",
+        "description": "Assign a role to a subject."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/rbac/revoke",
+        "description": "Revoke a role from a subject."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/rbac/check",
+        "description": "Check whether a subject can perform an action."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/rbac/my-roles",
+        "description": "List roles assigned to the current subject."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [],
+    "assets": {
+      "type": "builtin"
+    }
+  },
+  "sdk": {
+    "typescript": "yunque-client/rbac"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "group": "governance",
+    "phase": "A3",
+    "preload": "true",
+    "note": "Natively owns /v1/rbac/* through Pack Runtime. Admin mutations use passthrough auth so the pack can preserve requireAuth+requireAdmin composition."
+  },
+  "status": "beta"
+}

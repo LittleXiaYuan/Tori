@@ -573,11 +573,28 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 		t.Fatal("expected State Kernel resources route to be installed from manifest")
 	}
 
+	rbacPack, ok := registry.Get("yunque.pack.rbac")
+	if !ok {
+		t.Fatal("expected RBAC builtin pack to be installed")
+	}
+	if rbacPack.Status != packruntime.PackStatusEnabled {
+		t.Fatalf("expected RBAC default enabled, got %s", rbacPack.Status)
+	}
+	if rbacPack.Manifest.SDK.TypeScript != "yunque-client/rbac" {
+		t.Fatalf("unexpected RBAC SDK import: %s", rbacPack.Manifest.SDK.TypeScript)
+	}
+	if !hasRouteSpec(rbacPack.Manifest.Backend.RouteSpecs, "POST", "/v1/rbac/check") {
+		t.Fatal("expected RBAC check routeSpec")
+	}
+	if !hasRouteSpec(rbacPack.Manifest.Backend.RouteSpecs, "POST", "/v1/rbac/assign") {
+		t.Fatal("expected RBAC assign routeSpec")
+	}
+
 	ensureBuiltinPacks(registry)
 	// Count reflects the current packs/official/ set (incl. the newer
 	// console/control-plane/knowledge/memory/skills/work/workspace packs and the
 	// cognitive-layer/state packs). Adjust if the builtin pack set changes.
-	if got := len(registry.List()); got != 48 {
+	if got := len(registry.List()); got != 49 {
 		t.Fatalf("expected idempotent builtin install, got %d packs", got)
 	}
 }

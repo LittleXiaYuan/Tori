@@ -25,9 +25,9 @@
 // disable it from the pack center for the leanest surface.
 //
 // Only surfaces whose gateway routes are uniformly requireAuth are migrated per
-// slice: the pack route gate wraps handlers with requireAuth, so surfaces that
-// need requireAdmin or requireSetupOrAuth (e.g. sandbox, rbac, setup, some
-// provider setup routes) must wait until the pack auth modes are extended.
+// slice: the pack route gate wraps handlers with requireAuth. Surfaces that need
+// special auth composition either stay direct for now (setup/sandbox/provider
+// setup routes) or move into their own passthrough-auth pack (RBAC).
 package controlplanepack
 
 import (

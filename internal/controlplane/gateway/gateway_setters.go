@@ -143,6 +143,12 @@ func (g *Gateway) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 	return g.requireAuth(next)
 }
 
+// RequireAdmin exposes the host's admin-role wrapper to packs that own
+// administrator-only surfaces while still using Pack Runtime enablement gates.
+func (g *Gateway) RequireAdmin(next http.HandlerFunc) http.HandlerFunc {
+	return g.requireAdmin(next)
+}
+
 // SetHeartbeat attaches a heartbeat service.
 func (g *Gateway) SetHeartbeat(hb *heartbeat.Service) { g.heartbeat = hb }
 
@@ -561,6 +567,9 @@ func (g *Gateway) SetWorkflowEngine(e *workflow.Engine) {
 
 // SetRBACEnforcer attaches the RBAC permission enforcer.
 func (g *Gateway) SetRBACEnforcer(e *rbac.Enforcer) { g.rbacEnforcer = e }
+
+// RBACEnforcer exposes the permission engine to the RBAC pack.
+func (g *Gateway) RBACEnforcer() *rbac.Enforcer { return g.rbacEnforcer }
 
 // SetRBACMiddleware attaches the RBAC HTTP middleware.
 func (g *Gateway) SetRBACMiddleware(m *rbac.Middleware) { g.rbacMiddleware = m }
