@@ -149,6 +149,7 @@ describe("parsePackStudioBatchDraftRequestPrompt", () => {
       JSON.stringify({
         kind: "yunque.pack_studio.batch_draft_request.v1",
         goal: "把看得到但不知道怎么用的能力包补成可打开、可验证、可回滚。",
+        batch: { page: 2, page_count: 4, total: 22, page_size: 6 },
         rules: ["不要自动应用改动", "逐包生成 Draft Request"],
         packs: [
           {
@@ -169,6 +170,7 @@ describe("parsePackStudioBatchDraftRequestPrompt", () => {
     ].join("\n"));
 
     expect(parsed?.goal).toContain("可打开");
+    expect(parsed?.batch).toEqual({ page: 2, pageCount: 4, total: 22, pageSize: 6 });
     expect(parsed?.rules).toEqual(["不要自动应用改动", "逐包生成 Draft Request"]);
     expect(parsed?.packs[0]).toMatchObject({
       id: "yunque.pack.needs-entry",

@@ -74,6 +74,12 @@ export type PackStudioPatchDraftRequest = {
 export type PackStudioBatchDraftRequest = {
   goal: string;
   rules: string[];
+  batch?: {
+    page: number;
+    pageCount: number;
+    total: number;
+    pageSize: number;
+  };
   packs: Array<{
     id: string;
     name: string;
@@ -103,6 +109,10 @@ function stringValue(value: unknown): string {
 
 function stringList(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function numberValue(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
 function contentSummary(value: unknown): { length: number; hash: string } | undefined {
@@ -273,9 +283,18 @@ export function parsePackStudioBatchDraftRequestPrompt(text?: string): PackStudi
     if (!root || root.kind !== "yunque.pack_studio.batch_draft_request.v1") continue;
     const packs = Array.isArray(root.packs) ? root.packs : null;
     if (!packs) continue;
+    const batch = asRecord(root.batch);
     return {
       goal: stringValue(root.goal),
       rules: stringList(root.rules),
+      ...(batch ? {
+        batch: {
+          page: numberValue(batch.page),
+          pageCount: numberValue(batch.page_count),
+          total: numberValue(batch.total),
+          pageSize: numberValue(batch.page_size),
+        },
+      } : {}),
       packs: packs.map((item) => {
         const pack = asRecord(item) || {};
         return {

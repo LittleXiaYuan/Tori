@@ -212,10 +212,19 @@ function packStudioHref(manifest: PackManifest, options?: { packageUrl?: string;
   return `/packs/studio?${params.toString()}`;
 }
 
-function buildBatchReadinessPrompt(items: ReadinessQueueItem[]): string {
+function buildBatchReadinessPrompt(
+  items: ReadinessQueueItem[],
+  batch: { page: number; pageCount: number; total: number; pageSize: number },
+): string {
   const request = {
     kind: "yunque.pack_studio.batch_draft_request.v1",
     goal: "批量把这些能力包从“看得到但不知道怎么用”推进到用户能理解、能打开、能验证、能回滚的状态。",
+    batch: {
+      page: batch.page,
+      page_count: batch.pageCount,
+      total: batch.total,
+      page_size: batch.pageSize,
+    },
     rules: [
       "不要自动应用改动。",
       "每个包先给独立 Patch Draft Request，再回到 Pack Studio 只读检查、准备工作区、预览 diff、运行审计、重新打包和复检 SHA。",
@@ -514,7 +523,15 @@ export default function PacksPageOptimized() {
   const privatePageCount = pageCountFor(filteredPrivateCatalogEntries.length);
   const currentPrivatePage = Math.min(privatePage, privatePageCount);
   const pagedPrivateCatalogEntries = paginate(filteredPrivateCatalogEntries, currentPrivatePage);
-  const batchReadinessPrompt = useMemo(() => buildBatchReadinessPrompt(readinessQueue), [readinessQueue]);
+  const batchReadinessPrompt = useMemo(
+    () => buildBatchReadinessPrompt(readinessQueue, {
+      page: currentReadinessQueuePage,
+      pageCount: readinessQueuePageCount,
+      total: readinessQueueTotal,
+      pageSize: READINESS_QUEUE_PAGE_SIZE,
+    }),
+    [currentReadinessQueuePage, readinessQueue, readinessQueuePageCount, readinessQueueTotal],
+  );
   const batchReadinessChatHref = readinessQueue.length > 0 ? `/chat?q=${encodeURIComponent(batchReadinessPrompt)}` : "";
   const batchReadinessStudioHref = readinessQueue.length > 0 ? `/packs/studio?batch=${encodeURIComponent(batchReadinessPrompt)}` : "";
 

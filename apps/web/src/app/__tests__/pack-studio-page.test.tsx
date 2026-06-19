@@ -490,6 +490,7 @@ describe("PackStudioPage", () => {
     const batchRequest = {
       kind: "yunque.pack_studio.batch_draft_request.v1",
       goal: "批量把这些能力包补齐用途和入口。",
+      batch: { page: 2, page_count: 5, total: 26, page_size: 6 },
       rules: ["不要自动应用改动。", "回到 Pack Studio 预览 diff / 审计 / 重新打包。"],
       packs: [
         {
@@ -525,9 +526,11 @@ describe("PackStudioPage", () => {
     expect(await screen.findByText("导入批量补肉任务")).toBeInTheDocument();
     expect((screen.getByLabelText("导入批量补肉任务 JSON") as HTMLTextAreaElement).value).toContain("yunque.pack_studio.batch_draft_request.v1");
     expect(screen.getByText("2 个包")).toBeInTheDocument();
+    expect(screen.getByText("第 2 / 5 批")).toBeInTheDocument();
     expect(screen.getByText("逐包处理")).toBeInTheDocument();
     expect(screen.getByText("目标：批量把这些能力包补齐用途和入口。")).toBeInTheDocument();
     expect(screen.getByText("规则：不要自动应用改动。；回到 Pack Studio 预览 diff / 审计 / 重新打包。")).toBeInTheDocument();
+    expect(screen.getByText("来自补肉队列第 2 / 5 批：本批 2 个，队列总计 26 个，每批最多 6 个。")).toBeInTheDocument();
     expect(screen.getByText("批量处理进度")).toBeInTheDocument();
     expect(screen.getByText("逐包载入、逐包检查、逐包重打包；Studio 不会把批量任务自动应用到多个能力包。")).toBeInTheDocument();
     await waitFor(() => {

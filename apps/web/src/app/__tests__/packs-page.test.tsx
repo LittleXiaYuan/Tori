@@ -433,6 +433,10 @@ describe("PacksPageOptimized", () => {
     expect(firstBatch).toContain("yunque.pack.needs-entry-1");
     expect(firstBatch).toContain("yunque.pack.needs-entry-6");
     expect(firstBatch).not.toContain("yunque.pack.needs-entry-7");
+    expect(firstBatch).toContain("\"page\": 1");
+    expect(firstBatch).toContain("\"page_count\": 2");
+    expect(firstBatch).toContain("\"total\": 8");
+    expect(firstBatch).toContain("\"page_size\": 6");
 
     fireEvent.click(screen.getByRole("button", { name: "下一页" }));
 
@@ -445,6 +449,9 @@ describe("PacksPageOptimized", () => {
     expect(secondBatch).toContain("yunque.pack.needs-entry-7");
     expect(secondBatch).toContain("yunque.pack.needs-entry-8");
     expect(secondBatch).not.toContain("yunque.pack.needs-entry-1");
+    expect(secondBatch).toContain("\"page\": 2");
+    expect(secondBatch).toContain("\"page_count\": 2");
+    expect(secondBatch).toContain("\"total\": 8");
   });
 
   it("filters packs by stability so users can avoid experimental packs", async () => {

@@ -278,6 +278,7 @@ describe("ChatMessageList file preview", () => {
       JSON.stringify({
         kind: "yunque.pack_studio.batch_draft_request.v1",
         goal: "批量把这些能力包从“看得到但不知道怎么用”推进到用户能理解、能打开、能验证、能回滚的状态。",
+        batch: { page: 2, page_count: 4, total: 20, page_size: 6 },
         rules: [
           "不要自动应用改动。",
           "每个包先给独立 Patch Draft Request，再回到 Pack Studio 只读检查、准备工作区、预览 diff、运行审计、重新打包和复检 SHA。",
@@ -316,7 +317,7 @@ describe("ChatMessageList file preview", () => {
     })} />);
 
     expect(screen.getByText("Pack Studio 批量补肉任务")).toBeInTheDocument();
-    expect(screen.getByText(/2 个能力包/)).toBeInTheDocument();
+    expect(screen.getByText(/第 2 \/ 4 批 · 本批 2 个 · 总计 20 个待补肉/)).toBeInTheDocument();
     expect(screen.getByText("Needs Entry Pack")).toBeInTheDocument();
     expect(screen.getByText("Experimental Pack")).toBeInTheDocument();
     expect(screen.getByText("需补入口")).toBeInTheDocument();
@@ -328,6 +329,7 @@ describe("ChatMessageList file preview", () => {
     const batchParam = new URL(batchStudioLink.getAttribute("href")!, "http://localhost").searchParams.get("batch") || "";
     expect(batchParam).toContain("yunque.pack_studio.batch_draft_request.v1");
     expect(batchParam).toContain("yunque.pack.needs-entry");
+    expect(batchParam).toContain("\"page_count\": 4");
     expect(batchParam).toContain("studio_url");
     expect(screen.getByRole("link", { name: /返回能力包中心队列/ })).toHaveAttribute("href", "/packs#readiness-queue");
     expect(screen.getByText("请批量补肉这批能力包。")).toBeInTheDocument();
@@ -336,6 +338,7 @@ describe("ChatMessageList file preview", () => {
     fireEvent.click(screen.getByTestId("copy").closest("button")!);
     expect(onCopy).toHaveBeenCalledTimes(1);
     expect(onCopy.mock.calls[0][1]).toContain("Pack Studio 批量补肉任务: 2 个能力包");
+    expect(onCopy.mock.calls[0][1]).toContain("队列批次：第 2 / 4 批；总计 20 个待补肉");
     expect(onCopy.mock.calls[0][1]).toContain("Needs Entry Pack");
     expect(onCopy.mock.calls[0][1]).toContain("请逐包生成 Draft Request");
     expect(onCopy.mock.calls[0][1]).not.toContain("yunque.pack_studio.batch_draft_request.v1");

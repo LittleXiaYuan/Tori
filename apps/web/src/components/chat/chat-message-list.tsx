@@ -123,6 +123,7 @@ function packStudioToolSummary(content: string): string | null {
     return [
       batchRequest.displayText,
       `Pack Studio 批量补肉任务: ${batchRequest.packs.length} 个能力包`,
+      batchRequest.batch?.total ? `队列批次：第 ${batchRequest.batch.page || 1} / ${batchRequest.batch.pageCount || 1} 批；总计 ${batchRequest.batch.total} 个待补肉` : "",
       batchRequest.goal ? `目标：${batchRequest.goal}` : "",
       batchRequest.rules.length ? `规则：${batchRequest.rules.join(" / ")}` : "",
       ...packLines,
@@ -187,6 +188,14 @@ function packStudioBatchHandoffHref(request: PackStudioBatchDraftRequest): strin
   const payload = {
     kind: "yunque.pack_studio.batch_draft_request.v1",
     goal: request.goal,
+    ...(request.batch ? {
+      batch: {
+        page: request.batch.page,
+        page_count: request.batch.pageCount,
+        total: request.batch.total,
+        page_size: request.batch.pageSize,
+      },
+    } : {}),
     rules: request.rules,
     packs: request.packs.map((pack) => ({
       id: pack.id,
@@ -330,7 +339,9 @@ function renderPackStudioBatchDraftRequest(request: PackStudioBatchDraftRequest)
             <span>Pack Studio 批量补肉任务</span>
           </div>
           <div className="mt-1 truncate" style={{ color: "var(--yunque-text-muted)" }}>
-            {request.packs.length} 个能力包 · 小羽逐包生成 Draft Request
+            {request.batch?.total
+              ? `第 ${request.batch.page || 1} / ${request.batch.pageCount || 1} 批 · 本批 ${request.packs.length} 个 · 总计 ${request.batch.total} 个待补肉`
+              : `${request.packs.length} 个能力包 · 小羽逐包生成 Draft Request`}
           </div>
         </div>
         <a

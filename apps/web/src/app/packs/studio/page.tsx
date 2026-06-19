@@ -1504,6 +1504,11 @@ export default function PackStudioPage() {
             {importedBatchRequest && (
               <div className="flex flex-wrap gap-2">
                 <Chip size="sm" color="success">{importedBatchRequest.packs.length} 个包</Chip>
+                {importedBatchRequest.batch?.total ? (
+                  <Chip size="sm" variant="soft">
+                    第 {importedBatchRequest.batch.page || 1} / {importedBatchRequest.batch.pageCount || 1} 批
+                  </Chip>
+                ) : null}
                 <Chip size="sm" variant="soft">逐包处理</Chip>
               </div>
             )}
@@ -1531,6 +1536,11 @@ export default function PackStudioPage() {
                   规则：{importedBatchRequest.rules.slice(0, 2).join("；") || "不要自动应用改动，先回到 Studio 预览 diff / 审计 / 重新打包。"}
                 </div>
               </div>
+              {importedBatchRequest.batch?.total ? (
+                <div className="rounded px-2 py-2 text-[11px]" style={{ background: "var(--yunque-bg-hover)", color: "var(--yunque-text-secondary)" }}>
+                  来自补肉队列第 {importedBatchRequest.batch.page || 1} / {importedBatchRequest.batch.pageCount || 1} 批：本批 {importedBatchRequest.packs.length} 个，队列总计 {importedBatchRequest.batch.total} 个，每批最多 {importedBatchRequest.batch.pageSize || importedBatchRequest.packs.length} 个。
+                </div>
+              ) : null}
               <div className="rounded-md border p-3" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-bg-hover)" }}>
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
