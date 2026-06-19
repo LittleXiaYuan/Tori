@@ -171,6 +171,20 @@ function sourceName(url: string): string {
   }
 }
 
+function describePackEntry(label?: string, path?: string): string {
+  if (!path) return "没有独立页面，会在对话、任务、记忆或知识流程中自动生效。";
+  try {
+    const url = new URL(path, "http://yunque.local");
+    const q = url.searchParams.get("q")?.trim();
+    if (url.pathname === "/chat" && q) {
+      return `${label || "去 Chat"} · ${q}`;
+    }
+  } catch {
+    // Keep the raw path below when it is not URL-like.
+  }
+  return `${label || "打开入口"} · ${path}`;
+}
+
 function releaseSourceLabel(entry: PackReleaseCatalogEntry): string {
   const configured = PACK_RELEASE_SOURCES.find((source) => source.url === entry.release_url);
   return configured?.label || `官方源 · ${sourceName(entry.release_url)}`;
@@ -1324,6 +1338,12 @@ export default function PacksPageOptimized() {
     const usageLines = packUsageExplanation(manifest).slice(0, 3);
     const navItems = navItemsForPack(pack);
     const openPath = usability.primaryActionPath || manifest.frontend?.menus?.[0]?.path || manifest.frontend?.routes?.[0]?.path;
+    const entryHint = describePackEntry(usability.primaryActionLabel, openPath);
+    const pinHint = navItems.length > 0
+      ? pack.status === "enabled"
+        ? "可固定到侧栏，之后从侧栏或命令菜单直接打开。"
+        : "启用后可固定到侧栏，减少下次寻找成本。"
+      : "没有独立侧栏入口，通常在 Chat、任务或其他能力里自动生效。";
 
     return (
       <Card key={manifest.id} className="section-card p-4 hover-lift">
@@ -1396,6 +1416,24 @@ export default function PacksPageOptimized() {
               </div>
             </div>
           )}
+
+          <div className="mb-3 rounded-md p-3" style={{ background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.14)" }}>
+            <div className="mb-2 text-xs font-medium" style={{ color: "var(--yunque-text)" }}>启用后去哪用</div>
+            <div className="space-y-1">
+              <div className="flex items-start gap-2 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
+                <span style={{ color: "var(--yunque-primary)" }}>•</span>
+                <span>主入口：{entryHint}</span>
+              </div>
+              <div className="flex items-start gap-2 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
+                <span style={{ color: "var(--yunque-primary)" }}>•</span>
+                <span>固定方式：{pinHint}</span>
+              </div>
+              <div className="flex items-start gap-2 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
+                <span style={{ color: "var(--yunque-primary)" }}>•</span>
+                <span>想继续补肉：进详情确认权限，或交给小羽补用途、入口和示例。</span>
+              </div>
+            </div>
+          </div>
 
           {readiness.missing.length > 0 && (
             <div className="mb-3 rounded-md p-3 text-xs" style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.18)", color: "var(--yunque-text-secondary)" }}>

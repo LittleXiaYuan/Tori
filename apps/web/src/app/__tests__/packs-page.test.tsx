@@ -192,6 +192,11 @@ describe("PacksPageOptimized", () => {
     expect(screen.getByText("用户能感知到的位置：Chat 产物区、任务结果页、文件预览与下载入口")).toBeInTheDocument();
     expect(screen.getByText("开始生成文档")).toBeInTheDocument();
     expect(screen.getByText("查看最近产物")).toBeInTheDocument();
+    expect(screen.getAllByText("启用后去哪用").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText("主入口：开始生成文档 · 帮我生成一份可下载的文档")).toBeInTheDocument();
+    expect(screen.getByText("主入口：查看最近产物 · 列出我最近生成的文件")).toBeInTheDocument();
+    expect(screen.getAllByText("固定方式：没有独立侧栏入口，通常在 Chat、任务或其他能力里自动生效。").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText("想继续补肉：进详情确认权限，或交给小羽补用途、入口和示例。").length).toBeGreaterThanOrEqual(2);
     const studioLinks = screen.getAllByRole("link", { name: /小羽优化/ });
     expect(studioLinks[0]).toHaveAttribute("href", expect.stringContaining("/packs/studio?packId=yunque.pack.documents"));
     expect(decodeURIComponent(studioLinks[0].getAttribute("href") || "").replace(/\+/g, " ")).toContain("让 Documents (文档生成) 更像一个用户能直接理解和使用的能力包");
