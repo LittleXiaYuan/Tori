@@ -1537,6 +1537,88 @@ func TestPackStudioPlanCanUseCatalogOrRequestManifest(t *testing.T) {
 	}
 }
 
+func TestPackStudioInspectYqpackIsReadOnly(t *testing.T) {
+	srcDir := t.TempDir()
+	manifest := packruntime.Manifest{
+		ID:           "yunque.pack.inspect-http",
+		Name:         "Inspect HTTP",
+		Version:      "0.1.0",
+		Optional:     true,
+		DefaultState: "disabled",
+		Backend: packruntime.BackendManifest{
+			Capabilities: []string{"inspect.http"},
+			Permissions:  []string{"network:read"},
+			RouteSpecs:   []packruntime.BackendRouteSpec{{Method: http.MethodGet, Path: "/v1/inspect-http"}},
+		},
+		Frontend: packruntime.FrontendManifest{
+			Menus:  []packruntime.FrontendMenu{{Key: "inspect-http", Label: "Inspect", Path: "/packs/inspect-http"}},
+			Routes: []packruntime.FrontendRoute{{Path: "/packs/inspect-http", Component: "InspectHTTPPackPage"}},
+			Assets: packruntime.FrontendAssets{Type: packruntime.FrontendAssetsTypeIframeBundle, Entry: "index.html"},
+		},
+	}
+	writeTestPackManifest(t, filepath.Join(srcDir, packruntime.ManifestFileName), manifest)
+	if err := os.MkdirAll(filepath.Join(srcDir, "frontend"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(srcDir, "frontend", "index.html"), []byte("<main>Inspect</main>"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	pkgPath := filepath.Join(t.TempDir(), "inspect-http.yqpack")
+	sha, err := packruntime.PackToYqpack(srcDir, pkgPath)
+	if err != nil {
+		t.Fatalf("PackToYqpack: %v", err)
+	}
+	yqpackBytes, err := os.ReadFile(pkgPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	registry, err := packruntime.NewRegistry(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewRegistry: %v", err)
+	}
+	gw, tenants := newTestGatewayWithConfig(GatewayConfig{Packs: registry})
+	tenant := tenants.Register("pack-studio-inspect")
+
+	body := bytes.NewBufferString(`{"package_path":` + strconv.Quote(pkgPath) + `,"sha256":"` + sha + `","goal":"检查真实包内容"}`)
+	req := httptest.NewRequest(http.MethodPost, "/v1/packs/studio/inspect", body)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("local inspect status=%d body=%s", w.Code, w.Body.String())
+	}
+	var report packruntime.YqpackInspectReport
+	if err := json.NewDecoder(w.Body).Decode(&report); err != nil {
+		t.Fatalf("decode local report: %v", err)
+	}
+	if report.Manifest.ID != manifest.ID || !report.SHA256Match || report.EntryCount == 0 || report.Plan.PackID != manifest.ID {
+		t.Fatalf("unexpected local inspect report: %#v", report)
+	}
+	if _, ok := registry.Get(manifest.ID); ok {
+		t.Fatal("inspect must not install the yqpack")
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write(yqpackBytes)
+	}))
+	defer srv.Close()
+	body = bytes.NewBufferString(`{"package_url":` + strconv.Quote(srv.URL+"/inspect-http.yqpack") + `,"sha256":"` + strings.Repeat("0", 64) + `"}`)
+	req = httptest.NewRequest(http.MethodPost, "/v1/packs/studio/inspect", body)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("remote inspect status=%d body=%s", w.Code, w.Body.String())
+	}
+	report = packruntime.YqpackInspectReport{}
+	if err := json.NewDecoder(w.Body).Decode(&report); err != nil {
+		t.Fatalf("decode remote report: %v", err)
+	}
+	if report.SHA256Match || len(report.Warnings) == 0 || !strings.Contains(report.Warnings[0], "sha256 mismatch") {
+		t.Fatalf("expected sha mismatch warning for remote inspect: %#v", report)
+	}
+}
+
 func TestPackRoutesTogglePackStatus(t *testing.T) {
 	registry, err := packruntime.NewRegistry(t.TempDir())
 	if err != nil {

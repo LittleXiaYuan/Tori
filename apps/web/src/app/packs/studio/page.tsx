@@ -27,7 +27,7 @@ import {
   packUsability,
   riskProfileForPack,
 } from "@/lib/pack-presentation";
-import { createPacksClient, type PackManifest, type PackStudioPlanReport } from "yunque-client/packs";
+import { createPacksClient, type PackManifest, type PackStudioPlanReport, type YqpackInspectReport } from "yunque-client/packs";
 
 const packsClient = createPacksClient(createYunqueSDKClientOptions());
 
@@ -279,6 +279,11 @@ export default function PackStudioPage() {
   }, { packs: [] as PackCandidate[] });
   const [selectedId, setSelectedId] = useState("");
   const [goal, setGoal] = useState("让这个能力包更像一个用户能直接理解和使用的功能，而不是只看到存在。");
+  const [packagePath, setPackagePath] = useState("");
+  const [packageUrl, setPackageUrl] = useState("");
+  const [packageSHA, setPackageSHA] = useState("");
+  const [inspecting, setInspecting] = useState(false);
+  const [inspectReport, setInspectReport] = useState<YqpackInspectReport | null>(null);
 
   const candidates = data?.packs || [];
   const selected = useMemo(
@@ -304,6 +309,30 @@ export default function PackStudioPage() {
     if (!prompt) return;
     await navigator.clipboard?.writeText(prompt);
     showToast("已复制小羽改包任务", "success");
+  };
+
+  const inspectYqpack = async () => {
+    const path = packagePath.trim();
+    const url = packageUrl.trim();
+    if (!path && !url) {
+      showToast("请填写本地 yqpack 路径或 OSS/Release URL", "warning");
+      return;
+    }
+    setInspecting(true);
+    try {
+      const report = await packsClient.studioInspect({
+        packagePath: path || undefined,
+        packageUrl: url || undefined,
+        sha256: packageSHA.trim() || undefined,
+        goal,
+      });
+      setInspectReport(report);
+      showToast("已完成 yqpack 只读检查", "success");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "yqpack 检查失败", "error");
+    } finally {
+      setInspecting(false);
+    }
   };
 
   if (loading) {
@@ -449,6 +478,69 @@ export default function PackStudioPage() {
                   <FileSearch size={14} /> 刷新计划
                 </Button>
               </div>
+            </Card>
+
+            <Card className="section-card p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <PackageCheck size={16} style={{ color: "var(--yunque-primary)" }} />
+                <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>检查 yqpack 包内容</div>
+              </div>
+              <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_220px]">
+                <TextField value={packagePath} onChange={setPackagePath}>
+                  <Label>本地 yqpack 路径</Label>
+                  <Input placeholder="C:\\packs\\demo-0.1.0.yqpack" />
+                </TextField>
+                <TextField value={packageUrl} onChange={setPackageUrl}>
+                  <Label>OSS / Release URL</Label>
+                  <Input placeholder="https://oss.example.com/packs/demo.yqpack" />
+                </TextField>
+                <TextField value={packageSHA} onChange={setPackageSHA}>
+                  <Label>SHA256</Label>
+                  <Input placeholder="可选" />
+                </TextField>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button variant="outline" onPress={inspectYqpack} isDisabled={inspecting}>
+                  {inspecting ? <Spinner size="sm" /> : <FileSearch size={14} />} 只读检查
+                </Button>
+              </div>
+              {inspectReport && (
+                <div className="mt-4 grid gap-3 lg:grid-cols-[260px_minmax(0,1fr)]">
+                  <div className="rounded-md border p-3" style={{ borderColor: "var(--yunque-border)" }}>
+                    <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>{inspectReport.manifest.name}</div>
+                    <div className="mt-1 font-mono text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>{inspectReport.manifest.id}</div>
+                    <div className="mt-3 flex flex-wrap gap-1">
+                      <Chip size="sm" color={inspectReport.sha256_match ? "success" : "warning"}>{inspectReport.sha256_match ? "SHA 匹配" : "SHA 不匹配"}</Chip>
+                      <Chip size="sm" variant="soft">{inspectReport.entry_count} 个文件</Chip>
+                      <Chip size="sm" variant="soft">{inspectReport.editable_count} 可改</Chip>
+                      <Chip size="sm" variant="soft">{inspectReport.guarded_count} 需源码/审计</Chip>
+                    </div>
+                    <div className="mt-3 break-all font-mono text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>{inspectReport.sha256}</div>
+                    {(inspectReport.warnings || []).length > 0 && (
+                      <div className="mt-3 rounded p-2 text-xs" style={{ background: "rgba(245,158,11,0.10)", color: "var(--yunque-warning)" }}>
+                        {inspectReport.warnings?.join(" ")}
+                      </div>
+                    )}
+                  </div>
+                  <div className="rounded-md border p-3" style={{ borderColor: "var(--yunque-border)" }}>
+                    <div className="mb-2 text-xs font-medium" style={{ color: "var(--yunque-text)" }}>包内文件分类</div>
+                    <div className="max-h-72 overflow-y-auto space-y-1">
+                      {inspectReport.entries.slice(0, 24).map((entry) => (
+                        <div key={entry.path} className="grid gap-2 rounded px-2 py-1 text-xs md:grid-cols-[90px_minmax(0,1fr)_120px]" style={{ background: "var(--yunque-bg-hover)", color: "var(--yunque-text-secondary)" }}>
+                          <span>{entry.kind}</span>
+                          <span className="truncate font-mono">{entry.path}</span>
+                          <span style={{ color: entry.editable ? "var(--yunque-success)" : "var(--yunque-warning)" }}>
+                            {entry.editable ? "可改" : entry.needs_source ? "需源码" : "需审计"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-3 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+                      只读检查不会安装能力包；它只告诉小羽真实包内有哪些文件、哪些能改、哪些必须保留边界。
+                    </div>
+                  </div>
+                </div>
+              )}
             </Card>
 
             <Card className="section-card p-4">

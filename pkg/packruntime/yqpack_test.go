@@ -111,6 +111,81 @@ func TestInstallFromYqpackRejectsBadSHA(t *testing.T) {
 	}
 }
 
+func TestInspectYqpackFileBuildsStudioReportWithoutInstalling(t *testing.T) {
+	srcDir := t.TempDir()
+	manifest := minimalManifest("yunque.pack.inspect", "0.1.0")
+	manifest.Name = "Inspect Pack"
+	manifest.Backend = BackendManifest{
+		Capabilities: []string{"inspect.demo"},
+		Permissions:  []string{"wasm:execute"},
+		Runtime:      &BackendRuntime{Type: RuntimeTypeWasm, Module: "backend/plugin.wasm", SHA256: strings.Repeat("a", 64)},
+		RouteSpecs:   []BackendRouteSpec{{Method: "POST", Path: "/v1/inspect/run"}},
+	}
+	manifest.Frontend = FrontendManifest{
+		Menus:  []FrontendMenu{{Key: "inspect", Label: "Inspect", Path: "/packs/inspect"}},
+		Routes: []FrontendRoute{{Path: "/packs/inspect", Component: "InspectPackPage"}},
+		Assets: FrontendAssets{Type: FrontendAssetsTypeIframeBundle, Entry: "index.html"},
+	}
+	if err := SaveManifest(filepath.Join(srcDir, ManifestFileName), manifest); err != nil {
+		t.Fatalf("save manifest: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(srcDir, "frontend"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(srcDir, "backend"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(srcDir, "frontend", "index.html"), []byte("<main>Inspect</main>"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(srcDir, "backend", "plugin.wasm"), []byte("wasm"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(srcDir, "README.md"), []byte("# inspect"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	pkgPath := filepath.Join(t.TempDir(), "inspect.yqpack")
+	sha, err := PackToYqpack(srcDir, pkgPath)
+	if err != nil {
+		t.Fatalf("pack: %v", err)
+	}
+
+	report, err := InspectYqpackFile(pkgPath, strings.Repeat("0", 64), "补齐可用说明")
+	if err != nil {
+		t.Fatalf("inspect: %v", err)
+	}
+	if report.Manifest.ID != manifest.ID || report.SHA256 != sha || report.SHA256Match {
+		t.Fatalf("unexpected identity or sha match: %#v", report)
+	}
+	if report.EntryCount == 0 || report.EditableCount == 0 || report.GuardedCount == 0 {
+		t.Fatalf("expected mixed entry classification: %#v", report)
+	}
+	if !containsYqpackEntry(report.Entries, "pack.json", "manifest", true) {
+		t.Fatalf("expected editable manifest entry: %#v", report.Entries)
+	}
+	if !containsYqpackEntry(report.Entries, "frontend/index.html", "frontend", true) {
+		t.Fatalf("expected editable frontend entry: %#v", report.Entries)
+	}
+	if !containsYqpackEntry(report.Entries, "backend/plugin.wasm", "wasm", false) {
+		t.Fatalf("expected guarded wasm entry: %#v", report.Entries)
+	}
+	if report.Plan.PackID != manifest.ID || !strings.Contains(report.Plan.XiaoyuPrompt, "补齐可用说明") {
+		t.Fatalf("expected embedded studio plan: %#v", report.Plan)
+	}
+	if len(report.Warnings) == 0 || !strings.Contains(report.Warnings[0], "sha256 mismatch") {
+		t.Fatalf("expected sha warning, got %#v", report.Warnings)
+	}
+}
+
+func containsYqpackEntry(entries []YqpackEntryReport, path string, kind string, editable bool) bool {
+	for _, entry := range entries {
+		if entry.Path == path && entry.Kind == kind && entry.Editable == editable {
+			return true
+		}
+	}
+	return false
+}
+
 func TestSignAndVerifyManifest(t *testing.T) {
 	pub, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {

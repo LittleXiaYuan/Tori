@@ -93,6 +93,7 @@ func (g *Gateway) registerPackRoutes() {
 	g.mux.HandleFunc("/v1/packs/backend-modules", g.requireAuth(g.handlePackBackendModules))
 	g.mux.HandleFunc("/v1/packs/backend-route-audit", g.requireAuth(g.handlePackBackendRouteAudit))
 	g.mux.HandleFunc("/v1/packs/studio/plan", g.requireAuth(g.handlePackStudioPlan))
+	g.mux.HandleFunc("/v1/packs/studio/inspect", g.requireAuth(g.handlePackStudioInspect))
 	g.mux.HandleFunc("/v1/packs/install", g.requireAuth(g.handlePackInstall))
 	g.mux.HandleFunc("/v1/packs/enable", g.requireAuth(g.handlePackEnable))
 	g.mux.HandleFunc("/v1/packs/disable", g.requireAuth(g.handlePackDisable))
@@ -1562,6 +1563,55 @@ func (g *Gateway) handlePackStudioPlan(w http.ResponseWriter, r *http.Request) {
 	}
 	opts.Goal = req.Goal
 	writeJSON(w, packruntime.BuildPackStudioPlan(manifest, opts))
+}
+
+func (g *Gateway) handlePackStudioInspect(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSONStatus(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+		return
+	}
+	var req packruntime.PackStudioInspectRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": "invalid request body"})
+		return
+	}
+	report, err := inspectPackStudioYqpack(r, req)
+	if err != nil {
+		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+		return
+	}
+	writeJSON(w, report)
+}
+
+func inspectPackStudioYqpack(r *http.Request, req packruntime.PackStudioInspectRequest) (packruntime.YqpackInspectReport, error) {
+	if strings.TrimSpace(req.PackagePath) != "" {
+		return packruntime.InspectYqpackFile(req.PackagePath, req.SHA256, req.Goal)
+	}
+	packageURL := strings.TrimSpace(req.PackageURL)
+	if packageURL == "" {
+		return packruntime.YqpackInspectReport{}, fmt.Errorf("package_path or package_url is required")
+	}
+	httpReq, err := http.NewRequestWithContext(r.Context(), http.MethodGet, packageURL, nil)
+	if err != nil {
+		return packruntime.YqpackInspectReport{}, fmt.Errorf("create yqpack request: %w", err)
+	}
+	httpReq.Header.Set("User-Agent", "Yunque-PackRuntime")
+	res, err := http.DefaultClient.Do(httpReq)
+	if err != nil {
+		return packruntime.YqpackInspectReport{}, fmt.Errorf("download yqpack: %w", err)
+	}
+	defer res.Body.Close()
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		return packruntime.YqpackInspectReport{}, fmt.Errorf("download yqpack: http %d", res.StatusCode)
+	}
+	data, err := io.ReadAll(io.LimitReader(res.Body, 64<<20))
+	if err != nil {
+		return packruntime.YqpackInspectReport{}, fmt.Errorf("read yqpack: %w", err)
+	}
+	if len(bytes.TrimSpace(data)) == 0 {
+		return packruntime.YqpackInspectReport{}, fmt.Errorf("downloaded yqpack is empty")
+	}
+	return packruntime.InspectYqpackBytes(data, packageURL, req.SHA256, req.Goal)
 }
 
 func (g *Gateway) resolvePackStudioTarget(req packruntime.PackStudioPlanRequest) (packruntime.Manifest, packruntime.PackStudioPlanOptions, bool) {

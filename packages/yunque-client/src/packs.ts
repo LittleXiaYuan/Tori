@@ -41,6 +41,9 @@ export type PackPruneResponse = { removed: string[]; kept: string[]; errors?: st
 export type PackInstallRequest = { manifestPath?: string; manifestUrl?: string; packageUrl?: string; sha256?: string; source?: string; download?: boolean };
 export type PackStudioPlanRequest = { packId?: string; pack_id?: string; manifest?: PackManifest; goal?: string };
 export type PackStudioPlanReport = { generated_at: string; pack_id: string; pack_name: string; version: string; source?: string; status?: string; installed: boolean; enabled: boolean; goal: string; risk_level: "low" | "medium" | "high" | string; summary: string; capabilities?: string[]; permissions?: string[]; frontend_paths?: string[]; backend_routes?: string[]; surfaces: string[]; editable: string[]; guarded: string[]; warnings?: string[]; editable_files: string[]; diff_preview: string; audit_steps: string[]; package_steps: string[]; rollback_steps: string[]; cogni_use: string[]; xiaoyu_prompt: string; [key: string]: unknown };
+export type PackStudioInspectRequest = { packagePath?: string; package_path?: string; packageUrl?: string; package_url?: string; sha256?: string; goal?: string };
+export type YqpackEntryReport = { path: string; kind: string; size_bytes: number; editable: boolean; reason: string; needs_source?: boolean; [key: string]: unknown };
+export type YqpackInspectReport = { generated_at: string; source: string; sha256: string; expected_sha256?: string; sha256_match: boolean; size_bytes: number; manifest: PackManifest; entries: YqpackEntryReport[]; entry_count: number; editable_count: number; guarded_count: number; warnings?: string[]; plan: PackStudioPlanReport; [key: string]: unknown };
 export type PacksClientOptions = { baseUrl: string; token?: string; apiKey?: string; headers?: HeadersInit; fetch?: typeof fetch };
 export type PackCatalogSourceSummary = { total_sources: number; ok_sources: number; error_sources: number; manifest_count: number; matched_entries: number; errors: string[]; [key: string]: unknown };
 export type PackCapabilityPrepareSummary = {
@@ -110,6 +113,7 @@ export class PacksClient {
   backendRouteAudit(): Promise<PackBackendRouteAuditReport> { return this.json<PackBackendRouteAuditReport>("GET", "/v1/packs/backend-route-audit"); }
   capabilityCogniProfile(): Promise<PackCapabilityCogniProfileReport> { return this.json<PackCapabilityCogniProfileReport>("GET", "/v1/packs/capabilities/cogni-profile"); }
   studioPlan(request: PackStudioPlanRequest): Promise<PackStudioPlanReport> { return this.json<PackStudioPlanReport>("POST", "/v1/packs/studio/plan", { pack_id: request.pack_id ?? request.packId, manifest: request.manifest, goal: request.goal }); }
+  studioInspect(request: PackStudioInspectRequest): Promise<YqpackInspectReport> { return this.json<YqpackInspectReport>("POST", "/v1/packs/studio/inspect", { package_path: request.package_path ?? request.packagePath, package_url: request.package_url ?? request.packageUrl, sha256: request.sha256, goal: request.goal }); }
   install(request: PackInstallRequest): Promise<PackMutationResponse> { return this.json<PackMutationResponse>("POST", "/v1/packs/install", { manifest_path: request.manifestPath, manifest_url: request.manifestUrl, package_url: request.packageUrl, sha256: request.sha256, source: request.source, download: request.download }); }
   enable(id: string): Promise<PackMutationResponse> { return this.mutate("/v1/packs/enable", id); }
   disable(id: string): Promise<PackMutationResponse> { return this.mutate("/v1/packs/disable", id); }

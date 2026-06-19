@@ -264,6 +264,82 @@ func InspectYqpackManifestFile(path string) (Manifest, string, int64, error) {
 	return manifest, digest, int64(len(data)), err
 }
 
+// InspectYqpackFile returns a read-only Pack Studio report for a local .yqpack.
+// It lists archive entries and builds a conservative modification plan without
+// extracting, installing, signing, or mutating registry state.
+func InspectYqpackFile(path string, expectedSHA256 string, goal string) (YqpackInspectReport, error) {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return YqpackInspectReport{}, fmt.Errorf("yqpack: abs path: %w", err)
+	}
+	data, err := os.ReadFile(abs)
+	if err != nil {
+		return YqpackInspectReport{}, fmt.Errorf("yqpack: read %s: %w", abs, err)
+	}
+	return InspectYqpackBytes(data, abs, expectedSHA256, goal)
+}
+
+// InspectYqpackBytes is the byte-oriented counterpart to InspectYqpackFile. It
+// is safe for downloaded package previews because it never writes file content
+// to disk and never registers the pack.
+func InspectYqpackBytes(data []byte, source string, expectedSHA256 string, goal string) (YqpackInspectReport, error) {
+	digest := hex.EncodeToString(sha256Sum(data))
+	expected := normalizeSHA256(expectedSHA256)
+	zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		return YqpackInspectReport{}, fmt.Errorf("yqpack: open zip: %w", err)
+	}
+	manifestRaw, err := readZipFile(zr, ManifestFileName)
+	if err != nil {
+		return YqpackInspectReport{}, fmt.Errorf("yqpack: %w", err)
+	}
+	var manifest Manifest
+	if err := json.Unmarshal(manifestRaw, &manifest); err != nil {
+		return YqpackInspectReport{}, fmt.Errorf("yqpack: parse pack.json: %w", err)
+	}
+	if err := manifest.Validate(); err != nil {
+		return YqpackInspectReport{}, fmt.Errorf("yqpack: validate pack.json: %w", err)
+	}
+	report := YqpackInspectReport{
+		GeneratedAt:    time.Now().UTC(),
+		Source:         strings.TrimSpace(source),
+		SHA256:         digest,
+		ExpectedSHA256: expected,
+		SHA256Match:    expected == "" || strings.EqualFold(expected, digest),
+		SizeBytes:      int64(len(data)),
+		Manifest:       manifest,
+		Entries:        []YqpackEntryReport{},
+		Warnings:       []string{},
+		Plan: BuildPackStudioPlan(manifest, PackStudioPlanOptions{
+			Goal:      goal,
+			Source:    "yqpack:" + strings.TrimSpace(source),
+			Installed: false,
+			Enabled:   false,
+			Status:    "artifact",
+		}),
+	}
+	if expected != "" && !report.SHA256Match {
+		report.Warnings = append(report.Warnings, fmt.Sprintf("sha256 mismatch: expected %s got %s", expected, digest))
+	}
+	for _, f := range zr.File {
+		entry := classifyYqpackEntry(f)
+		report.Entries = append(report.Entries, entry)
+		report.EntryCount++
+		if entry.Editable {
+			report.EditableCount++
+		} else {
+			report.GuardedCount++
+		}
+		if strings.Contains(entry.Path, "..") {
+			report.Warnings = append(report.Warnings, "archive contains unsafe relative path: "+entry.Path)
+		}
+	}
+	sort.Slice(report.Entries, func(i, j int) bool {
+		return report.Entries[i].Path < report.Entries[j].Path
+	})
+	return report, nil
+}
+
 // InspectYqpackManifestBytes reads only pack.json from .yqpack bytes and
 // returns the validated manifest plus the artifact SHA256. It performs no
 // signature verification and does not extract or install anything.
@@ -285,6 +361,57 @@ func InspectYqpackManifestBytes(data []byte) (Manifest, string, error) {
 		return Manifest{}, digest, fmt.Errorf("yqpack: validate pack.json: %w", err)
 	}
 	return manifest, digest, nil
+}
+
+func classifyYqpackEntry(f *zip.File) YqpackEntryReport {
+	path := filepath.ToSlash(strings.TrimSpace(f.Name))
+	entry := YqpackEntryReport{
+		Path:      path,
+		Kind:      "file",
+		SizeBytes: int64(f.UncompressedSize64),
+		Editable:  false,
+		Reason:    "需要源码或对应运行时测试后才能修改。",
+	}
+	if f.FileInfo().IsDir() {
+		entry.Kind = "directory"
+		entry.Reason = "目录项本身不需要修改。"
+		return entry
+	}
+	lower := strings.ToLower(path)
+	switch {
+	case lower == ManifestFileName:
+		entry.Kind = "manifest"
+		entry.Editable = true
+		entry.Reason = "能力包 manifest，可改用途、入口、权限说明和发行元数据。"
+	case lower == ManifestSigName || lower == ManifestPubName || strings.Contains(lower, "signature"):
+		entry.Kind = "signature"
+		entry.NeedsSource = true
+		entry.Reason = "签名/公钥材料不能手改；改包后必须重新签名。"
+	case strings.HasSuffix(lower, ".wasm"):
+		entry.Kind = "wasm"
+		entry.NeedsSource = true
+		entry.Reason = "WASM 二进制不能硬改；需要源码、ABI 说明和 wasm 回归测试。"
+	case strings.HasPrefix(lower, "frontend/") && (strings.HasSuffix(lower, ".html") || strings.HasSuffix(lower, ".css") || strings.HasSuffix(lower, ".js") || strings.HasSuffix(lower, ".json")):
+		entry.Kind = "frontend"
+		entry.Editable = true
+		entry.Reason = "iframe/DLC 前端资源，可在沙箱边界内优化界面和文案。"
+	case strings.HasSuffix(lower, ".md") || strings.HasPrefix(lower, "docs/") || strings.HasPrefix(lower, "examples/"):
+		entry.Kind = "docs"
+		entry.Editable = true
+		entry.Reason = "说明、示例和文档可直接改善用户理解。"
+	case strings.HasSuffix(lower, ".ts") || strings.HasSuffix(lower, ".tsx") || strings.HasSuffix(lower, ".go") || strings.HasSuffix(lower, ".py"):
+		entry.Kind = "source"
+		entry.Editable = true
+		entry.Reason = "源码可改，但必须配套测试和重新打包。"
+	case strings.HasSuffix(lower, ".exe") || strings.HasSuffix(lower, ".dll") || strings.HasSuffix(lower, ".so") || strings.HasSuffix(lower, ".dylib") || strings.HasSuffix(lower, ".bin"):
+		entry.Kind = "binary"
+		entry.NeedsSource = true
+		entry.Reason = "二进制文件不能直接改造；需要源码或上游构建产物。"
+	default:
+		entry.Kind = "asset"
+		entry.Reason = "资产或运行时文件，修改前需要确认引用关系和测试覆盖。"
+	}
+	return entry
 }
 
 func sha256Sum(data []byte) []byte {

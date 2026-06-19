@@ -16,6 +16,15 @@ type PackStudioPlanRequest struct {
 	Goal     string    `json:"goal,omitempty"`
 }
 
+// PackStudioInspectRequest asks Pack Studio to inspect a yqpack artifact
+// without installing or extracting it into the runtime registry.
+type PackStudioInspectRequest struct {
+	PackagePath string `json:"package_path,omitempty"`
+	PackageURL  string `json:"package_url,omitempty"`
+	SHA256      string `json:"sha256,omitempty"`
+	Goal        string `json:"goal,omitempty"`
+}
+
 // PackStudioPlanOptions carries host-derived state that is not part of a
 // manifest, such as whether the pack is already installed or enabled.
 type PackStudioPlanOptions struct {
@@ -55,6 +64,36 @@ type PackStudioPlanReport struct {
 	RollbackSteps []string  `json:"rollback_steps"`
 	CogniUse      []string  `json:"cogni_use"`
 	XiaoyuPrompt  string    `json:"xiaoyu_prompt"`
+}
+
+// YqpackEntryReport is a safe file listing entry inside a .yqpack archive.
+// It never includes file bytes.
+type YqpackEntryReport struct {
+	Path        string `json:"path"`
+	Kind        string `json:"kind"`
+	SizeBytes   int64  `json:"size_bytes"`
+	Editable    bool   `json:"editable"`
+	Reason      string `json:"reason"`
+	NeedsSource bool   `json:"needs_source,omitempty"`
+}
+
+// YqpackInspectReport is a read-only archive inspection result for Pack
+// Studio. It combines artifact facts, file classification, and the usual
+// manifest-derived modification plan.
+type YqpackInspectReport struct {
+	GeneratedAt    time.Time            `json:"generated_at"`
+	Source         string               `json:"source"`
+	SHA256         string               `json:"sha256"`
+	ExpectedSHA256 string               `json:"expected_sha256,omitempty"`
+	SHA256Match    bool                 `json:"sha256_match"`
+	SizeBytes      int64                `json:"size_bytes"`
+	Manifest       Manifest             `json:"manifest"`
+	Entries        []YqpackEntryReport  `json:"entries"`
+	EntryCount     int                  `json:"entry_count"`
+	EditableCount  int                  `json:"editable_count"`
+	GuardedCount   int                  `json:"guarded_count"`
+	Warnings       []string             `json:"warnings,omitempty"`
+	Plan           PackStudioPlanReport `json:"plan"`
 }
 
 // BuildPackStudioPlan turns a manifest into a conservative, auditable

@@ -6,6 +6,7 @@ const packsClientMock = vi.hoisted(() => ({
   installed: vi.fn(),
   catalog: vi.fn(),
   studioPlan: vi.fn(),
+  studioInspect: vi.fn(),
 }));
 
 const toastMock = vi.hoisted(() => vi.fn());
@@ -153,6 +154,45 @@ describe("PackStudioPage", () => {
         "go test ./internal/packs/wasmplugin ./internal/controlplane/gateway -run WASM -count=1",
       ].join("\n"),
     }));
+    packsClientMock.studioInspect.mockResolvedValue({
+      generated_at: "2026-06-19T00:00:00Z",
+      source: "C:\\packs\\wasm-plugin.yqpack",
+      sha256: "a".repeat(64),
+      expected_sha256: "a".repeat(64),
+      sha256_match: true,
+      size_bytes: 4096,
+      manifest: wasmManifest,
+      entries: [
+        { path: "pack.json", kind: "manifest", size_bytes: 512, editable: true, reason: "能力包 manifest，可改用途、入口、权限说明和发行元数据。" },
+        { path: "frontend/index.html", kind: "frontend", size_bytes: 1024, editable: true, reason: "iframe/DLC 前端资源，可在沙箱边界内优化界面。" },
+        { path: "backend/plugin.wasm", kind: "wasm", size_bytes: 2048, editable: false, needs_source: true, reason: "WASM 二进制不能硬改；需要源码、ABI 说明和 wasm 回归测试。" },
+      ],
+      entry_count: 3,
+      editable_count: 2,
+      guarded_count: 1,
+      warnings: [],
+      plan: {
+        generated_at: "2026-06-19T00:00:00Z",
+        pack_id: wasmManifest.id,
+        pack_name: wasmManifest.name,
+        version: wasmManifest.version,
+        installed: false,
+        enabled: false,
+        goal: "增加一个可查看运行结果的界面",
+        risk_level: "high",
+        summary: "只读检查",
+        surfaces: ["frontend", "wasm"],
+        editable: [],
+        guarded: [],
+        editable_files: [],
+        diff_preview: "",
+        audit_steps: [],
+        package_steps: [],
+        rollback_steps: [],
+        cogni_use: [],
+        xiaoyu_prompt: "",
+      },
+    });
   });
 
   it("turns real pack metadata into a guarded Xiaoyu modification task", async () => {
@@ -197,6 +237,26 @@ describe("PackStudioPage", () => {
     expect(screen.getByText("回滚策略")).toBeInTheDocument();
     expect(screen.getByText("go run ./cmd/yunque-plugin pack packs\\official\\wasm-plugin-pack --out dist\\packs\\wasm-plugin-0.1.0.yqpack")).toBeInTheDocument();
     expect(screen.getByText("新包作为 fork/local 版本安装；验证失败时禁用新版本并回滚上一版本。")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("本地 yqpack 路径"), { target: { value: "C:\\packs\\wasm-plugin.yqpack" } });
+    fireEvent.change(screen.getByLabelText("SHA256"), { target: { value: "a".repeat(64) } });
+    fireEvent.click(screen.getByRole("button", { name: "只读检查" }));
+
+    await waitFor(() => {
+      expect(packsClientMock.studioInspect).toHaveBeenCalledWith({
+        packagePath: "C:\\packs\\wasm-plugin.yqpack",
+        packageUrl: undefined,
+        sha256: "a".repeat(64),
+        goal: "增加一个可查看运行结果的界面",
+      });
+    });
+    expect(await screen.findByText("SHA 匹配")).toBeInTheDocument();
+    expect(screen.getByText("3 个文件")).toBeInTheDocument();
+    expect(screen.getByText("2 可改")).toBeInTheDocument();
+    expect(screen.getByText("1 需源码/审计")).toBeInTheDocument();
+    expect(screen.getByText("frontend/index.html")).toBeInTheDocument();
+    expect(screen.getByText("backend/plugin.wasm")).toBeInTheDocument();
+    expect(screen.getByText("只读检查不会安装能力包；它只告诉小羽真实包内有哪些文件、哪些能改、哪些必须保留边界。")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "复制任务" }));
 
