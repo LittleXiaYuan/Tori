@@ -69,7 +69,7 @@ describe("TracePage", () => {
 
     await waitFor(() => expect(traceClient.recent).toHaveBeenCalledWith(50));
     expect(await screen.findByTestId("execution-trace")).toHaveTextContent("正在拆解任务");
-    expect(screen.getByText("执行轨迹")).toBeInTheDocument();
+    expect(screen.getAllByText("执行轨迹").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("事件")).toBeInTheDocument();
   });
 

@@ -27,6 +27,11 @@ describe("PackSurfaceGuide", () => {
       "yunque.pack.missions",
       "yunque.pack.work",
       "yunque.pack.scheduler",
+      "yunque.pack.cron",
+      "yunque.pack.planner-recovery",
+      "yunque.pack.session-queue",
+      "yunque.pack.state",
+      "yunque.pack.subagents",
     ]);
     expect(packSurfaceGuide("workers").items.map((item) => item.id)).toEqual([
       "yunque.pack.mcp-dispatch",
@@ -47,5 +52,45 @@ describe("PackSurfaceGuide", () => {
       "yunque.pack.control-plane",
       "yunque.pack.rbac",
     ]));
+  });
+
+  it("covers the remaining infrastructure packs through their real user surfaces", () => {
+    expect(allGuidedPackIDs()).toEqual(expect.arrayContaining([
+      "yunque.pack.documents",
+      "yunque.pack.files",
+      "yunque.pack.speech",
+      "yunque.pack.forks",
+      "yunque.pack.persona-modes",
+      "yunque.pack.channels",
+      "yunque.pack.cost",
+      "yunque.pack.plugin-api",
+      "yunque.pack.desktop",
+      "yunque.pack.identity",
+      "yunque.pack.instructions",
+      "yunque.pack.persona",
+      "yunque.pack.connectors",
+      "yunque.pack.notifications",
+      "yunque.pack.tori",
+      "yunque.pack.sandbox",
+      "yunque.pack.ide",
+      "yunque.pack.federation",
+      "yunque.pack.trace",
+      "yunque.pack.triggers",
+      "yunque.pack.cron",
+      "yunque.pack.planner-recovery",
+      "yunque.pack.session-queue",
+      "yunque.pack.state",
+      "yunque.pack.subagents",
+    ]));
+  });
+
+  it("renders compact mode for dense surfaces such as chat and inbox", () => {
+    render(<PackSurfaceGuide surface="chat" compact />);
+
+    expect(screen.getByText("对话里可直接触发的能力包")).toBeInTheDocument();
+    expect(screen.getByText("文档生成")).toBeInTheDocument();
+    expect(screen.getByText("产物文件")).toBeInTheDocument();
+    expect(screen.getByText("语音")).toBeInTheDocument();
+    expect(screen.getByText(/没有必要单独占一个页面/)).toBeInTheDocument();
   });
 });

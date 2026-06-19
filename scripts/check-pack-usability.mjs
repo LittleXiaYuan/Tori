@@ -9,7 +9,9 @@ const repoRoot = resolve(import.meta.dirname, "..");
 const argv = parseArgs(process.argv.slice(2));
 const officialDir = resolveArgPath(argv["source-dir"] || "packs/official");
 const appDir = resolveArgPath(argv["app-dir"] || "apps/web/src/app");
+const surfaceGuidanceFile = resolveArgPath(argv["surface-guidance"] || "apps/web/src/lib/pack-surface-guidance.ts");
 const strict = argv.strict === true;
+const surfaceGuidance = existsSync(surfaceGuidanceFile) ? readFileSync(surfaceGuidanceFile, "utf8") : "";
 
 const manifests = findPackManifests(officialDir)
   .map((manifestPath) => ({ manifestPath, manifest: readJson(manifestPath) }))
@@ -141,6 +143,17 @@ function auditPack({ manifestPath, manifest }) {
     issues.push({
       code: "missing-infrastructure-usage-surface",
       message: "infrastructure pack should describe where users feel its effect",
+      blocking: true,
+    });
+  }
+  if (
+    metadata.usability === "infrastructure" &&
+    metadata.internalOnly !== "true" &&
+    !surfaceGuidance.includes(String(manifest.id))
+  ) {
+    issues.push({
+      code: "missing-surface-guidance",
+      message: "infrastructure pack should be explained on its consuming user surface",
       blocking: true,
     });
   }

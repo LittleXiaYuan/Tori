@@ -67,6 +67,7 @@ import { ChatStreamTimeoutError, parseAgenticChatStream } from "@/lib/chat-sse";
 import { buildHiddenContextAttachments } from "@/lib/chat-attachments";
 import { workspacePathsFromProjects } from "@/lib/chat-workspace";
 import { PlannerRecoveryShelf } from "@/components/chat/planner-recovery-shelf";
+import PackSurfaceGuide from "@/components/pack-surface-guide";
 import { formatErrorMessage } from "@/lib/error-utils";
 import { providerModelLabel } from "@/lib/provider-ui";
 
@@ -1055,11 +1056,17 @@ export default function ChatPage() {
         {/* Chat Messages */}
         {chat.messages.length === 0 ? (
           <div className="flex-1 overflow-y-auto chat-scroll-area chat-scroll-area--empty px-5 py-4 xl:px-6">
+            <div className="mx-auto mb-4 max-w-5xl">
+              <PackSurfaceGuide surface="chat" compact />
+            </div>
             <ChatEmptyState setupNeeded={setupNeeded} chatD={chatD} inputRef={inputRef} composer={composer} />
           </div>
         ) : (
           <>
             <div ref={scrollRef} className="flex-1 overflow-y-auto chat-scroll-area px-5 py-4 xl:px-6">
+              <div className="mx-auto mb-4 max-w-5xl">
+                <PackSurfaceGuide surface="chat" compact />
+              </div>
               <ChatMessageList
                 messages={chat.messages}
                 streaming={chat.streaming}

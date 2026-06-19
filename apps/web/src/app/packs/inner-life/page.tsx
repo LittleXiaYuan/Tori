@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Button, Card, Spinner, Chip } from "@heroui/react";
 import { Sparkles, Compass, Brain, MoonStar, AlertTriangle, Send, ClipboardList, RefreshCw } from "lucide-react";
 import PageHeader from "@/components/page-header";
+import PackSurfaceGuide from "@/components/pack-surface-guide";
 import { formatErrorMessage } from "@/lib/error-utils";
 import { chatPromptHref } from "@/lib/pack-action-links";
 import {
@@ -303,6 +304,8 @@ export default function InnerLifePackPage() {
           </Button>
         )}
       />
+
+      <PackSurfaceGuide surface="innerLife" compact />
 
       <Card className="section-card overflow-hidden p-0">
         <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_260px]">

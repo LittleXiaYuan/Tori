@@ -5,6 +5,7 @@ import { Card, Button, Spinner, Chip, Tooltip, TextField, Input, Label, TextArea
 import { api } from "@/lib/api";
 import { showToast } from "@/components/toast-provider";
 import EmptyState from "@/components/empty-state";
+import PackSurfaceGuide from "@/components/pack-surface-guide";
 import { formatDate } from "@/lib/constants";
 import {
   Inbox, CheckCheck, Mail, MailOpen, Send, X, Star, StarOff,
@@ -152,6 +153,10 @@ export default function InboxPage() {
 
       {/* Middle - Message List */}
       <div className="w-80 flex flex-col shrink-0" style={{ borderRight: "1px solid var(--yunque-border)" }}>
+        <div className="p-3" style={{ borderBottom: "1px solid var(--yunque-border)" }}>
+          <PackSurfaceGuide surface="inbox" compact />
+        </div>
+
         {/* List Header */}
         <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: "1px solid var(--yunque-border)" }}>
           <span className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>

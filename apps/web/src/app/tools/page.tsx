@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 import { Terminal, Send, Trash2, Square, Plus, FolderOpen, Play, XCircle, RefreshCw } from "lucide-react";
 import { showToast } from "@/components/toast-provider";
 import PageHeader from "@/components/page-header";
+import PackSurfaceGuide from "@/components/pack-surface-guide";
 import { formatErrorMessage } from "@/lib/error-utils";
 
 interface ToolSession {
@@ -142,6 +143,8 @@ export default function ToolsPage() {
           </Tooltip>
         }
       />
+
+      <PackSurfaceGuide surface="tools" />
 
       {/* Session tabs */}
       {sessions.length > 1 && (

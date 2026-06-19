@@ -7,6 +7,7 @@ import { Activity, ListFilter, RefreshCw, Search } from "lucide-react";
 import EmptyState from "@/components/empty-state";
 import ExecutionTrace from "@/components/execution-trace";
 import PageHeader from "@/components/page-header";
+import PackSurfaceGuide from "@/components/pack-surface-guide";
 import { formatErrorMessage } from "@/lib/error-utils";
 import { createTracePackClient, type TraceEventsResponse } from "@/lib/trace-pack-client";
 
@@ -83,6 +84,8 @@ export default function TracePage() {
         description="查看云雀最近的执行过程、按任务定位步骤，或用 trace id 回放一次执行。"
         onRefresh={() => load()}
       />
+
+      <PackSurfaceGuide surface="trace" />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Card className="section-card p-4">

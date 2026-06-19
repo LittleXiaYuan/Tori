@@ -12,6 +12,7 @@ import { showToast } from "@/components/toast-provider";
 import { STATUS_COLORS, relTime } from "@/lib/constants";
 import { useApiData } from "@/lib/use-api-data";
 import EmptyState from "@/components/empty-state";
+import PackSurfaceGuide from "@/components/pack-surface-guide";
 
 const statusLabel: Record<string, string> = {
   pending: "待执行", running: "运行中", paused: "已暂停",
@@ -132,6 +133,8 @@ export default function WorkflowsPage() {
           </Button>
         </div>
       </div>
+
+      <PackSurfaceGuide surface="workflows" />
 
       {/* NL2Workflow */}
       <Card className="section-card overflow-hidden" style={{ border: "1px solid rgba(139,92,246,0.24)" }}>

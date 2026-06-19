@@ -13,6 +13,7 @@ import {
   Heart, ExternalLink, Cloud, Search, User,
 } from "lucide-react";
 import { PreferencesPanel } from "@/components/preferences-panel";
+import PackSurfaceGuide from "@/components/pack-surface-guide";
 import { SettingsCard } from "./_components/settings-card";
 
 const groupMeta: Record<string, { icon: React.ElementType; color: string }> = {
@@ -201,8 +202,10 @@ export default function SettingsPage() {
 
   return (
     <div>
+      <PackSurfaceGuide surface="settings" />
+
       {/* Actions bar */}
-      <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)", marginBottom: "var(--sp-4)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)", margin: "var(--sp-4) 0" }}>
         {saveResult && (
           <Chip size="sm" variant={saveResult.ok ? "soft" : "soft"}
             style={{ color: saveResult.ok ? "var(--yunque-success)" : "var(--yunque-danger)" }}>

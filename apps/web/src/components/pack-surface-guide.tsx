@@ -10,9 +10,37 @@ const kindTone: Record<string, { bg: string; fg: string }> = {
   "治理": { bg: "rgba(245,158,11,0.10)", fg: "var(--yunque-warning)" },
 };
 
-export default function PackSurfaceGuide({ surface }: { surface: PackSurfaceKey }) {
+export default function PackSurfaceGuide({ surface, compact = false }: { surface: PackSurfaceKey; compact?: boolean }) {
   const guide = packSurfaceGuide(surface);
   const Icon = guide.icon;
+
+  if (compact) {
+    return (
+      <Card className="section-card p-3">
+        <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
+          <Icon size={15} aria-hidden={true} />
+          {guide.title}
+        </div>
+        <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
+          {guide.description}
+        </div>
+        <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+          {guide.items.map((item) => {
+            const tone = kindTone[item.kind] || kindTone["基础能力"];
+            return (
+              <div key={item.id} className="rounded-lg p-2" style={{ border: "1px solid var(--yunque-border)", background: "rgba(255,255,255,0.025)" }}>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="truncate text-xs font-medium" style={{ color: "var(--yunque-text)" }}>{item.title}</div>
+                  <Chip size="sm" style={{ background: tone.bg, color: tone.fg, fontSize: "var(--text-2xs)" }}>{item.kind}</Chip>
+                </div>
+                <div className="mt-1 text-[11px] leading-4" style={{ color: "var(--yunque-text-muted)" }}>{item.summary}</div>
+              </div>
+            );
+          })}
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <Card className="section-card overflow-hidden p-0">

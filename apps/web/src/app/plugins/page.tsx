@@ -6,6 +6,7 @@ import { api, type PluginMeta } from "@/lib/api";
 import { Puzzle, Plus, Trash2, Save, FileCode, Search, Zap, Box, Terminal, ChevronUp, RefreshCw, FolderOpen, File, ExternalLink } from "lucide-react";
 import { showToast } from "@/components/toast-provider";
 import PageHeader from "@/components/page-header";
+import PackSurfaceGuide from "@/components/pack-surface-guide";
 import { useApiData } from "@/lib/use-api-data";
 
 type TemplateItem = {
@@ -141,6 +142,8 @@ export default function PluginsPage() {
           </div>
         }
       />
+
+      <PackSurfaceGuide surface="plugins" />
 
       {/* Stats bar */}
       <div className="flex items-center gap-3 flex-wrap">
