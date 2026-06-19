@@ -233,6 +233,8 @@
     "example2": "生成回滚、retention prune 或 kv_history cutover 计划。",
     "example3": "导出记忆漂移、审计链接和恢复证据包。",
     "usability": "experimental",
+    "primaryActionLabel": "查看记忆快照",
+    "primaryActionPath": "/packs/memory-time-travel",
     "limitation": "当前主要用于快照、diff、回滚计划和 pack-local 记录；原生 Ledger kv_history 深度联动仍在接入中。"
   },
   "status": "alpha"

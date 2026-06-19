@@ -124,6 +124,8 @@
     "example2": "生成 CI gate、规则写回和告警计划。",
     "example3": "导出 guardrail fuzz 证据包。",
     "usability": "experimental",
+    "primaryActionLabel": "查看 Fuzzer 面板",
+    "primaryActionPath": "/packs/guardrail-fuzzer",
     "limitation": "当前主要运行本地 mutation 探针和计划生成，不会自动写入生产规则、触发 CI fuzz 或发布告警。"
   },
   "status": "alpha"

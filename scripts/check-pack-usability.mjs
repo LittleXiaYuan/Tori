@@ -209,6 +209,20 @@ function auditPack({ manifestPath, manifest }) {
       });
     }
   }
+  if ((manifest.status === "alpha" || metadata.usability === "experimental") && !metadata.primaryActionPath) {
+    issues.push({
+      code: "missing-experimental-primary-path",
+      message: "experimental pack should still tell users where to inspect it",
+      blocking: true,
+    });
+  }
+  if ((manifest.status === "alpha" || metadata.usability === "experimental") && !metadata.primaryActionLabel) {
+    issues.push({
+      code: "missing-experimental-primary-label",
+      message: "experimental pack should still have a user-readable inspect action",
+      blocking: true,
+    });
+  }
   if ((manifest.status === "alpha" || metadata.usability === "experimental") && !metadata.limitation) {
     issues.push({
       code: "missing-experimental-limitation",

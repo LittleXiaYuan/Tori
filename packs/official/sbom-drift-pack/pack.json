@@ -135,6 +135,8 @@
     "example2": "对比 baseline 并生成 drift diff。",
     "example3": "导出 CycloneDX、CI gate 和供应链证据包。",
     "usability": "experimental",
+    "primaryActionLabel": "查看 SBOM 漂移",
+    "primaryActionPath": "/packs/sbom-drift",
     "limitation": "当前主要做本地 SBOM 快照、diff 和证据导出，不会自动修改依赖或提交修复。"
   },
   "status": "alpha"

@@ -120,6 +120,8 @@
     "example2": "读取 trace 详情并生成 dry-run 回放。",
     "example3": "生成 Browser Intent / executor handoff 计划。",
     "usability": "experimental",
+    "primaryActionLabel": "查看回放计划",
+    "primaryActionPath": "/packs/rpa-replay",
     "limitation": "当前主要保存和回放计划，不会自动控制浏览器或本机桌面执行真实 RPA。"
   },
   "status": "alpha"

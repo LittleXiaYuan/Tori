@@ -126,6 +126,8 @@
     "example2": "运行异常检测并生成 NeedsApproval 计划。",
     "example3": "写入 pack-local 审批队列并导出证据包。",
     "usability": "experimental",
+    "primaryActionLabel": "查看异常报告",
+    "primaryActionPath": "/packs/skill-anomaly",
     "limitation": "当前主要做本地事件对比和异常报告，不会自动禁用技能或修改策略。"
   },
   "status": "alpha"

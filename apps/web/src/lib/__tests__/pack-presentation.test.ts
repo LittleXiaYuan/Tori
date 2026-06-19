@@ -171,6 +171,8 @@ describe("pack-presentation", () => {
       version: "0.1.0",
       status: "alpha",
       metadata: {
+        primaryActionLabel: "查看电脑使用计划",
+        primaryActionPath: "/packs/computer-use",
         limitation: "当前只生成计划，不执行本机桌面控制。",
       },
     };
@@ -195,6 +197,8 @@ describe("pack-presentation", () => {
     expect(packUsability(experimental)).toMatchObject({
       kind: "experimental",
       label: "实验能力",
+      primaryActionLabel: "查看电脑使用计划",
+      primaryActionPath: "/packs/computer-use",
       limitation: "当前只生成计划，不执行本机桌面控制。",
     });
     expect(packUsability(infrastructure)).toMatchObject({
