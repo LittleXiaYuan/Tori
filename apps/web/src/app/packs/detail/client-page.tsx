@@ -13,6 +13,7 @@ import {
   ExternalLink,
   Info,
   LockKeyhole,
+  MessageSquare,
   PackageCheck,
   PackageX,
   Power,
@@ -43,6 +44,7 @@ import {
   packUsability,
   riskProfileForPack,
 } from "@/lib/pack-presentation";
+import { chatPromptHref } from "@/lib/pack-action-links";
 
 const packsClient = createPacksClient(createYunqueSDKClientOptions());
 
@@ -197,6 +199,18 @@ export default function PackDetailClientPage() {
   const usability = packUsability(manifest);
   const readiness = packReadiness(manifest);
   const openPath = usability.primaryActionPath || menus[0]?.path || routesFrontend[0]?.path;
+  const usagePrompt = [
+    `我正在查看云雀能力包：${manifest.name} (${manifest.id})。`,
+    "请用普通用户能理解的话告诉我：它能做什么、适合哪些任务、第一句话该怎么说、启用前要注意什么。",
+    `能力包说明：${manifest.description || "暂无说明"}`,
+    `可用性：${usability.label}；${usability.description}`,
+    readiness.missing.length > 0 ? `当前还缺：${readiness.missing.join("、")}` : "当前体检：说明基本完整",
+    usability.limitation ? `当前限制：${usability.limitation}` : "",
+    examples.length > 0 ? `已有示例：${examples.join(" / ")}` : "",
+    "如果它只是后台支撑能力，请告诉我应该从 Chat、任务、记忆、知识或能力包详情哪里感知它，不要把实验能力说成稳定能力。",
+  ].filter(Boolean).join("\n");
+  const studioGoal = `让 ${manifest.name} 更像一个用户能直接理解和使用的能力包，补齐用途、入口、示例、权限边界和回滚说明。`;
+  const studioHref = `/packs/studio?packId=${encodeURIComponent(manifest.id)}&goal=${encodeURIComponent(studioGoal)}`;
 
   const installFromCatalog = () => {
     if (!catalogEntry) {
@@ -309,6 +323,18 @@ export default function PackDetailClientPage() {
               当前限制：{usability.limitation}
             </div>
           )}
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link href={chatPromptHref(usagePrompt)}>
+              <Button size="sm" variant="outline">
+                <MessageSquare size={14} /> 问云雀怎么用
+              </Button>
+            </Link>
+            <Link href={studioHref}>
+              <Button size="sm" variant="ghost">
+                <Sparkles size={14} /> 交给小羽补齐
+              </Button>
+            </Link>
+          </div>
         </Card>
 
         <Card className="section-card p-4">
@@ -329,7 +355,10 @@ export default function PackDetailClientPage() {
           </div>
           {readiness.missing.length > 0 ? (
             <div className="mt-3 rounded-md p-3 text-xs" style={{ background: "rgba(245,158,11,0.08)", color: "var(--yunque-text-secondary)" }}>
-              还缺：{readiness.missing.join("、")}。可以回到能力包中心点“小羽优化”，补齐用途、入口、示例或边界说明。
+              <div>还缺：{readiness.missing.join("、")}。可以让小羽补齐用途、入口、示例或边界说明。</div>
+              <Link href={studioHref} className="mt-2 inline-flex items-center gap-1 font-medium" style={{ color: "var(--yunque-accent)" }}>
+                交给小羽补齐 <Sparkles size={12} />
+              </Link>
             </div>
           ) : (
             <div className="mt-3 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
