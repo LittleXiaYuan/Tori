@@ -910,6 +910,16 @@ export default function PackStudioPage() {
     repackReport,
     workspaceReport,
   ]);
+  const currentWorkflowStep = useMemo(
+    () => workflowSteps.find((step) => step.state === "blocked")
+      || workflowSteps.find((step) => step.state === "active")
+      || workflowSteps[workflowSteps.length - 1],
+    [workflowSteps],
+  );
+  const completedWorkflowCount = useMemo(
+    () => workflowSteps.filter((step) => step.state === "done").length,
+    [workflowSteps],
+  );
   const releaseChecklist = useMemo(() => [
     {
       label: "原包已只读检查",
@@ -1445,9 +1455,71 @@ export default function PackStudioPage() {
           )}
         </Card>
 
+        <Card className="section-card p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
+                <ClipboardCheck size={16} style={{ color: "var(--yunque-accent)" }} />
+                改包流程导轨
+              </div>
+              <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
+                从只读检查到启用/回滚都在同一条路径里推进；小羽只生成计划和草稿，真正写入、打包、安装都需要你确认。
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Chip size="sm" variant="soft">
+                当前包：{manifest?.name || "先选择能力包"}
+              </Chip>
+              <Chip size="sm" color={currentWorkflowStep?.state ? workflowStateColor(currentWorkflowStep.state) : "default"}>
+                {completedWorkflowCount}/{workflowSteps.length} 已完成
+              </Chip>
+            </div>
+          </div>
+          <div className="mt-3 grid gap-2 md:grid-cols-[260px_minmax(0,1fr)]">
+            <div className="rounded-md border p-3" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-bg-hover)" }}>
+              <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>当前步骤</div>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <Chip size="sm" color={currentWorkflowStep?.state ? workflowStateColor(currentWorkflowStep.state) : "default"}>
+                  {currentWorkflowStep?.title || "等待开始"}
+                </Chip>
+                <span className="text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
+                  {currentWorkflowStep ? workflowStateLabel(currentWorkflowStep.state) : "待开始"}
+                </span>
+              </div>
+              <div className="mt-2 text-[11px] leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
+                下一步：{currentWorkflowStep?.action || "先选择能力包"}
+              </div>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              {workflowSteps.map((step, index) => (
+                <div
+                  key={step.key}
+                  className="rounded-md border px-2 py-2"
+                  style={{
+                    borderColor: step.key === currentWorkflowStep?.key ? "var(--yunque-accent)" : "var(--yunque-border)",
+                    background: step.key === currentWorkflowStep?.key ? "rgba(59,130,246,0.08)" : "var(--yunque-surface)",
+                  }}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] font-medium" style={{ color: "var(--yunque-text)" }}>
+                      {index + 1}. {step.title}
+                    </span>
+                    <Chip size="sm" color={workflowStateColor(step.state)}>
+                      {workflowStateLabel(step.state)}
+                    </Chip>
+                  </div>
+                  <div className="mt-1 truncate text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
+                    {step.action}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Card>
+
         {manifest && analysis && (
           <>
-            <Card className="section-card p-4">
+            <Card id="yqpack-check" className="section-card p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>

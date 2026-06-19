@@ -316,6 +316,11 @@ describe("PackStudioPage", () => {
     expect((screen.getByLabelText("这次想补强什么") as HTMLInputElement).value).toBe("补一个结果面板");
     expect((screen.getByLabelText("OSS / Release URL") as HTMLInputElement).value).toBe("https://oss.example.com/wasm-plugin.yqpack");
     expect((screen.getByLabelText("SHA256") as HTMLInputElement).value).toBe("9".repeat(64));
+    expect(screen.getByText("改包流程导轨")).toBeInTheDocument();
+    expect(screen.getByText("从只读检查到启用/回滚都在同一条路径里推进；小羽只生成计划和草稿，真正写入、打包、安装都需要你确认。")).toBeInTheDocument();
+    expect(screen.getByText("当前包：WASM 能力包")).toBeInTheDocument();
+    expect(screen.getByText("0/8 已完成")).toBeInTheDocument();
+    expect(screen.getAllByText("下一步：填写路径/URL 后点击只读检查").length).toBeGreaterThan(0);
     expect(screen.getByText("已从能力包中心接入这个 yqpack")).toBeInTheDocument();
     expect(screen.getByText("不用回到商店手动找包；先在这里做只读检查，再进入工作区、diff 预览、审计和重新打包。这一步只校验 SHA、manifest 与文件分类，不会安装、启用或改动本地能力包。")).toBeInTheDocument();
     expect(screen.getByText("URL: https://oss.example.com/wasm-plugin.yqpack")).toBeInTheDocument();
@@ -578,7 +583,7 @@ describe("PackStudioPage", () => {
     expect(screen.getByText("packs/official/wasm-plugin-pack/pack.json")).toBeInTheDocument();
     expect(screen.getByText("internal/packs/wasmplugin/")).toBeInTheDocument();
     expect(screen.getByText("审计测试")).toBeInTheDocument();
-    expect(screen.getByText("重新打包")).toBeInTheDocument();
+    expect(screen.getAllByText("重新打包").length).toBeGreaterThan(0);
     expect(screen.getByText("回滚策略")).toBeInTheDocument();
     expect(screen.getByText("go run ./cmd/yunque-plugin pack packs\\official\\wasm-plugin-pack --out dist\\packs\\wasm-plugin-0.1.0.yqpack")).toBeInTheDocument();
     expect(screen.getByText("新包作为 fork/local 版本安装；验证失败时禁用新版本并回滚上一版本。")).toBeInTheDocument();
@@ -625,7 +630,7 @@ describe("PackStudioPage", () => {
     expect(screen.getByText("全部就绪后再把新 yqpack 放到 Release 或 OSS；清单不会替你上传，也不会自动启用能力包。")).toBeInTheDocument();
     expect(screen.getByText("继续检查")).toBeInTheDocument();
     expect(screen.getByText("回滚路径已记录")).toBeInTheDocument();
-    expect(screen.getByText("Plan / Draft")).toBeInTheDocument();
+    expect(screen.getAllByText("Plan / Draft").length).toBeGreaterThan(0);
     expect(screen.getAllByText("下一步：载入草稿或交给小羽生成 Draft").length).toBeGreaterThan(0);
 
     expect(screen.getByText("小羽改造草稿队列")).toBeInTheDocument();
@@ -715,7 +720,7 @@ describe("PackStudioPage", () => {
     fireEvent.change(screen.getByLabelText("导入 Patch Plan JSON"), { target: { value: importedChatMessage } });
     expect(screen.getByText("工作区匹配")).toBeInTheDocument();
     expect(screen.getByText("2 个候选")).toBeInTheDocument();
-    expect(screen.getByText(/包：WASM 能力包/)).toBeInTheDocument();
+    expect(screen.getAllByText(/包：WASM 能力包/).length).toBeGreaterThan(0);
     expect(screen.getByText("摘要：" + patchPlan.candidates[1].content_summary.hash)).toBeInTheDocument();
     const importButtons = screen.getAllByRole("button", { name: "填入文件" });
     fireEvent.click(importButtons[1]);
