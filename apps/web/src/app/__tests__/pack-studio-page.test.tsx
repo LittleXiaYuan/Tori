@@ -386,6 +386,19 @@ describe("PackStudioPage", () => {
       expect(toastMock).toHaveBeenCalledWith("已复制结构化 Patch Plan", "success");
     });
 
+    const patchPlanLink = screen.getByRole("link", { name: /交给 Chat 里的小羽（带 Patch Plan）/ });
+    expect(patchPlanLink).toHaveAttribute("href", expect.stringContaining("/chat?q="));
+    const patchPlanQuery = new URL(patchPlanLink.getAttribute("href")!, "http://localhost").searchParams.get("q") || "";
+    expect(patchPlanQuery).toContain("yunque.pack_studio.patch_plan.v1");
+    expect(patchPlanQuery).toContain("manifest 草稿");
+    expect(patchPlanQuery).toContain("预览 diff");
+    expect(patchPlanQuery).toContain("运行内置审计");
+    expect(patchPlanQuery).not.toContain("<!doctype html>");
+    const patchPlanJson = patchPlanQuery.match(/```json\n([\s\S]+?)\n```/)?.[1] || "";
+    const linkedPatchPlan = JSON.parse(patchPlanJson);
+    expect(linkedPatchPlan.candidates[1].file_path).toBe("C:\\yunque\\packs\\studio\\frontend\\index.html");
+    expect(linkedPatchPlan.candidates[1].content_summary.length).toBeGreaterThan(100);
+
     const draftButtons = screen.getAllByRole("button", { name: "载入草稿" });
     fireEvent.click(draftButtons[0]);
     const manifestDraft = screen.getByLabelText("新的文件内容") as HTMLTextAreaElement;

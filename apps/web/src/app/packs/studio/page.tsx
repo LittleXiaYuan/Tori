@@ -200,6 +200,56 @@ function stableStringHash(value: string): string {
   return hash.toString(16).padStart(8, "0");
 }
 
+function buildPatchPlan(workspace: PackStudioWorkspaceReport, candidates: StudioDraftCandidate[], goal: string) {
+  return {
+    kind: "yunque.pack_studio.patch_plan.v1",
+    pack: {
+      id: workspace.manifest.id,
+      name: workspace.manifest.name,
+      version: workspace.manifest.version,
+    },
+    goal,
+    workspace: {
+      id: workspace.workspace_id,
+      path: workspace.workspace_path,
+      original_sha256: workspace.original_sha256,
+    },
+    rules: [
+      "Only load one candidate into the workspace patch editor at a time.",
+      "Preview diff before applying.",
+      "Run built-in audit after applying.",
+      "Repack, reinspect sha256, then install or rollback explicitly.",
+    ],
+    candidates: candidates.map((candidate) => ({
+      key: candidate.key,
+      label: candidate.label,
+      file_path: candidate.filePath,
+      risk_level: candidate.riskLevel,
+      applyable: candidate.applyable,
+      reason: candidate.reason,
+      gates: candidate.gates,
+      content_summary: {
+        length: candidate.content.length,
+        hash: stableStringHash(candidate.content),
+      },
+    })),
+  };
+}
+
+function buildPatchPlanPrompt(prompt: string, patchPlan: ReturnType<typeof buildPatchPlan>): string {
+  return [
+    prompt,
+    "",
+    "下面是 Pack Studio 已准备好的 Patch Plan。请只把它当作结构化导航和安全约束，不要假设里面包含完整文件内容。",
+    "你需要引导用户在 Pack Studio 中载入草稿、预览 diff、应用到工作区、运行内置审计、重新打包、复检 SHA，再决定安装或回滚。",
+    "如果需要修改具体内容，请先要求用户在 Pack Studio 打开对应候选并查看 diff；不要绕过权限、签名、审计或回滚流程。",
+    "",
+    "```json",
+    JSON.stringify(patchPlan, null, 2),
+    "```",
+  ].join("\n");
+}
+
 function sourceLabel(candidate: PackCandidate): string {
   if (candidate.installed && candidate.enabled) return "已启用";
   if (candidate.installed) return "已安装";
@@ -449,6 +499,11 @@ export default function PackStudioPage() {
     () => workspaceReport ? buildStudioDraftCandidates(workspaceReport, goal) : [],
     [workspaceReport, goal],
   );
+  const patchPlan = useMemo(
+    () => workspaceReport && draftCandidates.length > 0 ? buildPatchPlan(workspaceReport, draftCandidates, goal) : null,
+    [workspaceReport, draftCandidates, goal],
+  );
+  const patchPlanChatHref = patchPlan ? `/chat?q=${encodeURIComponent(buildPatchPlanPrompt(prompt, patchPlan))}` : "";
 
   const copyPrompt = async () => {
     if (!prompt) return;
@@ -457,41 +512,8 @@ export default function PackStudioPage() {
   };
 
   const copyDraftPlan = async () => {
-    if (!workspaceReport || draftCandidates.length === 0) return;
-    const plan = {
-      kind: "yunque.pack_studio.patch_plan.v1",
-      pack: {
-        id: workspaceReport.manifest.id,
-        name: workspaceReport.manifest.name,
-        version: workspaceReport.manifest.version,
-      },
-      goal,
-      workspace: {
-        id: workspaceReport.workspace_id,
-        path: workspaceReport.workspace_path,
-        original_sha256: workspaceReport.original_sha256,
-      },
-      rules: [
-        "Only load one candidate into the workspace patch editor at a time.",
-        "Preview diff before applying.",
-        "Run built-in audit after applying.",
-        "Repack, reinspect sha256, then install or rollback explicitly.",
-      ],
-      candidates: draftCandidates.map((candidate) => ({
-        key: candidate.key,
-        label: candidate.label,
-        file_path: candidate.filePath,
-        risk_level: candidate.riskLevel,
-        applyable: candidate.applyable,
-        reason: candidate.reason,
-        gates: candidate.gates,
-        content_summary: {
-          length: candidate.content.length,
-          hash: stableStringHash(candidate.content),
-        },
-      })),
-    };
-    await navigator.clipboard?.writeText(JSON.stringify(plan, null, 2));
+    if (!patchPlan) return;
+    await navigator.clipboard?.writeText(JSON.stringify(patchPlan, null, 2));
     showToast("已复制结构化 Patch Plan", "success");
   };
 
@@ -820,6 +842,13 @@ export default function PackStudioPage() {
                     交给 Chat 里的小羽 <ArrowRight size={14} />
                   </Button>
                 </Link>
+                {patchPlanChatHref && (
+                  <Link href={patchPlanChatHref}>
+                    <Button variant="outline">
+                      交给 Chat 里的小羽（带 Patch Plan） <ArrowRight size={14} />
+                    </Button>
+                  </Link>
+                )}
                 <Button variant="ghost" onPress={refresh}>
                   <RefreshCw size={14} /> 重新读取
                 </Button>
