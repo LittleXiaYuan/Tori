@@ -412,6 +412,35 @@ describe("PackStudioPage", () => {
     expect(screen.queryByText("已从能力包中心接入这个 yqpack")).not.toBeInTheDocument();
   });
 
+  it("syncs Studio context to the manifest found by yqpack inspection", async () => {
+    navigationMock.query = new URLSearchParams({
+      packId: "yunque.pack.documents",
+      goal: "检查一个外部 yqpack",
+      packageUrl: "https://oss.example.com/wasm-plugin.yqpack",
+      sha256: "9".repeat(64),
+    }).toString();
+
+    render(<PackStudioPage />);
+
+    expect(await screen.findByText("当前能力包：Documents")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /查看详情/ })).toHaveAttribute("href", "/packs/detail?id=yunque.pack.documents");
+
+    fireEvent.click(screen.getByRole("button", { name: "立即只读检查" }));
+
+    await waitFor(() => {
+      expect(packsClientMock.studioInspect).toHaveBeenCalledWith({
+        packagePath: undefined,
+        packageUrl: "https://oss.example.com/wasm-plugin.yqpack",
+        sha256: "9".repeat(64),
+        goal: "检查一个外部 yqpack",
+      });
+    });
+    expect(screen.getByText("当前能力包：WASM 能力包")).toBeInTheDocument();
+    expect(screen.getByText("已同步检查结果")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /查看详情/ })).toHaveAttribute("href", "/packs/detail?id=yunque.pack.wasm-plugin");
+    expect(screen.getByRole("link", { name: /打开能力入口/ })).toHaveAttribute("href", "/packs/wasm-plugin");
+  });
+
   it("prefills yqpack source for private catalog candidates", async () => {
     const privateManifest = {
       ...documentsManifest,

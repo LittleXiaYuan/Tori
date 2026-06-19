@@ -773,7 +773,25 @@ export default function PackStudioPage() {
     }
   };
 
-  const manifest = selected?.manifest;
+  const contextCandidate = useMemo<PackCandidate | undefined>(() => {
+    if (!inspectReport?.manifest) return selected;
+    const matched = candidates.find((item) => item.manifest.id === inspectReport.manifest.id);
+    return {
+      manifest: inspectReport.manifest,
+      source: matched?.source || selected?.source || "release",
+      enabled: matched?.enabled || false,
+      installed: matched?.installed || false,
+      packageUrl: matched?.packageUrl || packageUrl.trim() || undefined,
+      sha256: inspectReport.sha256 || matched?.sha256 || packageSHA.trim() || undefined,
+    };
+  }, [candidates, inspectReport, packageSHA, packageUrl, selected]);
+  const manifest = contextCandidate?.manifest;
+  const contextSourceLabel = useMemo(() => {
+    if (!contextCandidate) return "未选择";
+    const matchesKnownCandidate = Boolean(candidates.some((item) => item.manifest.id === contextCandidate.manifest.id));
+    if (inspectReport && !matchesKnownCandidate) return "只读检查结果";
+    return sourceLabel(contextCandidate);
+  }, [candidates, contextCandidate, inspectReport]);
   const readiness = manifest ? packReadiness(manifest) : null;
   const { data: studioPlan, refresh: refreshStudioPlan } = useApiData(async () => {
     if (!manifest) return null;
@@ -1328,13 +1346,14 @@ export default function PackStudioPage() {
                   <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
                     当前能力包：{manifest.name}
                   </div>
-                  <Chip size="sm" variant="soft">{sourceLabel(selected)}</Chip>
+                  <Chip size="sm" variant="soft">{contextSourceLabel}</Chip>
                   <Chip size="sm" style={{
-                    background: selected.enabled ? "rgba(34,197,94,0.10)" : selected.installed ? "rgba(245,158,11,0.12)" : "rgba(255,255,255,0.05)",
-                    color: selected.enabled ? "var(--yunque-success)" : selected.installed ? "var(--yunque-warning)" : "var(--yunque-text-muted)",
+                    background: contextCandidate.enabled ? "rgba(34,197,94,0.10)" : contextCandidate.installed ? "rgba(245,158,11,0.12)" : "rgba(255,255,255,0.05)",
+                    color: contextCandidate.enabled ? "var(--yunque-success)" : contextCandidate.installed ? "var(--yunque-warning)" : "var(--yunque-text-muted)",
                   }}>
-                    {selected.enabled ? "已启用" : selected.installed ? "已安装未启用" : "未安装"}
+                    {contextCandidate.enabled ? "已启用" : contextCandidate.installed ? "已安装未启用" : "未安装"}
                   </Chip>
+                  {inspectReport && <Chip size="sm" color="success">已同步检查结果</Chip>}
                   {hasPackageSource && <Chip size="sm" color="success">已带 yqpack 来源</Chip>}
                 </div>
                 <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
