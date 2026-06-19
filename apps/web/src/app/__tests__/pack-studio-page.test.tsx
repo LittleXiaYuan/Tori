@@ -354,10 +354,15 @@ describe("PackStudioPage", () => {
       });
     });
     expect(await screen.findByText("Pack Studio 工作区")).toBeInTheDocument();
-    expect(screen.getByText("yunque.pack.wasm-plugin-0.1.0-aaaaaaaaaaaa")).toBeInTheDocument();
+    expect(screen.getAllByText("yunque.pack.wasm-plugin-0.1.0-aaaaaaaaaaaa").length).toBeGreaterThan(0);
     expect(screen.getByText("go run ./cmd/yunque-plugin pack C:\\yunque\\packs\\studio\\yunque.pack.wasm-plugin-0.1.0-aaaaaaaaaaaa --out dist\\packs\\yunque.pack.wasm-plugin-0.1.0-studio.yqpack")).toBeInTheDocument();
     expect(screen.getByText("新包安装后若验证失败，执行 /v1/packs/disable 禁用新包。")).toBeInTheDocument();
     expect(screen.getByText("工作区是可编辑副本，不会启用能力包；安装新 yqpack 前仍需重新检查、测试和确认回滚路径。")).toBeInTheDocument();
+    expect(screen.getByText("改包工作流状态")).toBeInTheDocument();
+    expect(screen.getByText("小羽可以帮你生成计划和草稿，但每一步都必须经过 diff、审计、复检和显式安装确认。")).toBeInTheDocument();
+    expect(screen.getByText("不自动应用")).toBeInTheDocument();
+    expect(screen.getByText("Plan / Draft")).toBeInTheDocument();
+    expect(screen.getAllByText("下一步：载入草稿或交给小羽生成 Draft").length).toBeGreaterThan(0);
 
     expect(screen.getByText("小羽改造草稿队列")).toBeInTheDocument();
     expect(screen.getByText("从 Chat 导入 Patch Plan").closest("#import-plan")).not.toBeNull();
@@ -518,6 +523,7 @@ describe("PackStudioPage", () => {
     expect(frontendDraft.value).toContain("<title>WASM 能力包</title>");
     expect(frontendDraft.value).toContain("能力包界面草稿 · yunque.pack.wasm-plugin");
     expect(frontendDraft.value).toContain("接入真实 bridge/API 前必须先预览 diff、运行审计并重新打包");
+    expect(screen.getAllByText("下一步：点击预览 diff").length).toBeGreaterThan(0);
 
     fireEvent.click(draftButtons[0]);
     fireEvent.change(screen.getByLabelText("新的文件内容"), { target: { value: "{\n  \"description\": \"更清楚\"\n}" } });
@@ -540,6 +546,7 @@ describe("PackStudioPage", () => {
       expect(packsClientMock.studioPatch).toHaveBeenCalledWith(expect.objectContaining({ apply: true }));
     });
     expect(await screen.findByText("已应用")).toBeInTheDocument();
+    expect(screen.getAllByText("下一步：运行内置审计").length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole("button", { name: "运行内置审计" }));
     await waitFor(() => {
@@ -550,6 +557,7 @@ describe("PackStudioPage", () => {
     });
     expect(await screen.findByText("审计通过")).toBeInTheDocument();
     expect(screen.getByText("1 个改动 · 1 可改 · 0 需源码/专项审计")).toBeInTheDocument();
+    expect(screen.getAllByText("下一步：可以重新打包").length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole("button", { name: "重新打包" }));
     await waitFor(() => {
@@ -561,6 +569,7 @@ describe("PackStudioPage", () => {
     expect(await screen.findByText("新 yqpack 已生成")).toBeInTheDocument();
     expect(screen.getByText("C:\\yunque\\packs\\studio\\yunque.pack.wasm-plugin-0.1.0-studio.yqpack")).toBeInTheDocument();
     expect(screen.getByText("SHA256：" + "d".repeat(64))).toBeInTheDocument();
+    expect(screen.getAllByText("下一步：复检新包 SHA").length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole("button", { name: "复检新包" }));
     await waitFor(() => {
@@ -571,6 +580,7 @@ describe("PackStudioPage", () => {
       });
     });
     expect(await screen.findByText("复检 SHA 匹配")).toBeInTheDocument();
+    expect(screen.getAllByText("下一步：安装新包").length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole("button", { name: "安装新包" }));
     await waitFor(() => {
@@ -583,6 +593,7 @@ describe("PackStudioPage", () => {
     expect(await screen.findByText("已安装未启用")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /打开入口/ })).toHaveAttribute("href", "/packs/wasm-plugin");
     expect(screen.getByRole("link", { name: /查看详情/ })).toHaveAttribute("href", "/packs/detail?id=yunque.pack.wasm-plugin");
+    expect(screen.getAllByText("下一步：确认权限后启用或回滚").length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole("button", { name: "启用" }));
     await waitFor(() => {
@@ -591,6 +602,7 @@ describe("PackStudioPage", () => {
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "启用" })).toBeDisabled();
     });
+    expect(screen.getAllByText("下一步：打开入口或查看详情").length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole("button", { name: "复制任务" }));
 

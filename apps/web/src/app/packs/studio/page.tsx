@@ -71,6 +71,28 @@ type StudioDraftCandidate = {
   applyable: boolean;
 };
 
+type StudioWorkflowStep = {
+  key: string;
+  title: string;
+  state: "done" | "active" | "blocked" | "pending";
+  detail: string;
+  action: string;
+};
+
+function workflowStateLabel(state: StudioWorkflowStep["state"]): string {
+  if (state === "done") return "已完成";
+  if (state === "active") return "当前";
+  if (state === "blocked") return "需处理";
+  return "待开始";
+}
+
+function workflowStateColor(state: StudioWorkflowStep["state"]): "success" | "warning" | "danger" | "default" {
+  if (state === "done") return "success";
+  if (state === "active") return "warning";
+  if (state === "blocked") return "danger";
+  return "default";
+}
+
 function packSlug(manifest: PackManifest): string {
   return manifest.id.replace(/^yunque\.pack\./, "");
 }
@@ -574,6 +596,91 @@ export default function PackStudioPage() {
   const importedPatchDraftMatchesWorkspace = useMemo(() => {
     return packStudioWorkspaceMatches(importedPatchDraft?.workspace, workspaceReport);
   }, [importedPatchDraft, workspaceReport]);
+  const workflowSteps = useMemo<StudioWorkflowStep[]>(() => {
+    const hasDraftQueue = draftCandidates.length > 0;
+    const hasPreparedDraft = Boolean(patchContent.trim())
+      || Boolean(importedPatchDraft && importedPatchDraftMatchesWorkspace);
+    const hasAppliedPatch = Boolean(patchReport?.applied);
+    const auditBlocked = auditReport?.allowed === false;
+    const auditPassed = auditReport?.allowed === true;
+    const repackReady = Boolean(repackReport);
+    const reinspectPassed = Boolean(reinspectReport?.sha256_match);
+    const installed = Boolean(installedRepack);
+    const enabled = installedRepack?.status === "enabled";
+
+    return [
+      {
+        key: "inspect",
+        title: "只读检查",
+        state: inspectReport ? "done" : "active",
+        detail: inspectReport ? `${inspectReport.entry_count} 个文件 · ${inspectReport.editable_count} 可改` : "先检查 yqpack 内容和 SHA，不安装、不启用。",
+        action: inspectReport ? "可继续准备工作区" : "填写路径/URL 后点击只读检查",
+      },
+      {
+        key: "workspace",
+        title: "准备工作区",
+        state: workspaceReport ? "done" : inspectReport?.sha256_match ? "active" : "pending",
+        detail: workspaceReport ? workspaceReport.workspace_id : "创建可编辑副本，避免直接改已安装包。",
+        action: workspaceReport ? "可生成或导入草稿" : "SHA 匹配后准备工作区",
+      },
+      {
+        key: "draft",
+        title: "Plan / Draft",
+        state: hasPreparedDraft ? "done" : workspaceReport ? "active" : "pending",
+        detail: hasPreparedDraft ? "已有草稿内容，仍需先看 diff。" : hasDraftQueue ? "已有候选队列，尚未载入单文件草稿。" : "让小羽给计划，或从候选里载入单文件草稿。",
+        action: hasPreparedDraft ? "点击预览 diff" : hasDraftQueue ? "载入草稿或交给小羽生成 Draft" : "导入 Plan、导入 Draft，或载入草稿",
+      },
+      {
+        key: "diff",
+        title: "diff 预览 / 应用",
+        state: hasAppliedPatch ? "done" : patchReport ? "active" : hasPreparedDraft ? "active" : "pending",
+        detail: patchReport ? (patchReport.applied ? "改动已写入工作区副本。" : "已有 diff 预览，尚未写入。") : "先预览，再由用户确认应用。",
+        action: hasAppliedPatch ? "运行内置审计" : patchReport ? "确认后应用到工作区" : "预览 diff",
+      },
+      {
+        key: "audit",
+        title: "内置审计",
+        state: auditBlocked ? "blocked" : auditPassed ? "done" : hasAppliedPatch ? "active" : "pending",
+        detail: auditReport ? `${auditReport.change_count} 个改动 · 风险 ${auditReport.risk_level}` : "检查越权文件、不可改内容和高风险权限。",
+        action: auditBlocked ? "按审计提示回退或改小范围" : auditPassed ? "可以重新打包" : "运行内置审计",
+      },
+      {
+        key: "repack",
+        title: "重新打包",
+        state: repackReady ? "done" : auditBlocked ? "blocked" : auditPassed ? "active" : "pending",
+        detail: repackReady ? `${repackReport?.size_bytes.toLocaleString()} bytes` : "生成新的 yqpack，不覆盖原包。",
+        action: repackReady ? "复检新包 SHA" : auditBlocked ? "审计阻断时不能继续打包" : "重新打包",
+      },
+      {
+        key: "install",
+        title: "复检 / 安装",
+        state: installed ? "done" : reinspectPassed ? "active" : repackReady ? "active" : "pending",
+        detail: installed ? "新包已进入本地能力包列表。" : reinspectPassed ? "SHA 已匹配，可显式安装。" : "安装前必须复检新 yqpack。",
+        action: installed ? "确认权限后启用或回滚" : reinspectPassed ? "安装新包" : "复检新包",
+      },
+      {
+        key: "enable",
+        title: "启用 / 回滚",
+        state: enabled ? "done" : installed ? "active" : "pending",
+        detail: enabled ? "新能力已启用，保留禁用和回滚路径。" : "启用仍需用户明确确认。",
+        action: enabled ? "打开入口或查看详情" : installed ? "启用、禁用或回滚" : "安装后再处理启用",
+      },
+    ];
+  }, [
+    auditReport,
+    draftCandidates.length,
+    importedPatchDraft,
+    importedPatchDraftMatchesWorkspace,
+    importedPatchPlan,
+    importedPatchPlanMatchesWorkspace,
+    inspectReport,
+    installedRepack,
+    patchContent,
+    patchReport,
+    reinspectReport,
+    repackReport,
+    workspaceReport,
+  ]);
 
   const copyPrompt = async () => {
     if (!prompt) return;
@@ -1058,6 +1165,31 @@ export default function PackStudioPage() {
                   </div>
                   <div className="mt-3 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
                     工作区是可编辑副本，不会启用能力包；安装新 yqpack 前仍需重新检查、测试和确认回滚路径。
+                  </div>
+                  <div className="mt-4 rounded-md border p-3" style={{ borderColor: "var(--yunque-border)" }}>
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>改包工作流状态</div>
+                        <div className="mt-1 text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
+                          小羽可以帮你生成计划和草稿，但每一步都必须经过 diff、审计、复检和显式安装确认。
+                        </div>
+                      </div>
+                      <Chip size="sm" variant="soft">不自动应用</Chip>
+                    </div>
+                    <div className="grid gap-2 lg:grid-cols-4">
+                      {workflowSteps.map((step) => (
+                        <div key={step.key} className="rounded-md border p-2" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-surface)" }}>
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>{step.title}</div>
+                            <Chip size="sm" color={workflowStateColor(step.state)}>{workflowStateLabel(step.state)}</Chip>
+                          </div>
+                          <div className="mt-2 text-[11px] leading-5" style={{ color: "var(--yunque-text-muted)" }}>{step.detail}</div>
+                          <div className="mt-2 text-[11px]" style={{ color: step.state === "blocked" ? "var(--yunque-danger)" : "var(--yunque-text-secondary)" }}>
+                            下一步：{step.action}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                   <div className="mt-4 rounded-md border p-3" style={{ borderColor: "var(--yunque-border)" }}>
                     <div className="mb-3 text-xs font-medium" style={{ color: "var(--yunque-text)" }}>工作区改动预览</div>
