@@ -41,6 +41,7 @@
     "usability": "infrastructure",
     "primaryActionLabel": "由任务和对话自动使用",
     "primaryActionPath": "/missions",
+    "usageSurface": "任务中心、Chat 任务进度、资源仪表、目标/焦点状态与可恢复现场",
     "descriptionStyle": "one-line-plus-three-examples",
     "example1": "为任务、目标、焦点和资源追踪提供结构化状态。",
     "example2": "用户通常不直接打开它，而是在任务中心看到结果。",

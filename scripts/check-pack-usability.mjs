@@ -137,6 +137,13 @@ function auditPack({ manifestPath, manifest }) {
       blocking: true,
     });
   }
+  if (metadata.usability === "infrastructure" && metadata.internalOnly !== "true" && !metadata.usageSurface) {
+    issues.push({
+      code: "missing-infrastructure-usage-surface",
+      message: "infrastructure pack should describe where users feel its effect",
+      blocking: true,
+    });
+  }
   if (isActionableUserPack({ manifest, metadata, userVisible, hasConcretePage, usesRuntimeHost, isBackendSupportPack })) {
     if (metadata.usability !== "actionable") {
       issues.push({
