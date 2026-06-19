@@ -376,7 +376,7 @@ describe("PackStudioPage", () => {
     render(<PackStudioPage />);
 
     expect((await screen.findAllByText("WASM 能力包")).length).toBeGreaterThan(0);
-    expect(screen.getByText("官方源")).toBeInTheDocument();
+    expect(screen.getAllByText("官方源").length).toBeGreaterThan(0);
     await waitFor(() => {
       expect((screen.getByLabelText("OSS / Release URL") as HTMLInputElement).value).toBe("https://oss.example.com/wasm-plugin.yqpack");
       expect((screen.getByLabelText("SHA256") as HTMLInputElement).value).toBe("9".repeat(64));
@@ -448,10 +448,47 @@ describe("PackStudioPage", () => {
     expect(screen.getByText("已从能力包中心接入这个 yqpack")).toBeInTheDocument();
   });
 
+  it("keeps Studio candidate selection searchable and paginated", async () => {
+    const manyPacks = Array.from({ length: 14 }, (_, index) => ({
+      manifest: {
+        ...documentsManifest,
+        id: `yunque.pack.bulk-${index + 1}`,
+        name: `Bulk Pack ${index + 1}`,
+        description: `批量候选 ${index + 1}`,
+      },
+      status: "disabled",
+    }));
+    packsClientMock.installed.mockResolvedValueOnce({
+      packs: manyPacks,
+      count: manyPacks.length,
+    });
+
+    render(<PackStudioPage />);
+
+    expect(await screen.findByText("匹配 14 个 · 第 1 / 2 页")).toBeInTheDocument();
+    expect(screen.getByText("Studio 候选 · 每页 12 个")).toBeInTheDocument();
+    expect(screen.getAllByText("Bulk Pack 1").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Bulk Pack 9")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "下一页" }));
+
+    expect(screen.getByText("匹配 14 个 · 第 2 / 2 页")).toBeInTheDocument();
+    expect(screen.getByText("Bulk Pack 9")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("搜索 Studio 能力包"), { target: { value: "bulk-14" } });
+
+    expect(screen.getByText("匹配 1 个 · 第 1 / 1 页")).toBeInTheDocument();
+    expect(screen.getByText("Bulk Pack 14")).toBeInTheDocument();
+  });
+
   it("turns real pack metadata into a guarded Xiaoyu modification task", async () => {
     render(<PackStudioPage />);
 
     expect(await screen.findByText("Pack Studio")).toBeInTheDocument();
+    expect(screen.getByText("匹配 2 个 · 第 1 / 1 页")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("搜索 Studio 能力包"), { target: { value: "documents" } });
+    expect(screen.getByText("匹配 1 个 · 第 1 / 1 页")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "清除搜索" }));
     expect(screen.getByText("WASM 能力包")).toBeInTheDocument();
     expect(screen.getAllByText("Documents").length).toBeGreaterThan(0);
 

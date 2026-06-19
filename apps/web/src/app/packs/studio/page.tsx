@@ -43,6 +43,7 @@ import { createPacksClient, type InstalledPack, type PackManifest, type PackStud
 const packsClient = createPacksClient(createYunqueSDKClientOptions());
 const PACK_RELEASE_SOURCES = resolvePackReleaseSources();
 const DEFAULT_STUDIO_GOAL = "让这个能力包更像一个用户能直接理解和使用的功能，而不是只看到存在。";
+const STUDIO_CANDIDATE_PAGE_SIZE = 12;
 
 type PackCandidate = {
   manifest: PackManifest;
@@ -52,6 +53,8 @@ type PackCandidate = {
   packageUrl?: string;
   sha256?: string;
 };
+
+type StudioCandidateSourceFilter = "all" | PackCandidate["source"];
 
 type StudioAnalysis = {
   packId?: string;
@@ -663,6 +666,9 @@ export default function PackStudioPage() {
     return { packs: [...map.values()].sort((a, b) => a.manifest.name.localeCompare(b.manifest.name)) };
   }, { packs: [] as PackCandidate[] });
   const [selectedId, setSelectedId] = useState(() => searchParams.get("packId") || "");
+  const [candidateQuery, setCandidateQuery] = useState("");
+  const [candidateSourceFilter, setCandidateSourceFilter] = useState<StudioCandidateSourceFilter>("all");
+  const [candidatePage, setCandidatePage] = useState(1);
   const [goal, setGoal] = useState(() => searchParams.get("goal") || DEFAULT_STUDIO_GOAL);
   const [packagePath, setPackagePath] = useState(() => searchParams.get("packagePath") || "");
   const [packageUrl, setPackageUrl] = useState(() => searchParams.get("packageUrl") || "");
@@ -690,10 +696,40 @@ export default function PackStudioPage() {
   const [postInstallBusy, setPostInstallBusy] = useState<string | null>(null);
 
   const candidates = data?.packs || [];
+  const filteredCandidates = useMemo(() => {
+    const query = candidateQuery.trim().toLowerCase();
+    return candidates.filter((candidate) => {
+      if (candidateSourceFilter !== "all" && candidate.source !== candidateSourceFilter) return false;
+      if (!query) return true;
+      const manifest = candidate.manifest;
+      const haystack = [
+        manifest.id,
+        manifest.name,
+        manifest.description,
+        manifest.status,
+        sourceLabel(candidate),
+        ...(manifest.backend?.capabilities || []),
+        ...(manifest.backend?.permissions || []),
+        ...(manifest.frontend?.menus || []).map((menu) => `${menu.label} ${menu.path}`),
+        ...(manifest.frontend?.routes || []).map((route) => `${route.title || ""} ${route.path}`),
+      ].filter(Boolean).join(" ").toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [candidateQuery, candidateSourceFilter, candidates]);
+  const candidatePageCount = Math.max(1, Math.ceil(filteredCandidates.length / STUDIO_CANDIDATE_PAGE_SIZE));
+  const safeCandidatePage = Math.min(candidatePage, candidatePageCount);
+  const pagedCandidates = filteredCandidates.slice(
+    (safeCandidatePage - 1) * STUDIO_CANDIDATE_PAGE_SIZE,
+    safeCandidatePage * STUDIO_CANDIDATE_PAGE_SIZE,
+  );
   const selected = useMemo(
     () => candidates.find((item) => item.manifest.id === selectedId) || candidates[0],
     [candidates, selectedId],
   );
+
+  useEffect(() => {
+    setCandidatePage(1);
+  }, [candidateQuery, candidateSourceFilter, candidates.length]);
 
   useEffect(() => {
     if (!selected || selected.source !== "release") return;
@@ -1227,41 +1263,94 @@ export default function PackStudioPage() {
 
       <div className="flex-1 overflow-y-auto p-5 space-y-4">
         <Card className="section-card p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <FileSearch size={16} style={{ color: "var(--yunque-accent)" }} />
-            <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>选择要分析的能力包</div>
+          <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <FileSearch size={16} style={{ color: "var(--yunque-accent)" }} />
+              <div>
+                <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>选择要分析的能力包</div>
+                <div className="mt-1 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+                  匹配 {filteredCandidates.length} 个 · 第 {safeCandidatePage} / {candidatePageCount} 页
+                </div>
+              </div>
+            </div>
+            <TextField value={candidateQuery} onChange={setCandidateQuery} className="min-w-[220px]">
+              <Label>搜索 Studio 能力包</Label>
+              <Input placeholder="名称、用途、权限、入口" />
+            </TextField>
+          </div>
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            {([
+              ["all", "全部来源"],
+              ["installed", "已安装"],
+              ["release", "官方源"],
+              ["catalog", "私有源"],
+            ] as const).map(([value, label]) => (
+              <Button
+                key={value}
+                size="sm"
+                variant={candidateSourceFilter === value ? "primary" : "outline"}
+                className={candidateSourceFilter === value ? "btn-accent" : ""}
+                onPress={() => setCandidateSourceFilter(value)}
+              >
+                {label}
+              </Button>
+            ))}
+            {candidateQuery.trim() && (
+              <Button size="sm" variant="ghost" onPress={() => setCandidateQuery("")}>
+                清除搜索
+              </Button>
+            )}
           </div>
           {candidates.length === 0 ? (
             <div className="text-sm" style={{ color: "var(--yunque-text-muted)" }}>还没有可分析的能力包。</div>
-          ) : (
-            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-              {candidates.map((candidate) => {
-                const usability = packUsability(candidate.manifest);
-                const active = candidate.manifest.id === (manifest?.id || "");
-                return (
-                  <button
-                    key={candidate.manifest.id}
-                    type="button"
-                    onClick={() => selectCandidate(candidate)}
-                    className="rounded-md border p-3 text-left transition-colors"
-                    style={{
-                      borderColor: active ? "var(--yunque-accent)" : "var(--yunque-border)",
-                      background: active ? "rgba(59,130,246,0.08)" : "var(--yunque-surface)",
-                    }}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="truncate text-sm font-medium" style={{ color: "var(--yunque-text)" }}>{candidate.manifest.name}</div>
-                      <Chip size="sm" variant="soft">{sourceLabel(candidate)}</Chip>
-                    </div>
-                    <div className="mt-1 truncate text-xs" style={{ color: "var(--yunque-text-muted)" }}>{candidate.manifest.id}</div>
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      <Chip size="sm" style={{ background: "rgba(59,130,246,0.08)", color: "var(--yunque-primary)" }}>{usability.label}</Chip>
-                      <Chip size="sm" variant="soft">v{candidate.manifest.version}</Chip>
-                    </div>
-                  </button>
-                );
-              })}
+          ) : filteredCandidates.length === 0 ? (
+            <div className="rounded-md border p-4 text-sm" style={{ borderColor: "var(--yunque-border)", color: "var(--yunque-text-muted)" }}>
+              没有匹配的能力包。可以清除搜索，或切换来源筛选。
             </div>
+          ) : (
+            <>
+              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                {pagedCandidates.map((candidate) => {
+                  const usability = packUsability(candidate.manifest);
+                  const active = candidate.manifest.id === (manifest?.id || "");
+                  return (
+                    <button
+                      key={candidate.manifest.id}
+                      type="button"
+                      onClick={() => selectCandidate(candidate)}
+                      className="rounded-md border p-3 text-left transition-colors"
+                      style={{
+                        borderColor: active ? "var(--yunque-accent)" : "var(--yunque-border)",
+                        background: active ? "rgba(59,130,246,0.08)" : "var(--yunque-surface)",
+                      }}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="truncate text-sm font-medium" style={{ color: "var(--yunque-text)" }}>{candidate.manifest.name}</div>
+                        <Chip size="sm" variant="soft">{sourceLabel(candidate)}</Chip>
+                      </div>
+                      <div className="mt-1 truncate text-xs" style={{ color: "var(--yunque-text-muted)" }}>{candidate.manifest.id}</div>
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        <Chip size="sm" style={{ background: "rgba(59,130,246,0.08)", color: "var(--yunque-primary)" }}>{usability.label}</Chip>
+                        <Chip size="sm" variant="soft">v{candidate.manifest.version}</Chip>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+              {candidatePageCount > 1 && (
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+                  <span>Studio 候选 · 每页 {STUDIO_CANDIDATE_PAGE_SIZE} 个</span>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" onPress={() => setCandidatePage((page) => Math.max(1, page - 1))} isDisabled={safeCandidatePage <= 1}>
+                      上一页
+                    </Button>
+                    <Button size="sm" variant="outline" onPress={() => setCandidatePage((page) => Math.min(candidatePageCount, page + 1))} isDisabled={safeCandidatePage >= candidatePageCount}>
+                      下一页
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </Card>
 
