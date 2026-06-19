@@ -16,6 +16,28 @@ import {
 
 const microClient = createMicroAgentPackClient();
 
+const userFacingSteps = [
+  {
+    title: "1. 查看已注册微代理",
+    body: "确认哪些领域提示会常驻或按触发词注入到任务里。",
+  },
+  {
+    title: "2. 试一条触发消息",
+    body: "输入消息，预览会激活哪些微代理，再决定是否用它开始任务。",
+  },
+  {
+    title: "3. 回放任务推理",
+    body: "输入 task_id 查看 ReAct 轨迹，并把轨迹交给 Chat 总结。",
+  },
+];
+
+const boundaryItems = [
+  "不会自动执行微代理内容。",
+  "不会绕过 Chat 或任务确认直接开工。",
+  "不会把禁用的微代理注入上下文。",
+  "不会修改 data/microagents 下的源文件。",
+];
+
 function formatTimestamp(iso: string): string {
   if (!iso) return "—";
   try {
@@ -355,6 +377,38 @@ export default function MicroAgentPackPage() {
   return (
     <div className="page-root space-y-6 animate-fade-in-up">
       <PageHeader icon={<Bot size={20} />} title="微代理" />
+
+      <Card className="section-card overflow-hidden p-0">
+        <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="p-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <Chip size="sm" style={{ background: "rgba(34,197,94,0.10)", color: "var(--yunque-success)" }}>可直接使用</Chip>
+              <Chip size="sm" variant="soft">可试触发</Chip>
+              <Chip size="sm" variant="soft">可回放轨迹</Chip>
+            </div>
+            <div className="mt-3 text-base font-semibold" style={{ color: "var(--yunque-text)" }}>
+              这个能力包现在适合做什么
+            </div>
+            <div className="mt-2 max-w-3xl text-sm leading-6" style={{ color: "var(--yunque-text-secondary)" }}>
+              它用于查看哪些轻量专家提示会参与任务，并在真正发起前预览触发结果。当前可以查看微代理内容、模拟消息触发、用匹配到的微代理开始任务，也可以按 task_id 回放推理轨迹。
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              {userFacingSteps.map((item) => (
+                <div key={item.title} className="rounded-lg p-3" style={{ background: "var(--yunque-bg-hover)", border: "1px solid var(--yunque-border)" }}>
+                  <div className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>{item.title}</div>
+                  <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>{item.body}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="p-5" style={{ background: "rgba(245,158,11,0.08)", borderLeft: "1px solid var(--yunque-border)" }}>
+            <div className="mb-3 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>当前不会做什么</div>
+            <div className="space-y-2 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
+              {boundaryItems.map((item) => <div key={item}>{item}</div>)}
+            </div>
+          </div>
+        </div>
+      </Card>
 
       <Card className="section-card p-4 text-sm" style={{ color: "var(--yunque-text-muted)" }}>
         微代理是按需注入的领域提示。Agent 收到消息时会按触发词激活相应的微代理；ReAct 引擎记录每一步的推理轨迹，支持事后回放。

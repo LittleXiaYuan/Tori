@@ -58,6 +58,28 @@ function droppedTotal(preview: TrainingDataPreview | null): number {
 
 const loraPack = createLoRAPackClient();
 
+const userFacingSteps = [
+  {
+    title: "1. 先做训练预检",
+    body: "确认样本量、过滤结果和调度条件是否满足训练门槛。",
+  },
+  {
+    title: "2. 观察 A/B 与成功率",
+    body: "查看新旧适配器表现、滚动成功率和训练历史。",
+  },
+  {
+    title: "3. 必要时人工回滚",
+    body: "当新适配器表现不稳时，手动回到上一版本。",
+  },
+];
+
+const boundaryItems = [
+  "不会绕过样本量和间隔限制强行训练。",
+  "不会自动把低质量样本加入训练。",
+  "不会在没有确认时自动回滚。",
+  "不会保证每次训练都提升模型表现。",
+];
+
 export default function LoRAPackPage() {
   const [status, setStatus] = useState<LoRAStatus | null>(null);
   const [records, setRecords] = useState<TrainingRecord[]>([]);
@@ -256,6 +278,38 @@ export default function LoRAPackPage() {
           </div>
         }
       />
+
+      <Card className="section-card overflow-hidden p-0">
+        <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="p-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <Chip size="sm" style={{ background: "rgba(34,197,94,0.10)", color: "var(--yunque-success)" }}>可直接使用</Chip>
+              <Chip size="sm" variant="soft">训练受门槛限制</Chip>
+              <Chip size="sm" variant="soft">可人工回滚</Chip>
+            </div>
+            <div className="mt-3 text-base font-semibold" style={{ color: "var(--yunque-text)" }}>
+              这个能力包现在适合做什么
+            </div>
+            <div className="mt-2 max-w-3xl text-sm leading-6" style={{ color: "var(--yunque-text-secondary)" }}>
+              它用于把云雀积累的任务样本转成 LoRA/LAA 训练闭环，并通过 A/B、成功率和回滚保护新适配器上线。当前可以预检训练数据、手动触发训练、观察训练历史与进化状态，并在表现不稳时手动回滚。
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              {userFacingSteps.map((item) => (
+                <div key={item.title} className="rounded-lg p-3" style={{ background: "var(--yunque-bg-hover)", border: "1px solid var(--yunque-border)" }}>
+                  <div className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>{item.title}</div>
+                  <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>{item.body}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="p-5" style={{ background: "rgba(245,158,11,0.08)", borderLeft: "1px solid var(--yunque-border)" }}>
+            <div className="mb-3 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>当前不会做什么</div>
+            <div className="space-y-2 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
+              {boundaryItems.map((item) => <div key={item}>{item}</div>)}
+            </div>
+          </div>
+        </div>
+      </Card>
 
       {disabledReason && (
         <Card className="section-card p-4" style={{ borderColor: "rgba(255,170,0,0.35)" }}>

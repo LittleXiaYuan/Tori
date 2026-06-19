@@ -16,6 +16,28 @@ import {
 
 const nightSchool = createNightSchoolPackClient();
 
+const userFacingSteps = [
+  {
+    title: "1. 看夜间复盘",
+    body: "查看云雀从已完成任务中整理出的梦境、规则和模式。",
+  },
+  {
+    title: "2. 应用蒸馏经验",
+    body: "把某条经验带回 Chat，让云雀按它改进下一次任务。",
+  },
+  {
+    title: "3. 检查学到的画像",
+    body: "确认偏好特征是否合理，避免长期学习方向跑偏。",
+  },
+];
+
+const boundaryItems = [
+  "不会在夜间自动执行新任务。",
+  "不会直接改你的真实文件或配置。",
+  "不会把低置信度画像当成硬规则。",
+  "不会替代你对经验是否有用的判断。",
+];
+
 function applyDistillPrompt(entry: DistillEntry): string {
   return [
     "请把这条夜校蒸馏出的经验应用到我接下来的任务里，并告诉我应该怎么改进工作方式：",
@@ -285,6 +307,38 @@ export default function NightSchoolPackPage() {
   return (
     <div className="page-root space-y-6 animate-fade-in-up">
       <PageHeader icon={<GraduationCap size={20} />} title="夜校" />
+
+      <Card className="section-card overflow-hidden p-0">
+        <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="p-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <Chip size="sm" style={{ background: "rgba(34,197,94,0.10)", color: "var(--yunque-success)" }}>可直接使用</Chip>
+              <Chip size="sm" variant="soft">复盘任务</Chip>
+              <Chip size="sm" variant="soft">可带回 Chat</Chip>
+            </div>
+            <div className="mt-3 text-base font-semibold" style={{ color: "var(--yunque-text)" }}>
+              这个能力包现在适合做什么
+            </div>
+            <div className="mt-2 max-w-3xl text-sm leading-6" style={{ color: "var(--yunque-text-secondary)" }}>
+              它用于把已完成任务里的经验、失败模式和用户偏好整理出来，让云雀下次做得更稳。当前可以查看夜间复盘、蒸馏规则、工具洞察和画像特征，并把任一条经验带回 Chat 应用到新任务。
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              {userFacingSteps.map((item) => (
+                <div key={item.title} className="rounded-lg p-3" style={{ background: "var(--yunque-bg-hover)", border: "1px solid var(--yunque-border)" }}>
+                  <div className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>{item.title}</div>
+                  <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>{item.body}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="p-5" style={{ background: "rgba(245,158,11,0.08)", borderLeft: "1px solid var(--yunque-border)" }}>
+            <div className="mb-3 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>当前不会做什么</div>
+            <div className="space-y-2 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
+              {boundaryItems.map((item) => <div key={item}>{item}</div>)}
+            </div>
+          </div>
+        </div>
+      </Card>
 
       <Card className="section-card p-4 text-sm" style={{ color: "var(--yunque-text-muted)" }}>
         Agent 会在夜间复盘：从已完成任务中蒸馏可复用的规则与模式，并通过对话学习关于你的偏好画像。

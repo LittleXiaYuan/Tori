@@ -16,6 +16,28 @@ import {
 
 const experience = createExperiencePackClient();
 
+const userFacingSteps = [
+  {
+    title: "1. 看推荐能力",
+    body: "根据近期反馈，挑出当前最值得继续使用的技能或能力。",
+  },
+  {
+    title: "2. 检查偏好画像",
+    body: "查看云雀学到的偏好、标签和需要避免的类别。",
+  },
+  {
+    title: "3. 复盘任务自评",
+    body: "把任务评分和建议交回 Chat，沉淀成下一次可复用经验。",
+  },
+];
+
+const boundaryItems = [
+  "不会替你自动修改偏好画像。",
+  "不会自动启用或禁用技能。",
+  "不会把低置信度推荐当成必须执行的决定。",
+  "不会隐藏任务自评中的失败原因。",
+];
+
 function useRecommendationPrompt(item: Recommendation): string {
   return [
     "请基于云雀当前推荐的能力，帮我设计下一步任务方案：",
@@ -297,6 +319,38 @@ export default function ExperiencePackPage() {
   return (
     <div className="page-root space-y-6 animate-fade-in-up">
       <PageHeader icon={<History size={20} />} title="经验" />
+
+      <Card className="section-card overflow-hidden p-0">
+        <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="p-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <Chip size="sm" style={{ background: "rgba(34,197,94,0.10)", color: "var(--yunque-success)" }}>可直接使用</Chip>
+              <Chip size="sm" variant="soft">推荐下一步</Chip>
+              <Chip size="sm" variant="soft">可回到 Chat</Chip>
+            </div>
+            <div className="mt-3 text-base font-semibold" style={{ color: "var(--yunque-text)" }}>
+              这个能力包现在适合做什么
+            </div>
+            <div className="mt-2 max-w-3xl text-sm leading-6" style={{ color: "var(--yunque-text-secondary)" }}>
+              它用于把云雀完成任务后的反馈、偏好和自评分数变成可查看的经验面板。当前可以查看推荐能力、偏好画像和任务自评，并把任一条推荐或自评带回 Chat 继续规划下一步。
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              {userFacingSteps.map((item) => (
+                <div key={item.title} className="rounded-lg p-3" style={{ background: "var(--yunque-bg-hover)", border: "1px solid var(--yunque-border)" }}>
+                  <div className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>{item.title}</div>
+                  <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>{item.body}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="p-5" style={{ background: "rgba(245,158,11,0.08)", borderLeft: "1px solid var(--yunque-border)" }}>
+            <div className="mb-3 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>当前不会做什么</div>
+            <div className="space-y-2 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
+              {boundaryItems.map((item) => <div key={item}>{item}</div>)}
+            </div>
+          </div>
+        </div>
+      </Card>
 
       <Card className="section-card p-4 text-sm" style={{ color: "var(--yunque-text-muted)" }}>
         Agent 会根据你的反馈累积经验：动态推荐最值得使用的技能、维护对你的偏好画像，并对每次任务做自我评分。
