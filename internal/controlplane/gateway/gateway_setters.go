@@ -413,8 +413,14 @@ func (g *Gateway) SetLLMCall(fn workflow.LLMCallFunc) {
 // SetSpeechRegistry attaches the TTS/STT speech registry.
 func (g *Gateway) SetSpeechRegistry(sr *speech.Registry) { g.speechReg = sr }
 
+// SpeechRegistry exposes the TTS/STT registry to the speech pack.
+func (g *Gateway) SpeechRegistry() *speech.Registry { return g.speechReg }
+
 // SetEmotionAnalyzer attaches the emotion analyzer for text/audio emotion detection.
 func (g *Gateway) SetEmotionAnalyzer(ea *emotion.Analyzer) { g.emotionAnalyzer = ea }
+
+// EmotionAnalyzer exposes the emotion analyzer to packs that can annotate outputs.
+func (g *Gateway) EmotionAnalyzer() *emotion.Analyzer { return g.emotionAnalyzer }
 
 // SetEmotionHistory attaches the emotion history store.
 func (g *Gateway) SetEmotionHistory(h *emotion.History) { g.emotionHistory = h }

@@ -123,11 +123,8 @@ func (g *Gateway) registerSystemRoutes() {
 	// File upload
 	g.mux.HandleFunc("/v1/upload", g.requireAuth(g.handleFileUpload))
 
-	// Speech (TTS / STT)
-	g.mux.HandleFunc("/v1/speech/tts", g.requireAuth(g.handleTTS))
-	g.mux.HandleFunc("/v1/speech/stt", g.requireAuth(g.handleSTT))
-	g.mux.HandleFunc("/v1/speech/stt/stream", g.requireAuth(g.handleSTTStream))
-	g.mux.HandleFunc("/v1/speech/voices", g.requireAuth(g.handleVoices))
+	// Speech (/v1/speech*) is owned by the speech pack
+	// (internal/packs/speech), mounted via gw.RegisterModule.
 
 	// Heartbeat (/v1/heartbeat*) is owned by the heartbeat pack
 	// (internal/packs/heartbeat), mounted via gw.RegisterModule.

@@ -194,6 +194,23 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 		t.Fatal("expected Federation receive routeSpec")
 	}
 
+	speechPack, ok := registry.Get("yunque.pack.speech")
+	if !ok {
+		t.Fatal("expected Speech builtin pack to be installed")
+	}
+	if speechPack.Status != packruntime.PackStatusEnabled {
+		t.Fatalf("expected Speech default enabled, got %s", speechPack.Status)
+	}
+	if speechPack.Manifest.SDK.TypeScript != "yunque-client/speech" {
+		t.Fatalf("unexpected Speech SDK import: %s", speechPack.Manifest.SDK.TypeScript)
+	}
+	if !hasRouteSpec(speechPack.Manifest.Backend.RouteSpecs, "POST", "/v1/speech/tts") {
+		t.Fatal("expected Speech TTS routeSpec")
+	}
+	if !hasRouteSpec(speechPack.Manifest.Backend.RouteSpecs, "GET", "/v1/speech/stt/stream") {
+		t.Fatal("expected Speech STT stream routeSpec")
+	}
+
 	forks, ok := registry.Get("yunque.pack.forks")
 	if !ok {
 		t.Fatal("expected Conversation Forks builtin pack to be installed")
@@ -444,7 +461,7 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 	// Count reflects the current packs/official/ set (incl. the newer
 	// console/control-plane/knowledge/memory/skills/work/workspace packs and the
 	// cognitive-layer/state packs). Adjust if the builtin pack set changes.
-	if got := len(registry.List()); got != 40 {
+	if got := len(registry.List()); got != 41 {
 		t.Fatalf("expected idempotent builtin install, got %d packs", got)
 	}
 }

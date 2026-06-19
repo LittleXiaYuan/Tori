@@ -40,6 +40,7 @@ import (
 	schedulerpack "yunque-agent/internal/packs/scheduler"
 	skillhubpack "yunque-agent/internal/packs/skillhub"
 	skillspack "yunque-agent/internal/packs/skills"
+	speechpack "yunque-agent/internal/packs/speech"
 	statepack "yunque-agent/internal/packs/state"
 	triggerspack "yunque-agent/internal/packs/triggers"
 	workpack "yunque-agent/internal/packs/work"
@@ -88,6 +89,7 @@ var migrationPackPaths = map[string][]string{
 	reflectionpack.PackID:    reflectionpack.Paths(),
 	schedulerpack.PackID:     schedulerpack.Paths(),
 	skillhubpack.PackID:      skillhubpack.Paths(),
+	speechpack.PackID:        speechpack.Paths(),
 	// Monolith route groups extracted into native packs (Tier 0 microkernel).
 	modespack.PackID: {"/v1/persona/modes", "/v1/persona/mode", "/v1/persona/mode/current"},
 	reveriepack.PackID: {
@@ -126,6 +128,7 @@ var migrationPackNames = map[string]string{
 	reflectionpack.PackID:    "Reflection",
 	schedulerpack.PackID:     "Scheduler",
 	skillhubpack.PackID:      "SkillHub",
+	speechpack.PackID:        "Speech",
 	modespack.PackID:         "Persona Modes",
 	reveriepack.PackID:       "Reverie",
 	idepack.PackID:           "IDE",
@@ -185,6 +188,7 @@ func registerMigrationPacks(gw *Gateway) {
 	_ = gw.RegisterModule(reflectionpack.New(gw))
 	_ = gw.RegisterModule(schedulerpack.NewProvider(gw.Scheduler))
 	_ = gw.RegisterModule(skillhubpack.New(gw))
+	_ = gw.RegisterModule(speechpack.New(gw))
 	// Native monolith-extracted packs (mirror cmd/agent/init_task_engine.go).
 	_ = gw.RegisterModule(modespack.New(gw))
 	_ = gw.RegisterModule(reveriepack.New(gw))
@@ -268,6 +272,8 @@ func newTestGatewayWithMigrationPack(t *testing.T, packID string, status packrun
 		_ = gw.RegisterModule(schedulerpack.New(nil))
 	case skillhubpack.PackID:
 		_ = gw.RegisterModule(skillhubpack.New(nil))
+	case speechpack.PackID:
+		_ = gw.RegisterModule(speechpack.New(nil))
 	case statepack.PackID:
 		_ = gw.RegisterModule(statepack.New(gw))
 	}
@@ -302,6 +308,7 @@ func TestMigrationPackRouteGating(t *testing.T) {
 		{"reflection", reflectionpack.PackID, "/v1/reflect/experiences"},
 		{"scheduler", schedulerpack.PackID, "/v1/scheduler/jobs"},
 		{"skillhub", skillhubpack.PackID, "/api/skillhub/search"},
+		{"speech", speechpack.PackID, "/v1/speech/voices"},
 		{"state", statepack.PackID, "/v1/state"},
 	}
 	for _, tc := range cases {

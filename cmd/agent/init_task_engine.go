@@ -70,6 +70,7 @@ import (
 	schedulerpack "yunque-agent/internal/packs/scheduler"
 	skillhubpack "yunque-agent/internal/packs/skillhub"
 	skillspack "yunque-agent/internal/packs/skills"
+	speechpack "yunque-agent/internal/packs/speech"
 	statepack "yunque-agent/internal/packs/state"
 	triggerspack "yunque-agent/internal/packs/triggers"
 	workpack "yunque-agent/internal/packs/work"
@@ -221,6 +222,9 @@ func initTaskEngine(
 	// keeps passthrough auth because federation messages authenticate at the
 	// protocol layer while Pack Runtime still owns enablement.
 	_ = gw.RegisterModule(federationpack.New(gw))
+	// Speech pack — owns /v1/speech* natively via the shared speech registry,
+	// while reusing the gateway's WebSocket origin policy for STT streaming.
+	_ = gw.RegisterModule(speechpack.New(gw))
 	// MCP Dispatch pack — owns /mcp/v1 plus worker-management routes natively.
 	// It keeps method-sensitive auth inside the pack: probe reads are open,
 	// JSON-RPC writes are authenticated through the host RequireAuth wrapper.

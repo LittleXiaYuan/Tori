@@ -619,6 +619,10 @@ func (g *Gateway) checkWSOrigin(r *http.Request) bool {
 	return false
 }
 
+// CheckWSOrigin exposes the kernel WebSocket origin policy to backend packs
+// that serve WebSocket routes while keeping the policy implementation private.
+func (g *Gateway) CheckWSOrigin(r *http.Request) bool { return g.checkWSOrigin(r) }
+
 // corsOrigin returns the value to echo in Access-Control-Allow-Origin for the
 // supplied request. An empty allowed-origins list used to default to "*",
 // which is a footgun as soon as the operator adds Cookie-based auth. We now
