@@ -20,6 +20,7 @@ import (
 	"yunque-agent/internal/agentcore/websearch"
 	"yunque-agent/internal/controlplane/gateway"
 	"yunque-agent/internal/execution/channel"
+	pluginapipack "yunque-agent/internal/packs/pluginapi"
 	"yunque-agent/pkg/plugin"
 )
 
@@ -220,24 +221,26 @@ func initPluginExtensions(
 
 	slog.Info("extension registry initialized")
 
-	// Plugin API handler (SDK bridge)
-	tokenMgr := gateway.NewPluginTokenManager()
+	// Plugin API handler (SDK bridge). Pack Runtime owns enablement/method
+	// gates; plugin tokens and permissions remain protocol-specific inside the
+	// pack.
+	tokenMgr := pluginapipack.NewPluginTokenManager()
 	memMgr := plugin.NewPluginMemoryManager(app.Config.DataPath("plugin_memory"))
 
-	apiHandler := gateway.NewPluginAPIHandler(gateway.PluginAPIConfig{
+	apiHandler := pluginapipack.New(pluginapipack.Config{
 		LLMClient:    app.LLMClient,
 		LLMBreaker:   app.LLMBreaker.Call,
 		MemManager:   app.MemManager,
 		Orchestrator: app.Orchestrator,
 		MemoryMgr:    memMgr,
-		SearchFunc: func(ctx context.Context, query string, limit int) ([]gateway.SearchResult, error) {
+		SearchFunc: func(ctx context.Context, query string, limit int) ([]pluginapipack.SearchResult, error) {
 			results, err := searchReg.Search(ctx, query, limit)
 			if err != nil {
 				return nil, err
 			}
-			out := make([]gateway.SearchResult, len(results))
+			out := make([]pluginapipack.SearchResult, len(results))
 			for i, r := range results {
-				out[i] = gateway.SearchResult{Title: r.Title, URL: r.URL, Snippet: r.Snippet}
+				out[i] = pluginapipack.SearchResult{Title: r.Title, URL: r.URL, Snippet: r.Snippet}
 			}
 			return out, nil
 		},
@@ -251,7 +254,7 @@ func initPluginExtensions(
 		ExtRegistry: extRegistry,
 	}, tokenMgr)
 
-	gw.MountPluginAPIRoutes(apiHandler)
+	_ = gw.RegisterModule(apiHandler)
 	app.Set("plugin_token_mgr", tokenMgr)
 	app.Set("plugin_mem_mgr", memMgr)
 

@@ -465,8 +465,6 @@ func (g *Gateway) SetRateLimit(maxRequests int, window time.Duration) {
 	g.limiter = NewRateLimiter(maxRequests, window)
 }
 
-// MountPluginAPIRoutes registers all /v1/plugin-api/* routes from a PluginAPIHandler.
-// These routes are used by the Go/Python SDKs for plugin ↔ agent communication.
 // SetPasswordStore attaches the admin password store.
 func (g *Gateway) SetPasswordStore(ps *PasswordStore) {
 	g.passwordStore = ps
@@ -477,11 +475,6 @@ func (g *Gateway) SetPasswordStore(ps *PasswordStore) {
 	g.mux.HandleFunc("/v1/auth/set-password", g.handleAuthSetPassword)
 	g.mux.HandleFunc("/v1/auth/oauth/tori", g.handleOAuthToriStart)
 	g.mux.HandleFunc("/v1/auth/oauth/tori/callback", g.handleOAuthToriCallback)
-}
-
-func (g *Gateway) MountPluginAPIRoutes(handler *PluginAPIHandler) {
-	handler.RegisterRoutes(g.mux)
-	slog.Info("plugin API routes mounted", "prefix", "/v1/plugin-api/")
 }
 
 // MountPluginRoutes discovers all UIPlugin HTTP handlers from the plugin registry

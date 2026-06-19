@@ -45,6 +45,7 @@ import (
 	orchestratorpack "yunque-agent/internal/packs/orchestrator"
 	personapack "yunque-agent/internal/packs/persona"
 	plannerrecoverypack "yunque-agent/internal/packs/plannerrecovery"
+	pluginapipack "yunque-agent/internal/packs/pluginapi"
 	rbacpack "yunque-agent/internal/packs/rbac"
 	reflectionpack "yunque-agent/internal/packs/reflection"
 	retrievalpack "yunque-agent/internal/packs/retrieval"
@@ -108,6 +109,7 @@ var migrationPackPaths = map[string][]string{
 	orchestratorpack.PackID:    orchestratorpack.Paths(),
 	personapack.PackID:         personapack.Paths(),
 	plannerrecoverypack.PackID: plannerrecoverypack.Paths(),
+	pluginapipack.PackID:       pluginapipack.Paths(),
 	rbacpack.PackID:            rbacpack.Paths(),
 	reflectionpack.PackID:      reflectionpack.Paths(),
 	retrievalpack.PackID:       retrievalpack.Paths(),
@@ -162,6 +164,7 @@ var migrationPackNames = map[string]string{
 	orchestratorpack.PackID:    "IDE Work Orchestrator",
 	personapack.PackID:         "Persona",
 	plannerrecoverypack.PackID: "Planner Recovery",
+	pluginapipack.PackID:       "Plugin API Bridge",
 	rbacpack.PackID:            "RBAC",
 	reflectionpack.PackID:      "Reflection",
 	retrievalpack.PackID:       "Retrieval",
@@ -238,6 +241,7 @@ func registerMigrationPacks(gw *Gateway) {
 	_ = gw.RegisterModule(orchestratorpack.New(gw))
 	_ = gw.RegisterModule(personapack.New(gw))
 	_ = gw.RegisterModule(plannerrecoverypack.New(gw))
+	_ = gw.RegisterModule(pluginapipack.New(pluginapipack.Config{}, pluginapipack.NewPluginTokenManager()))
 	_ = gw.RegisterModule(rbacpack.New(gw))
 	_ = gw.RegisterModule(reflectionpack.New(gw))
 	_ = gw.RegisterModule(retrievalpack.New(gw))
@@ -341,6 +345,8 @@ func newTestGatewayWithMigrationPack(t *testing.T, packID string, status packrun
 		_ = gw.RegisterModule(personapack.New(gw))
 	case plannerrecoverypack.PackID:
 		_ = gw.RegisterModule(plannerrecoverypack.New(gw))
+	case pluginapipack.PackID:
+		_ = gw.RegisterModule(pluginapipack.New(pluginapipack.Config{}, pluginapipack.NewPluginTokenManager()))
 	case rbacpack.PackID:
 		_ = gw.RegisterModule(rbacpack.New(gw))
 	case reflectionpack.PackID:
@@ -421,6 +427,7 @@ func TestMigrationPackRouteGating(t *testing.T) {
 		{"orchestrator", orchestratorpack.PackID, http.MethodGet, "/v1/orchestrator/status"},
 		{"persona", personapack.PackID, http.MethodGet, "/v1/persona"},
 		{"planner-recovery", plannerrecoverypack.PackID, http.MethodGet, "/v1/planner/checkpoints"},
+		{"plugin-api", pluginapipack.PackID, http.MethodPost, "/v1/plugin-api/llm"},
 		{"rbac", rbacpack.PackID, http.MethodGet, "/v1/rbac/my-roles"},
 		{"reflection", reflectionpack.PackID, http.MethodGet, "/v1/reflect/experiences"},
 		{"retrieval", retrievalpack.PackID, http.MethodGet, "/v1/search/providers"},

@@ -48,6 +48,7 @@ func TestDiscoverBuiltinPackManifestPaths(t *testing.T) {
 		"packs/official/persona-pack/pack.json",
 		"packs/official/persona-modes-pack/pack.json",
 		"packs/official/planner-recovery-pack/pack.json",
+		"packs/official/plugin-api-pack/pack.json",
 		"packs/official/rbac-pack/pack.json",
 		"packs/official/reflection-pack/pack.json",
 		"packs/official/retrieval-pack/pack.json",

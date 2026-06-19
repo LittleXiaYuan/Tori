@@ -463,6 +463,26 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 		t.Fatal("expected Cognitive Layer toggle routeSpec")
 	}
 
+	pluginAPI, ok := registry.Get("yunque.pack.plugin-api")
+	if !ok {
+		t.Fatal("expected Plugin API Bridge builtin pack to be installed")
+	}
+	if pluginAPI.Status != packruntime.PackStatusEnabled {
+		t.Fatalf("expected Plugin API Bridge default enabled, got %s", pluginAPI.Status)
+	}
+	if pluginAPI.Manifest.SDK.TypeScript != "yunque-client/plugin-api" {
+		t.Fatalf("unexpected Plugin API Bridge SDK import: %s", pluginAPI.Manifest.SDK.TypeScript)
+	}
+	if !hasRouteSpec(pluginAPI.Manifest.Backend.RouteSpecs, "POST", "/v1/plugin-api/llm") {
+		t.Fatal("expected Plugin API Bridge llm routeSpec")
+	}
+	if !hasRouteSpec(pluginAPI.Manifest.Backend.RouteSpecs, "GET", "/v1/plugin-api/extensions") {
+		t.Fatal("expected Plugin API Bridge extensions routeSpec")
+	}
+	if !hasRouteSpec(pluginAPI.Manifest.Backend.RouteSpecs, "GET", "/v1/plugin-api/cron/list") {
+		t.Fatal("expected Plugin API Bridge cron list routeSpec")
+	}
+
 	cronPack, ok := registry.Get("yunque.pack.cron")
 	if !ok {
 		t.Fatal("expected Cron builtin pack to be installed")
@@ -745,7 +765,7 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 	ensureBuiltinPacks(registry)
 	// Count reflects the current auto-seeded packs/official/ set. Adjust if the
 	// builtin pack set changes (dlc-demo stays excluded by design).
-	if got := len(registry.List()); got != 63 {
+	if got := len(registry.List()); got != 64 {
 		t.Fatalf("expected idempotent builtin install, got %d packs", got)
 	}
 }

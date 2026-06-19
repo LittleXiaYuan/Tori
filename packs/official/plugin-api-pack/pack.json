@@ -1,0 +1,194 @@
+{
+  "id": "yunque.pack.plugin-api",
+  "name": "Plugin API Bridge Pack",
+  "version": "0.1.0",
+  "description": "第三方插件与云雀主能力之间的 SDK 桥：模型调用、插件私有记忆、知识检索、定时任务与扩展注册。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": [
+      "plugin_api.llm",
+      "plugin_api.search",
+      "plugin_api.channel_send",
+      "plugin_api.memory",
+      "plugin_api.agent_memory",
+      "plugin_api.knowledge",
+      "plugin_api.cron",
+      "plugin_api.extensions"
+    ],
+    "routes": [
+      "/v1/plugin-api/llm",
+      "/v1/plugin-api/search",
+      "/v1/plugin-api/send",
+      "/v1/plugin-api/memory/get",
+      "/v1/plugin-api/memory/set",
+      "/v1/plugin-api/memory/delete",
+      "/v1/plugin-api/memory/list",
+      "/v1/plugin-api/memory/search",
+      "/v1/plugin-api/agent-memory/search",
+      "/v1/plugin-api/agent-memory/add",
+      "/v1/plugin-api/knowledge/search",
+      "/v1/plugin-api/knowledge/ingest",
+      "/v1/plugin-api/cron/add",
+      "/v1/plugin-api/cron/remove",
+      "/v1/plugin-api/cron/list",
+      "/v1/plugin-api/register/provider",
+      "/v1/plugin-api/register/channel",
+      "/v1/plugin-api/register/search",
+      "/v1/plugin-api/register/guardrail",
+      "/v1/plugin-api/register/embedding",
+      "/v1/plugin-api/register/speech",
+      "/v1/plugin-api/extensions"
+    ],
+    "permissions": [
+      "plugin-api:llm",
+      "plugin-api:search",
+      "plugin-api:channel-send",
+      "plugin-api:memory",
+      "plugin-api:knowledge",
+      "plugin-api:cron",
+      "plugin-api:extensions",
+      "llm:call",
+      "memory:read",
+      "memory:write",
+      "knowledge:read",
+      "knowledge:write",
+      "cron:read",
+      "cron:write",
+      "system:extensions"
+    ],
+    "routeSpecs": [
+      {
+        "method": "POST",
+        "path": "/v1/plugin-api/llm",
+        "description": "Call the host LLM from a plugin with a plugin token."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/plugin-api/search",
+        "description": "Search through host-configured search providers."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/plugin-api/send",
+        "description": "Send a message through a host channel."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/plugin-api/memory/get",
+        "description": "Read plugin-private key/value memory."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/plugin-api/memory/set",
+        "description": "Write plugin-private key/value memory."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/plugin-api/memory/delete",
+        "description": "Delete plugin-private key/value memory."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/plugin-api/memory/list",
+        "description": "List plugin-private key/value memory."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/plugin-api/memory/search",
+        "description": "Search plugin-private memory values."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/plugin-api/agent-memory/search",
+        "description": "Read compiled host memory context for a plugin query."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/plugin-api/agent-memory/add",
+        "description": "Add a host memory fact attributed to the plugin."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/plugin-api/knowledge/search",
+        "description": "Search host knowledge sources from a plugin."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/plugin-api/knowledge/ingest",
+        "description": "Ingest plugin-provided content into host knowledge."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/plugin-api/cron/add",
+        "description": "Create a plugin-owned scheduled job."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/plugin-api/cron/remove",
+        "description": "Remove a plugin-owned scheduled job."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/plugin-api/cron/list",
+        "description": "List plugin-owned scheduled jobs."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/plugin-api/register/provider",
+        "description": "Register a provider extension with the host."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/plugin-api/register/channel",
+        "description": "Register a channel extension with the host."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/plugin-api/register/search",
+        "description": "Register a search extension with the host."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/plugin-api/register/guardrail",
+        "description": "Register a guardrail extension with the host."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/plugin-api/register/embedding",
+        "description": "Register an embedding extension with the host."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/plugin-api/register/speech",
+        "description": "Register a speech extension with the host."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/plugin-api/extensions",
+        "description": "List plugin-registered host extensions."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [],
+    "assets": {
+      "type": "builtin"
+    }
+  },
+  "sdk": {
+    "typescript": "yunque-client/plugin-api"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "group": "extensions",
+    "stage": "native-pack-route-migration",
+    "auth": "Pack Runtime controls enablement and method gates; plugin Bearer token permissions are checked inside the pack.",
+    "note": "Natively owns /v1/plugin-api/* so third-party plugins use the same hot-pluggable runtime surface as other capability packs."
+  },
+  "status": "beta"
+}
