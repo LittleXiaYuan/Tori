@@ -27,7 +27,7 @@ import {
   packUsability,
   riskProfileForPack,
 } from "@/lib/pack-presentation";
-import { createPacksClient, type PackManifest } from "yunque-client/packs";
+import { createPacksClient, type PackManifest, type PackStudioPlanReport } from "yunque-client/packs";
 
 const packsClient = createPacksClient(createYunqueSDKClientOptions());
 
@@ -39,6 +39,8 @@ type PackCandidate = {
 };
 
 type StudioAnalysis = {
+  packId?: string;
+  goal?: string;
   editable: string[];
   guarded: string[];
   tests: string[];
@@ -48,6 +50,7 @@ type StudioAnalysis = {
   auditSteps: string[];
   packageSteps: string[];
   rollbackSteps: string[];
+  prompt?: string;
 };
 
 function packSlug(manifest: PackManifest): string {
@@ -178,7 +181,7 @@ function buildStudioAnalysis(manifest: PackManifest, goal = ""): StudioAnalysis 
     "如果涉及高风险权限，回滚后重新跑 backend-route-audit 和 Pack 可用性审计。",
   ];
 
-  return { editable, guarded, tests, warnings, editableFiles, diffPreview, auditSteps, packageSteps, rollbackSteps };
+  return { packId: manifest.id, goal, editable, guarded, tests, warnings, editableFiles, diffPreview, auditSteps, packageSteps, rollbackSteps };
 }
 
 function buildXiaoyuPrompt(manifest: PackManifest, goal: string): string {
@@ -233,6 +236,23 @@ function buildXiaoyuPrompt(manifest: PackManifest, goal: string): string {
   ].join("\n");
 }
 
+function mapStudioPlanReport(report: PackStudioPlanReport): StudioAnalysis {
+  return {
+    packId: report.pack_id,
+    goal: report.goal,
+    editable: report.editable || [],
+    guarded: report.guarded || [],
+    tests: [],
+    warnings: report.warnings || [],
+    editableFiles: report.editable_files || [],
+    diffPreview: report.diff_preview || "",
+    auditSteps: report.audit_steps || [],
+    packageSteps: report.package_steps || [],
+    rollbackSteps: report.rollback_steps || [],
+    prompt: report.xiaoyu_prompt,
+  };
+}
+
 export default function PackStudioPage() {
   const { data, loading, refresh } = useApiData(async () => {
     const [installed, catalog] = await Promise.all([packsClient.installed(), packsClient.catalog()]);
@@ -266,8 +286,18 @@ export default function PackStudioPage() {
     [candidates, selectedId],
   );
   const manifest = selected?.manifest;
-  const analysis = manifest ? buildStudioAnalysis(manifest, goal) : null;
-  const prompt = manifest ? buildXiaoyuPrompt(manifest, goal) : "";
+  const { data: studioPlan, refresh: refreshStudioPlan } = useApiData(async () => {
+    if (!manifest) return null;
+    try {
+      const report = await packsClient.studioPlan({ packId: manifest.id, goal });
+      return mapStudioPlanReport(report);
+    } catch {
+      return buildStudioAnalysis(manifest, goal);
+    }
+  }, null as StudioAnalysis | null, [manifest?.id, goal]);
+  const fallbackAnalysis = manifest ? buildStudioAnalysis(manifest, goal) : null;
+  const analysis = studioPlan && studioPlan.packId === manifest?.id && studioPlan.goal === goal ? studioPlan : fallbackAnalysis;
+  const prompt = manifest ? (analysis?.prompt || buildXiaoyuPrompt(manifest, goal)) : "";
   const chatHref = `/chat?q=${encodeURIComponent(prompt)}`;
 
   const copyPrompt = async () => {
@@ -414,6 +444,9 @@ export default function PackStudioPage() {
                 </Link>
                 <Button variant="ghost" onPress={refresh}>
                   <RefreshCw size={14} /> 重新读取
+                </Button>
+                <Button variant="ghost" onPress={refreshStudioPlan}>
+                  <FileSearch size={14} /> 刷新计划
                 </Button>
               </div>
             </Card>

@@ -5,6 +5,7 @@ import PackStudioPage from "../packs/studio/page";
 const packsClientMock = vi.hoisted(() => ({
   installed: vi.fn(),
   catalog: vi.fn(),
+  studioPlan: vi.fn(),
 }));
 
 const toastMock = vi.hoisted(() => vi.fn());
@@ -103,6 +104,55 @@ describe("PackStudioPage", () => {
       capabilities: 0,
       entries: [],
     });
+    packsClientMock.studioPlan.mockImplementation(({ packId, goal }: { packId: string; goal: string }) => Promise.resolve({
+      generated_at: "2026-06-19T00:00:00Z",
+      pack_id: packId,
+      pack_name: packId === "yunque.pack.wasm-plugin" ? "WASM 能力包" : "Documents",
+      version: "0.1.0",
+      source: "test",
+      status: packId === "yunque.pack.wasm-plugin" ? "enabled" : "disabled",
+      installed: true,
+      enabled: packId === "yunque.pack.wasm-plugin",
+      goal,
+      risk_level: packId === "yunque.pack.wasm-plugin" ? "high" : "medium",
+      summary: "后端只读改包计划",
+      capabilities: packId === "yunque.pack.wasm-plugin" ? ["wasm.load", "wasm.execute"] : ["documents.generate"],
+      permissions: packId === "yunque.pack.wasm-plugin" ? ["wasm:execute", "network:download", "filesystem:write"] : ["documents:write"],
+      frontend_paths: packId === "yunque.pack.wasm-plugin" ? ["/packs/wasm-plugin"] : [],
+      backend_routes: packId === "yunque.pack.wasm-plugin" ? ["POST /v1/wasm-plugin/run"] : [],
+      surfaces: packId === "yunque.pack.wasm-plugin" ? ["frontend", "backend", "wasm"] : ["manifest"],
+      editable: ["用途说明、起手示例、入口文案、可用度分层和权限解释可以从 manifest/前端展示层优化。"],
+      guarded: [
+        "不直接修改已签名或已安装包；先生成 diff 方案，用户确认后再打包为新 yqpack。",
+        "不要反编译后硬改 WASM；需要源码、ABI 说明和 wasm-plugin 回归测试。",
+      ],
+      warnings: ["这个包仍是实验能力，改造时不要把它包装成稳定承诺。"],
+      editable_files: [
+        "packs/official/wasm-plugin-pack/pack.json",
+        "apps/web/src/app/packs/wasm-plugin/page.tsx",
+        "internal/packs/wasmplugin/",
+      ],
+      diff_preview: `diff --git a/packs/official/wasm-plugin-pack/pack.json b/packs/official/wasm-plugin-pack/pack.json\n+ "description": "${goal}"`,
+      audit_steps: [
+        "node scripts\\check-pack-usability.mjs --strict",
+        "go test ./internal/packs/wasmplugin ./internal/controlplane/gateway -run WASM -count=1",
+      ],
+      package_steps: [
+        "go run ./cmd/yunque-plugin pack packs\\official\\wasm-plugin-pack --out dist\\packs\\wasm-plugin-0.1.0.yqpack",
+      ],
+      rollback_steps: ["新包作为 fork/local 版本安装；验证失败时禁用新版本并回滚上一版本。"],
+      cogni_use: ["WASM 包只能使用 host 允许的 ABI。"],
+      xiaoyu_prompt: [
+        "请以“小羽改包”的方式改造能力包 WASM 能力包",
+        `用户目标：${goal}`,
+        "POST /v1/wasm-plugin/run",
+        "可改文件候选：",
+        "diff 预览草案：",
+        "不要直接扩大权限或绕过签名",
+        "重新打包与回滚：",
+        "go test ./internal/packs/wasmplugin ./internal/controlplane/gateway -run WASM -count=1",
+      ].join("\n"),
+    }));
   });
 
   it("turns real pack metadata into a guarded Xiaoyu modification task", async () => {
@@ -120,6 +170,13 @@ describe("PackStudioPage", () => {
     expect(screen.getByText("这个包仍是实验能力，改造时不要把它包装成稳定承诺。")).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("这次想补强什么"), { target: { value: "增加一个可查看运行结果的界面" } });
+
+    await waitFor(() => {
+      expect(packsClientMock.studioPlan).toHaveBeenCalledWith({
+        packId: "yunque.pack.wasm-plugin",
+        goal: "增加一个可查看运行结果的界面",
+      });
+    });
 
     const task = screen.getByLabelText("小羽改包任务") as HTMLTextAreaElement;
     expect(task.value).toContain("用户目标：增加一个可查看运行结果的界面");

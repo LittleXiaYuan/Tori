@@ -1434,6 +1434,109 @@ func TestPackRoutesPruneArtifacts(t *testing.T) {
 	}
 }
 
+func TestPackStudioPlanBuildsReadOnlyPlanForInstalledPack(t *testing.T) {
+	registry, err := packruntime.NewRegistry(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewRegistry: %v", err)
+	}
+	_, err = registry.Install(packruntime.Manifest{
+		ID:           "yunque.pack.computer-use",
+		Name:         "Computer Use",
+		Version:      "0.1.0",
+		Optional:     true,
+		DefaultState: "enabled",
+		Description:  "Generate computer use plans.",
+		Backend: packruntime.BackendManifest{
+			Capabilities: []string{"computer.use.plan"},
+			Permissions:  []string{"computer:plan", "browser:read"},
+			RouteSpecs:   []packruntime.BackendRouteSpec{{Method: http.MethodPost, Path: "/v1/computer-use/plan", Description: "Plan computer use"}},
+		},
+		Frontend: packruntime.FrontendManifest{
+			Menus:  []packruntime.FrontendMenu{{Key: "computer-use", Label: "Computer Use", Path: "/packs/computer-use"}},
+			Routes: []packruntime.FrontendRoute{{Path: "/packs/computer-use", Component: "ComputerUsePackPage", Title: "Computer Use"}},
+			Assets: packruntime.FrontendAssets{Type: packruntime.FrontendAssetsTypeIframeBundle, Entry: "index.html"},
+		},
+		Update: packruntime.UpdateManifest{Rollback: true},
+	}, "test")
+	if err != nil {
+		t.Fatalf("Install: %v", err)
+	}
+	gw, tenants := newTestGatewayWithConfig(GatewayConfig{Packs: registry})
+	tenant := tenants.Register("pack-studio")
+
+	body := bytes.NewBufferString(`{"pack_id":"yunque.pack.computer-use","goal":"补齐结果区和授权说明"}`)
+	req := httptest.NewRequest(http.MethodPost, "/v1/packs/studio/plan", body)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	var report packruntime.PackStudioPlanReport
+	if err := json.NewDecoder(w.Body).Decode(&report); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if report.PackID != "yunque.pack.computer-use" || !report.Installed || !report.Enabled || report.RiskLevel != "high" {
+		t.Fatalf("unexpected studio report identity/risk: %#v", report)
+	}
+	if !slices.Contains(report.Surfaces, "iframe-bundle") || !slices.Contains(report.Surfaces, "backend") {
+		t.Fatalf("expected iframe/backend surfaces, got %#v", report.Surfaces)
+	}
+	if !strings.Contains(report.DiffPreview, "补齐结果区和授权说明") || !strings.Contains(report.XiaoyuPrompt, "当前不执行本机控制") {
+		t.Fatalf("expected diff and prompt to include goal/computer-use boundary: diff=%s prompt=%s", report.DiffPreview, report.XiaoyuPrompt)
+	}
+	if len(report.PackageSteps) == 0 || !strings.Contains(strings.Join(report.Guarded, " "), "不直接修改已签名或已安装包") {
+		t.Fatalf("expected package steps and guarded boundary: %#v", report)
+	}
+}
+
+func TestPackStudioPlanCanUseCatalogOrRequestManifest(t *testing.T) {
+	sourceDir := t.TempDir()
+	writeTestPackManifest(t, filepath.Join(sourceDir, "studio-pack", packruntime.ManifestFileName), packruntime.Manifest{
+		ID:           "yunque.pack.studio-catalog",
+		Name:         "Studio Catalog",
+		Version:      "0.2.0",
+		Optional:     true,
+		DefaultState: "disabled",
+		Backend:      packruntime.BackendManifest{Capabilities: []string{"studio.catalog"}, Permissions: []string{"network:read"}},
+		Frontend:     packruntime.FrontendManifest{Menus: []packruntime.FrontendMenu{{Key: "studio-catalog", Label: "Studio Catalog", Path: "/packs/studio-catalog"}}},
+	})
+	gw, tenants := newTestGatewayWithConfig(GatewayConfig{})
+	gw.SetPackCatalogSources([]string{sourceDir})
+	tenant := tenants.Register("pack-studio-catalog")
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/packs/studio/plan", bytes.NewBufferString(`{"pack_id":"yunque.pack.studio-catalog"}`))
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("catalog status=%d body=%s", w.Code, w.Body.String())
+	}
+	var catalogReport packruntime.PackStudioPlanReport
+	if err := json.NewDecoder(w.Body).Decode(&catalogReport); err != nil {
+		t.Fatalf("decode catalog report: %v", err)
+	}
+	if catalogReport.Installed || catalogReport.Enabled || catalogReport.Source != sourceDir || catalogReport.RiskLevel != "medium" {
+		t.Fatalf("unexpected catalog report: %#v", catalogReport)
+	}
+
+	requestManifest := `{"manifest":{"id":"yunque.pack.request-only","name":"Request Only","version":"0.1.0","optional":true,"backend":{"capabilities":["request.only"]},"frontend":{}},"goal":"只读分析"}`
+	req = httptest.NewRequest(http.MethodPost, "/v1/packs/studio/plan", bytes.NewBufferString(requestManifest))
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("request manifest status=%d body=%s", w.Code, w.Body.String())
+	}
+	var manifestReport packruntime.PackStudioPlanReport
+	if err := json.NewDecoder(w.Body).Decode(&manifestReport); err != nil {
+		t.Fatalf("decode manifest report: %v", err)
+	}
+	if manifestReport.Source != "request-manifest" || manifestReport.PackID != "yunque.pack.request-only" || manifestReport.Installed {
+		t.Fatalf("unexpected request manifest report: %#v", manifestReport)
+	}
+}
+
 func TestPackRoutesTogglePackStatus(t *testing.T) {
 	registry, err := packruntime.NewRegistry(t.TempDir())
 	if err != nil {

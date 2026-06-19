@@ -92,6 +92,7 @@ func (g *Gateway) registerPackRoutes() {
 	g.mux.HandleFunc("/v1/packs/capabilities", g.requireAuth(g.handlePackCapabilities))
 	g.mux.HandleFunc("/v1/packs/backend-modules", g.requireAuth(g.handlePackBackendModules))
 	g.mux.HandleFunc("/v1/packs/backend-route-audit", g.requireAuth(g.handlePackBackendRouteAudit))
+	g.mux.HandleFunc("/v1/packs/studio/plan", g.requireAuth(g.handlePackStudioPlan))
 	g.mux.HandleFunc("/v1/packs/install", g.requireAuth(g.handlePackInstall))
 	g.mux.HandleFunc("/v1/packs/enable", g.requireAuth(g.handlePackEnable))
 	g.mux.HandleFunc("/v1/packs/disable", g.requireAuth(g.handlePackDisable))
@@ -1538,6 +1539,68 @@ func (g *Gateway) handlePackBackendRouteAudit(w http.ResponseWriter, r *http.Req
 		return
 	}
 	writeJSON(w, g.backendRouteAuditReport())
+}
+
+func (g *Gateway) handlePackStudioPlan(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSONStatus(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+		return
+	}
+	var req packruntime.PackStudioPlanRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": "invalid request body"})
+		return
+	}
+	manifest, opts, ok := g.resolvePackStudioTarget(req)
+	if !ok {
+		writeJSONStatus(w, http.StatusNotFound, map[string]any{"error": "pack not found"})
+		return
+	}
+	if err := manifest.Validate(); err != nil {
+		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": "invalid pack manifest", "detail": err.Error()})
+		return
+	}
+	opts.Goal = req.Goal
+	writeJSON(w, packruntime.BuildPackStudioPlan(manifest, opts))
+}
+
+func (g *Gateway) resolvePackStudioTarget(req packruntime.PackStudioPlanRequest) (packruntime.Manifest, packruntime.PackStudioPlanOptions, bool) {
+	if req.Manifest != nil {
+		manifest := *req.Manifest
+		return manifest, packruntime.PackStudioPlanOptions{
+			Source:    "request-manifest",
+			Installed: false,
+			Enabled:   false,
+			Status:    strings.TrimSpace(manifest.Status),
+		}, true
+	}
+	packID := strings.TrimSpace(req.PackID)
+	if packID == "" {
+		return packruntime.Manifest{}, packruntime.PackStudioPlanOptions{}, false
+	}
+	if g.packRegistry != nil {
+		if pack, ok := g.packRegistry.Get(packID); ok {
+			return pack.Manifest, packruntime.PackStudioPlanOptions{
+				Source:    pack.Source,
+				Installed: true,
+				Enabled:   pack.Status == packruntime.PackStatusEnabled,
+				Status:    string(pack.Status),
+			}, true
+		}
+	}
+	catalog := g.packCatalogReport("", "")
+	for _, entry := range catalog.Entries {
+		if entry.Manifest.ID != packID {
+			continue
+		}
+		return entry.Manifest, packruntime.PackStudioPlanOptions{
+			Source:    entry.Source,
+			Installed: entry.Installed,
+			Enabled:   entry.Enabled,
+			Status:    string(entry.Status),
+		}, true
+	}
+	return packruntime.Manifest{}, packruntime.PackStudioPlanOptions{}, false
 }
 
 func (g *Gateway) backendRouteAuditReport() packruntime.BackendRouteAuditReport {
