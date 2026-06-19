@@ -415,6 +415,23 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 		t.Fatal("expected Cost Governance budget routeSpec")
 	}
 
+	desktopPack, ok := registry.Get("yunque.pack.desktop")
+	if !ok {
+		t.Fatal("expected Desktop Shell builtin pack to be installed")
+	}
+	if desktopPack.Status != packruntime.PackStatusEnabled {
+		t.Fatalf("expected Desktop Shell default enabled, got %s", desktopPack.Status)
+	}
+	if desktopPack.Manifest.SDK.TypeScript != "yunque-client/desktop" {
+		t.Fatalf("unexpected Desktop Shell SDK import: %s", desktopPack.Manifest.SDK.TypeScript)
+	}
+	if !hasRouteSpec(desktopPack.Manifest.Backend.RouteSpecs, "POST", "/v1/desktop/console") {
+		t.Fatal("expected Desktop Shell console routeSpec")
+	}
+	if !hasRouteSpec(desktopPack.Manifest.Backend.RouteSpecs, "GET", "/v1/desktop/autostart") {
+		t.Fatal("expected Desktop Shell autostart routeSpec")
+	}
+
 	computerUse, ok := registry.Get("yunque.pack.computer-use")
 	if !ok {
 		t.Fatal("expected Computer Use builtin pack to be installed")
@@ -628,7 +645,7 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 	// Count reflects the current packs/official/ set (incl. the newer
 	// console/control-plane/knowledge/memory/skills/work/workspace packs and the
 	// cognitive-layer/state packs). Adjust if the builtin pack set changes.
-	if got := len(registry.List()); got != 51 {
+	if got := len(registry.List()); got != 52 {
 		t.Fatalf("expected idempotent builtin install, got %d packs", got)
 	}
 }

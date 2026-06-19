@@ -1,0 +1,67 @@
+{
+  "id": "yunque.pack.desktop",
+  "name": "Desktop Shell (桌面壳控制)",
+  "version": "0.1.0",
+  "description": "本地桌面壳控制能力：切换控制台显示状态，并管理开机自启动。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": [
+      "desktop.console.read",
+      "desktop.console.toggle",
+      "desktop.autostart.read",
+      "desktop.autostart.toggle"
+    ],
+    "routes": [
+      "/v1/desktop/console",
+      "/v1/desktop/autostart"
+    ],
+    "permissions": [
+      "desktop:read",
+      "desktop:write"
+    ],
+    "routeSpecs": [
+      {
+        "method": "GET",
+        "path": "/v1/desktop/console",
+        "description": "Read local console visibility state."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/desktop/console",
+        "description": "Toggle the local console window visibility."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/desktop/autostart",
+        "description": "Read desktop auto-start state."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/desktop/autostart",
+        "description": "Toggle desktop auto-start on login."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [],
+    "assets": {
+      "type": "builtin"
+    }
+  },
+  "sdk": {
+    "typescript": "yunque-client/desktop"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "group": "desktop",
+    "phase": "A4",
+    "preload": "true",
+    "note": "Natively owns local desktop shell controls through Pack Runtime. Non-Windows builds degrade gracefully through the desktop package stubs."
+  },
+  "status": "beta"
+}

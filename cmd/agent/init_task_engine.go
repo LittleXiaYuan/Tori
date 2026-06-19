@@ -44,6 +44,7 @@ import (
 	controlplanepack "yunque-agent/internal/packs/controlplane"
 	costpack "yunque-agent/internal/packs/cost"
 	cronpack "yunque-agent/internal/packs/cron"
+	desktoppack "yunque-agent/internal/packs/desktop"
 	documentspack "yunque-agent/internal/packs/documents"
 	emotionpack "yunque-agent/internal/packs/emotion"
 	experiencepack "yunque-agent/internal/packs/experience"
@@ -296,6 +297,9 @@ func initTaskEngine(
 	// Tori pack — owns /v1/tori/* natively. OAuth bind/unbind, status and
 	// health/usage calls keep the original SSRF guard and token-store semantics.
 	_ = gw.RegisterModule(toripack.New(gw))
+	// Desktop pack — owns local desktop shell controls (console visibility and
+	// auto-start) natively through Pack Runtime.
+	_ = gw.RegisterModule(desktoppack.New())
 
 	// Inner Life pack — exposes the soul-layer outputs (curiosity / reflection /
 	// dreaming) over a read-only HTTP surface. Registered here because the

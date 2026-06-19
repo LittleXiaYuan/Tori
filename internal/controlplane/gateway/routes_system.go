@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"time"
 
-	"yunque-agent/internal/desktop"
 	"yunque-agent/internal/sbom"
 	"yunque-agent/internal/version"
 )
@@ -75,33 +74,8 @@ func (g *Gateway) registerSystemRoutes() {
 		json.NewEncoder(w).Encode(resp)
 	})
 
-	// Desktop controls (console toggle; Windows only, no-op on other platforms)
-	g.mux.HandleFunc("/v1/desktop/console", g.requireAuth(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		switch r.Method {
-		case http.MethodPost:
-			hidden := desktop.ToggleConsole()
-			json.NewEncoder(w).Encode(map[string]any{"console_hidden": hidden})
-		default:
-			json.NewEncoder(w).Encode(map[string]any{"console_hidden": desktop.IsConsoleHidden()})
-		}
-	}))
-
-	// Auto-start toggle (Windows registry, no-op on other platforms)
-	g.mux.HandleFunc("/v1/desktop/autostart", g.requireAuth(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		switch r.Method {
-		case http.MethodPost:
-			enabled := !desktop.IsAutoStartEnabled()
-			if err := desktop.SetAutoStart(enabled); err != nil {
-				json.NewEncoder(w).Encode(map[string]any{"error": err.Error()})
-				return
-			}
-			json.NewEncoder(w).Encode(map[string]any{"autostart_enabled": enabled})
-		default:
-			json.NewEncoder(w).Encode(map[string]any{"autostart_enabled": desktop.IsAutoStartEnabled()})
-		}
-	}))
+	// Desktop shell controls (/v1/desktop*) are owned by the desktop pack
+	// (internal/packs/desktop), mounted via gw.RegisterModule.
 
 	// System info / metrics / cache stats and tenants migrated to the
 	// control-plane pack (internal/packs/controlplane).

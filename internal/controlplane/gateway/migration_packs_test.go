@@ -22,6 +22,7 @@ import (
 	controlplanepack "yunque-agent/internal/packs/controlplane"
 	costpack "yunque-agent/internal/packs/cost"
 	cronpack "yunque-agent/internal/packs/cron"
+	desktoppack "yunque-agent/internal/packs/desktop"
 	documentspack "yunque-agent/internal/packs/documents"
 	federationpack "yunque-agent/internal/packs/federation"
 	forkspack "yunque-agent/internal/packs/forks"
@@ -89,6 +90,7 @@ var migrationPackPaths = map[string][]string{
 	connectorspack.PackID:      connectorspack.Paths(),
 	controlplanepack.PackID:    controlplanepack.Paths,
 	costpack.PackID:            costpack.Paths(),
+	desktoppack.PackID:         desktoppack.Paths(),
 	federationpack.PackID:      federationpack.Paths(),
 	forkspack.PackID:           forkspack.Paths(),
 	heartbeatpack.PackID:       heartbeatpack.Paths(),
@@ -138,6 +140,7 @@ var migrationPackNames = map[string]string{
 	connectorspack.PackID:      "Connectors",
 	controlplanepack.PackID:    "Control Plane",
 	costpack.PackID:            "Cost",
+	desktoppack.PackID:         "Desktop Shell",
 	federationpack.PackID:      "Federation",
 	forkspack.PackID:           "Forks",
 	heartbeatpack.PackID:       "Heartbeat",
@@ -208,6 +211,7 @@ func registerMigrationPacks(gw *Gateway) {
 	_ = gw.RegisterModule(connectorspack.NewProvider(gw.ConnectorRegistry))
 	gw.RegisterBackendPack(controlplanepack.NewHandler(gw))
 	_ = gw.RegisterModule(costpack.NewProvider(func() *costtrack.Tracker { return gw.costTracker }))
+	_ = gw.RegisterModule(desktoppack.New())
 	_ = gw.RegisterModule(federationpack.New(gw))
 	_ = gw.RegisterModule(forkspack.NewProvider(gw.ForkTree, gw.ForkPersister))
 	_ = gw.RegisterModule(heartbeatpack.New(gw))
@@ -292,6 +296,8 @@ func newTestGatewayWithMigrationPack(t *testing.T, packID string, status packrun
 		gw.RegisterBackendPack(controlplanepack.NewHandler(gw))
 	case costpack.PackID:
 		_ = gw.RegisterModule(costpack.New(nil))
+	case desktoppack.PackID:
+		_ = gw.RegisterModule(desktoppack.NewWithController(nil))
 	case federationpack.PackID:
 		_ = gw.RegisterModule(federationpack.New(nil))
 	case forkspack.PackID:
@@ -358,6 +364,7 @@ func TestMigrationPackRouteGating(t *testing.T) {
 		{"work", workpack.PackID, "/v1/tasks"},
 		{"connectors", connectorspack.PackID, "/api/connectors"},
 		{"cost", costpack.PackID, "/v1/cost/summary"},
+		{"desktop", desktoppack.PackID, "/v1/desktop/console"},
 		{"federation", federationpack.PackID, "/v1/federation/peers"},
 		{"forks", forkspack.PackID, "/v1/fork/list"},
 		{"heartbeat", heartbeatpack.PackID, "/v1/heartbeat"},
