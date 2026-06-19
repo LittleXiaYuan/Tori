@@ -41,6 +41,7 @@ import {
   entryInstallRequest,
   formatPackInstallError,
   groupPackPermissions,
+  packInstallChecklist,
   packExamples,
   packFeatureFlags,
   packReadiness,
@@ -138,6 +139,28 @@ function packStatusBadge(packStatus?: string): { label: string; color: string; b
   if (packStatus === "beta") return { label: "测试版", color: "var(--yunque-warning)", bg: "rgba(245,158,11,0.12)" };
   if (packStatus === "alpha") return { label: "开发中", color: "var(--yunque-text-muted)", bg: "rgba(255,255,255,0.05)" };
   return { label: "未知", color: "var(--yunque-text-muted)", bg: "rgba(255,255,255,0.05)" };
+}
+
+function checklistToneStyle(tone: "safe" | "warning" | "danger"): { borderColor: string; background: string; color: string } {
+  if (tone === "danger") {
+    return {
+      borderColor: "rgba(239,68,68,0.22)",
+      background: "rgba(239,68,68,0.08)",
+      color: "var(--yunque-danger)",
+    };
+  }
+  if (tone === "warning") {
+    return {
+      borderColor: "rgba(245,158,11,0.22)",
+      background: "rgba(245,158,11,0.08)",
+      color: "var(--yunque-warning)",
+    };
+  }
+  return {
+    borderColor: "var(--yunque-border)",
+    background: "var(--yunque-bg-hover)",
+    color: "var(--yunque-success)",
+  };
 }
 
 function sourceName(url: string): string {
@@ -1131,6 +1154,11 @@ export default function PacksPageOptimized() {
     const usability = packUsability(manifest);
     const readiness = packReadiness(manifest);
     const usageLines = packUsageExplanation(manifest).slice(0, 3);
+    const installChecklist = packInstallChecklist(manifest, {
+      sourceLabel: options.sourceLabel || options.source,
+      installed: options.action.kind === "enable" || options.action.kind === "use",
+      enabled: options.action.kind === "use",
+    });
     const actionBusyKey = options.action.kind === "enable" ? `enable:${manifest.id}` : options.busyKey;
     const disabled = options.action.disabled || busy === actionBusyKey;
     const primaryPath = usability.primaryActionPath || manifest.frontend?.menus?.[0]?.path || manifest.frontend?.routes?.[0]?.path;
@@ -1238,6 +1266,25 @@ export default function PacksPageOptimized() {
             {permissionGroups.length > 4 && <Chip size="sm" variant="soft">+{permissionGroups.length - 4}</Chip>}
           </div>
         )}
+
+        <div className="mb-3 rounded-md p-3" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid var(--yunque-border)" }}>
+          <div className="mb-2 text-xs font-medium" style={{ color: "var(--yunque-text)" }}>安装前看这几点</div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {installChecklist.map((item) => {
+              const style = checklistToneStyle(item.tone);
+              return (
+                <div
+                  key={item.key}
+                  className="rounded-md border p-2"
+                  style={{ borderColor: style.borderColor, background: style.background }}
+                >
+                  <div className="text-xs font-medium" style={{ color: style.color }}>{item.label}</div>
+                  <div className="mt-1 text-[11px] leading-4" style={{ color: "var(--yunque-text-muted)" }}>{item.detail}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
 
         <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>
           v{manifest.version}

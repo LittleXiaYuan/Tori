@@ -258,6 +258,13 @@ describe("PacksPageOptimized", () => {
     expect(screen.getByText("来源：官方源")).toBeInTheDocument();
     expect(screen.getByText("来源：官方源 · example.com")).toBeInTheDocument();
     expect(screen.getByText("https://example.com/docs.yqpack")).toBeInTheDocument();
+    expect(screen.getByText("安装前看这几点")).toBeInTheDocument();
+    expect(screen.getByText("确认来源")).toBeInTheDocument();
+    expect(screen.getByText("理解权限")).toBeInTheDocument();
+    expect(screen.getByText("能力边界")).toBeInTheDocument();
+    expect(screen.getByText("回滚路径")).toBeInTheDocument();
+    expect(screen.getByText("来源：官方源 · example.com。安装前可先在 Studio 只读检查包内容、SHA 与 manifest。")).toBeInTheDocument();
+    expect(screen.getByText("边界：不会自动泄露 API Key，不会绕过权限声明，也不能调用未声明 route。")).toBeInTheDocument();
     const remoteStudioLink = screen.getAllByRole("link", { name: /小羽优化/ })
       .find((link) => link.getAttribute("href")?.includes("yunque.pack.remote-docs"));
     expect(remoteStudioLink).toHaveAttribute("href", expect.stringContaining("packageUrl=https%3A%2F%2Fexample.com%2Fdocs.yqpack"));
@@ -301,6 +308,9 @@ describe("PacksPageOptimized", () => {
     expect(screen.getByText("源可用")).toBeInTheDocument();
     expect(screen.getByText("来源：私有源 · oss.example.com")).toBeInTheDocument();
     expect(screen.getByText("https://oss.example.com/yunque/private/private-pack.yqpack")).toBeInTheDocument();
+    expect(screen.getByText("安装前看这几点")).toBeInTheDocument();
+    expect(screen.getByText("来源：私有源 · oss.example.com。安装前可先在 Studio 只读检查包内容、SHA 与 manifest。")).toBeInTheDocument();
+    expect(screen.getByText("回滚：声明支持版本回滚；也可以随时禁用能力包。")).toBeInTheDocument();
   });
 
   it("filters packs by readiness so unclear packs can be sent to Xiaoyu first", async () => {
