@@ -26,6 +26,7 @@ type packActionRequest struct {
 type packInstallRequest struct {
 	ManifestPath string `json:"manifest_path"`
 	ManifestURL  string `json:"manifest_url"`
+	PackagePath  string `json:"package_path"`
 	PackageURL   string `json:"package_url"`
 	SHA256       string `json:"sha256"`
 	Source       string `json:"source"`
@@ -1964,12 +1965,32 @@ func (g *Gateway) handlePackInstall(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req packInstallRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || (req.ManifestPath == "" && req.ManifestURL == "" && req.PackageURL == "") {
-		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": "manifest_path, manifest_url or package_url is required"})
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || (req.ManifestPath == "" && req.ManifestURL == "" && req.PackagePath == "" && req.PackageURL == "") {
+		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": "manifest_path, manifest_url, package_path or package_url is required"})
 		return
 	}
 	var pack packruntime.InstalledPack
-	if req.PackageURL != "" && req.ManifestPath == "" && req.ManifestURL == "" {
+	if req.PackagePath != "" && req.PackageURL == "" && req.ManifestPath == "" && req.ManifestURL == "" {
+		source := strings.TrimSpace(req.Source)
+		if source == "" {
+			source = "yqpack:" + strings.TrimSpace(req.PackagePath)
+		}
+		pack, err := g.packRegistry.InstallFromYqpack(req.PackagePath, packruntime.InstallOptions{
+			ExpectedSHA256: req.SHA256,
+			TrustRoot:      g.packTrustRoot,
+			Source:         source,
+		})
+		if err != nil {
+			writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+			return
+		}
+		if g.planner != nil {
+			g.planner.InvalidatePromptCache()
+		}
+		writeJSON(w, map[string]any{"pack": pack, "status": pack.Status})
+		return
+	}
+	if req.PackageURL != "" && req.PackagePath == "" && req.ManifestPath == "" && req.ManifestURL == "" {
 		pack, err := g.installPackFromPackageURL(r, req)
 		if err != nil {
 			writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": err.Error()})

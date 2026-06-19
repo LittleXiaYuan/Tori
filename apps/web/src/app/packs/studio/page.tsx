@@ -292,6 +292,9 @@ export default function PackStudioPage() {
   const [patchReport, setPatchReport] = useState<PackStudioPatchReport | null>(null);
   const [repacking, setRepacking] = useState(false);
   const [repackReport, setRepackReport] = useState<PackStudioRepackReport | null>(null);
+  const [reinspectReport, setReinspectReport] = useState<YqpackInspectReport | null>(null);
+  const [reinspecting, setReinspecting] = useState(false);
+  const [installingRepack, setInstallingRepack] = useState(false);
 
   const candidates = data?.packs || [];
   const selected = useMemo(
@@ -364,6 +367,7 @@ export default function PackStudioPage() {
       setPatchContent("");
       setPatchReport(null);
       setRepackReport(null);
+      setReinspectReport(null);
       showToast("已准备 Pack Studio 工作区", "success");
     } catch (error) {
       showToast(error instanceof Error ? error.message : "准备工作区失败", "error");
@@ -388,7 +392,10 @@ export default function PackStudioPage() {
         apply,
       });
       setPatchReport(report);
-      if (apply) setRepackReport(null);
+      if (apply) {
+        setRepackReport(null);
+        setReinspectReport(null);
+      }
       showToast(apply ? "已应用到工作区" : "已生成 diff 预览", "success");
     } catch (error) {
       showToast(error instanceof Error ? error.message : "工作区改动失败", "error");
@@ -406,11 +413,49 @@ export default function PackStudioPage() {
         goal,
       });
       setRepackReport(report);
+      setReinspectReport(null);
       showToast("已生成新的 yqpack", "success");
     } catch (error) {
       showToast(error instanceof Error ? error.message : "重新打包失败", "error");
     } finally {
       setRepacking(false);
+    }
+  };
+
+  const reinspectRepack = async () => {
+    if (!repackReport) return;
+    setReinspecting(true);
+    try {
+      const report = await packsClient.studioInspect({
+        packagePath: repackReport.package_path,
+        sha256: repackReport.sha256,
+        goal,
+      });
+      setReinspectReport(report);
+      showToast("新 yqpack 复检通过", "success");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "新包复检失败", "error");
+    } finally {
+      setReinspecting(false);
+    }
+  };
+
+  const installRepack = async () => {
+    if (!repackReport || !reinspectReport?.sha256_match) return;
+    setInstallingRepack(true);
+    try {
+      await packsClient.install({
+        packagePath: repackReport.package_path,
+        sha256: repackReport.sha256,
+        source: `pack-studio:${repackReport.package_path}`,
+      });
+      showToast("已安装新的能力包，启用前请再次确认权限", "success");
+      refresh();
+      refreshStudioPlan();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "安装新包失败", "error");
+    } finally {
+      setInstallingRepack(false);
     }
   };
 
@@ -710,6 +755,26 @@ export default function PackStudioPage() {
                         </div>
                         <div className="break-all font-mono">{repackReport.package_path}</div>
                         <div className="mt-1 break-all font-mono">SHA256：{repackReport.sha256}</div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <Button variant="outline" onPress={reinspectRepack} isDisabled={reinspecting}>
+                            {reinspecting ? <Spinner size="sm" /> : <FileSearch size={14} />} 复检新包
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onPress={installRepack}
+                            isDisabled={installingRepack || !reinspectReport?.sha256_match}
+                          >
+                            {installingRepack ? <Spinner size="sm" /> : <PackageCheck size={14} />} 安装新包
+                          </Button>
+                        </div>
+                        {reinspectReport && (
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
+                            <Chip size="sm" color={reinspectReport.sha256_match ? "success" : "danger"}>
+                              {reinspectReport.sha256_match ? "复检 SHA 匹配" : "复检 SHA 不匹配"}
+                            </Chip>
+                            <span>{reinspectReport.entry_count} 个文件 · {reinspectReport.editable_count} 可改 · {reinspectReport.guarded_count} 需审计</span>
+                          </div>
+                        )}
                         <div className="mt-2 space-y-1">
                           {repackReport.next_steps.map((step) => (
                             <div key={step}>{step}</div>

@@ -5,6 +5,7 @@ import PackStudioPage from "../packs/studio/page";
 const packsClientMock = vi.hoisted(() => ({
   installed: vi.fn(),
   catalog: vi.fn(),
+  install: vi.fn(),
   studioPlan: vi.fn(),
   studioInspect: vi.fn(),
   studioWorkspace: vi.fn(),
@@ -157,11 +158,11 @@ describe("PackStudioPage", () => {
         "go test ./internal/packs/wasmplugin ./internal/controlplane/gateway -run WASM -count=1",
       ].join("\n"),
     }));
-    packsClientMock.studioInspect.mockResolvedValue({
+    packsClientMock.studioInspect.mockImplementation(({ packagePath }: { packagePath?: string }) => Promise.resolve({
       generated_at: "2026-06-19T00:00:00Z",
-      source: "C:\\packs\\wasm-plugin.yqpack",
-      sha256: "a".repeat(64),
-      expected_sha256: "a".repeat(64),
+      source: packagePath || "C:\\packs\\wasm-plugin.yqpack",
+      sha256: packagePath ? "d".repeat(64) : "a".repeat(64),
+      expected_sha256: packagePath ? "d".repeat(64) : "a".repeat(64),
       sha256_match: true,
       size_bytes: 4096,
       manifest: wasmManifest,
@@ -195,7 +196,7 @@ describe("PackStudioPage", () => {
         cogni_use: [],
         xiaoyu_prompt: "",
       },
-    });
+    }));
     packsClientMock.studioWorkspace.mockResolvedValue({
       generated_at: "2026-06-19T00:00:00Z",
       workspace_path: "C:\\yunque\\packs\\studio\\yunque.pack.wasm-plugin-0.1.0-aaaaaaaaaaaa",
@@ -239,6 +240,10 @@ describe("PackStudioPage", () => {
       inspect: { sha256_match: true } as never,
       warnings: [],
       next_steps: ["重新运行只读检查，确认新 yqpack 的 manifest、sha256 和文件分类。"],
+    });
+    packsClientMock.install.mockResolvedValue({
+      pack: { manifest: wasmManifest, status: "installed" },
+      status: "installed",
     });
   });
 
@@ -351,6 +356,25 @@ describe("PackStudioPage", () => {
     expect(await screen.findByText("新 yqpack 已生成")).toBeInTheDocument();
     expect(screen.getByText("C:\\yunque\\packs\\studio\\yunque.pack.wasm-plugin-0.1.0-studio.yqpack")).toBeInTheDocument();
     expect(screen.getByText("SHA256：" + "d".repeat(64))).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "复检新包" }));
+    await waitFor(() => {
+      expect(packsClientMock.studioInspect).toHaveBeenCalledWith({
+        packagePath: "C:\\yunque\\packs\\studio\\yunque.pack.wasm-plugin-0.1.0-studio.yqpack",
+        sha256: "d".repeat(64),
+        goal: "增加一个可查看运行结果的界面",
+      });
+    });
+    expect(await screen.findByText("复检 SHA 匹配")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "安装新包" }));
+    await waitFor(() => {
+      expect(packsClientMock.install).toHaveBeenCalledWith({
+        packagePath: "C:\\yunque\\packs\\studio\\yunque.pack.wasm-plugin-0.1.0-studio.yqpack",
+        sha256: "d".repeat(64),
+        source: "pack-studio:C:\\yunque\\packs\\studio\\yunque.pack.wasm-plugin-0.1.0-studio.yqpack",
+      });
+    });
 
     fireEvent.click(screen.getByRole("button", { name: "复制任务" }));
 

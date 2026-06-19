@@ -1381,6 +1381,62 @@ func TestPackRoutesInstallPackFromManifestURL(t *testing.T) {
 	}
 }
 
+func TestPackRoutesInstallPackFromLocalYqpack(t *testing.T) {
+	root := t.TempDir()
+	registry, err := packruntime.NewRegistry(filepath.Join(root, "registry"))
+	if err != nil {
+		t.Fatalf("NewRegistry: %v", err)
+	}
+	srcDir := filepath.Join(root, "studio-pack")
+	if err := os.MkdirAll(srcDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	manifest := packruntime.Manifest{
+		ID:           "yunque.pack.local-yqpack",
+		Name:         "Local Yqpack",
+		Version:      "0.1.0",
+		RequiresCore: ">=0.1.0",
+		Optional:     true,
+		DefaultState: "disabled",
+		Backend:      packruntime.BackendManifest{Capabilities: []string{"local.yqpack"}},
+		Update:       packruntime.UpdateManifest{Rollback: true},
+	}
+	if err := packruntime.SaveManifest(filepath.Join(srcDir, packruntime.ManifestFileName), manifest); err != nil {
+		t.Fatalf("SaveManifest: %v", err)
+	}
+	pkgPath := filepath.Join(root, "local-yqpack.yqpack")
+	sha, err := packruntime.PackToYqpack(srcDir, pkgPath)
+	if err != nil {
+		t.Fatalf("PackToYqpack: %v", err)
+	}
+	gw := NewFromConfig(GatewayConfig{Packs: registry})
+
+	body := bytes.NewBufferString(`{"package_path":` + strconv.Quote(pkgPath) + `,"sha256":` + strconv.Quote(sha) + `,"source":"pack-studio"}`)
+	req := httptest.NewRequest(http.MethodPost, "/v1/packs/install", body)
+	req = req.WithContext(ctxWithTenant(req.Context(), "t1"))
+	w := httptest.NewRecorder()
+	gw.handlePackInstall(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("install status=%d body=%s", w.Code, w.Body.String())
+	}
+	pack, ok := registry.Get(manifest.ID)
+	if !ok || pack.Status != packruntime.PackStatusDisabled || pack.Source != "pack-studio" {
+		t.Fatalf("unexpected installed pack: %#v", pack)
+	}
+	if pack.Artifacts == nil || pack.Artifacts.SHA256 != sha || pack.Artifacts.PackagePath == "" {
+		t.Fatalf("expected yqpack artifacts to be recorded: %#v", pack.Artifacts)
+	}
+
+	badBody := bytes.NewBufferString(`{"package_path":` + strconv.Quote(pkgPath) + `,"sha256":"` + strings.Repeat("0", 64) + `"}`)
+	req = httptest.NewRequest(http.MethodPost, "/v1/packs/install", badBody)
+	req = req.WithContext(ctxWithTenant(req.Context(), "t1"))
+	w = httptest.NewRecorder()
+	gw.handlePackInstall(w, req)
+	if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), "sha256 mismatch") {
+		t.Fatalf("expected sha rejection, status=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
 func TestPackRoutesPruneArtifacts(t *testing.T) {
 	root := t.TempDir()
 	registry, err := packruntime.NewRegistry(root)
