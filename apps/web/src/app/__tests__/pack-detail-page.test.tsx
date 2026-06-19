@@ -138,6 +138,13 @@ describe("PackDetailClientPage", () => {
     expect(screen.getByText("SHA256 abc123")).toBeInTheDocument();
     expect(screen.getByText("4 KB")).toBeInTheDocument();
 
+    const sourceStudioLink = screen.getByRole("link", { name: /先在 Studio 只读检查/ });
+    expect(sourceStudioLink).toHaveAttribute("href", expect.stringContaining("/packs/studio?"));
+    expect(sourceStudioLink).toHaveAttribute("href", expect.stringContaining("packId=yunque.pack.needs-context"));
+    expect(sourceStudioLink).toHaveAttribute("href", expect.stringContaining("packageUrl=https%3A%2F%2Fexample.com%2Fneeds-context.yqpack"));
+    expect(sourceStudioLink).toHaveAttribute("href", expect.stringContaining("sha256=abc123"));
+    expect(screen.getByRole("link", { name: /回能力包中心/ })).toHaveAttribute("href", "/packs");
+
     const studioLinks = screen.getAllByRole("link", { name: /交给小羽补齐/ });
     expect(studioLinks[0]).toHaveAttribute("href", expect.stringContaining("packageUrl=https%3A%2F%2Fexample.com%2Fneeds-context.yqpack"));
     expect(studioLinks[0]).toHaveAttribute("href", expect.stringContaining("sha256=abc123"));

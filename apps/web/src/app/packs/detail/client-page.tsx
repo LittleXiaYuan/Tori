@@ -6,6 +6,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { Button, Card, Chip, Spinner } from "@heroui/react";
 import {
   ArrowLeft,
+  ArrowRight,
   Boxes,
   ChevronDown,
   ChevronUp,
@@ -473,6 +474,18 @@ export default function PackDetailClientPage() {
             <div className="mt-2 flex flex-wrap gap-2">
               {installSource.sha256 && <Chip size="sm" variant="soft">SHA256 {installSource.sha256}</Chip>}
               {installSource.sizeBytes && <Chip size="sm" variant="soft">{formatBytes(installSource.sizeBytes)}</Chip>}
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Link href={studioHref}>
+                <Button size="sm" variant="outline">
+                  <Sparkles size={14} /> 先在 Studio 只读检查
+                </Button>
+              </Link>
+              <Link href="/packs">
+                <Button size="sm" variant="ghost">
+                  回能力包中心 <ArrowRight size={14} />
+                </Button>
+              </Link>
             </div>
           </Card>
         )}
