@@ -253,6 +253,8 @@ describe("PacksPageOptimized", () => {
     expect(screen.getAllByText("交付状态：后台支撑").length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText("它不一定单独打开，而是在 Chat、任务、记忆、知识或设置流程里被云雀调用。").length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText("下一步：从它声明的用户感知位置验证：能否在主路径里看到效果、结果或状态变化。").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText("权限：读取、写入、沙箱；启用前建议确认")).toBeInTheDocument();
+    expect(screen.getByText("权限：读取；低风险")).toBeInTheDocument();
     expect(screen.getByText("主入口：开始生成文档 · 帮我生成一份可下载的文档")).toBeInTheDocument();
     expect(screen.getByText("主入口：查看最近产物 · 列出我最近生成的文件")).toBeInTheDocument();
     expect(screen.getAllByText("固定方式：没有独立侧栏入口，通常在 Chat、任务或其他能力里自动生效。").length).toBeGreaterThanOrEqual(2);
@@ -338,6 +340,7 @@ describe("PacksPageOptimized", () => {
     expect(screen.getByText("理解权限")).toBeInTheDocument();
     expect(screen.getByText("能力边界")).toBeInTheDocument();
     expect(screen.getByText("回滚路径")).toBeInTheDocument();
+    expect(screen.getByText("权限：读取、写入、沙箱；启用前建议确认")).toBeInTheDocument();
     expect(screen.getByText("来源：官方源 · example.com。安装前可先在 Studio 只读检查包内容、SHA 与 manifest。")).toBeInTheDocument();
     expect(screen.getByText("边界：不会自动泄露 API Key，不会绕过权限声明，也不能调用未声明 route。")).toBeInTheDocument();
     const remoteStudioLink = screen.getAllByRole("link", { name: /小羽优化/ })

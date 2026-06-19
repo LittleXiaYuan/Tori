@@ -46,6 +46,7 @@ import {
   packInstallChecklist,
   packExamples,
   packFeatureFlags,
+  packPermissionSummary,
   packReadiness,
   packUsageExplanation,
   packUsability,
@@ -1332,6 +1333,7 @@ export default function PacksPageOptimized() {
     const usability = packUsability(manifest);
     const readiness = packReadiness(manifest);
     const delivery = packDeliveryProfile(manifest);
+    const permissionSummary = packPermissionSummary(manifest);
     const deliveryStyle = deliveryToneStyle(delivery.tone);
     const usageLines = packUsageExplanation(manifest).slice(0, 3);
     const installChecklist = packInstallChecklist(manifest, {
@@ -1371,6 +1373,9 @@ export default function PacksPageOptimized() {
             {manifest.description && (
               <div className="text-xs mt-2" style={{ color: "var(--yunque-text-secondary)" }}>{manifest.description}</div>
             )}
+            <div className="text-xs mt-2 font-medium" style={{ color: risk.requiresAuthorization ? "var(--yunque-warning)" : "var(--yunque-text-muted)" }}>
+              {permissionSummary}
+            </div>
           </div>
           <Button
             size="sm"
@@ -1511,6 +1516,7 @@ export default function PacksPageOptimized() {
     const usability = packUsability(manifest);
     const readiness = packReadiness(manifest);
     const delivery = packDeliveryProfile(manifest);
+    const permissionSummary = packPermissionSummary(manifest);
     const deliveryStyle = deliveryToneStyle(delivery.tone);
     const usageLines = packUsageExplanation(manifest).slice(0, 3);
     const navItems = navItemsForPack(pack);
@@ -1553,6 +1559,9 @@ export default function PacksPageOptimized() {
               {manifest.description && (
                 <div className="text-xs mt-2" style={{ color: "var(--yunque-text-secondary)" }}>{manifest.description}</div>
               )}
+              <div className="text-xs mt-2 font-medium" style={{ color: risk.requiresAuthorization ? "var(--yunque-warning)" : "var(--yunque-text-muted)" }}>
+                {permissionSummary}
+              </div>
             </div>
           </div>
 
