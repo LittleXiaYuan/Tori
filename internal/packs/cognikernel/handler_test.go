@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -40,6 +42,7 @@ type fakeDependencyProvider struct {
 	workflow    *cogni.WorkflowEngine
 	traces      cogni.TraceStore
 	sentinel    *cogni.Sentinel
+	dir         string
 }
 
 func (p fakeDependencyProvider) CogniBus() *cogni.CogniBus { return p.bus }
@@ -59,6 +62,8 @@ func (p fakeDependencyProvider) CogniWorkflowEngine() *cogni.WorkflowEngine { re
 func (p fakeDependencyProvider) CogniTraceStore() cogni.TraceStore { return p.traces }
 
 func (p fakeDependencyProvider) CogniSentinel() *cogni.Sentinel { return p.sentinel }
+
+func (p fakeDependencyProvider) CogniDirectory() string { return p.dir }
 
 func (fakeRuntimeReporter) CogniKernelRuntimeState() RuntimeStateReport {
 	return RuntimeStateReport{
@@ -126,11 +131,17 @@ func TestCogniKernelHandlerRoutesExposeSurface(t *testing.T) {
 		t.Fatalf("runtime state route is not mounted")
 	}
 
+	registry := cogni.NewRegistry()
+	handler = NewHandlerWithDeps(api, fakeRuntimeReporter{}, Dependencies{
+		RegistryProvider: fakeDependencyProvider{registry: registry},
+	})
+	routes = handler.Routes()
+
 	req := httptest.NewRequest(http.MethodGet, CollectionRoute, nil)
 	w := httptest.NewRecorder()
 	routes[0].Handler(w, req)
-	if w.Code != http.StatusNoContent || api.called != 1 || api.paths[0] != CollectionRoute {
-		t.Fatalf("expected route to delegate to API, status=%d called=%d paths=%v", w.Code, api.called, api.paths)
+	if w.Code != http.StatusOK || api.called != 0 {
+		t.Fatalf("expected collection route to be pack-owned, status=%d called=%d paths=%v", w.Code, api.called, api.paths)
 	}
 
 	runtimeRoutes := handler.RuntimeRoutes()
@@ -187,7 +198,7 @@ func TestCogniKernelRouterOwnsRuntimeStateBeforeAPIDelegation(t *testing.T) {
 		t.Fatalf("runtime pack-state should not delegate to API adapter, called=%d", api.called)
 	}
 
-	req = httptest.NewRequest(http.MethodGet, SubResourceRoute+"reviewer", nil)
+	req = httptest.NewRequest(http.MethodPost, SubResourceRoute+"reviewer/evolve", nil)
 	w = httptest.NewRecorder()
 	router.ServeCogniKernel(w, req)
 	if w.Code != http.StatusNoContent || api.called != 1 {
@@ -231,6 +242,143 @@ func TestCogniKernelRouterOwnsRouteDecision(t *testing.T) {
 	}
 	if len(result.SelectedIDs) != 1 || result.SelectedIDs[0] != "reviewer" {
 		t.Fatalf("expected reviewer to win, got %v (bids=%v)", result.SelectedIDs, result.AllBids)
+	}
+}
+
+func TestCogniKernelRouterOwnsRegistryLifecycle(t *testing.T) {
+	api := &fakeCogniAPI{}
+	registry := cogni.NewRegistry()
+	store := cogni.NewInMemoryTraceStore(10)
+	store.Record(cogni.Trace{
+		Activations: []cogni.TraceActivation{{
+			ID:        "reviewer",
+			Activated: true,
+			Score:     0.9,
+		}},
+	})
+	router := NewRouterWithDeps(api, fakeRuntimeReporter{}, Dependencies{
+		RegistryProvider:   fakeDependencyProvider{registry: registry},
+		TraceStoreProvider: fakeDependencyProvider{traces: store},
+	})
+
+	body, _ := json.Marshal(cogni.Declaration{
+		ID:          "reviewer",
+		DisplayName: "Reviewer",
+		Activation:  cogni.ActivationRules{AlwaysOn: true},
+	})
+	req := httptest.NewRequest(http.MethodPost, CollectionRoute, bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	router.ServeCogniKernel(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("create status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodGet, CollectionRoute, nil)
+	w = httptest.NewRecorder()
+	router.ServeCogniKernel(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("list status=%d body=%s", w.Code, w.Body.String())
+	}
+	var list map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &list); err != nil {
+		t.Fatalf("decode list: %v", err)
+	}
+	if list["count"].(float64) != 1 {
+		t.Fatalf("expected one cogni, got %#v", list)
+	}
+	health := list["health"].(map[string]any)
+	if _, ok := health["reviewer"]; !ok {
+		t.Fatalf("expected reviewer health summary, got %#v", health)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/cognis/reviewer", nil)
+	w = httptest.NewRecorder()
+	router.ServeCogniKernel(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("get status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/cognis/reviewer/disable", nil)
+	w = httptest.NewRecorder()
+	router.ServeCogniKernel(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("disable status=%d body=%s", w.Code, w.Body.String())
+	}
+	if registry.IsEnabled("reviewer") {
+		t.Fatalf("reviewer should be disabled")
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/cognis/reviewer/enable", nil)
+	w = httptest.NewRecorder()
+	router.ServeCogniKernel(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("enable status=%d body=%s", w.Code, w.Body.String())
+	}
+	if !registry.IsEnabled("reviewer") {
+		t.Fatalf("reviewer should be enabled")
+	}
+
+	req = httptest.NewRequest(http.MethodDelete, "/v1/cognis/reviewer", nil)
+	w = httptest.NewRecorder()
+	router.ServeCogniKernel(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("delete status=%d body=%s", w.Code, w.Body.String())
+	}
+	if _, ok := registry.Get("reviewer"); ok {
+		t.Fatalf("reviewer should be removed")
+	}
+	if api.called != 0 {
+		t.Fatalf("registry lifecycle should not delegate to API adapter, called=%d", api.called)
+	}
+}
+
+func TestCogniKernelRouterOwnsReload(t *testing.T) {
+	api := &fakeCogniAPI{}
+	registry := cogni.NewRegistry()
+	dir := t.TempDir()
+	decl := &cogni.Declaration{
+		ID:         "from-disk",
+		Activation: cogni.ActivationRules{AlwaysOn: true},
+	}
+	if err := cogni.SaveDeclaration(decl, filepath.Join(dir, "from-disk.json")); err != nil {
+		t.Fatalf("save declaration: %v", err)
+	}
+	router := NewRouterWithDeps(api, fakeRuntimeReporter{}, Dependencies{
+		RegistryProvider:  fakeDependencyProvider{registry: registry},
+		DirectoryProvider: fakeDependencyProvider{dir: dir},
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/cognis/reload", nil)
+	w := httptest.NewRecorder()
+	router.ServeCogniKernel(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("reload status=%d body=%s", w.Code, w.Body.String())
+	}
+	var result map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
+		t.Fatalf("decode reload: %v", err)
+	}
+	if result["added"].(float64) != 1 || result["dir"] != dir {
+		t.Fatalf("unexpected reload result: %#v", result)
+	}
+	if _, ok := registry.Get("from-disk"); !ok {
+		t.Fatalf("from-disk declaration should be loaded")
+	}
+
+	if err := os.Remove(filepath.Join(dir, "from-disk.json")); err != nil {
+		t.Fatalf("remove declaration: %v", err)
+	}
+	req = httptest.NewRequest(http.MethodPost, "/v1/cognis/reload", nil)
+	w = httptest.NewRecorder()
+	router.ServeCogniKernel(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("reload remove status=%d body=%s", w.Code, w.Body.String())
+	}
+	if _, ok := registry.Get("from-disk"); ok {
+		t.Fatalf("from-disk declaration should be removed after reload")
+	}
+	if api.called != 0 {
+		t.Fatalf("reload should not delegate to API adapter, called=%d", api.called)
 	}
 }
 
@@ -689,7 +837,7 @@ func TestCogniKernelRouterRouteDecisionRequiresBus(t *testing.T) {
 func TestCogniKernelRouterReportsMissingAPIAdapter(t *testing.T) {
 	router := NewRouter(nil, fakeRuntimeReporter{})
 
-	req := httptest.NewRequest(http.MethodGet, CollectionRoute, nil)
+	req := httptest.NewRequest(http.MethodPost, SubResourceRoute+"reviewer/evolve", nil)
 	w := httptest.NewRecorder()
 	router.ServeCogniKernel(w, req)
 	if w.Code != http.StatusServiceUnavailable {

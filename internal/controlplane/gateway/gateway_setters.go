@@ -770,6 +770,9 @@ func (g *Gateway) SetCogniRegistry(r *cogni.Registry, dir string) {
 // CogniRegistry exposes the Cogni declaration registry to the Cogni Kernel pack.
 func (g *Gateway) CogniRegistry() *cogni.Registry { return g.cogniRegistry }
 
+// CogniDirectory exposes the declaration directory to the Cogni Kernel pack for reloads.
+func (g *Gateway) CogniDirectory() string { return g.cogniDir }
+
 // SetCogniKernelRuntimeStateHandler attaches a read-only Pack Runtime state
 // reporter owned by the Cogni Kernel module. It is intentionally separate from
 // the broad /v1/cognis/ bridge route so Pack Runtime can keep a method-aware

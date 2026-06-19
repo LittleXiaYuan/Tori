@@ -42,7 +42,7 @@ func (g *Gateway) handleCognis(w http.ResponseWriter, r *http.Request) {
 
 	switch {
 	case path == "":
-		g.cogniCollection(w, r)
+		apperror.WriteCode(w, apperror.CodeNotFound, "cogni collection is owned by cogni-kernel pack")
 	case path == "runtime/pack-state":
 		if g.cogniKernelRuntimeState == nil {
 			apperror.WriteCode(w, apperror.CodeInternal, "cogni runtime state reporter not configured")
@@ -50,7 +50,7 @@ func (g *Gateway) handleCognis(w http.ResponseWriter, r *http.Request) {
 		}
 		g.cogniKernelRuntimeState(w, r)
 	case path == "reload":
-		g.cogniReload(w, r)
+		apperror.WriteCode(w, apperror.CodeNotFound, "cogni reload is owned by cogni-kernel pack")
 	case path == "generate":
 		g.cogniGenerate(w, r)
 	case path == "export":
@@ -64,11 +64,11 @@ func (g *Gateway) handleCognis(w http.ResponseWriter, r *http.Request) {
 		id := segs[0]
 		switch {
 		case len(segs) == 1:
-			g.cogniByID(w, r, id)
+			apperror.WriteCode(w, apperror.CodeNotFound, "cogni declaration route is owned by cogni-kernel pack")
 		case len(segs) == 2 && segs[1] == "enable":
-			g.cogniSetEnabled(w, r, id, true)
+			apperror.WriteCode(w, apperror.CodeNotFound, "cogni enable route is owned by cogni-kernel pack")
 		case len(segs) == 2 && segs[1] == "disable":
-			g.cogniSetEnabled(w, r, id, false)
+			apperror.WriteCode(w, apperror.CodeNotFound, "cogni disable route is owned by cogni-kernel pack")
 		case len(segs) == 2 && segs[1] == "evolve":
 			g.cogniEvolve(w, r, id)
 		case len(segs) == 2 && segs[1] == "evolution":
@@ -179,121 +179,6 @@ func (g *Gateway) cogniImportBundle(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(summary)
-}
-
-func (g *Gateway) cogniCollection(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	switch r.Method {
-	case http.MethodGet:
-		entries := g.cogniRegistry.List()
-		health := map[string]cogni.HealthMetrics{}
-		if g.cogniTraces != nil {
-			mon := cogni.NewMonitor(g.cogniTraces)
-			for _, hm := range mon.ComputeAll(0) {
-				health[hm.ID] = hm
-			}
-		}
-		json.NewEncoder(w).Encode(map[string]any{
-			"cognis":  entries,
-			"health":  health,
-			"count":   len(entries),
-			"version": g.cogniRegistry.Version(),
-			"dir":     g.cogniDir,
-		})
-	case http.MethodPost:
-		var d cogni.Declaration
-		if err := json.NewDecoder(r.Body).Decode(&d); err != nil {
-			apperror.WriteCode(w, apperror.CodeBadRequest, "invalid JSON body: "+err.Error())
-			return
-		}
-		if err := g.cogniRegistry.Add(&d, "api"); err != nil {
-			apperror.WriteCode(w, apperror.CodeBadRequest, err.Error())
-			return
-		}
-		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(map[string]any{"status": "ok", "id": d.ID})
-	default:
-		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET or POST")
-	}
-}
-
-func (g *Gateway) cogniByID(w http.ResponseWriter, r *http.Request, id string) {
-	w.Header().Set("Content-Type", "application/json")
-	switch r.Method {
-	case http.MethodGet:
-		decl, ok := g.cogniRegistry.Get(id)
-		if !ok {
-			apperror.WriteCode(w, apperror.CodeNotFound, "cogni not found: "+id)
-			return
-		}
-		json.NewEncoder(w).Encode(map[string]any{
-			"id":          decl.ID,
-			"declaration": decl,
-			"enabled":     g.cogniRegistry.IsEnabled(id),
-		})
-	case http.MethodDelete:
-		if !g.cogniRegistry.Remove(id) {
-			apperror.WriteCode(w, apperror.CodeNotFound, "cogni not found: "+id)
-			return
-		}
-		json.NewEncoder(w).Encode(map[string]any{"status": "removed", "id": id})
-	default:
-		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET or DELETE")
-	}
-}
-
-func (g *Gateway) cogniSetEnabled(w http.ResponseWriter, r *http.Request, id string, enabled bool) {
-	if r.Method != http.MethodPost {
-		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "POST only")
-		return
-	}
-	if err := g.cogniRegistry.SetEnabled(id, enabled); err != nil {
-		apperror.WriteCode(w, apperror.CodeNotFound, err.Error())
-		return
-	}
-	state := "disabled"
-	if enabled {
-		state = "enabled"
-	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{"status": state, "id": id})
-}
-
-func (g *Gateway) cogniReload(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "POST only")
-		return
-	}
-	dir := g.cogniDir
-	if dir == "" {
-		apperror.WriteCode(w, apperror.CodeInternal, "cogni directory not configured")
-		return
-	}
-	summary, err := g.cogniRegistry.ReloadFromDir(dir)
-	if err != nil {
-		apperror.WriteCode(w, apperror.CodeInternal, err.Error())
-		return
-	}
-
-	errs := make([]map[string]string, 0, len(summary.Errors))
-	for _, e := range summary.Errors {
-		errs = append(errs, map[string]string{
-			"file":  filepath.Base(e.Path),
-			"path":  e.Path,
-			"error": e.Err.Error(),
-		})
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{
-		"status":  "ok",
-		"dir":     dir,
-		"added":   summary.Added,
-		"updated": summary.Updated,
-		"removed": summary.Removed,
-		"errors":  errs,
-		"version": g.cogniRegistry.Version(),
-	})
 }
 
 // ── Self-Genesis handler ──

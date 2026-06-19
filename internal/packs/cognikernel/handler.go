@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -71,6 +72,10 @@ type SentinelProvider interface {
 	CogniSentinel() *cogni.Sentinel
 }
 
+type DirectoryProvider interface {
+	CogniDirectory() string
+}
+
 type Dependencies struct {
 	BusProvider         BusProvider
 	FederationProvider  FederationProvider
@@ -80,6 +85,7 @@ type Dependencies struct {
 	WorkflowProvider    WorkflowEngineProvider
 	TraceStoreProvider  TraceStoreProvider
 	SentinelProvider    SentinelProvider
+	DirectoryProvider   DirectoryProvider
 }
 
 type RuntimeStateReport struct {
@@ -172,6 +178,7 @@ type Router struct {
 	workflowProvider   WorkflowEngineProvider
 	traceProvider      TraceStoreProvider
 	sentinelProvider   SentinelProvider
+	directoryProvider  DirectoryProvider
 }
 
 func NewRouter(api API, reporter RuntimeStateReporter) *Router {
@@ -195,6 +202,7 @@ func NewRouterWithDeps(api API, reporter RuntimeStateReporter, deps Dependencies
 		workflowProvider:   deps.WorkflowProvider,
 		traceProvider:      deps.TraceStoreProvider,
 		sentinelProvider:   deps.SentinelProvider,
+		directoryProvider:  deps.DirectoryProvider,
 	}
 }
 
@@ -232,6 +240,9 @@ func (r *Router) RuntimeRoutes() []packruntime.BackendRoute {
 }
 
 func (r *Router) ServeCogniKernel(w http.ResponseWriter, req *http.Request) {
+	if r.serveRegistry(w, req) {
+		return
+	}
 	if r.serveExperience(w, req) {
 		return
 	}
@@ -249,6 +260,180 @@ func (r *Router) ServeCogniKernel(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	r.api.ServeCogniKernel(w, req)
+}
+
+func (r *Router) serveRegistry(w http.ResponseWriter, req *http.Request) bool {
+	path := strings.TrimPrefix(req.URL.Path, CollectionRoute)
+	path = strings.Trim(path, "/")
+	if path == "" {
+		r.HandleCollection(w, req)
+		return true
+	}
+	if path == "reload" {
+		r.HandleReload(w, req)
+		return true
+	}
+
+	segs := strings.Split(path, "/")
+	if len(segs) == 1 {
+		if reservedCogniTopLevel(segs[0]) {
+			return false
+		}
+		r.HandleByID(w, req, segs[0])
+		return true
+	}
+	if len(segs) == 2 {
+		switch segs[1] {
+		case "enable":
+			r.HandleSetEnabled(w, req, segs[0], true)
+			return true
+		case "disable":
+			r.HandleSetEnabled(w, req, segs[0], false)
+			return true
+		}
+	}
+	return false
+}
+
+func reservedCogniTopLevel(path string) bool {
+	switch path {
+	case "runtime", "generate", "export", "import", "evolution", "federation", "economics", "route",
+		"traces", "stats", "health", "alerts", "verify", "reload":
+		return true
+	default:
+		return false
+	}
+}
+
+func (r *Router) HandleCollection(w http.ResponseWriter, req *http.Request) {
+	registry := r.cogniRegistry()
+	if registry == nil {
+		apperror.WriteCode(w, apperror.CodeInternal, "cogni registry not configured")
+		return
+	}
+	switch req.Method {
+	case http.MethodGet:
+		entries := registry.List()
+		health := map[string]cogni.HealthMetrics{}
+		if traces := r.cogniTraceStore(); traces != nil {
+			mon := cogni.NewMonitor(traces)
+			for _, hm := range mon.ComputeAll(0) {
+				health[hm.ID] = hm
+			}
+		}
+		writeJSON(w, map[string]any{
+			"cognis":  entries,
+			"health":  health,
+			"count":   len(entries),
+			"version": registry.Version(),
+			"dir":     r.cogniDirectory(),
+		})
+	case http.MethodPost:
+		var d cogni.Declaration
+		if err := json.NewDecoder(req.Body).Decode(&d); err != nil {
+			apperror.WriteCode(w, apperror.CodeBadRequest, "invalid JSON body: "+err.Error())
+			return
+		}
+		if err := registry.Add(&d, "api"); err != nil {
+			apperror.WriteCode(w, apperror.CodeBadRequest, err.Error())
+			return
+		}
+		w.WriteHeader(http.StatusCreated)
+		writeJSON(w, map[string]any{"status": "ok", "id": d.ID})
+	default:
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET or POST")
+	}
+}
+
+func (r *Router) HandleByID(w http.ResponseWriter, req *http.Request, id string) {
+	registry := r.cogniRegistry()
+	if registry == nil {
+		apperror.WriteCode(w, apperror.CodeInternal, "cogni registry not configured")
+		return
+	}
+	switch req.Method {
+	case http.MethodGet:
+		decl, ok := registry.Get(id)
+		if !ok {
+			apperror.WriteCode(w, apperror.CodeNotFound, "cogni not found: "+id)
+			return
+		}
+		writeJSON(w, map[string]any{
+			"id":          decl.ID,
+			"declaration": decl,
+			"enabled":     registry.IsEnabled(id),
+		})
+	case http.MethodDelete:
+		if !registry.Remove(id) {
+			apperror.WriteCode(w, apperror.CodeNotFound, "cogni not found: "+id)
+			return
+		}
+		writeJSON(w, map[string]any{"status": "removed", "id": id})
+	default:
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET or DELETE")
+	}
+}
+
+func (r *Router) HandleSetEnabled(w http.ResponseWriter, req *http.Request, id string, enabled bool) {
+	if req.Method != http.MethodPost {
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "POST only")
+		return
+	}
+	registry := r.cogniRegistry()
+	if registry == nil {
+		apperror.WriteCode(w, apperror.CodeInternal, "cogni registry not configured")
+		return
+	}
+	if err := registry.SetEnabled(id, enabled); err != nil {
+		apperror.WriteCode(w, apperror.CodeNotFound, err.Error())
+		return
+	}
+	state := "disabled"
+	if enabled {
+		state = "enabled"
+	}
+	writeJSON(w, map[string]any{"status": state, "id": id})
+}
+
+func (r *Router) HandleReload(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "POST only")
+		return
+	}
+	registry := r.cogniRegistry()
+	if registry == nil {
+		apperror.WriteCode(w, apperror.CodeInternal, "cogni registry not configured")
+		return
+	}
+	dir := r.cogniDirectory()
+	if dir == "" {
+		apperror.WriteCode(w, apperror.CodeInternal, "cogni directory not configured")
+		return
+	}
+	summary, err := registry.ReloadFromDir(dir)
+	if err != nil {
+		apperror.WriteCode(w, apperror.CodeInternal, err.Error())
+		return
+	}
+
+	errs := make([]map[string]string, 0, len(summary.Errors))
+	for _, e := range summary.Errors {
+		errs = append(errs, map[string]string{
+			"file":  filepath.Base(e.Path),
+			"path":  e.Path,
+			"error": e.Err.Error(),
+		})
+	}
+
+	writeJSON(w, map[string]any{
+		"status":  "ok",
+		"dir":     dir,
+		"added":   summary.Added,
+		"updated": summary.Updated,
+		"removed": summary.Removed,
+		"errors":  errs,
+		"version": registry.Version(),
+	})
 }
 
 func (r *Router) HandleFederationStatus(w http.ResponseWriter, req *http.Request) {
@@ -825,6 +1010,13 @@ func (r *Router) cogniSentinel() *cogni.Sentinel {
 	return r.sentinelProvider.CogniSentinel()
 }
 
+func (r *Router) cogniDirectory() string {
+	if r == nil || r.directoryProvider == nil {
+		return ""
+	}
+	return r.directoryProvider.CogniDirectory()
+}
+
 func (r *Router) cogniFederation() *cogni.CogniFederation {
 	if r == nil || r.federationProvider == nil {
 		return nil
@@ -939,6 +1131,9 @@ func inferDependencies(api API) Dependencies {
 	if inferred, ok := api.(SentinelProvider); ok {
 		deps.SentinelProvider = inferred
 	}
+	if inferred, ok := api.(DirectoryProvider); ok {
+		deps.DirectoryProvider = inferred
+	}
 	return deps
 }
 
@@ -966,6 +1161,9 @@ func mergeDependencies(primary, fallback Dependencies) Dependencies {
 	}
 	if primary.SentinelProvider == nil {
 		primary.SentinelProvider = fallback.SentinelProvider
+	}
+	if primary.DirectoryProvider == nil {
+		primary.DirectoryProvider = fallback.DirectoryProvider
 	}
 	return primary
 }
