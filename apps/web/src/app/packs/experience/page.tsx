@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Card, Spinner, Chip } from "@heroui/react";
-import { History, ThumbsUp, User, Trophy, AlertTriangle } from "lucide-react";
+import Link from "next/link";
+import { Button, Card, Spinner, Chip } from "@heroui/react";
+import { History, ThumbsUp, User, Trophy, AlertTriangle, Send, ClipboardList } from "lucide-react";
 import PageHeader from "@/components/page-header";
 import { formatErrorMessage } from "@/lib/error-utils";
+import { chatPromptHref, taskDetailHref } from "@/lib/pack-action-links";
 import {
   createExperiencePackClient,
   type Recommendation,
@@ -13,6 +15,27 @@ import {
 } from "@/lib/experience-pack-client";
 
 const experience = createExperiencePackClient();
+
+function useRecommendationPrompt(item: Recommendation): string {
+  return [
+    "请基于云雀当前推荐的能力，帮我设计下一步任务方案：",
+    `推荐项：${item.item_id}`,
+    `推荐原因：${item.reason}`,
+    `置信度：${(item.confidence * 100).toFixed(0)}%`,
+  ].join("\n");
+}
+
+function improveFromEvaluationPrompt(item: EvaluationEntry): string {
+  return [
+    "请根据这次任务自评，帮我总结可复用经验，并给出下一次怎么做会更好：",
+    `任务 ID：${item.task_id}`,
+    `质量：${(item.quality_score * 100).toFixed(0)}%`,
+    `目标达成：${(item.goal_achieved * 100).toFixed(0)}%`,
+    `效率：${(item.efficiency * 100).toFixed(0)}%`,
+    item.reasoning ? `自评原因：${item.reasoning}` : "",
+    item.suggestions?.length ? `建议：${item.suggestions.join("；")}` : "",
+  ].filter(Boolean).join("\n");
+}
 
 function formatTimestamp(iso: string): string {
   if (!iso) return "—";
@@ -91,6 +114,13 @@ function RecommendationsColumn({ items, loading }: { items: Recommendation[]; lo
                 </div>
                 <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>
                   置信度 {(r.confidence * 100).toFixed(0)}%
+                </div>
+                <div className="mt-2">
+                  <Link href={chatPromptHref(useRecommendationPrompt(r))}>
+                    <Button size="sm" variant="ghost">
+                      <Send size={13} /> 用它规划任务
+                    </Button>
+                  </Link>
                 </div>
               </div>
             );
@@ -205,6 +235,20 @@ function EvaluationsColumn({ items, loading }: { items: EvaluationEntry[]; loadi
                     ))}
                   </ul>
                 ) : null}
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Link href={chatPromptHref(improveFromEvaluationPrompt(e))}>
+                    <Button size="sm" variant="ghost">
+                      <Send size={13} /> 让云雀改进
+                    </Button>
+                  </Link>
+                  {e.task_id ? (
+                    <Link href={taskDetailHref(e.task_id)}>
+                      <Button size="sm" variant="ghost">
+                        <ClipboardList size={13} /> 查看任务
+                      </Button>
+                    </Link>
+                  ) : null}
+                </div>
               </div>
             );
           })}

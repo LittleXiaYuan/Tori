@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Card, Spinner, Chip } from "@heroui/react";
-import { GraduationCap, MoonStar, Lightbulb, User, AlertTriangle } from "lucide-react";
+import Link from "next/link";
+import { Button, Card, Spinner, Chip } from "@heroui/react";
+import { GraduationCap, MoonStar, Lightbulb, User, AlertTriangle, Send, ClipboardList } from "lucide-react";
 import PageHeader from "@/components/page-header";
 import { formatErrorMessage } from "@/lib/error-utils";
+import { chatPromptHref, taskDetailHref } from "@/lib/pack-action-links";
 import {
   createNightSchoolPackClient,
   type DreamEntry,
@@ -13,6 +15,15 @@ import {
 } from "@/lib/night-school-pack-client";
 
 const nightSchool = createNightSchoolPackClient();
+
+function applyDistillPrompt(entry: DistillEntry): string {
+  return [
+    "请把这条夜校蒸馏出的经验应用到我接下来的任务里，并告诉我应该怎么改进工作方式：",
+    `类型：${entry.key}`,
+    `经验：${entry.content}`,
+    entry.task_id ? `来源任务：${entry.task_id}` : "",
+  ].filter(Boolean).join("\n");
+}
 
 function formatTimestamp(iso: string): string {
   if (!iso) return "—";
@@ -178,6 +189,20 @@ function DistillCard({
       </div>
       <div className="whitespace-pre-line" style={{ color: "var(--yunque-text)" }}>
         {entry.content}
+      </div>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <Link href={chatPromptHref(applyDistillPrompt(entry))}>
+          <Button size="sm" variant="ghost">
+            <Send size={13} /> 应用这条经验
+          </Button>
+        </Link>
+        {entry.task_id ? (
+          <Link href={taskDetailHref(entry.task_id)}>
+            <Button size="sm" variant="ghost">
+              <ClipboardList size={13} /> 查看来源任务
+            </Button>
+          </Link>
+        ) : null}
       </div>
     </div>
   );

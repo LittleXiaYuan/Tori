@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Button, Card, Chip, Input, Label, Spinner, TextField } from "@heroui/react";
 import { Activity, ListFilter, RefreshCw, Search } from "lucide-react";
 import EmptyState from "@/components/empty-state";
@@ -20,6 +21,7 @@ const modeOptions: Array<{ key: TraceMode; label: string; placeholder: string }>
 ];
 
 export default function TracePage() {
+  const searchParams = useSearchParams();
   const [mode, setMode] = useState<TraceMode>("recent");
   const [query, setQuery] = useState("");
   const [data, setData] = useState<TraceEventsResponse | null>(null);
@@ -50,6 +52,20 @@ export default function TracePage() {
   }, [mode, query]);
 
   useEffect(() => {
+    const task = searchParams.get("task");
+    const trace = searchParams.get("trace");
+    if (task) {
+      setMode("task");
+      setQuery(task);
+      void load("task", task);
+      return;
+    }
+    if (trace) {
+      setMode("trace");
+      setQuery(trace);
+      void load("trace", trace);
+      return;
+    }
     void load("recent", "");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

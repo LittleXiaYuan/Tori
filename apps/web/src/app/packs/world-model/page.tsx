@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { Card, Spinner, Chip, Input, Button } from "@heroui/react";
-import { Globe, Clock, AlertOctagon, GitBranch, AlertTriangle } from "lucide-react";
+import { Globe, Clock, AlertOctagon, GitBranch, AlertTriangle, Send, ClipboardList, Activity } from "lucide-react";
 import PageHeader from "@/components/page-header";
 import { formatErrorMessage } from "@/lib/error-utils";
+import { chatPromptHref, taskDetailHref, traceTaskHref } from "@/lib/pack-action-links";
 import {
   createWorldModelPackClient,
   type WorldStateEntry,
@@ -13,6 +15,28 @@ import {
 } from "@/lib/world-model-pack-client";
 
 const worldClient = createWorldModelPackClient();
+
+function investigatePatternPrompt(pattern: FailurePattern): string {
+  return [
+    "请基于这条世界模型发现的失败模式，给我一个规避方案和下一步验证计划：",
+    `因果：${pattern.cause_kind} → ${pattern.effect_kind}`,
+    `机制：${pattern.mechanism}`,
+    `出现次数：${pattern.occurrences}`,
+    pattern.task_ids?.length ? `相关任务：${pattern.task_ids.join("、")}` : "",
+  ].filter(Boolean).join("\n");
+}
+
+function fixRootCausePrompt(taskId: string, chain: CausalChain): string {
+  return [
+    "请基于这条根因链，帮我制定修复方案。先说明根因，再给出最小可执行下一步：",
+    `任务 ID：${taskId}`,
+    `根因：${chain.root_cause}`,
+    `最终影响：${chain.final_effect}`,
+    chain.links.length
+      ? `因果链：${chain.links.map((link) => `${link.cause_kind} -> ${link.effect_kind}: ${link.mechanism}`).join("；")}`
+      : "",
+  ].filter(Boolean).join("\n");
+}
 
 function formatTimestamp(iso: string): string {
   if (!iso) return "—";
@@ -155,6 +179,20 @@ function FailurePatternsColumn({ items, loading }: { items: FailurePattern[]; lo
                   {p.task_ids.length > 3 ? ` (+${p.task_ids.length - 3})` : ""}
                 </div>
               ) : null}
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Link href={chatPromptHref(investigatePatternPrompt(p))}>
+                  <Button size="sm" variant="ghost">
+                    <Send size={13} /> 生成规避方案
+                  </Button>
+                </Link>
+                {p.task_ids?.[0] ? (
+                  <Link href={taskDetailHref(p.task_ids[0])}>
+                    <Button size="sm" variant="ghost">
+                      <ClipboardList size={13} /> 查看样例任务
+                    </Button>
+                  </Link>
+                ) : null}
+              </div>
             </div>
           ))}
         </div>
@@ -234,6 +272,23 @@ function RootCauseColumn({
               </div>
             </div>
           ))}
+          <div className="flex flex-wrap gap-2 pt-1">
+            <Link href={chatPromptHref(fixRootCausePrompt(taskId, chain))}>
+              <Button size="sm" variant="ghost">
+                <Send size={13} /> 生成修复方案
+              </Button>
+            </Link>
+            <Link href={taskDetailHref(taskId)}>
+              <Button size="sm" variant="ghost">
+                <ClipboardList size={13} /> 查看任务
+              </Button>
+            </Link>
+            <Link href={traceTaskHref(taskId)}>
+              <Button size="sm" variant="ghost">
+                <Activity size={13} /> 查看轨迹
+              </Button>
+            </Link>
+          </div>
         </div>
       )}
     </Card>

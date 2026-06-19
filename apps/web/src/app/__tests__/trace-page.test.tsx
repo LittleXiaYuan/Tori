@@ -8,9 +8,14 @@ const traceClient = vi.hoisted(() => ({
   byTask: vi.fn(),
   byTrace: vi.fn(),
 }));
+let queryString = "";
 
 vi.mock("@/lib/trace-pack-client", () => ({
   createTracePackClient: vi.fn(() => traceClient),
+}));
+
+vi.mock("next/navigation", () => ({
+  useSearchParams: () => new URLSearchParams(queryString),
 }));
 
 vi.mock("@/components/execution-trace", () => ({
@@ -35,6 +40,7 @@ function traceEvent(id: string, summary: string) {
 
 describe("TracePage", () => {
   beforeEach(() => {
+    queryString = "";
     vi.mocked(createTracePackClient).mockClear();
     traceClient.recent.mockReset();
     traceClient.byTask.mockReset();
@@ -90,5 +96,15 @@ describe("TracePage", () => {
     await waitFor(() => expect(traceClient.byTrace).toHaveBeenCalledWith("trace-42"));
     expect(await screen.findByText(/Trace 已回放/)).toBeInTheDocument();
     expect(screen.getByText("Raw")).toBeInTheDocument();
+  });
+
+  it("loads task trace directly from the task query parameter", async () => {
+    queryString = "task=task-42";
+
+    render(<TracePage />);
+
+    await waitFor(() => expect(traceClient.byTask).toHaveBeenCalledWith("task-42"));
+    expect(await screen.findByText(/任务步骤已完成/)).toBeInTheDocument();
+    expect(traceClient.recent).not.toHaveBeenCalled();
   });
 });

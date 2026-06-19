@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Card, Spinner, Chip } from "@heroui/react";
-import { Sparkles, Compass, Brain, MoonStar, AlertTriangle } from "lucide-react";
+import Link from "next/link";
+import { Button, Card, Spinner, Chip } from "@heroui/react";
+import { Sparkles, Compass, Brain, MoonStar, AlertTriangle, Send } from "lucide-react";
 import PageHeader from "@/components/page-header";
 import { formatErrorMessage } from "@/lib/error-utils";
+import { chatPromptHref } from "@/lib/pack-action-links";
 import {
   createInnerLifePackClient,
   type CuriosityQuestion,
@@ -33,6 +35,15 @@ function asNumber(v: unknown): number | null {
   if (typeof v === "number") return v;
   if (typeof v === "string" && v !== "" && !Number.isNaN(Number(v))) return Number(v);
   return null;
+}
+
+function exploreCuriosityPrompt(q: CuriosityQuestion): string {
+  return [
+    "请基于这条好奇心问题继续探索，并给出可执行的下一步：",
+    `问题：${q.question}`,
+    q.context ? `背景：${q.context}` : "",
+    q.related_to && q.related_to.length > 0 ? `相关线索：${q.related_to.join("、")}` : "",
+  ].filter(Boolean).join("\n");
 }
 
 function ColumnHeader({
@@ -102,6 +113,13 @@ function CuriosityColumn({ items, loading }: { items: CuriosityQuestion[]; loadi
                   {q.context}
                 </div>
               ) : null}
+              <div className="mt-2">
+                <Link href={chatPromptHref(exploreCuriosityPrompt(q))}>
+                  <Button size="sm" variant="ghost">
+                    <Send size={13} /> 继续探索
+                  </Button>
+                </Link>
+              </div>
             </div>
           ))}
         </div>
