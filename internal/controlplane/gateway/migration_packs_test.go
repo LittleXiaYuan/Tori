@@ -47,6 +47,7 @@ import (
 	speechpack "yunque-agent/internal/packs/speech"
 	statepack "yunque-agent/internal/packs/state"
 	subagentspack "yunque-agent/internal/packs/subagents"
+	tracepack "yunque-agent/internal/packs/trace"
 	triggerspack "yunque-agent/internal/packs/triggers"
 	workpack "yunque-agent/internal/packs/work"
 	"yunque-agent/pkg/packruntime"
@@ -100,6 +101,7 @@ var migrationPackPaths = map[string][]string{
 	skillhubpack.PackID:      skillhubpack.Paths(),
 	speechpack.PackID:        speechpack.Paths(),
 	subagentspack.PackID:     subagentspack.Paths(),
+	tracepack.PackID:         tracepack.Paths(),
 	// Monolith route groups extracted into native packs (Tier 0 microkernel).
 	modespack.PackID: {"/v1/persona/modes", "/v1/persona/mode", "/v1/persona/mode/current"},
 	reveriepack.PackID: {
@@ -144,6 +146,7 @@ var migrationPackNames = map[string]string{
 	skillhubpack.PackID:      "SkillHub",
 	speechpack.PackID:        "Speech",
 	subagentspack.PackID:     "Subagents",
+	tracepack.PackID:         "Trace",
 	modespack.PackID:         "Persona Modes",
 	reveriepack.PackID:       "Reverie",
 	idepack.PackID:           "IDE",
@@ -209,6 +212,7 @@ func registerMigrationPacks(gw *Gateway) {
 	_ = gw.RegisterModule(skillhubpack.New(gw))
 	_ = gw.RegisterModule(speechpack.New(gw))
 	_ = gw.RegisterModule(subagentspack.New(gw))
+	_ = gw.RegisterModule(tracepack.New(gw))
 	// Native monolith-extracted packs (mirror cmd/agent/init_task_engine.go).
 	_ = gw.RegisterModule(modespack.New(gw))
 	_ = gw.RegisterModule(reveriepack.New(gw))
@@ -304,6 +308,8 @@ func newTestGatewayWithMigrationPack(t *testing.T, packID string, status packrun
 		_ = gw.RegisterModule(speechpack.New(nil))
 	case subagentspack.PackID:
 		_ = gw.RegisterModule(subagentspack.New(gw))
+	case tracepack.PackID:
+		_ = gw.RegisterModule(tracepack.New(gw))
 	case statepack.PackID:
 		_ = gw.RegisterModule(statepack.New(gw))
 	}
@@ -344,6 +350,7 @@ func TestMigrationPackRouteGating(t *testing.T) {
 		{"skillhub", skillhubpack.PackID, "/api/skillhub/search"},
 		{"speech", speechpack.PackID, "/v1/speech/voices"},
 		{"subagents", subagentspack.PackID, "/v1/subagent"},
+		{"trace", tracepack.PackID, "/v1/trace/recent"},
 		{"state", statepack.PackID, "/v1/state"},
 	}
 	for _, tc := range cases {

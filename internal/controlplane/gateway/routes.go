@@ -242,9 +242,8 @@ func (g *Gateway) registerSSERoutes() {
 }
 
 func (g *Gateway) registerTraceRoutes() {
-	g.mux.HandleFunc("/v1/trace/recent", g.requireAuth(g.handleTraceRecent))
-	g.mux.HandleFunc("/v1/trace/task/", g.requireAuth(g.handleTraceByTask))
-	g.mux.HandleFunc("/v1/trace/", g.requireAuth(g.handleTraceByID))
+	// Execution trace routes (/v1/trace*) are owned by the trace pack
+	// (internal/packs/trace), mounted via gw.RegisterModule.
 }
 
 // ──────────────────────────────────────────────

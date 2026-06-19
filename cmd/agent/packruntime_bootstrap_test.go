@@ -293,6 +293,23 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 		t.Fatal("expected Subagents message routeSpec")
 	}
 
+	tracePack, ok := registry.Get("yunque.pack.trace")
+	if !ok {
+		t.Fatal("expected Trace builtin pack to be installed")
+	}
+	if tracePack.Status != packruntime.PackStatusEnabled {
+		t.Fatalf("expected Trace default enabled, got %s", tracePack.Status)
+	}
+	if tracePack.Manifest.SDK.TypeScript != "yunque-client/trace" {
+		t.Fatalf("unexpected Trace SDK import: %s", tracePack.Manifest.SDK.TypeScript)
+	}
+	if !hasRouteSpec(tracePack.Manifest.Backend.RouteSpecs, "GET", "/v1/trace/recent") {
+		t.Fatal("expected Trace recent routeSpec")
+	}
+	if !hasBackendRoute(tracePack.Manifest, "/v1/trace/task/") {
+		t.Fatal("expected Trace task route")
+	}
+
 	forks, ok := registry.Get("yunque.pack.forks")
 	if !ok {
 		t.Fatal("expected Conversation Forks builtin pack to be installed")
@@ -543,7 +560,7 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 	// Count reflects the current packs/official/ set (incl. the newer
 	// console/control-plane/knowledge/memory/skills/work/workspace packs and the
 	// cognitive-layer/state packs). Adjust if the builtin pack set changes.
-	if got := len(registry.List()); got != 46 {
+	if got := len(registry.List()); got != 47 {
 		t.Fatalf("expected idempotent builtin install, got %d packs", got)
 	}
 }

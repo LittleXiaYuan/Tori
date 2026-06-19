@@ -11,7 +11,7 @@ import (
 )
 
 func TestTraceEndpointsSanitizeUserVisibleEventsByDefault(t *testing.T) {
-	gw, tm := newTestGateway()
+	gw, tm := newTestGatewayMigrationEnabled()
 	tenant := tm.Register("trace-sanitized")
 	trail := observe.NewAuditTrail(20)
 	gw.SetEventTrail(trail)
@@ -50,7 +50,7 @@ func TestTraceEndpointsSanitizeUserVisibleEventsByDefault(t *testing.T) {
 }
 
 func TestTraceEndpointsRawModePreservesAuditEvents(t *testing.T) {
-	gw, tm := newTestGateway()
+	gw, tm := newTestGatewayMigrationEnabled()
 	tenant := tm.Register("trace-raw")
 	trail := observe.NewAuditTrail(20)
 	gw.SetEventTrail(trail)
@@ -77,7 +77,7 @@ func TestTraceEndpointsRawModePreservesAuditEvents(t *testing.T) {
 }
 
 func TestTraceEndpointsSanitizeModelSwitchReasonByDefault(t *testing.T) {
-	gw, tm := newTestGateway()
+	gw, tm := newTestGatewayMigrationEnabled()
 	tenant := tm.Register("trace-model-switch-safe")
 	trail := observe.NewAuditTrail(20)
 	gw.SetEventTrail(trail)

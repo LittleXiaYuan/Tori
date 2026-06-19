@@ -77,6 +77,7 @@ import (
 	speechpack "yunque-agent/internal/packs/speech"
 	statepack "yunque-agent/internal/packs/state"
 	subagentspack "yunque-agent/internal/packs/subagents"
+	tracepack "yunque-agent/internal/packs/trace"
 	triggerspack "yunque-agent/internal/packs/triggers"
 	workpack "yunque-agent/internal/packs/work"
 	worldmodelpack "yunque-agent/internal/packs/worldmodel"
@@ -279,6 +280,9 @@ func initTaskEngine(
 	// Subagents pack — owns /v1/subagent* natively. Handoff execution remains
 	// planner-facing; lifecycle inspection/mutation is Pack-gated here.
 	_ = gw.RegisterModule(subagentspack.New(gw))
+	// Trace pack — owns /v1/trace* natively while preserving user-safe summaries
+	// and raw audit mode through a narrow EventTrail accessor.
+	_ = gw.RegisterModule(tracepack.New(gw))
 
 	// Inner Life pack — exposes the soul-layer outputs (curiosity / reflection /
 	// dreaming) over a read-only HTTP surface. Registered here because the

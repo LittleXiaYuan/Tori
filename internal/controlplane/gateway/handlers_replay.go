@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"yunque-agent/internal/agentcore/llm"
+	"yunque-agent/internal/agentcore/traceview"
 	"yunque-agent/internal/apperror"
 	"yunque-agent/internal/observe"
 )
@@ -52,7 +53,7 @@ func (g *Gateway) handleConversationReplay(w http.ResponseWriter, r *http.Reques
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{
 			"session_id":  sessionID,
-			"raw":         traceRawMode(r),
+			"raw":         traceview.RawMode(r),
 			"turns":       []replayTurn{},
 			"total_turns": 0,
 		})
@@ -60,12 +61,12 @@ func (g *Gateway) handleConversationReplay(w http.ResponseWriter, r *http.Reques
 	}
 
 	turns := buildTurnsFromMessages(messages)
-	rawEvents := traceRawMode(r)
+	rawEvents := traceview.RawMode(r)
 
 	if g.eventTrail != nil {
 		events := g.eventTrail.QueryBySessionID(sessionID)
 		if !rawEvents {
-			events, _ = traceEventsForResponse(r, events)
+			events, _ = traceview.EventsForResponse(r, events)
 		}
 		enrichTurnsWithEvents(turns, events)
 	}

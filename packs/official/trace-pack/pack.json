@@ -1,0 +1,60 @@
+{
+  "id": "yunque.pack.trace",
+  "name": "Trace (执行轨迹)",
+  "version": "0.1.0",
+  "description": "执行轨迹查询：查看最近执行事件、按任务查看轨迹、按 trace id 回放执行过程。默认展示用户可读的安全文案，raw 模式保留原始审计事件。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": [
+      "trace.read",
+      "trace.raw.read"
+    ],
+    "routes": [
+      "/v1/trace/recent",
+      "/v1/trace/task/",
+      "/v1/trace/"
+    ],
+    "permissions": [
+      "trace:read"
+    ],
+    "routeSpecs": [
+      {
+        "method": "GET",
+        "path": "/v1/trace/recent",
+        "description": "List recent execution trace events."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/trace/task/{task_id}",
+        "description": "List execution trace events for a task."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/trace/{trace_id}",
+        "description": "List execution trace events for a trace."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [],
+    "assets": {
+      "type": "builtin"
+    }
+  },
+  "sdk": {
+    "typescript": "yunque-client/trace"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "group": "ops",
+    "phase": "A3",
+    "preload": "true",
+    "note": "Natively owns /v1/trace/* through the Pack Runtime gate. It preserves the user-safe default trace view and raw audit mode."
+  },
+  "status": "beta"
+}

@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"net/http"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -21,6 +20,7 @@ import (
 	"yunque-agent/internal/agentcore/memory"
 	"yunque-agent/internal/agentcore/persona"
 	"yunque-agent/internal/agentcore/planner"
+	"yunque-agent/internal/agentcore/traceview"
 	"yunque-agent/internal/apperror"
 	channelpkg "yunque-agent/internal/execution/channel"
 	"yunque-agent/internal/observe"
@@ -675,12 +675,7 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 }
 
 func friendlyAgentEventForStream(event observe.AgentEvent) observe.AgentEvent {
-	streamEvent := event
-	if friendly := plannerKnownFriendlyError(streamEvent.Summary); friendly != "" {
-		streamEvent.Summary = friendly
-	}
-	streamEvent.Detail = friendlyAgentEventDetailForStream(streamEvent.Detail)
-	return streamEvent
+	return traceview.FriendlyEvent(event)
 }
 
 func cloneLLMMessages(in []llm.Message) []llm.Message {
@@ -755,98 +750,7 @@ func isHiddenAttachmentContextMessage(msg llm.Message) bool {
 }
 
 func friendlyAgentEventDetailForStream(detail any) any {
-	switch d := detail.(type) {
-	case observe.HandoffDetail:
-		if friendly := plannerKnownFriendlyError(d.Error); friendly != "" {
-			d.Error = friendly
-		}
-		return d
-	case *observe.HandoffDetail:
-		if d == nil {
-			return detail
-		}
-		clone := *d
-		if friendly := plannerKnownFriendlyError(clone.Error); friendly != "" {
-			clone.Error = friendly
-		}
-		return &clone
-	case observe.ToolResultDetail:
-		if friendly := plannerKnownFriendlyError(d.Error); friendly != "" {
-			d.Error = friendly
-		}
-		if friendly := plannerKnownFriendlyError(d.Result); friendly != "" {
-			d.Result = friendly
-		}
-		return d
-	case *observe.ToolResultDetail:
-		if d == nil {
-			return detail
-		}
-		clone := *d
-		if friendly := plannerKnownFriendlyError(clone.Error); friendly != "" {
-			clone.Error = friendly
-		}
-		if friendly := plannerKnownFriendlyError(clone.Result); friendly != "" {
-			clone.Result = friendly
-		}
-		return &clone
-	case planner.ModelFallbackDetail:
-		if friendly := plannerKnownFriendlyError(d.Reason); friendly != "" {
-			d.Reason = friendly
-		}
-		return d
-	case *planner.ModelFallbackDetail:
-		if d == nil {
-			return detail
-		}
-		clone := *d
-		if friendly := plannerKnownFriendlyError(clone.Reason); friendly != "" {
-			clone.Reason = friendly
-		}
-		return &clone
-	default:
-		return sanitizeAgentEventDetailValue(detail)
-	}
-}
-
-func sanitizeAgentEventDetailValue(value any) any {
-	switch v := value.(type) {
-	case string:
-		if friendly := plannerKnownFriendlyError(v); friendly != "" {
-			return friendly
-		}
-		return value
-	case map[string]any:
-		clone := make(map[string]any, len(v))
-		changed := false
-		for key, raw := range v {
-			sanitized := sanitizeAgentEventDetailValue(raw)
-			clone[key] = sanitized
-			if !reflect.DeepEqual(sanitized, raw) {
-				changed = true
-			}
-		}
-		if changed {
-			return clone
-		}
-		return value
-	case []any:
-		clone := make([]any, len(v))
-		changed := false
-		for i, raw := range v {
-			sanitized := sanitizeAgentEventDetailValue(raw)
-			clone[i] = sanitized
-			if !reflect.DeepEqual(sanitized, raw) {
-				changed = true
-			}
-		}
-		if changed {
-			return clone
-		}
-		return value
-	default:
-		return value
-	}
+	return traceview.FriendlyDetail(detail)
 }
 
 // buildSuggestions generates follow-up suggestions.

@@ -577,6 +577,9 @@ func (g *Gateway) SetSSEBroker(b *SSEBroker) { g.sseBroker = b }
 // SetEventTrail attaches the unified event audit trail.
 func (g *Gateway) SetEventTrail(t *observe.AuditTrail) { g.eventTrail = t }
 
+// EventTrail exposes execution trace events to the trace pack.
+func (g *Gateway) EventTrail() *observe.AuditTrail { return g.eventTrail }
+
 // SetLastPlanCache sets the plan result cache for save_as_workflow.
 func (g *Gateway) SetLastPlanCache(c *sync.Map) { g.lastPlanCache = c }
 
