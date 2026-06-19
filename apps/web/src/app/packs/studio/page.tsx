@@ -28,7 +28,11 @@ import {
   packUsability,
   riskProfileForPack,
 } from "@/lib/pack-presentation";
-import { parsePackStudioPatchPlanPrompt } from "@/lib/pack-studio-chat";
+import {
+  packStudioWorkspaceMatches,
+  parsePackStudioPatchDraftPrompt,
+  parsePackStudioPatchPlanPrompt,
+} from "@/lib/pack-studio-chat";
 import { createPacksClient, type InstalledPack, type PackManifest, type PackStudioAuditReport, type PackStudioPatchReport, type PackStudioPlanReport, type PackStudioRepackReport, type PackStudioWorkspaceReport, type YqpackInspectReport } from "yunque-client/packs";
 
 const packsClient = createPacksClient(createYunqueSDKClientOptions());
@@ -466,6 +470,7 @@ export default function PackStudioPage() {
   const [patchFile, setPatchFile] = useState("");
   const [patchContent, setPatchContent] = useState("");
   const [importedPatchPlanText, setImportedPatchPlanText] = useState("");
+  const [importedPatchDraftText, setImportedPatchDraftText] = useState("");
   const [patching, setPatching] = useState(false);
   const [patchReport, setPatchReport] = useState<PackStudioPatchReport | null>(null);
   const [auditing, setAuditing] = useState(false);
@@ -510,15 +515,16 @@ export default function PackStudioPage() {
     () => parsePackStudioPatchPlanPrompt(importedPatchPlanText),
     [importedPatchPlanText],
   );
+  const importedPatchDraft = useMemo(
+    () => parsePackStudioPatchDraftPrompt(importedPatchDraftText),
+    [importedPatchDraftText],
+  );
   const importedPatchPlanMatchesWorkspace = useMemo(() => {
-    if (!importedPatchPlan || !workspaceReport) return false;
-    const normalizePath = (value: string) => value.replace(/\\/g, "/").toLowerCase();
-    return (
-      importedPatchPlan.workspace.id === workspaceReport.workspace_id ||
-      normalizePath(importedPatchPlan.workspace.path) === normalizePath(workspaceReport.workspace_path) ||
-      (Boolean(importedPatchPlan.workspace.originalSha256) && importedPatchPlan.workspace.originalSha256 === workspaceReport.original_sha256)
-    );
+    return packStudioWorkspaceMatches(importedPatchPlan?.workspace, workspaceReport);
   }, [importedPatchPlan, workspaceReport]);
+  const importedPatchDraftMatchesWorkspace = useMemo(() => {
+    return packStudioWorkspaceMatches(importedPatchDraft?.workspace, workspaceReport);
+  }, [importedPatchDraft, workspaceReport]);
 
   const copyPrompt = async () => {
     if (!prompt) return;
@@ -634,6 +640,18 @@ export default function PackStudioPage() {
     setPatchContent("");
     setPatchReport(null);
     showToast("已填入 Patch Plan 目标文件；请补入新内容后再预览 diff", "success");
+  };
+
+  const fillImportedPatchDraft = () => {
+    if (!importedPatchDraft) return;
+    if (!importedPatchDraftMatchesWorkspace) {
+      showToast("Patch Draft 与当前工作区不匹配，请重新从当前工作区生成", "warning");
+      return;
+    }
+    setPatchFile(importedPatchDraft.filePath);
+    setPatchContent(importedPatchDraft.content);
+    setPatchReport(null);
+    showToast("已载入 Patch Draft，请先预览 diff 再应用", "success");
   };
 
   const auditWorkspace = async () => {
@@ -1074,6 +1092,61 @@ export default function PackStudioPage() {
                           </div>
                         </div>
                       )}
+                      <div className="mt-3 rounded-md border p-3" style={{ borderColor: "var(--yunque-border)" }}>
+                        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>从 Chat 导入 Patch Draft</div>
+                            <div className="mt-1 text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
+                              Patch Draft 可以携带单个文件的新内容；载入后仍只进入 diff 预览框，不会自动应用。
+                            </div>
+                          </div>
+                          {importedPatchDraft && (
+                            <Chip size="sm" color={importedPatchDraftMatchesWorkspace ? "success" : "warning"}>
+                              {importedPatchDraftMatchesWorkspace ? "Draft 工作区匹配" : "Draft 待确认"}
+                            </Chip>
+                          )}
+                        </div>
+                        <TextArea
+                          aria-label="导入 Patch Draft JSON"
+                          value={importedPatchDraftText}
+                          onChange={(event) => setImportedPatchDraftText(event.target.value)}
+                          rows={4}
+                        >
+                          <Label>Patch Draft JSON 或 Chat 消息</Label>
+                        </TextArea>
+                        {importedPatchDraftText.trim() && !importedPatchDraft && (
+                          <div className="mt-2 rounded px-2 py-1 text-[11px]" style={{ background: "rgba(248,113,113,0.08)", color: "var(--yunque-danger)" }}>
+                            未识别到 yunque.pack_studio.patch_draft.v1。Patch Draft 必须包含 file_path 和 content。
+                          </div>
+                        )}
+                        {importedPatchDraft && (
+                          <div className="mt-3 rounded-md border p-2" style={{ borderColor: "var(--yunque-border)" }}>
+                            {!importedPatchDraftMatchesWorkspace && (
+                              <div className="mb-2 rounded px-2 py-1 text-[11px]" style={{ background: "rgba(245,158,11,0.10)", color: "var(--yunque-warning)" }}>
+                                这个 Patch Draft 的工作区或原始 SHA 与当前工作区不一致。请重新从当前工作区生成草稿。
+                              </div>
+                            )}
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="min-w-0">
+                                <div className="truncate font-mono text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>{importedPatchDraft.filePath}</div>
+                                <div className="mt-1 flex flex-wrap gap-1">
+                                  {importedPatchDraft.riskLevel && <Chip size="sm" variant="soft">风险：{importedPatchDraft.riskLevel}</Chip>}
+                                  <Chip size="sm" variant="soft">{importedPatchDraft.content.length.toLocaleString()} chars</Chip>
+                                  {importedPatchDraft.gates.map((gate) => (
+                                    <Chip key={`draft:${gate}`} size="sm" variant="soft">{gate}</Chip>
+                                  ))}
+                                </div>
+                              </div>
+                              <Button size="sm" variant="outline" onPress={fillImportedPatchDraft} isDisabled={!importedPatchDraftMatchesWorkspace}>
+                                <Sparkles size={13} /> 载入 Draft
+                              </Button>
+                            </div>
+                            {importedPatchDraft.reason && (
+                              <div className="mt-2 text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>原因：{importedPatchDraft.reason}</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
                     {draftCandidates.length > 0 && (
                       <div className="mt-3 rounded-md p-2" style={{ background: "var(--yunque-bg-hover)" }}>

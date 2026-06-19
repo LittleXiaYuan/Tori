@@ -433,6 +433,48 @@ describe("PackStudioPage", () => {
     expect(screen.getByText(/工作区或原始 SHA 与当前工作区不一致/)).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "填入文件" })[0]).toBeDisabled();
 
+    const patchDraft = {
+      kind: "yunque.pack_studio.patch_draft.v1",
+      pack: {
+        id: wasmManifest.id,
+        name: wasmManifest.name,
+        version: wasmManifest.version,
+      },
+      goal: "增加一个可查看运行结果的界面",
+      workspace: patchPlan.workspace,
+      file_path: "C:\\yunque\\packs\\studio\\pack.json",
+      content: "{\n  \"description\": \"Patch Draft 内容\"\n}\n",
+      reason: "Chat 里的小羽补了一版 manifest 内容",
+      risk_level: "low",
+      gates: ["预览 diff", "内置审计"],
+    };
+    fireEvent.change(screen.getByLabelText("导入 Patch Draft JSON"), {
+      target: { value: `\`\`\`json\n${JSON.stringify(patchDraft, null, 2)}\n\`\`\`` },
+    });
+    expect(screen.getByText("Draft 工作区匹配")).toBeInTheDocument();
+    expect(screen.queryByText("2 chars")).not.toBeInTheDocument();
+    expect(screen.getByText("原因：Chat 里的小羽补了一版 manifest 内容")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "载入 Draft" }));
+    expect(screen.getByDisplayValue("C:\\yunque\\packs\\studio\\pack.json")).toBeInTheDocument();
+    expect((screen.getByLabelText("新的文件内容") as HTMLTextAreaElement).value).toContain("Patch Draft 内容");
+    expect(toastMock).toHaveBeenCalledWith("已载入 Patch Draft，请先预览 diff 再应用", "success");
+
+    const mismatchedPatchDraft = {
+      ...patchDraft,
+      workspace: {
+        ...patchDraft.workspace,
+        id: "other-workspace",
+        path: "C:\\other\\pack",
+        original_sha256: "f".repeat(64),
+      },
+    };
+    fireEvent.change(screen.getByLabelText("导入 Patch Draft JSON"), {
+      target: { value: `\`\`\`json\n${JSON.stringify(mismatchedPatchDraft, null, 2)}\n\`\`\`` },
+    });
+    expect(screen.getByText("Draft 待确认")).toBeInTheDocument();
+    expect(screen.getByText(/Patch Draft 的工作区或原始 SHA 与当前工作区不一致/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "载入 Draft" })).toBeDisabled();
+
     const draftButtons = screen.getAllByRole("button", { name: "载入草稿" });
     fireEvent.click(draftButtons[0]);
     const manifestDraft = screen.getByLabelText("新的文件内容") as HTMLTextAreaElement;

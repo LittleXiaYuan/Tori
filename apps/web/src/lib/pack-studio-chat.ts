@@ -25,6 +25,27 @@ export type PackStudioPatchPlanSummary = {
   displayText: string;
 };
 
+export type PackStudioWorkspaceRef = {
+  id: string;
+  path: string;
+  originalSha256: string;
+};
+
+export type PackStudioPatchDraft = {
+  pack: {
+    id: string;
+    name: string;
+    version: string;
+  };
+  goal: string;
+  workspace: PackStudioWorkspaceRef;
+  filePath: string;
+  content: string;
+  reason: string;
+  riskLevel: string;
+  gates: string[];
+};
+
 type PackStudioPatchPlanCandidate = PackStudioPatchPlanSummary["candidates"][number];
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -58,12 +79,35 @@ function displayTextBeforePlan(text: string): string {
     .trim();
 }
 
-export function parsePackStudioPatchPlanPrompt(text?: string): PackStudioPatchPlanSummary | null {
-  if (!text?.includes("yunque.pack_studio.patch_plan.v1")) return null;
+export function packStudioWorkspaceMatches(
+  imported: PackStudioWorkspaceRef | null | undefined,
+  current: { workspace_id?: string; workspace_path?: string; original_sha256?: string } | null | undefined,
+): boolean {
+  if (!imported || !current) return false;
+  const normalizePath = (value: string) => value.replace(/\\/g, "/").toLowerCase();
+  return (
+    imported.id === current.workspace_id ||
+    normalizePath(imported.path) === normalizePath(current.workspace_path || "") ||
+    (Boolean(imported.originalSha256) && imported.originalSha256 === current.original_sha256)
+  );
+}
+
+function parseJsonBlocks(text: string): unknown[] {
   const blocks = [...text.matchAll(/```json\s*([\s\S]*?)```/g)];
+  const parsed: unknown[] = [];
   for (const block of blocks) {
     try {
-      const parsed = JSON.parse(block[1]);
+      parsed.push(JSON.parse(block[1]));
+    } catch {
+      continue;
+    }
+  }
+  return parsed;
+}
+
+export function parsePackStudioPatchPlanPrompt(text?: string): PackStudioPatchPlanSummary | null {
+  if (!text?.includes("yunque.pack_studio.patch_plan.v1")) return null;
+  for (const parsed of parseJsonBlocks(text)) {
       const root = asRecord(parsed);
       if (!root || root.kind !== "yunque.pack_studio.patch_plan.v1") continue;
       const pack = asRecord(root.pack);
@@ -100,9 +144,39 @@ export function parsePackStudioPatchPlanPrompt(text?: string): PackStudioPatchPl
         candidates: parsedCandidates,
         displayText: displayTextBeforePlan(text),
       };
-    } catch {
-      continue;
-    }
+  }
+  return null;
+}
+
+export function parsePackStudioPatchDraftPrompt(text?: string): PackStudioPatchDraft | null {
+  if (!text?.includes("yunque.pack_studio.patch_draft.v1")) return null;
+  for (const parsed of parseJsonBlocks(text)) {
+    const root = asRecord(parsed);
+    if (!root || root.kind !== "yunque.pack_studio.patch_draft.v1") continue;
+    const pack = asRecord(root.pack);
+    const workspace = asRecord(root.workspace);
+    if (!pack || !workspace) continue;
+    const filePath = stringValue(root.file_path);
+    const content = stringValue(root.content);
+    if (!filePath || !content) continue;
+    return {
+      pack: {
+        id: stringValue(pack.id),
+        name: stringValue(pack.name),
+        version: stringValue(pack.version),
+      },
+      goal: stringValue(root.goal),
+      workspace: {
+        id: stringValue(workspace.id),
+        path: stringValue(workspace.path),
+        originalSha256: stringValue(workspace.original_sha256),
+      },
+      filePath,
+      content,
+      reason: stringValue(root.reason),
+      riskLevel: stringValue(root.risk_level),
+      gates: stringList(root.gates),
+    };
   }
   return null;
 }

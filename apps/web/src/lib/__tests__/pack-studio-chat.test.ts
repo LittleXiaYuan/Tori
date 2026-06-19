@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { parsePackStudioPatchPlanPrompt } from "../pack-studio-chat";
+import {
+  packStudioWorkspaceMatches,
+  parsePackStudioPatchDraftPrompt,
+  parsePackStudioPatchPlanPrompt,
+} from "../pack-studio-chat";
 
 function promptWithPlan() {
   return [
@@ -52,5 +56,61 @@ describe("parsePackStudioPatchPlanPrompt", () => {
   it("ignores invalid or unrelated JSON blocks", () => {
     expect(parsePackStudioPatchPlanPrompt("```json\n{\"kind\":\"other\"}\n```")).toBeNull();
     expect(parsePackStudioPatchPlanPrompt("yunque.pack_studio.patch_plan.v1\n```json\nnot-json\n```")).toBeNull();
+  });
+});
+
+describe("parsePackStudioPatchDraftPrompt", () => {
+  it("extracts a single-file draft that still needs Studio diff preview", () => {
+    const parsed = parsePackStudioPatchDraftPrompt([
+      "小羽给出的单文件草稿：",
+      "```json",
+      JSON.stringify({
+        kind: "yunque.pack_studio.patch_draft.v1",
+        pack: { id: "yunque.pack.wasm-plugin", name: "WASM 能力包", version: "0.1.0" },
+        goal: "增加结果界面",
+        workspace: {
+          id: "yunque.pack.wasm-plugin-0.1.0-aaaaaaaaaaaa",
+          path: "C:\\yunque\\packs\\studio\\yunque.pack.wasm-plugin-0.1.0-aaaaaaaaaaaa",
+          original_sha256: "a".repeat(64),
+        },
+        file_path: "C:\\yunque\\packs\\studio\\pack.json",
+        content: "{\n  \"description\": \"更清楚\"\n}\n",
+        reason: "补强说明",
+        risk_level: "low",
+        gates: ["预览 diff", "内置审计"],
+      }, null, 2),
+      "```",
+    ].join("\n"));
+
+    expect(parsed?.pack.id).toBe("yunque.pack.wasm-plugin");
+    expect(parsed?.filePath).toBe("C:\\yunque\\packs\\studio\\pack.json");
+    expect(parsed?.content).toContain("\"description\": \"更清楚\"");
+    expect(parsed?.gates).toEqual(["预览 diff", "内置审计"]);
+  });
+
+  it("requires a real file path and content", () => {
+    expect(parsePackStudioPatchDraftPrompt("```json\n{\"kind\":\"yunque.pack_studio.patch_draft.v1\"}\n```")).toBeNull();
+  });
+});
+
+describe("packStudioWorkspaceMatches", () => {
+  const imported = {
+    id: "ws-id",
+    path: "C:\\studio\\pack",
+    originalSha256: "a".repeat(64),
+  };
+
+  it("matches by id, path or original sha", () => {
+    expect(packStudioWorkspaceMatches(imported, { workspace_id: "ws-id" })).toBe(true);
+    expect(packStudioWorkspaceMatches(imported, { workspace_path: "c:/studio/pack" })).toBe(true);
+    expect(packStudioWorkspaceMatches(imported, { original_sha256: "a".repeat(64) })).toBe(true);
+  });
+
+  it("rejects unrelated workspaces", () => {
+    expect(packStudioWorkspaceMatches(imported, {
+      workspace_id: "other",
+      workspace_path: "C:\\other",
+      original_sha256: "b".repeat(64),
+    })).toBe(false);
   });
 });
