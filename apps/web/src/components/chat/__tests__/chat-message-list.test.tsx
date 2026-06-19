@@ -66,6 +66,7 @@ vi.mock("lucide-react", () => ({
   Wand2: () => <svg data-testid="wand" />,
   Cpu: () => <svg data-testid="cpu" />,
   MoreHorizontal: () => <svg data-testid="more" />,
+  ArrowRight: () => <svg data-testid="arrow-right" />,
 }));
 
 vi.mock("@heroui/react", () => {
@@ -115,6 +116,51 @@ function props(overrides: Partial<ChatMessageListProps> = {}): ChatMessageListPr
 }
 
 describe("ChatMessageList file preview", () => {
+  it("renders Pack Studio patch plans as a guarded user task card", () => {
+    const prompt = [
+      "请以小羽改包方式优化能力包。",
+      "",
+      "下面是 Pack Studio 已准备好的 Patch Plan。请只把它当作结构化导航和安全约束。",
+      "",
+      "```json",
+      JSON.stringify({
+        kind: "yunque.pack_studio.patch_plan.v1",
+        pack: { id: "yunque.pack.wasm-plugin", name: "WASM 能力包", version: "0.1.0" },
+        goal: "增加结果界面",
+        workspace: {
+          id: "yunque.pack.wasm-plugin-0.1.0-aaaaaaaaaaaa",
+          path: "C:\\yunque\\packs\\studio\\yunque.pack.wasm-plugin-0.1.0-aaaaaaaaaaaa",
+          original_sha256: "a".repeat(64),
+        },
+        candidates: [
+          {
+            key: "manifest:C:\\yunque\\packs\\studio\\pack.json",
+            label: "manifest 草稿",
+            file_path: "C:\\yunque\\packs\\studio\\pack.json",
+            risk_level: "low",
+            applyable: true,
+            gates: ["预览 diff", "内置审计"],
+            content_summary: { length: 1200, hash: "abcd1234" },
+          },
+        ],
+      }, null, 2),
+      "```",
+    ].join("\n");
+
+    render(<ChatMessageList {...props({
+      messages: [{ role: "user", content: prompt, id: "u1" }],
+    })} />);
+
+    expect(screen.getByText("Pack Studio 改包任务")).toBeInTheDocument();
+    expect(screen.getByText(/WASM 能力包/)).toBeInTheDocument();
+    expect(screen.getByText("manifest 草稿")).toBeInTheDocument();
+    expect(screen.getByText("风险：low")).toBeInTheDocument();
+    expect(screen.getByText("摘要：abcd1234")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /回到 Studio/ })).toHaveAttribute("href", "/packs/studio");
+    expect(screen.getByText("请以小羽改包方式优化能力包。")).toBeInTheDocument();
+    expect(screen.queryByText(/yunque.pack_studio.patch_plan.v1/)).not.toBeInTheDocument();
+  });
+
   it("renders persisted assistant message content without raw parser or runtime diagnostics", () => {
     const onCopy = vi.fn();
     render(<ChatMessageList {...props({

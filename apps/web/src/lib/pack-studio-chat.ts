@@ -1,0 +1,108 @@
+export type PackStudioPatchPlanSummary = {
+  pack: {
+    id: string;
+    name: string;
+    version: string;
+  };
+  goal: string;
+  workspace: {
+    id: string;
+    path: string;
+    originalSha256: string;
+  };
+  candidates: Array<{
+    key: string;
+    label: string;
+    filePath: string;
+    riskLevel: string;
+    applyable: boolean;
+    gates: string[];
+    contentSummary?: {
+      length: number;
+      hash: string;
+    };
+  }>;
+  displayText: string;
+};
+
+type PackStudioPatchPlanCandidate = PackStudioPatchPlanSummary["candidates"][number];
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function stringValue(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+function stringList(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function contentSummary(value: unknown): { length: number; hash: string } | undefined {
+  const record = asRecord(value);
+  if (!record) return undefined;
+  const length = typeof record.length === "number" ? record.length : 0;
+  const hash = stringValue(record.hash);
+  if (!length || !hash) return undefined;
+  return { length, hash };
+}
+
+function displayTextBeforePlan(text: string): string {
+  const marker = "下面是 Pack Studio 已准备好的 Patch Plan";
+  const beforeMarker = text.includes(marker) ? text.slice(0, text.indexOf(marker)) : text;
+  return beforeMarker
+    .replace(/```json[\s\S]*?```/g, "")
+    .trim();
+}
+
+export function parsePackStudioPatchPlanPrompt(text?: string): PackStudioPatchPlanSummary | null {
+  if (!text?.includes("yunque.pack_studio.patch_plan.v1")) return null;
+  const blocks = [...text.matchAll(/```json\s*([\s\S]*?)```/g)];
+  for (const block of blocks) {
+    try {
+      const parsed = JSON.parse(block[1]);
+      const root = asRecord(parsed);
+      if (!root || root.kind !== "yunque.pack_studio.patch_plan.v1") continue;
+      const pack = asRecord(root.pack);
+      const workspace = asRecord(root.workspace);
+      if (!pack || !workspace) continue;
+      const candidates = Array.isArray(root.candidates) ? root.candidates : [];
+      const parsedCandidates: PackStudioPatchPlanCandidate[] = [];
+      for (const item of candidates) {
+        const candidate = asRecord(item);
+        if (!candidate) continue;
+        const summary = contentSummary(candidate.content_summary);
+        parsedCandidates.push({
+          key: stringValue(candidate.key),
+          label: stringValue(candidate.label),
+          filePath: stringValue(candidate.file_path),
+          riskLevel: stringValue(candidate.risk_level),
+          applyable: candidate.applyable === true,
+          gates: stringList(candidate.gates),
+          ...(summary ? { contentSummary: summary } : {}),
+        });
+      }
+      return {
+        pack: {
+          id: stringValue(pack.id),
+          name: stringValue(pack.name),
+          version: stringValue(pack.version),
+        },
+        goal: stringValue(root.goal),
+        workspace: {
+          id: stringValue(workspace.id),
+          path: stringValue(workspace.path),
+          originalSha256: stringValue(workspace.original_sha256),
+        },
+        candidates: parsedCandidates,
+        displayText: displayTextBeforePlan(text),
+      };
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}

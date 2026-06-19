@@ -4,6 +4,7 @@ import {
   Pencil, RotateCcw, Copy, Undo2, Check, Library,
   Paperclip, Volume2, VolumeX, Heart, Monitor,
   Brain, Sparkles, FileDown, BookOpen, Share2, Send, Settings, Eye, Wand2, Cpu, MoreHorizontal,
+  ArrowRight,
 } from "lucide-react";
 import { api, type FilePreviewResponse, type NotifyChannel } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
@@ -20,6 +21,7 @@ import { browserActionLabel } from "@/lib/browser-action-labels";
 import type { ChatSharePayload, Message } from "@/lib/chat-types";
 import { collectGeneratedFiles } from "@/lib/chat-utils";
 import { formatErrorMessage } from "@/lib/error-utils";
+import { parsePackStudioPatchPlanPrompt, type PackStudioPatchPlanSummary } from "@/lib/pack-studio-chat";
 import type { BrowserBridgeState, BrowserSessionNotice } from "@/components/browser-session-card";
 
 export interface ChatMessageListProps {
@@ -100,6 +102,58 @@ function displayChatText(text?: string): string {
 function displayMessageContent(msg: Message): string {
   if (msg.role === "user") return msg.content;
   return displayChatText(msg.content);
+}
+
+function renderPackStudioPlan(plan: PackStudioPatchPlanSummary) {
+  return (
+    <div
+      className="mb-3 rounded-xl border p-3 text-xs"
+      style={{
+        background: "rgba(59,130,246,0.08)",
+        borderColor: "rgba(59,130,246,0.22)",
+        color: "var(--yunque-text)",
+      }}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 font-semibold">
+            <Sparkles size={14} style={{ color: "var(--yunque-accent)" }} />
+            <span>Pack Studio 改包任务</span>
+          </div>
+          <div className="mt-1 truncate" style={{ color: "var(--yunque-text-muted)" }}>
+            {plan.pack.name || plan.pack.id} · {plan.pack.version || "unknown"} · {plan.candidates.length} 个候选改动
+          </div>
+        </div>
+        <a
+          href="/packs/studio"
+          className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1.5 text-[11px] font-medium"
+          style={{ background: "var(--yunque-accent-muted)", color: "var(--yunque-accent)" }}
+        >
+          回到 Studio <ArrowRight size={11} />
+        </a>
+      </div>
+      <div className="mt-2 break-all font-mono text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
+        工作区：{plan.workspace.id || plan.workspace.path}
+      </div>
+      <div className="mt-2 grid gap-1.5">
+        {plan.candidates.slice(0, 3).map((candidate) => (
+          <div key={candidate.key || candidate.filePath} className="rounded-lg px-2 py-1.5" style={{ background: "var(--yunque-bg-muted)" }}>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="font-medium">{candidate.label || "候选改动"}</span>
+              {candidate.riskLevel && <Chip size="sm" variant="soft">风险：{candidate.riskLevel}</Chip>}
+              {candidate.contentSummary && <Chip size="sm" variant="soft">摘要：{candidate.contentSummary.hash}</Chip>}
+            </div>
+            <div className="mt-1 truncate font-mono text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
+              {candidate.filePath}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-2 leading-5" style={{ color: "var(--yunque-text-muted)" }}>
+        这张卡只展示结构化计划，不包含完整文件内容。请在 Studio 载入草稿、预览 diff、运行审计、重新打包并复检 SHA 后再安装或回滚。
+      </div>
+    </div>
+  );
 }
 
 export function ChatMessageList({
@@ -502,7 +556,16 @@ export function ChatMessageList({
                 </details>
               )}
               {msg.content ? (
-                msg.role === "assistant" ? <MarkdownRenderer content={displayMessageContent(msg)} /> : (msg.content.replace(/\[(Uploaded file|File):\s*[^\]]+\]\s*/g, "").trim() || (msg.images?.length ? null : msg.content))
+                msg.role === "assistant" ? <MarkdownRenderer content={displayMessageContent(msg)} /> : (() => {
+                  const studioPlan = parsePackStudioPatchPlanPrompt(msg.content);
+                  const userContent = studioPlan?.displayText || msg.content.replace(/\[(Uploaded file|File):\s*[^\]]+\]\s*/g, "").trim();
+                  return (
+                    <>
+                      {studioPlan && renderPackStudioPlan(studioPlan)}
+                      {userContent || (msg.images?.length ? null : msg.content)}
+                    </>
+                  );
+                })()
               ) : (
                 !msg.images?.length && (
                   <div className="flex items-center gap-1.5">
@@ -787,4 +850,3 @@ export function ChatMessageList({
     </div>
   );
 }
-
