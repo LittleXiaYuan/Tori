@@ -33,6 +33,7 @@ import { createPacksClient, type InstalledPack, type PackCatalogEntry, type Pack
 import { createYunqueSDKClientOptions } from "@/lib/sdk-client";
 import { useApiData } from "@/lib/use-api-data";
 import { buildPackNavItems } from "@/lib/pack-sync";
+import { resolvePackReleaseSources } from "@/lib/pack-release-sources";
 import { useNavigationPreferences } from "@/hooks/use-user-preferences";
 import {
   capabilitySurfaceLabels,
@@ -48,13 +49,7 @@ import {
   riskProfileForPack,
 } from "@/lib/pack-presentation";
 
-const PACK_RELEASE_SOURCES = [
-  {
-    label: "云雀官方能力包源",
-    url: "https://github.com/LittleXiaYuan/Tori/releases/tag/pack%2Fmicro-agent%2Fv0.1.0",
-    note: "官方发布的 .yqpack 包，安装前会展示版本、权限和风险。",
-  },
-];
+const PACK_RELEASE_SOURCES = resolvePackReleaseSources();
 const OFFICIAL_BACKUP_MANIFEST = "packs/official/backup-pack/pack.json";
 const packsClient = createPacksClient(createYunqueSDKClientOptions());
 const PAGE_SIZE = 12;
