@@ -149,6 +149,7 @@ describe("PacksPageOptimized", () => {
     expect(screen.getByText("可直接使用")).toBeInTheDocument();
     expect(screen.getByText("基础能力")).toBeInTheDocument();
     expect(screen.getByText("实验中")).toBeInTheDocument();
+    expect(screen.getAllByText("说明完整").length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText("通常不单独当应用打开，而是在 Chat、任务、记忆、知识或设置页里生效。")).toBeInTheDocument();
 
     await waitFor(() => {

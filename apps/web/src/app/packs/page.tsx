@@ -42,6 +42,7 @@ import {
   groupPackPermissions,
   packExamples,
   packFeatureFlags,
+  packReadiness,
   packUsageExplanation,
   packUsability,
   riskProfileForPack,
@@ -826,6 +827,7 @@ export default function PacksPageOptimized() {
     const permissionGroups = groupPackPermissions(manifest.backend?.permissions || []);
     const labels = capabilitySurfaceLabels(manifest);
     const usability = packUsability(manifest);
+    const readiness = packReadiness(manifest);
     const usageLines = packUsageExplanation(manifest).slice(0, 3);
     const actionBusyKey = options.action.kind === "enable" ? `enable:${manifest.id}` : options.busyKey;
     const disabled = options.action.disabled || busy === actionBusyKey;
@@ -845,6 +847,12 @@ export default function PacksPageOptimized() {
                 color: risk.level === "high" ? "var(--yunque-danger)" : risk.level === "medium" ? "var(--yunque-warning)" : "var(--yunque-success)",
               }}>
                 {risk.label}
+              </Chip>
+              <Chip size="sm" style={{
+                background: readiness.level === "complete" ? "rgba(34,197,94,0.10)" : readiness.level === "needs_context" ? "rgba(245,158,11,0.12)" : "rgba(239,68,68,0.10)",
+                color: readiness.level === "complete" ? "var(--yunque-success)" : readiness.level === "needs_context" ? "var(--yunque-warning)" : "var(--yunque-danger)",
+              }}>
+                {readiness.label}
               </Chip>
             </div>
             {manifest.description && (
@@ -903,6 +911,12 @@ export default function PacksPageOptimized() {
           </div>
         )}
 
+        {readiness.missing.length > 0 && (
+          <div className="mb-3 rounded-md p-3 text-xs" style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.18)", color: "var(--yunque-text-secondary)" }}>
+            可用性体检：还缺 {readiness.missing.join("、")}。可以交给小羽优化补齐用途、入口或使用说明。
+          </div>
+        )}
+
         {permissionGroups.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mb-3">
             {permissionGroups.slice(0, 4).map((group) => (
@@ -948,6 +962,7 @@ export default function PacksPageOptimized() {
     const labels = capabilitySurfaceLabels(manifest);
     const permissionGroups = groupPackPermissions(manifest.backend?.permissions || []);
     const usability = packUsability(manifest);
+    const readiness = packReadiness(manifest);
     const usageLines = packUsageExplanation(manifest).slice(0, 3);
     const navItems = navItemsForPack(pack);
     const openPath = usability.primaryActionPath || manifest.frontend?.menus?.[0]?.path || manifest.frontend?.routes?.[0]?.path;
@@ -968,6 +983,12 @@ export default function PacksPageOptimized() {
                   color: risk.level === "high" ? "var(--yunque-danger)" : risk.level === "medium" ? "var(--yunque-warning)" : "var(--yunque-success)",
                 }}>
                   {risk.label}
+                </Chip>
+                <Chip size="sm" style={{
+                  background: readiness.level === "complete" ? "rgba(34,197,94,0.10)" : readiness.level === "needs_context" ? "rgba(245,158,11,0.12)" : "rgba(239,68,68,0.10)",
+                  color: readiness.level === "complete" ? "var(--yunque-success)" : readiness.level === "needs_context" ? "var(--yunque-warning)" : "var(--yunque-danger)",
+                }}>
+                  {readiness.label}
                 </Chip>
               </div>
               <div className="text-xs mt-1 font-mono" style={{ color: "var(--yunque-text-muted)" }}>{manifest.id}</div>
@@ -1015,6 +1036,12 @@ export default function PacksPageOptimized() {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {readiness.missing.length > 0 && (
+            <div className="mb-3 rounded-md p-3 text-xs" style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.18)", color: "var(--yunque-text-secondary)" }}>
+              可用性体检：还缺 {readiness.missing.join("、")}。可以交给小羽优化补齐用途、入口或使用说明。
             </div>
           )}
 

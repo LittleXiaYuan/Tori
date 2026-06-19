@@ -52,6 +52,13 @@ export type PackUsability = {
   limitation?: string;
 };
 
+export type PackReadiness = {
+  level: "complete" | "needs_context" | "needs_entry";
+  label: string;
+  description: string;
+  missing: string[];
+};
+
 type EntryLike = {
   manifest: PackManifest;
   package_url?: string;
@@ -175,6 +182,51 @@ export function packUsability(manifest: PackManifest): PackUsability {
     primaryActionLabel,
     primaryActionPath,
     limitation,
+  };
+}
+
+export function packReadiness(manifest: PackManifest): PackReadiness {
+  const metadata = manifest.metadata || {};
+  const frontend = manifest.frontend || {};
+  const backend = manifest.backend || {};
+  const examples = packExamples(manifest, 1);
+  const usageSurface = typeof metadata.usageSurface === "string" && metadata.usageSurface.trim().length > 0;
+  const primaryActionPath = typeof metadata.primaryActionPath === "string" && metadata.primaryActionPath.trim().length > 0;
+  const hasFrontend = (frontend.menus?.length ?? 0) > 0 || (frontend.routes?.length ?? 0) > 0 || Boolean(frontend.assets?.entry);
+  const hasBackend =
+    (backend.capabilities?.length ?? 0) > 0 ||
+    (backend.routes?.length ?? 0) > 0 ||
+    (backend.routeSpecs?.length ?? 0) > 0;
+  const missing: string[] = [];
+
+  if (examples.length === 0) missing.push("使用示例");
+  if (!usageSurface) missing.push("用户感知位置");
+  if (!primaryActionPath && !hasFrontend) missing.push("打开/使用入口");
+  if (!hasBackend) missing.push("后端能力声明");
+
+  if (missing.length === 0) {
+    return {
+      level: "complete",
+      label: "说明完整",
+      description: "用途、入口、示例和能力边界都已声明，用户更容易判断是否需要安装。",
+      missing,
+    };
+  }
+
+  if (missing.includes("打开/使用入口") || missing.includes("后端能力声明")) {
+    return {
+      level: "needs_entry",
+      label: "需补入口",
+      description: "这个能力包还缺用户入口或后端能力声明，适合先用小羽补齐可用路径。",
+      missing,
+    };
+  }
+
+  return {
+    level: "needs_context",
+    label: "需补说明",
+    description: "能力本体存在，但还需要补齐用户在哪里感知、如何使用或典型场景。",
+    missing,
   };
 }
 

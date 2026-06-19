@@ -38,6 +38,7 @@ import {
   formatPackInstallError,
   groupPackPermissions,
   packFeatureFlags,
+  packReadiness,
   packUsageExplanation,
   packUsability,
   riskProfileForPack,
@@ -194,6 +195,7 @@ export default function PackDetailClientPage() {
   const surfaceLabels = capabilitySurfaceLabels(manifest);
   const usageExplanation = packUsageExplanation(manifest);
   const usability = packUsability(manifest);
+  const readiness = packReadiness(manifest);
   const openPath = usability.primaryActionPath || menus[0]?.path || routesFrontend[0]?.path;
 
   const installFromCatalog = () => {
@@ -305,6 +307,33 @@ export default function PackDetailClientPage() {
           {usability.limitation && (
             <div className="mt-3 rounded-md p-3 text-xs" style={{ background: "rgba(245,158,11,0.10)", color: "var(--yunque-warning)" }}>
               当前限制：{usability.limitation}
+            </div>
+          )}
+        </Card>
+
+        <Card className="section-card p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <ShieldCheck size={16} style={{ color: "var(--yunque-primary)" }} />
+            <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
+              能力包体检
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Chip size="sm" style={{
+              background: readiness.level === "complete" ? "rgba(34,197,94,0.10)" : readiness.level === "needs_context" ? "rgba(245,158,11,0.12)" : "rgba(239,68,68,0.10)",
+              color: readiness.level === "complete" ? "var(--yunque-success)" : readiness.level === "needs_context" ? "var(--yunque-warning)" : "var(--yunque-danger)",
+            }}>
+              {readiness.label}
+            </Chip>
+            <span className="text-sm" style={{ color: "var(--yunque-text-secondary)" }}>{readiness.description}</span>
+          </div>
+          {readiness.missing.length > 0 ? (
+            <div className="mt-3 rounded-md p-3 text-xs" style={{ background: "rgba(245,158,11,0.08)", color: "var(--yunque-text-secondary)" }}>
+              还缺：{readiness.missing.join("、")}。可以回到能力包中心点“小羽优化”，补齐用途、入口、示例或边界说明。
+            </div>
+          ) : (
+            <div className="mt-3 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+              已声明用途、入口或使用面、示例和能力边界；仍可继续用小羽优化文案或补更具体的场景。
             </div>
           )}
         </Card>

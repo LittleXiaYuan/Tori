@@ -7,6 +7,7 @@ import {
   formatPackInstallError,
   groupPackPermissions,
   packFeatureFlags,
+  packReadiness,
   packUsageExplanation,
   packUsability,
   riskProfileForPack,
@@ -207,5 +208,45 @@ describe("pack-presentation", () => {
       primaryActionPath: "/missions",
     });
     expect(packUsageExplanation(infrastructure).join(" ")).toContain("任务中心与 Chat 任务进度");
+  });
+
+  it("summarizes whether pack cards have enough user-facing context", () => {
+    const complete: PackManifest = {
+      id: "yunque.pack.complete",
+      name: "Complete",
+      version: "0.1.0",
+      metadata: {
+        primaryActionPath: "/packs/complete",
+        usageSurface: "能力包中心和 Chat 产物区",
+        example1: "打开能力界面查看结果。",
+      },
+      backend: { capabilities: ["complete.run"] },
+    };
+    const missingContext: PackManifest = {
+      id: "yunque.pack.context",
+      name: "Context",
+      version: "0.1.0",
+      metadata: {
+        primaryActionPath: "/packs/context",
+        example1: "运行一次检查。",
+      },
+      backend: { capabilities: ["context.run"] },
+    };
+    const missingEntry: PackManifest = {
+      id: "yunque.pack.entry",
+      name: "Entry",
+      version: "0.1.0",
+      metadata: {
+        usageSurface: "后台自动使用",
+        example1: "由云雀自动调度。",
+      },
+    };
+
+    expect(packReadiness(complete)).toMatchObject({ level: "complete", label: "说明完整", missing: [] });
+    expect(packReadiness(missingContext)).toMatchObject({ level: "needs_context", missing: ["用户感知位置"] });
+    expect(packReadiness(missingEntry)).toMatchObject({
+      level: "needs_entry",
+      missing: ["打开/使用入口", "后端能力声明"],
+    });
   });
 });
