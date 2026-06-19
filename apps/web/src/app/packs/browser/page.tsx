@@ -40,6 +40,38 @@ import { formatErrorMessage } from "@/lib/error-utils";
 const browserIntentClient = createBrowserIntentPackClient();
 const directPublishScenarioIds = new Set(["xiaohongshu-post-direct", "x-post-direct"]);
 
+const capabilityCards = [
+  {
+    icon: <Monitor size={16} />,
+    title: "看见网页现场",
+    desc: "连接浏览器扩展后，可查看当前页面、截图留痕，并把页面内容交给云雀理解。",
+  },
+  {
+    icon: <Search size={16} />,
+    title: "提取页面信息",
+    desc: "支持 DOM / OCR / 视觉等读取方式，用于整理页面文字、表格和关键状态。",
+  },
+  {
+    icon: <Play size={16} />,
+    title: "运行审核过的场景",
+    desc: "可执行预置浏览器场景；涉及发布、填写、点击等高风险动作时保留人工确认入口。",
+  },
+  {
+    icon: <FileText size={16} />,
+    title: "生成动作计划",
+    desc: "把“打开、点击、输入、截图、提取”转成可审阅计划；当前不会直接控制本机桌面。",
+  },
+];
+
+const planStatusCards = [
+  { key: "browser_act_plan_ready", label: "动作计划", ready: "已生成", pending: "待生成" },
+  { key: "permission_gate_ready", label: "权限检查", ready: "已检查", pending: "待检查" },
+  { key: "runtime_skill_gate_ready", label: "运行能力", ready: "已匹配", pending: "待匹配" },
+  { key: "opp_gate_ready", label: "人工审批", ready: "已接入", pending: "待接入" },
+  { key: "browser_act_ready", label: "真实执行", ready: "可执行", pending: "仅计划" },
+  { key: "network_access", label: "联网动作", ready: "会联网", pending: "不联网" },
+] as const;
+
 export default function BrowserIntentPackPage() {
   const [screenshot, setScreenshot] = useState<string | null>(null);
   const [screenshotLoading, setScreenshotLoading] = useState(false);
@@ -317,6 +349,49 @@ export default function BrowserIntentPackPage() {
       />
 
       <Card className="section-card overflow-hidden p-0">
+        <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_300px]">
+          <div className="p-5">
+            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2 text-base font-semibold" style={{ color: "var(--yunque-text)" }}>
+                  <Globe size={18} style={{ color: "var(--yunque-accent)" }} />
+                  浏览器能力包能做什么
+                </div>
+                <p className="mt-2 max-w-3xl text-sm leading-6" style={{ color: "var(--yunque-text-secondary)" }}>
+                  它把浏览器变成云雀可观察、可审阅、可留痕的工作现场：先看见页面和生成计划，再由你决定是否运行场景或审批高风险动作。
+                </p>
+              </div>
+              <Chip size="sm" style={{ background: "rgba(245,158,11,0.12)", color: "#f59e0b" }}>
+                当前不执行本机桌面控制
+              </Chip>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {capabilityCards.map((item) => (
+                <div key={item.title} className="rounded-lg p-3" style={{ background: "var(--yunque-bg-hover)", border: "1px solid var(--yunque-border)" }}>
+                  <div className="mb-2 flex items-center gap-2 text-sm font-medium" style={{ color: "var(--yunque-text)" }}>
+                    <span className="flex h-7 w-7 items-center justify-center rounded-md" style={{ background: "rgba(59,130,246,0.10)", color: "#60a5fa" }}>{item.icon}</span>
+                    {item.title}
+                  </div>
+                  <div className="text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>{item.desc}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="p-5" style={{ background: "rgba(245,158,11,0.06)", borderLeft: "1px solid var(--yunque-border)" }}>
+            <div className="mb-3 flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
+              <ShieldAlert size={16} style={{ color: "#f59e0b" }} />
+              当前边界
+            </div>
+            <div className="space-y-2 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
+              <div>可以：截图、读取页面、运行预置场景、生成可审阅动作计划。</div>
+              <div>需要确认：发布、提交、删除、付款、登录态相关动作。</div>
+              <div>不会：绕过扩展授权、偷取 token、直接控制本机鼠标键盘或写本地文件。</div>
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      <Card className="section-card overflow-hidden p-0">
         <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_320px]">
           <div className="p-5">
             <div className="flex flex-wrap items-start justify-between gap-4">
@@ -370,7 +445,7 @@ export default function BrowserIntentPackPage() {
             <Tabs.Tab id="browser">{t("browserPage.tab.browser")}<Tabs.Indicator /></Tabs.Tab>
             <Tabs.Tab id="ocr"><Tabs.Separator />{t("browserPage.tab.ocr")}<Tabs.Indicator /></Tabs.Tab>
             <Tabs.Tab id="opp"><Tabs.Separator />{t("browserPage.tab.opp")}{oppItems.length > 0 && <Chip size="sm" style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444", fontSize: "var(--text-2xs)" }}>{oppItems.length}</Chip>}<Tabs.Indicator /></Tabs.Tab>
-            <Tabs.Tab id="intent"><Tabs.Separator /><FileText size={12} className="mr-1 inline" />browser_act<Chip size="sm" style={{ background: "rgba(245,158,11,0.1)", color: "#f59e0b", fontSize: "var(--text-2xs)" }}>PLAN</Chip><Tabs.Indicator /></Tabs.Tab>
+            <Tabs.Tab id="intent"><Tabs.Separator /><FileText size={12} className="mr-1 inline" />动作计划<Chip size="sm" style={{ background: "rgba(245,158,11,0.1)", color: "#f59e0b", fontSize: "var(--text-2xs)" }}>PLAN</Chip><Tabs.Indicator /></Tabs.Tab>
             <Tabs.Tab id="log"><Tabs.Separator />{t("browserPage.tab.actionLog")}{actionLog.length > 0 && <Chip size="sm" style={{ background: "rgba(59,130,246,0.1)", color: "#3b82f6", fontSize: "var(--text-2xs)" }}>{actionLog.length}</Chip>}<Tabs.Indicator /></Tabs.Tab>
             <Tabs.Tab id="scenarios"><Tabs.Separator /><Zap size={12} className="mr-1 inline" />{t("browserPage.tab.scenarios")}{scenarios.length > 0 && <Chip size="sm" style={{ background: "rgba(139,92,246,0.1)", color: "#8b5cf6", fontSize: "var(--text-2xs)" }}>{scenarios.length}</Chip>}<Tabs.Indicator /></Tabs.Tab>
             <Tabs.Tab id="desktop"><Tabs.Separator /><Cloud size={12} className="mr-1 inline" />云电脑{desktopSandbox && <Chip size="sm" style={{ background: "rgba(34,197,94,0.1)", color: "#22c55e", fontSize: "var(--text-2xs)" }}>LIVE</Chip>}<Tabs.Indicator /></Tabs.Tab>
@@ -462,10 +537,10 @@ export default function BrowserIntentPackPage() {
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
-                    <FileText size={16} /> browser_act 语义计划 Gate
+                    <FileText size={16} /> 动作计划预览
                   </div>
                   <p className="mt-2 max-w-3xl text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
-                    这里先把「打开页面 / 点击 / 输入 / 截图 / 提取」等语义意图塑形成未来 executor 可消费的契约，并同时展示权限 gate、runtime skill gate 与 OPP 审批 gate。当前仍是 plan-only：不消费浏览器会话、不执行扩展动作、不写浏览器状态、不写文件、无网络访问。
+                    把「打开页面 / 点击 / 输入 / 截图 / 提取」等目标变成可审阅的步骤。当前是 plan-only：只生成计划和安全检查，不消费浏览器会话、不执行扩展动作、不写浏览器状态、不写文件。
                   </p>
                 </div>
                 <Button size="sm" onPress={buildBrowserActPlan} isPending={browserActPlanning} className="btn-accent">
@@ -473,59 +548,67 @@ export default function BrowserIntentPackPage() {
                 </Button>
               </div>
               <div className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-6">
-                {[
-                  ["browser_act_plan_ready", browserActPlan?.browser_act_plan_ready],
-                  ["browser_act_ready", browserActPlan?.browser_act_ready],
-                  ["permission_gate_ready", browserActPlan?.permission_gate_ready],
-                  ["runtime_skill_gate_ready", browserActPlan?.runtime_skill_gate_ready],
-                  ["opp_gate_ready", browserActPlan?.opp_gate_ready],
-                  ["network_access", browserActPlan?.network_access],
-                ].map(([label, value]) => (
-                  <div key={String(label)} className="rounded-lg p-2" style={{ background: "var(--yunque-bg-hover)", border: "1px solid var(--yunque-border)" }}>
-                    <div className="truncate text-[10px]" style={{ color: "var(--yunque-text-muted)" }}>{label}</div>
-                    <div className="mt-1 text-xs font-semibold" style={{ color: value ? "#22c55e" : "#f59e0b" }}>{String(value ?? "pending")}</div>
-                  </div>
-                ))}
+                {planStatusCards.map((item) => {
+                  const value = browserActPlan?.[item.key];
+                  return (
+                    <div key={item.key} className="rounded-lg p-2" style={{ background: "var(--yunque-bg-hover)", border: "1px solid var(--yunque-border)" }}>
+                      <div className="truncate text-[10px]" style={{ color: "var(--yunque-text-muted)" }}>{item.label}</div>
+                      <div className="mt-1 text-xs font-semibold" style={{ color: value ? "#22c55e" : "#f59e0b" }}>{value ? item.ready : item.pending}</div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="mt-3 rounded-lg p-3 text-xs leading-5" style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.22)", color: "var(--yunque-text-secondary)" }}>
+                这一步用于让用户先审阅“云雀准备怎么做”。只有未来接入执行器、权限、审批和运行时能力都满足时，才会进入真实浏览器动作。
               </div>
             </Card>
 
             {browserActPlan ? (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-                <Card className="section-card p-4">
-                  <div className="mb-2 text-sm font-medium" style={{ color: "var(--yunque-text)" }}>Planned actions</div>
+                <Card className="section-card p-4 lg:col-span-2">
+                  <div className="mb-2 text-sm font-medium" style={{ color: "var(--yunque-text)" }}>计划步骤</div>
                   <div className="space-y-2">
                     {browserActPlan.planned_actions.map((action) => (
                       <div key={action.index} className="rounded-lg p-3" style={{ background: "var(--yunque-bg-hover)" }}>
                         <div className="flex items-center justify-between gap-2">
-                          <span className="text-xs font-semibold">{action.intent}</span>
+                          <span className="text-xs font-semibold">{action.index + 1}. {action.intent}</span>
                           <Chip size="sm" style={{ background: "rgba(59,130,246,0.1)", color: "#3b82f6", fontSize: "var(--text-2xs)" }}>{action.executor_action}</Chip>
                         </div>
                         {action.target_url && <div className="mt-2 truncate text-[11px] font-mono" style={{ color: "var(--yunque-text-muted)" }}>{action.target_url}</div>}
                         {action.selector && <div className="mt-1 truncate text-[11px] font-mono" style={{ color: "var(--yunque-text-muted)" }}>{action.selector}</div>}
-                        <div className="mt-2 grid grid-cols-2 gap-1 text-[10px]" style={{ color: "var(--yunque-text-secondary)" }}>
-                          <span>permission: {action.requires_permission}</span>
-                          <span>skill: {action.requires_runtime_skill}</span>
-                          <span>executes: {String(action.executes_browser_action)}</span>
-                          <span>writes: {String(action.writes_browser_state)}</span>
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          <Chip size="sm" variant="soft">权限：{action.requires_permission}</Chip>
+                          <Chip size="sm" variant="soft">运行能力：{action.requires_runtime_skill}</Chip>
+                          {action.requires_opp_gate && <Chip size="sm" style={{ background: "rgba(245,158,11,0.1)", color: "#f59e0b" }}>需要审批</Chip>}
+                          {!action.executes_browser_action && <Chip size="sm" style={{ background: "rgba(34,197,94,0.1)", color: "#22c55e" }}>当前不执行</Chip>}
+                          {action.writes_browser_state && <Chip size="sm" style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444" }}>会改浏览器状态</Chip>}
                         </div>
                       </div>
                     ))}
                   </div>
                 </Card>
+                <Card className="section-card p-4">
+                  <div className="mb-2 text-sm font-medium" style={{ color: "var(--yunque-text)" }}>为什么还不能自动执行</div>
+                  <div className="space-y-2 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
+                    {(browserActPlan.blocked_by.length > 0 ? browserActPlan.blocked_by : ["执行器、权限和审批全部满足后才会开放真实动作。"]).map((blocker) => (
+                      <div key={blocker} className="rounded-md px-3 py-2" style={{ background: "rgba(245,158,11,0.08)" }}>{blocker}</div>
+                    ))}
+                  </div>
+                </Card>
                 {[
-                  ["Permission gate", browserActPlan.permission_gate],
-                  ["Runtime skill gate", browserActPlan.runtime_skill_gate],
-                  ["OPP gate", browserActPlan.opp_gate],
+                  ["权限检查详情", browserActPlan.permission_gate],
+                  ["运行能力详情", browserActPlan.runtime_skill_gate],
+                  ["审批详情", browserActPlan.opp_gate],
                 ].map(([title, gate]) => (
-                  <Card key={String(title)} className="section-card p-4">
-                    <div className="mb-2 text-sm font-medium" style={{ color: "var(--yunque-text)" }}>{String(title)}</div>
-                    <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded-lg p-3 text-[11px] font-mono" style={{ background: "var(--yunque-bg-hover)", color: "var(--yunque-text-muted)" }}>
+                  <details key={String(title)} className="section-card rounded-xl p-4 lg:col-span-1" style={{ border: "1px solid var(--yunque-border)" }}>
+                    <summary className="cursor-pointer text-sm font-medium" style={{ color: "var(--yunque-text)" }}>{String(title)}</summary>
+                    <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap rounded-lg p-3 text-[11px] font-mono" style={{ background: "var(--yunque-bg-hover)", color: "var(--yunque-text-muted)" }}>
                       {JSON.stringify(gate, null, 2)}
                     </pre>
-                  </Card>
+                  </details>
                 ))}
                 <Card className="section-card p-4 lg:col-span-3">
-                  <div className="mb-2 text-sm font-medium" style={{ color: "var(--yunque-text)" }}>Artifacts / blocked_by</div>
+                  <div className="mb-2 text-sm font-medium" style={{ color: "var(--yunque-text)" }}>产物与阻塞原因</div>
                   <div className="flex flex-wrap gap-2">
                     {browserActPlan.artifacts.map((artifact) => (
                       <Chip key={artifact} size="sm" style={{ background: "rgba(59,130,246,0.1)", color: "#3b82f6", fontSize: "var(--text-2xs)" }}>{artifact}</Chip>
@@ -539,8 +622,8 @@ export default function BrowserIntentPackPage() {
             ) : (
               <Card className="section-card p-12 text-center">
                 <FileText size={40} className="mx-auto mb-3" style={{ color: "var(--yunque-text-muted)" }} />
-                <div className="text-sm" style={{ color: "var(--yunque-text-muted)" }}>尚未生成 browser_act plan。</div>
-                <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-secondary)" }}>点击「生成计划」查看保守 gate 和不可执行边界。</div>
+                <div className="text-sm" style={{ color: "var(--yunque-text-muted)" }}>尚未生成动作计划。</div>
+                <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-secondary)" }}>点击「生成计划」查看云雀准备怎么做，以及为什么当前不会直接执行。</div>
               </Card>
             )}
           </div>
