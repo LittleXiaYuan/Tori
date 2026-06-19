@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import PacksPageOptimized from "../packs/page";
 
@@ -105,6 +105,27 @@ const makePack = (index: number) => ({
       usageSurface: `分页测试入口 ${index}`,
       example1: `分页测试示例 ${index}`,
     },
+  },
+  status: "disabled",
+  updatedAt: "2026-06-19T00:00:00Z",
+});
+
+const makeNeedsEntryPack = (index: number) => ({
+  manifest: {
+    ...filesManifest,
+    id: `yunque.pack.needs-entry-${index}`,
+    name: `Needs Entry Pack ${index}`,
+    description: `补肉队列分页测试能力包 ${index}`,
+    backend: {
+      capabilities: [],
+      permissions: [],
+    },
+    frontend: {
+      menus: [],
+      routes: [],
+      assets: { type: "builtin" },
+    },
+    metadata: {},
   },
   status: "disabled",
   updatedAt: "2026-06-19T00:00:00Z",
@@ -341,7 +362,7 @@ describe("PacksPageOptimized", () => {
     expect(screen.getByRole("button", { name: /需补说明1/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /需补入口1/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /查看补肉队列/ })).toBeInTheDocument();
-    expect(screen.getByText("按体检缺口自动挑出最需要小羽补用途、入口、示例或能力边界的能力包。当前展示 2 个，共 2 个待补肉。")).toBeInTheDocument();
+    expect(screen.getByText("按体检缺口自动挑出最需要小羽补用途、入口、示例或能力边界的能力包。当前第 1 / 1 批，展示 2 个，共 2 个待补肉。")).toBeInTheDocument();
     expect(screen.getByText("还缺：使用示例、用户感知位置、打开/使用入口、后端能力声明")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "复制批量补肉任务" })).toBeInTheDocument();
     const batchChatLink = screen.getByRole("link", { name: /交给 Chat 批量补肉/ });
@@ -388,6 +409,42 @@ describe("PacksPageOptimized", () => {
 
     expect(screen.getAllByText("Needs Context Pack").length).toBeGreaterThan(0);
     expect(screen.getByText("Documents (文档生成)")).toBeInTheDocument();
+  });
+
+  it("paginates the readiness queue so Xiaoyu batch work stays scoped", async () => {
+    packsClientMock.installed.mockResolvedValueOnce({
+      packs: Array.from({ length: 8 }, (_, index) => makeNeedsEntryPack(index + 1)),
+      count: 8,
+    });
+
+    render(<PacksPageOptimized />);
+
+    expect(await screen.findByText("补肉优先队列")).toBeInTheDocument();
+    const queue = screen.getByText("补肉优先队列").closest("#readiness-queue");
+    expect(queue).not.toBeNull();
+    expect(screen.getByText("按体检缺口自动挑出最需要小羽补用途、入口、示例或能力边界的能力包。当前第 1 / 2 批，展示 6 个，共 8 个待补肉。")).toBeInTheDocument();
+    expect(screen.getByText("补肉队列 · 第 1 / 2 页 · 共 8 个")).toBeInTheDocument();
+    expect(within(queue as HTMLElement).getByText("Needs Entry Pack 1")).toBeInTheDocument();
+    expect(within(queue as HTMLElement).getByText("Needs Entry Pack 6")).toBeInTheDocument();
+    expect(within(queue as HTMLElement).queryByText("Needs Entry Pack 7")).not.toBeInTheDocument();
+
+    const firstBatchLink = screen.getByRole("link", { name: /导入 Studio 逐包处理/ });
+    const firstBatch = new URL(firstBatchLink.getAttribute("href")!, "http://localhost").searchParams.get("batch") || "";
+    expect(firstBatch).toContain("yunque.pack.needs-entry-1");
+    expect(firstBatch).toContain("yunque.pack.needs-entry-6");
+    expect(firstBatch).not.toContain("yunque.pack.needs-entry-7");
+
+    fireEvent.click(screen.getByRole("button", { name: "下一页" }));
+
+    expect(screen.getByText("按体检缺口自动挑出最需要小羽补用途、入口、示例或能力边界的能力包。当前第 2 / 2 批，展示 2 个，共 8 个待补肉。")).toBeInTheDocument();
+    expect(within(queue as HTMLElement).getByText("Needs Entry Pack 7")).toBeInTheDocument();
+    expect(within(queue as HTMLElement).getByText("Needs Entry Pack 8")).toBeInTheDocument();
+    expect(within(queue as HTMLElement).queryByText("Needs Entry Pack 1")).not.toBeInTheDocument();
+    const secondBatchLink = screen.getByRole("link", { name: /导入 Studio 逐包处理/ });
+    const secondBatch = new URL(secondBatchLink.getAttribute("href")!, "http://localhost").searchParams.get("batch") || "";
+    expect(secondBatch).toContain("yunque.pack.needs-entry-7");
+    expect(secondBatch).toContain("yunque.pack.needs-entry-8");
+    expect(secondBatch).not.toContain("yunque.pack.needs-entry-1");
   });
 
   it("filters packs by stability so users can avoid experimental packs", async () => {

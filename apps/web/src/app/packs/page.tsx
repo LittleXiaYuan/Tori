@@ -54,6 +54,7 @@ const PACK_RELEASE_SOURCES = resolvePackReleaseSources();
 const OFFICIAL_BACKUP_MANIFEST = "packs/official/backup-pack/pack.json";
 const packsClient = createPacksClient(createYunqueSDKClientOptions());
 const PAGE_SIZE = 12;
+const READINESS_QUEUE_PAGE_SIZE = 6;
 
 type KindFilter = "all" | "actionable" | "infrastructure" | "experimental";
 type InstallFilter = "all" | "installed" | "enabled" | "disabled" | "available";
@@ -281,12 +282,12 @@ function sortPacks<T>(items: T[], manifestOf: (item: T) => PackManifest, sortMod
   });
 }
 
-function pageCountFor(total: number): number {
-  return Math.max(1, Math.ceil(total / PAGE_SIZE));
+function pageCountFor(total: number, pageSize = PAGE_SIZE): number {
+  return Math.max(1, Math.ceil(total / pageSize));
 }
 
-function paginate<T>(items: T[], page: number): T[] {
-  return items.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+function paginate<T>(items: T[], page: number, pageSize = PAGE_SIZE): T[] {
+  return items.slice((page - 1) * pageSize, page * pageSize);
 }
 
 function renderFilterGroup(
@@ -323,8 +324,9 @@ function renderPagination(
   total: number,
   onPrev: () => void,
   onNext: () => void,
+  pageSize = PAGE_SIZE,
 ) {
-  if (total <= PAGE_SIZE) return null;
+  if (total <= pageSize) return null;
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>
@@ -367,6 +369,7 @@ export default function PacksPageOptimized() {
   const [installedPage, setInstalledPage] = useState(1);
   const [releasePage, setReleasePage] = useState(1);
   const [privatePage, setPrivatePage] = useState(1);
+  const [readinessQueuePage, setReadinessQueuePage] = useState(1);
 
   const packs = data?.packs || [];
   const catalogEntries = catalog?.entries || [];
@@ -413,8 +416,13 @@ export default function PacksPageOptimized() {
           || a.manifest.name.localeCompare(b.manifest.name);
       });
   }, [packs, releaseEntries, privateCatalogEntries]);
-  const readinessQueue = useMemo(() => readinessItems.slice(0, 6), [readinessItems]);
   const readinessQueueTotal = readinessItems.length;
+  const readinessQueuePageCount = pageCountFor(readinessQueueTotal, READINESS_QUEUE_PAGE_SIZE);
+  const currentReadinessQueuePage = Math.min(readinessQueuePage, readinessQueuePageCount);
+  const readinessQueue = useMemo(
+    () => paginate(readinessItems, currentReadinessQueuePage, READINESS_QUEUE_PAGE_SIZE),
+    [currentReadinessQueuePage, readinessItems],
+  );
   const packKindStats = useMemo(() => {
     const manifests = new Map<string, PackManifest>();
     for (const pack of packs) manifests.set(pack.manifest.id, pack.manifest);
@@ -515,6 +523,10 @@ export default function PacksPageOptimized() {
     setReleasePage(1);
     setPrivatePage(1);
   }, [normalizedQuery, kindFilter, installFilter, riskFilter, sourceFilter, stabilityFilter, readinessFilter, sortMode]);
+
+  useEffect(() => {
+    setReadinessQueuePage(1);
+  }, [readinessQueueTotal]);
 
   const refreshAll = async () => {
     await Promise.all([refresh(), refreshCatalog(), refreshReleaseCatalog()]);
@@ -779,7 +791,7 @@ export default function PacksPageOptimized() {
               <div>
                 <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>补肉优先队列</div>
                 <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
-                  按体检缺口自动挑出最需要小羽补用途、入口、示例或能力边界的能力包。当前展示 {readinessQueue.length} 个，共 {readinessQueueTotal} 个待补肉。
+                  按体检缺口自动挑出最需要小羽补用途、入口、示例或能力边界的能力包。当前第 {currentReadinessQueuePage} / {readinessQueuePageCount} 批，展示 {readinessQueue.length} 个，共 {readinessQueueTotal} 个待补肉。
                 </div>
               </div>
               <Button size="sm" variant="outline" onPress={() => {
@@ -825,6 +837,17 @@ export default function PacksPageOptimized() {
                   </div>
                 );
               })}
+            </div>
+            <div className="mt-3">
+              {renderPagination(
+                "补肉队列",
+                currentReadinessQueuePage,
+                readinessQueuePageCount,
+                readinessQueueTotal,
+                () => setReadinessQueuePage((value) => Math.max(1, value - 1)),
+                () => setReadinessQueuePage((value) => Math.min(readinessQueuePageCount, value + 1)),
+                READINESS_QUEUE_PAGE_SIZE,
+              )}
             </div>
           </div>
         )}
