@@ -382,6 +382,166 @@ func TestCogniKernelRouterOwnsReload(t *testing.T) {
 	}
 }
 
+func TestCogniKernelRouterOwnsBundleImportAndPersistence(t *testing.T) {
+	api := &fakeCogniAPI{}
+	dir := t.TempDir()
+	registry := cogni.NewRegistry()
+	if err := registry.Add(&cogni.Declaration{
+		ID:          "existing-cogni",
+		Description: "original version",
+		Activation:  cogni.ActivationRules{AlwaysOn: true},
+	}, "test"); err != nil {
+		t.Fatalf("add existing cogni: %v", err)
+	}
+	router := NewRouterWithDeps(api, fakeRuntimeReporter{}, Dependencies{
+		RegistryProvider:  fakeDependencyProvider{registry: registry},
+		DirectoryProvider: fakeDependencyProvider{dir: dir},
+	})
+
+	bundle := cogni.Bundle{
+		Schema: cogni.BundleSchema,
+		Cognis: []*cogni.Declaration{
+			{
+				ID:          "new-cogni-1",
+				DisplayName: "New Cogni 1",
+				Description: "First new cogni",
+				Activation:  cogni.ActivationRules{Keywords: []string{"test"}},
+			},
+			{
+				ID:          "new-cogni-2",
+				DisplayName: "New Cogni 2",
+				Description: "Second new cogni",
+				Activation:  cogni.ActivationRules{AlwaysOn: true},
+			},
+			{
+				ID:          "existing-cogni",
+				Description: "updated version",
+				Activation:  cogni.ActivationRules{AlwaysOn: true},
+			},
+		},
+	}
+	body, err := json.Marshal(bundle)
+	if err != nil {
+		t.Fatalf("marshal bundle: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/cognis/import?overwrite=true", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	router.ServeCogniKernel(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("import status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	var summary cogni.ImportSummary
+	if err := json.NewDecoder(w.Body).Decode(&summary); err != nil {
+		t.Fatalf("decode summary: %v", err)
+	}
+	if len(summary.Added) != 2 || len(summary.Updated) != 1 || len(summary.Failed) != 0 {
+		t.Fatalf("unexpected import summary: %+v", summary)
+	}
+	for _, filename := range []string{"new-cogni-1.json", "new-cogni-2.json", "existing-cogni.json"} {
+		filePath := filepath.Join(dir, filename)
+		data, err := os.ReadFile(filePath)
+		if err != nil {
+			t.Fatalf("expected persisted declaration %s: %v", filename, err)
+		}
+		var decl cogni.Declaration
+		if err := json.Unmarshal(data, &decl); err != nil {
+			t.Fatalf("persisted declaration %s is invalid JSON: %v", filename, err)
+		}
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/cognis/export?ids=new-cogni-1,existing-cogni&notes=portable", nil)
+	w = httptest.NewRecorder()
+	router.ServeCogniKernel(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("export status=%d body=%s", w.Code, w.Body.String())
+	}
+	if got := w.Header().Get("Content-Disposition"); got != "attachment; filename=\"cogni-bundle.json\"" {
+		t.Fatalf("unexpected content disposition: %q", got)
+	}
+	var exported cogni.Bundle
+	if err := json.NewDecoder(w.Body).Decode(&exported); err != nil {
+		t.Fatalf("decode exported bundle: %v", err)
+	}
+	if exported.Notes != "portable" || len(exported.Cognis) != 2 {
+		t.Fatalf("unexpected exported bundle: %+v", exported)
+	}
+	if api.called != 0 {
+		t.Fatalf("bundle routes should not delegate to API adapter, called=%d", api.called)
+	}
+}
+
+func TestCogniKernelRouterImportSkipsFailedAndHandlesEmptyDirectory(t *testing.T) {
+	registry := cogni.NewRegistry()
+	dir := t.TempDir()
+	router := NewRouterWithDeps(&fakeCogniAPI{}, fakeRuntimeReporter{}, Dependencies{
+		RegistryProvider:  fakeDependencyProvider{registry: registry},
+		DirectoryProvider: fakeDependencyProvider{dir: dir},
+	})
+
+	bundle := cogni.Bundle{
+		Schema: cogni.BundleSchema,
+		Cognis: []*cogni.Declaration{
+			{
+				ID:          "valid-cogni",
+				Description: "This one is valid",
+				Activation:  cogni.ActivationRules{AlwaysOn: true},
+			},
+			{
+				Description: "This one is invalid",
+				Activation:  cogni.ActivationRules{AlwaysOn: true},
+			},
+			{
+				ID:         "invalid-score",
+				Activation: cogni.ActivationRules{MinScore: 2.0},
+			},
+		},
+	}
+	body, _ := json.Marshal(bundle)
+	req := httptest.NewRequest(http.MethodPost, "/v1/cognis/import", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	router.ServeCogniKernel(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("import status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	var summary cogni.ImportSummary
+	if err := json.NewDecoder(w.Body).Decode(&summary); err != nil {
+		t.Fatalf("decode summary: %v", err)
+	}
+	if len(summary.Added) != 1 || len(summary.Failed) != 2 {
+		t.Fatalf("unexpected summary: %+v", summary)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "valid-cogni.json")); err != nil {
+		t.Fatalf("expected valid cogni to be persisted: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "invalid-score.json")); !os.IsNotExist(err) {
+		t.Fatalf("invalid-score.json should not exist, stat err=%v", err)
+	}
+
+	registry = cogni.NewRegistry()
+	router = NewRouterWithDeps(&fakeCogniAPI{}, fakeRuntimeReporter{}, Dependencies{
+		RegistryProvider: fakeDependencyProvider{registry: registry},
+	})
+	body, _ = json.Marshal(cogni.Bundle{
+		Schema: cogni.BundleSchema,
+		Cognis: []*cogni.Declaration{{
+			ID:         "memory-only",
+			Activation: cogni.ActivationRules{AlwaysOn: true},
+		}},
+	})
+	req = httptest.NewRequest(http.MethodPost, "/v1/cognis/import", bytes.NewReader(body))
+	w = httptest.NewRecorder()
+	router.ServeCogniKernel(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("memory-only import status=%d body=%s", w.Code, w.Body.String())
+	}
+	if _, ok := registry.Get("memory-only"); !ok {
+		t.Fatalf("memory-only cogni should still be imported without a directory")
+	}
+}
+
 func TestCogniKernelRouterOwnsFederationAndEconomics(t *testing.T) {
 	api := &fakeCogniAPI{}
 	registry := cogni.NewRegistry()

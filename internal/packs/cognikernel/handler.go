@@ -3,7 +3,9 @@ package cognikernelpack
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -220,6 +222,8 @@ func (r *Router) Routes() []packruntime.BackendRoute {
 		{Methods: []string{http.MethodGet}, Path: "/v1/cognis/alerts", Handler: r.HandleAlerts},
 		{Methods: []string{http.MethodPost}, Path: "/v1/cognis/alerts/scan", Handler: r.HandleAlertsScan},
 		{Methods: []string{http.MethodGet, http.MethodPost}, Path: "/v1/cognis/verify", Handler: r.HandleVerifyAll},
+		{Methods: []string{http.MethodGet, http.MethodPost}, Path: "/v1/cognis/export", Handler: r.HandleExportBundle},
+		{Methods: []string{http.MethodPost}, Path: "/v1/cognis/import", Handler: r.HandleImportBundle},
 		{Methods: []string{http.MethodPost}, Path: RouteDecisionRoute, Handler: r.HandleRouteDecision},
 		{Methods: []string{http.MethodGet}, Path: RuntimePackStateRoute, Handler: r.HandleRuntimePackState},
 	}
@@ -271,6 +275,14 @@ func (r *Router) serveRegistry(w http.ResponseWriter, req *http.Request) bool {
 	}
 	if path == "reload" {
 		r.HandleReload(w, req)
+		return true
+	}
+	if path == "export" {
+		r.HandleExportBundle(w, req)
+		return true
+	}
+	if path == "import" {
+		r.HandleImportBundle(w, req)
 		return true
 	}
 
@@ -434,6 +446,79 @@ func (r *Router) HandleReload(w http.ResponseWriter, req *http.Request) {
 		"errors":  errs,
 		"version": registry.Version(),
 	})
+}
+
+func (r *Router) HandleExportBundle(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet && req.Method != http.MethodPost {
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET or POST")
+		return
+	}
+	registry := r.cogniRegistry()
+	if registry == nil {
+		apperror.WriteCode(w, apperror.CodeInternal, "cogni registry not configured")
+		return
+	}
+
+	var ids []string
+	if idsRaw := req.URL.Query().Get("ids"); idsRaw != "" {
+		for _, id := range strings.Split(idsRaw, ",") {
+			id = strings.TrimSpace(id)
+			if id != "" {
+				ids = append(ids, id)
+			}
+		}
+	}
+	bundle := registry.ExportBundle(ids, req.URL.Query().Get("notes"))
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Disposition", "attachment; filename=\"cogni-bundle.json\"")
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	_ = enc.Encode(bundle)
+}
+
+func (r *Router) HandleImportBundle(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "POST only")
+		return
+	}
+	registry := r.cogniRegistry()
+	if registry == nil {
+		apperror.WriteCode(w, apperror.CodeInternal, "cogni registry not configured")
+		return
+	}
+	var bundle cogni.Bundle
+	if err := json.NewDecoder(req.Body).Decode(&bundle); err != nil {
+		apperror.WriteCode(w, apperror.CodeBadRequest, "invalid bundle JSON: "+err.Error())
+		return
+	}
+	summary, err := registry.ImportBundle(&bundle, strings.EqualFold(req.URL.Query().Get("overwrite"), "true"))
+	if err != nil {
+		apperror.WriteCode(w, apperror.CodeBadRequest, err.Error())
+		return
+	}
+	r.persistImportedCognis(registry, summary)
+	writeJSON(w, summary)
+}
+
+func (r *Router) persistImportedCognis(registry *cogni.Registry, summary cogni.ImportSummary) {
+	dir := r.cogniDirectory()
+	if dir == "" {
+		return
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		slog.Warn("cogni: failed to create directory", "dir", dir, "err", err)
+		return
+	}
+	for _, id := range append(append([]string{}, summary.Added...), summary.Updated...) {
+		decl, ok := registry.Get(id)
+		if !ok {
+			continue
+		}
+		savePath := filepath.Join(dir, id+".json")
+		if err := cogni.SaveDeclaration(decl, savePath); err != nil {
+			slog.Warn("cogni: failed to save imported declaration", "id", id, "path", savePath, "err", err)
+		}
+	}
 }
 
 func (r *Router) HandleFederationStatus(w http.ResponseWriter, req *http.Request) {
@@ -1087,6 +1172,8 @@ func delegatedRouteSpecs() []delegatedRouteSpec {
 			"/v1/cognis/alerts",
 			"/v1/cognis/alerts/scan",
 			"/v1/cognis/verify",
+			"/v1/cognis/export",
+			"/v1/cognis/import",
 			RouteDecisionRoute,
 			RuntimePackStateRoute:
 			continue

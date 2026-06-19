@@ -2,9 +2,7 @@ package gateway
 
 import (
 	"encoding/json"
-	"log/slog"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -54,9 +52,9 @@ func (g *Gateway) handleCognis(w http.ResponseWriter, r *http.Request) {
 	case path == "generate":
 		g.cogniGenerate(w, r)
 	case path == "export":
-		g.cogniExportBundle(w, r)
+		apperror.WriteCode(w, apperror.CodeNotFound, "cogni export is owned by cogni-kernel pack")
 	case path == "import":
-		g.cogniImportBundle(w, r)
+		apperror.WriteCode(w, apperror.CodeNotFound, "cogni import is owned by cogni-kernel pack")
 	case path == "evolution":
 		g.cogniEvolutionList(w, r)
 	default:
@@ -89,96 +87,6 @@ func (g *Gateway) handleCognis(w http.ResponseWriter, r *http.Request) {
 // are extracted behind a standalone Cogni service in later reversible steps.
 func (g *Gateway) ServeCogniKernel(w http.ResponseWriter, r *http.Request) {
 	g.handleCognis(w, r)
-}
-
-func (g *Gateway) cogniExportBundle(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet && r.Method != http.MethodPost {
-		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET or POST")
-		return
-	}
-	if g.cogniRegistry == nil {
-		apperror.WriteCode(w, apperror.CodeInternal, "cogni registry not configured")
-		return
-	}
-
-	idsRaw := r.URL.Query().Get("ids")
-	var ids []string
-	if idsRaw != "" {
-		for _, id := range strings.Split(idsRaw, ",") {
-			id = strings.TrimSpace(id)
-			if id != "" {
-				ids = append(ids, id)
-			}
-		}
-	}
-	notes := r.URL.Query().Get("notes")
-
-	bundle := g.cogniRegistry.ExportBundle(ids, notes)
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Content-Disposition", "attachment; filename=\"cogni-bundle.json\"")
-	enc := json.NewEncoder(w)
-	enc.SetIndent("", "  ")
-	_ = enc.Encode(bundle)
-}
-
-// cogniImportBundle imports a bundle of Cogni declarations into the registry.
-// Successfully imported cognis (added and updated) are automatically persisted
-// to disk in the cogniDir as {id}.json files, ensuring they survive restarts.
-// Skipped and failed cognis are not persisted.
-//
-// Query parameters:
-//   - overwrite=true: replace existing declarations with the same ID
-//   - overwrite=false (default): skip existing declarations
-func (g *Gateway) cogniImportBundle(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "POST only")
-		return
-	}
-	if g.cogniRegistry == nil {
-		apperror.WriteCode(w, apperror.CodeInternal, "cogni registry not configured")
-		return
-	}
-	var bundle cogni.Bundle
-	if err := json.NewDecoder(r.Body).Decode(&bundle); err != nil {
-		apperror.WriteCode(w, apperror.CodeBadRequest, "invalid bundle JSON: "+err.Error())
-		return
-	}
-	overwrite := strings.EqualFold(r.URL.Query().Get("overwrite"), "true")
-	summary, err := g.cogniRegistry.ImportBundle(&bundle, overwrite)
-	if err != nil {
-		apperror.WriteCode(w, apperror.CodeBadRequest, err.Error())
-		return
-	}
-
-	// Persist successfully imported cognis to disk
-	if g.cogniDir != "" {
-		// Ensure the directory exists
-		if err := os.MkdirAll(g.cogniDir, 0o755); err != nil {
-			slog.Warn("cogni: failed to create directory", "dir", g.cogniDir, "err", err)
-		} else {
-			// Save added cognis
-			for _, id := range summary.Added {
-				if decl, ok := g.cogniRegistry.Get(id); ok {
-					savePath := filepath.Join(g.cogniDir, id+".json")
-					if err := cogni.SaveDeclaration(decl, savePath); err != nil {
-						slog.Warn("cogni: failed to save imported declaration", "id", id, "path", savePath, "err", err)
-					}
-				}
-			}
-			// Save updated cognis
-			for _, id := range summary.Updated {
-				if decl, ok := g.cogniRegistry.Get(id); ok {
-					savePath := filepath.Join(g.cogniDir, id+".json")
-					if err := cogni.SaveDeclaration(decl, savePath); err != nil {
-						slog.Warn("cogni: failed to save updated declaration", "id", id, "path", savePath, "err", err)
-					}
-				}
-			}
-		}
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(summary)
 }
 
 // ── Self-Genesis handler ──
