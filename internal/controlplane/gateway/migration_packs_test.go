@@ -45,6 +45,7 @@ import (
 	skillspack "yunque-agent/internal/packs/skills"
 	speechpack "yunque-agent/internal/packs/speech"
 	statepack "yunque-agent/internal/packs/state"
+	subagentspack "yunque-agent/internal/packs/subagents"
 	triggerspack "yunque-agent/internal/packs/triggers"
 	workpack "yunque-agent/internal/packs/work"
 	"yunque-agent/pkg/packruntime"
@@ -96,6 +97,7 @@ var migrationPackPaths = map[string][]string{
 	schedulerpack.PackID:     schedulerpack.Paths(),
 	skillhubpack.PackID:      skillhubpack.Paths(),
 	speechpack.PackID:        speechpack.Paths(),
+	subagentspack.PackID:     subagentspack.Paths(),
 	// Monolith route groups extracted into native packs (Tier 0 microkernel).
 	modespack.PackID: {"/v1/persona/modes", "/v1/persona/mode", "/v1/persona/mode/current"},
 	reveriepack.PackID: {
@@ -138,6 +140,7 @@ var migrationPackNames = map[string]string{
 	schedulerpack.PackID:     "Scheduler",
 	skillhubpack.PackID:      "SkillHub",
 	speechpack.PackID:        "Speech",
+	subagentspack.PackID:     "Subagents",
 	modespack.PackID:         "Persona Modes",
 	reveriepack.PackID:       "Reverie",
 	idepack.PackID:           "IDE",
@@ -201,6 +204,7 @@ func registerMigrationPacks(gw *Gateway) {
 	_ = gw.RegisterModule(schedulerpack.NewProvider(gw.Scheduler))
 	_ = gw.RegisterModule(skillhubpack.New(gw))
 	_ = gw.RegisterModule(speechpack.New(gw))
+	_ = gw.RegisterModule(subagentspack.New(gw))
 	// Native monolith-extracted packs (mirror cmd/agent/init_task_engine.go).
 	_ = gw.RegisterModule(modespack.New(gw))
 	_ = gw.RegisterModule(reveriepack.New(gw))
@@ -292,6 +296,8 @@ func newTestGatewayWithMigrationPack(t *testing.T, packID string, status packrun
 		_ = gw.RegisterModule(skillhubpack.New(nil))
 	case speechpack.PackID:
 		_ = gw.RegisterModule(speechpack.New(nil))
+	case subagentspack.PackID:
+		_ = gw.RegisterModule(subagentspack.New(gw))
 	case statepack.PackID:
 		_ = gw.RegisterModule(statepack.New(gw))
 	}
@@ -330,6 +336,7 @@ func TestMigrationPackRouteGating(t *testing.T) {
 		{"scheduler", schedulerpack.PackID, "/v1/scheduler/jobs"},
 		{"skillhub", skillhubpack.PackID, "/api/skillhub/search"},
 		{"speech", speechpack.PackID, "/v1/speech/voices"},
+		{"subagents", subagentspack.PackID, "/v1/subagent"},
 		{"state", statepack.PackID, "/v1/state"},
 	}
 	for _, tc := range cases {

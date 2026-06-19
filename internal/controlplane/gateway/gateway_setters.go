@@ -221,6 +221,9 @@ func (g *Gateway) EmbeddingsResolver() *embeddings.Resolver { return g.embedReso
 // SetSubagentManager attaches a subagent manager.
 func (g *Gateway) SetSubagentManager(sm *subagent.Manager) { g.subagentMgr = sm }
 
+// SubagentManager exposes the subagent manager to the subagents pack.
+func (g *Gateway) SubagentManager() *subagent.Manager { return g.subagentMgr }
+
 // SetHandoffRegistry attaches a handoff registry for subagent delegation.
 func (g *Gateway) SetHandoffRegistry(hr *subagent.HandoffRegistry) { g.handoffReg = hr }
 

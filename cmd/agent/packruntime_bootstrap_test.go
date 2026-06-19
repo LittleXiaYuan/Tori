@@ -259,6 +259,23 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 		t.Fatal("expected Retrieval search providers routeSpec")
 	}
 
+	subagentsPack, ok := registry.Get("yunque.pack.subagents")
+	if !ok {
+		t.Fatal("expected Subagents builtin pack to be installed")
+	}
+	if subagentsPack.Status != packruntime.PackStatusEnabled {
+		t.Fatalf("expected Subagents default enabled, got %s", subagentsPack.Status)
+	}
+	if subagentsPack.Manifest.SDK.TypeScript != "yunque-client/subagents" {
+		t.Fatalf("unexpected Subagents SDK import: %s", subagentsPack.Manifest.SDK.TypeScript)
+	}
+	if !hasRouteSpec(subagentsPack.Manifest.Backend.RouteSpecs, "POST", "/v1/subagent") {
+		t.Fatal("expected Subagents spawn routeSpec")
+	}
+	if !hasRouteSpec(subagentsPack.Manifest.Backend.RouteSpecs, "POST", "/v1/subagent/message") {
+		t.Fatal("expected Subagents message routeSpec")
+	}
+
 	forks, ok := registry.Get("yunque.pack.forks")
 	if !ok {
 		t.Fatal("expected Conversation Forks builtin pack to be installed")
@@ -509,7 +526,7 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 	// Count reflects the current packs/official/ set (incl. the newer
 	// console/control-plane/knowledge/memory/skills/work/workspace packs and the
 	// cognitive-layer/state packs). Adjust if the builtin pack set changes.
-	if got := len(registry.List()); got != 44 {
+	if got := len(registry.List()); got != 45 {
 		t.Fatalf("expected idempotent builtin install, got %d packs", got)
 	}
 }

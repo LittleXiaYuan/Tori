@@ -75,6 +75,7 @@ import (
 	skillspack "yunque-agent/internal/packs/skills"
 	speechpack "yunque-agent/internal/packs/speech"
 	statepack "yunque-agent/internal/packs/state"
+	subagentspack "yunque-agent/internal/packs/subagents"
 	triggerspack "yunque-agent/internal/packs/triggers"
 	workpack "yunque-agent/internal/packs/work"
 	worldmodelpack "yunque-agent/internal/packs/worldmodel"
@@ -273,6 +274,9 @@ func initTaskEngine(
 	// Retrieval pack — owns /v1/embeddings and /v1/search* natively, reading the
 	// configured embedding/search providers lazily through narrow host accessors.
 	_ = gw.RegisterModule(retrievalpack.New(gw))
+	// Subagents pack — owns /v1/subagent* natively. Handoff execution remains
+	// planner-facing; lifecycle inspection/mutation is Pack-gated here.
+	_ = gw.RegisterModule(subagentspack.New(gw))
 
 	// Inner Life pack — exposes the soul-layer outputs (curiosity / reflection /
 	// dreaming) over a read-only HTTP surface. Registered here because the

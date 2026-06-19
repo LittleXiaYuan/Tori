@@ -46,9 +46,8 @@ func (g *Gateway) registerChatRoutes() {
 	// Fork routes (/v1/fork*) are owned by the conversation forks pack
 	// (internal/packs/forks), mounted via gw.RegisterModule.
 
-	// Subagent
-	g.mux.HandleFunc("/v1/subagent", g.requireAuth(g.handleSubagent))
-	g.mux.HandleFunc("/v1/subagent/message", g.requireAuth(g.handleSubagentMessage))
+	// Subagent management (/v1/subagent*) is owned by the subagents pack
+	// (internal/packs/subagents), mounted via gw.RegisterModule.
 
 	// Bots routes migrated to the control-plane pack (internal/packs/controlplane).
 

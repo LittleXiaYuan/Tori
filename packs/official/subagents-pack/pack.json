@@ -1,0 +1,67 @@
+{
+  "id": "yunque.pack.subagents",
+  "name": "Subagents (子代理)",
+  "version": "0.1.0",
+  "description": "子代理管理：创建、查看、销毁子代理，并向子代理上下文追加消息。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": [
+      "subagents.list",
+      "subagents.spawn",
+      "subagents.destroy",
+      "subagents.messages.append"
+    ],
+    "routes": [
+      "/v1/subagent",
+      "/v1/subagent/message"
+    ],
+    "permissions": [
+      "subagents:read",
+      "subagents:write"
+    ],
+    "routeSpecs": [
+      {
+        "method": "GET",
+        "path": "/v1/subagent",
+        "description": "List subagents or read one subagent by id."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/subagent",
+        "description": "Spawn a subagent with optional skills."
+      },
+      {
+        "method": "DELETE",
+        "path": "/v1/subagent",
+        "description": "Destroy a subagent by id."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/subagent/message",
+        "description": "Append messages to a subagent context."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [],
+    "assets": {
+      "type": "builtin"
+    }
+  },
+  "sdk": {
+    "typescript": "yunque-client/subagents"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "group": "agent-runtime",
+    "phase": "A3",
+    "preload": "true",
+    "note": "Natively owns /v1/subagent and /v1/subagent/message through the Pack Runtime gate. Handoff execution remains planner-facing; this pack owns lifecycle inspection and mutation."
+  },
+  "status": "beta"
+}
