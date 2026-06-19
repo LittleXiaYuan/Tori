@@ -146,14 +146,9 @@ func (g *Gateway) registerTriggerRoutes() {
 	// (internal/packs/scheduler), mounted via gw.RegisterModule.
 
 	// Tools (process execution) migrated to the control-plane pack
-	// (internal/packs/controlplane). Sandbox routes below stay admin-gated here.
-
-	// Sandbox (admin-only — arbitrary command execution)
-	g.mux.HandleFunc("/v1/sandbox/exec", g.requireAuth(g.requireAdmin(g.handleSandboxExec)))
-	g.mux.HandleFunc("/v1/sandbox/probe", g.requireAuth(g.requireAdmin(g.handleSandboxProbe)))
-	g.mux.HandleFunc("/v1/sandbox/desktop", g.requireAuth(g.requireAdmin(g.handleDesktopCreate)))
-	g.mux.HandleFunc("/v1/sandbox/desktop/status", g.requireAuth(g.handleDesktopStatus))
-	g.mux.HandleFunc("/v1/sandbox/desktop/destroy", g.requireAuth(g.handleDesktopDestroy))
+	// (internal/packs/controlplane). Sandbox/cloud-desktop routes are owned by
+	// the sandbox pack (internal/packs/sandbox), preserving admin-only execution
+	// gates while Pack Runtime owns enablement.
 
 	// Agent output files (/api/files, /api/files/preview, /api/files/download)
 	// are owned by the files pack (internal/packs/files), mounted via

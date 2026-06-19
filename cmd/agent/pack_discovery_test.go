@@ -53,6 +53,7 @@ func TestDiscoverBuiltinPackManifestPaths(t *testing.T) {
 		"packs/official/reflection-pack/pack.json",
 		"packs/official/retrieval-pack/pack.json",
 		"packs/official/reverie-pack/pack.json",
+		"packs/official/sandbox-pack/pack.json",
 		"packs/official/scheduler-pack/pack.json",
 		"packs/official/session-queue-pack/pack.json",
 		"packs/official/speech-pack/pack.json",

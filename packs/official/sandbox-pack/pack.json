@@ -1,0 +1,87 @@
+{
+  "id": "yunque.pack.sandbox",
+  "name": "Sandbox Pack",
+  "version": "0.1.0",
+  "description": "受控命令执行与云桌面沙箱能力包：保留管理员授权边界，并让高风险执行面可被 Pack Runtime 启停。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": [
+      "sandbox.exec",
+      "sandbox.probe",
+      "sandbox.desktop.create",
+      "sandbox.desktop.status",
+      "sandbox.desktop.destroy"
+    ],
+    "routes": [
+      "/v1/sandbox/exec",
+      "/v1/sandbox/probe",
+      "/v1/sandbox/desktop",
+      "/v1/sandbox/desktop/status",
+      "/v1/sandbox/desktop/destroy"
+    ],
+    "permissions": [
+      "sandbox:read",
+      "sandbox:execute",
+      "sandbox:desktop",
+      "computer:cloud-desktop",
+      "network:external",
+      "admin:required"
+    ],
+    "routeSpecs": [
+      {
+        "method": "POST",
+        "path": "/v1/sandbox/exec",
+        "description": "Execute an admin-approved command inside the local sandbox policy."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/sandbox/probe",
+        "description": "Probe cloud sandbox and Tori cloud desktop readiness."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/sandbox/desktop",
+        "description": "Create or reuse an authenticated cloud desktop sandbox."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/sandbox/desktop/status",
+        "description": "Read the current cloud desktop sandbox status."
+      },
+      {
+        "method": "DELETE",
+        "path": "/v1/sandbox/desktop/destroy",
+        "description": "Destroy the current cloud desktop sandbox."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/sandbox/desktop/destroy",
+        "description": "Destroy the current cloud desktop sandbox."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [],
+    "assets": {
+      "type": "builtin"
+    }
+  },
+  "sdk": {
+    "typescript": "yunque-client/sandbox"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "group": "runtime",
+    "stage": "native-pack-route-migration",
+    "risk": "high",
+    "auth": "Pack Runtime controls enablement; exec/probe/create compose host RequireAuth+RequireAdmin inside the pack.",
+    "computer_use_relation": "Computer Use reads cloud desktop status through the sandbox pack, but local desktop control remains outside this slice.",
+    "note": "Natively owns /v1/sandbox/* so high-risk command/cloud-desktop surfaces can be disabled as a capability pack."
+  },
+  "status": "beta"
+}

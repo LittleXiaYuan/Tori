@@ -483,6 +483,23 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 		t.Fatal("expected Plugin API Bridge cron list routeSpec")
 	}
 
+	sandboxPack, ok := registry.Get("yunque.pack.sandbox")
+	if !ok {
+		t.Fatal("expected Sandbox builtin pack to be installed")
+	}
+	if sandboxPack.Status != packruntime.PackStatusEnabled {
+		t.Fatalf("expected Sandbox default enabled, got %s", sandboxPack.Status)
+	}
+	if sandboxPack.Manifest.SDK.TypeScript != "yunque-client/sandbox" {
+		t.Fatalf("unexpected Sandbox SDK import: %s", sandboxPack.Manifest.SDK.TypeScript)
+	}
+	if !hasRouteSpec(sandboxPack.Manifest.Backend.RouteSpecs, "POST", "/v1/sandbox/exec") {
+		t.Fatal("expected Sandbox exec routeSpec")
+	}
+	if !hasRouteSpec(sandboxPack.Manifest.Backend.RouteSpecs, "GET", "/v1/sandbox/desktop/status") {
+		t.Fatal("expected Sandbox desktop status routeSpec")
+	}
+
 	cronPack, ok := registry.Get("yunque.pack.cron")
 	if !ok {
 		t.Fatal("expected Cron builtin pack to be installed")
@@ -765,7 +782,7 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 	ensureBuiltinPacks(registry)
 	// Count reflects the current auto-seeded packs/official/ set. Adjust if the
 	// builtin pack set changes (dlc-demo stays excluded by design).
-	if got := len(registry.List()); got != 64 {
+	if got := len(registry.List()); got != 65 {
 		t.Fatalf("expected idempotent builtin install, got %d packs", got)
 	}
 }

@@ -75,6 +75,7 @@ import (
 	reflectionpack "yunque-agent/internal/packs/reflection"
 	retrievalpack "yunque-agent/internal/packs/retrieval"
 	reveriepack "yunque-agent/internal/packs/reverie"
+	sandboxpack "yunque-agent/internal/packs/sandbox"
 	schedulerpack "yunque-agent/internal/packs/scheduler"
 	sessionqueuepack "yunque-agent/internal/packs/sessionqueue"
 	skillhubpack "yunque-agent/internal/packs/skillhub"
@@ -263,6 +264,12 @@ func initTaskEngine(
 	_ = gw.RegisterModule(cronpack.New(gw))
 	// Triggers pack — owns /v1/triggers* natively (split out of the grab-bag).
 	_ = gw.RegisterModule(triggerspack.New(gw))
+	// Sandbox pack — owns /v1/sandbox/* natively. It keeps arbitrary command
+	// execution and cloud desktop creation admin-only while exposing read-only
+	// desktop status back to the computer-use pack.
+	sandboxPack := sandboxpack.New(gw)
+	gw.SetDesktopSandboxStatusProvider(sandboxPack.StatusMap)
+	_ = gw.RegisterModule(sandboxPack)
 	// Documents pack — owns /v1/documents* natively (split out of the grab-bag).
 	_ = gw.RegisterModule(documentspack.New(gw))
 	// Missions pack — owns /v1/missions* natively (split out of the grab-bag).

@@ -50,6 +50,7 @@ import (
 	reflectionpack "yunque-agent/internal/packs/reflection"
 	retrievalpack "yunque-agent/internal/packs/retrieval"
 	reveriepack "yunque-agent/internal/packs/reverie"
+	sandboxpack "yunque-agent/internal/packs/sandbox"
 	schedulerpack "yunque-agent/internal/packs/scheduler"
 	sessionqueuepack "yunque-agent/internal/packs/sessionqueue"
 	skillhubpack "yunque-agent/internal/packs/skillhub"
@@ -114,6 +115,7 @@ var migrationPackPaths = map[string][]string{
 	reflectionpack.PackID:      reflectionpack.Paths(),
 	retrievalpack.PackID:       retrievalpack.Paths(),
 	schedulerpack.PackID:       schedulerpack.Paths(),
+	sandboxpack.PackID:         sandboxpack.Paths(),
 	sessionqueuepack.PackID:    sessionqueuepack.Paths(),
 	skillhubpack.PackID:        skillhubpack.Paths(),
 	speechpack.PackID:          speechpack.Paths(),
@@ -168,6 +170,7 @@ var migrationPackNames = map[string]string{
 	rbacpack.PackID:            "RBAC",
 	reflectionpack.PackID:      "Reflection",
 	retrievalpack.PackID:       "Retrieval",
+	sandboxpack.PackID:         "Sandbox",
 	schedulerpack.PackID:       "Scheduler",
 	sessionqueuepack.PackID:    "Session Queue",
 	skillhubpack.PackID:        "SkillHub",
@@ -245,6 +248,9 @@ func registerMigrationPacks(gw *Gateway) {
 	_ = gw.RegisterModule(rbacpack.New(gw))
 	_ = gw.RegisterModule(reflectionpack.New(gw))
 	_ = gw.RegisterModule(retrievalpack.New(gw))
+	sandboxPack := sandboxpack.New(gw)
+	gw.SetDesktopSandboxStatusProvider(sandboxPack.StatusMap)
+	_ = gw.RegisterModule(sandboxPack)
 	_ = gw.RegisterModule(schedulerpack.NewProvider(gw.Scheduler))
 	_ = gw.RegisterModule(sessionqueuepack.New(gw))
 	_ = gw.RegisterModule(skillhubpack.New(gw))
@@ -353,6 +359,10 @@ func newTestGatewayWithMigrationPack(t *testing.T, packID string, status packrun
 		_ = gw.RegisterModule(reflectionpack.New(gw))
 	case retrievalpack.PackID:
 		_ = gw.RegisterModule(retrievalpack.New(gw))
+	case sandboxpack.PackID:
+		sandboxPack := sandboxpack.New(gw)
+		gw.SetDesktopSandboxStatusProvider(sandboxPack.StatusMap)
+		_ = gw.RegisterModule(sandboxPack)
 	case reveriepack.PackID:
 		_ = gw.RegisterModule(reveriepack.New(gw))
 	case schedulerpack.PackID:
@@ -431,6 +441,7 @@ func TestMigrationPackRouteGating(t *testing.T) {
 		{"rbac", rbacpack.PackID, http.MethodGet, "/v1/rbac/my-roles"},
 		{"reflection", reflectionpack.PackID, http.MethodGet, "/v1/reflect/experiences"},
 		{"retrieval", retrievalpack.PackID, http.MethodGet, "/v1/search/providers"},
+		{"sandbox", sandboxpack.PackID, http.MethodGet, "/v1/sandbox/desktop/status"},
 		{"reverie", reveriepack.PackID, http.MethodGet, "/v1/reverie/dream/status"},
 		{"scheduler", schedulerpack.PackID, http.MethodGet, "/v1/scheduler/jobs"},
 		{"session-queue", sessionqueuepack.PackID, http.MethodGet, "/v1/sessions/queue"},

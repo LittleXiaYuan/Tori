@@ -743,6 +743,7 @@ func fallbackBuiltinPackManifestPaths() []string {
 		"packs/official/memory-time-travel-pack/pack.json",
 		"packs/official/rpa-replay-pack/pack.json",
 		"packs/official/market-pack/pack.json",
+		"packs/official/sandbox-pack/pack.json",
 		"packs/official/scheduler-pack/pack.json",
 		"packs/official/session-queue-pack/pack.json",
 		"packs/official/skillhub-pack/pack.json",

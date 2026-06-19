@@ -298,9 +298,10 @@ type Gateway struct {
 	toriTokenStore *tori.TokenStore
 
 	// Cloud sandbox runner (E2B Desktop)
-	cloudRunner    *sandbox.CloudRunner
-	desktopSandbox *sandbox.DesktopSandbox
-	desktopMu      sync.Mutex
+	cloudRunner           *sandbox.CloudRunner
+	desktopSandbox        *sandbox.DesktopSandbox
+	desktopMu             sync.Mutex
+	desktopStatusProvider func(context.Context) map[string]any
 
 	// OAuth login state (Tori PKCE)
 	oauthPending map[string]*oauthPendingState
