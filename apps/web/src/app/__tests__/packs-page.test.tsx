@@ -160,7 +160,7 @@ describe("PacksPageOptimized", () => {
     expect(screen.getByText("查看最近产物")).toBeInTheDocument();
     const studioLinks = screen.getAllByRole("link", { name: /小羽优化/ });
     expect(studioLinks[0]).toHaveAttribute("href", expect.stringContaining("/packs/studio?packId=yunque.pack.documents"));
-    expect(decodeURIComponent(studioLinks[0].getAttribute("href") || "")).toContain("让 Documents (文档生成) 更像一个用户能直接理解和使用的能力包");
+    expect(decodeURIComponent(studioLinks[0].getAttribute("href") || "").replace(/\+/g, " ")).toContain("让 Documents (文档生成) 更像一个用户能直接理解和使用的能力包");
   });
 
   it("filters installed packs by search and resets the store filters", async () => {
@@ -211,6 +211,10 @@ describe("PacksPageOptimized", () => {
     expect(screen.getByText("Remote Docs Pack")).toBeInTheDocument();
     expect(screen.queryByText("Documents (文档生成)")).not.toBeInTheDocument();
     expect(screen.getByText(/官方源 1/)).toBeInTheDocument();
+    const remoteStudioLink = screen.getAllByRole("link", { name: /小羽优化/ })
+      .find((link) => link.getAttribute("href")?.includes("yunque.pack.remote-docs"));
+    expect(remoteStudioLink).toHaveAttribute("href", expect.stringContaining("packageUrl=https%3A%2F%2Fexample.com%2Fdocs.yqpack"));
+    expect(remoteStudioLink).toHaveAttribute("href", expect.stringContaining("sha256=abc"));
   });
 
   it("paginates installed packs so a large pack set stays scannable", async () => {

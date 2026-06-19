@@ -596,9 +596,9 @@ export default function PackStudioPage() {
   }, { packs: [] as PackCandidate[] });
   const [selectedId, setSelectedId] = useState(() => searchParams.get("packId") || "");
   const [goal, setGoal] = useState(() => searchParams.get("goal") || DEFAULT_STUDIO_GOAL);
-  const [packagePath, setPackagePath] = useState("");
-  const [packageUrl, setPackageUrl] = useState("");
-  const [packageSHA, setPackageSHA] = useState("");
+  const [packagePath, setPackagePath] = useState(() => searchParams.get("packagePath") || "");
+  const [packageUrl, setPackageUrl] = useState(() => searchParams.get("packageUrl") || "");
+  const [packageSHA, setPackageSHA] = useState(() => searchParams.get("sha256") || "");
   const [inspecting, setInspecting] = useState(false);
   const [inspectReport, setInspectReport] = useState<YqpackInspectReport | null>(null);
   const [preparingWorkspace, setPreparingWorkspace] = useState(false);

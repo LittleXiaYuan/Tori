@@ -98,9 +98,15 @@ function sourceName(url: string): string {
   }
 }
 
-function packStudioHref(manifest: PackManifest): string {
+function packStudioHref(manifest: PackManifest, options?: { packageUrl?: string; sha256?: string }): string {
   const goal = `让 ${manifest.name} 更像一个用户能直接理解和使用的能力包，补齐用途、入口、权限说明和可回滚改造建议。`;
-  return `/packs/studio?packId=${encodeURIComponent(manifest.id)}&goal=${encodeURIComponent(goal)}`;
+  const params = new URLSearchParams({
+    packId: manifest.id,
+    goal,
+  });
+  if (options?.packageUrl) params.set("packageUrl", options.packageUrl);
+  if (options?.sha256) params.set("sha256", options.sha256);
+  return `/packs/studio?${params.toString()}`;
 }
 
 function packSearchText(manifest: PackManifest): string {
@@ -556,6 +562,8 @@ export default function PacksPageOptimized() {
                   action: catalogActionForEntry(entry),
                   busyKey: `install:${entry.package_url}`,
                   onInstall: () => installRelease(entry),
+                  packageUrl: typeof entry.package_url === "string" ? entry.package_url : undefined,
+                  sha256: typeof entry.sha256 === "string" ? entry.sha256 : undefined,
                 }))}
               </div>
               {renderPagination(
@@ -622,10 +630,12 @@ export default function PacksPageOptimized() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {pagedPrivateCatalogEntries.map((entry) => renderInstallableCard(entry.manifest, {
                   key: entry.manifest.id,
-                  source: entry.source || entry.manifest_path || entry.manifest_url || entry.package_url,
+                  source: [entry.source, entry.manifest_path, entry.manifest_url, entry.package_url].find((value): value is string => typeof value === "string"),
                   action: catalogActionForEntry(entry),
                   busyKey: `install:${entry.manifest.id}`,
                   onInstall: () => installCatalogEntry(entry),
+                  packageUrl: typeof entry.package_url === "string" ? entry.package_url : undefined,
+                  sha256: typeof entry.sha256 === "string" ? entry.sha256 : undefined,
                 }))}
               </div>
               {renderPagination(
@@ -726,7 +736,7 @@ export default function PacksPageOptimized() {
 
   function renderInstallableCard(
     manifest: PackManifest,
-    options: { key: string; source?: string; size?: string; action: ReturnType<typeof catalogActionForEntry>; busyKey: string; onInstall: () => void },
+    options: { key: string; source?: string; size?: string; action: ReturnType<typeof catalogActionForEntry>; busyKey: string; onInstall: () => void; packageUrl?: string; sha256?: string },
   ) {
     const badge = packStatusBadge(manifest.status);
     const risk = riskProfileForPack(manifest);
@@ -831,7 +841,7 @@ export default function PacksPageOptimized() {
           <Link href={`/packs/detail?id=${encodeURIComponent(manifest.id)}`}>
             <Button size="sm" variant="ghost">查看详情 <ArrowRight size={14} /></Button>
           </Link>
-          <Link href={packStudioHref(manifest)}>
+          <Link href={packStudioHref(manifest, { packageUrl: options.packageUrl, sha256: options.sha256 })}>
             <Button size="sm" variant="ghost">小羽优化 <Wrench size={14} /></Button>
           </Link>
           {primaryPath && (

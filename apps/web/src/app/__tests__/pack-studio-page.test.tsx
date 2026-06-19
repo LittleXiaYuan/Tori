@@ -293,6 +293,8 @@ describe("PackStudioPage", () => {
     navigationMock.query = new URLSearchParams({
       packId: "yunque.pack.wasm-plugin",
       goal: "补一个结果面板",
+      packageUrl: "https://oss.example.com/wasm-plugin.yqpack",
+      sha256: "9".repeat(64),
     }).toString();
 
     render(<PackStudioPage />);
@@ -305,6 +307,8 @@ describe("PackStudioPage", () => {
       });
     });
     expect((screen.getByLabelText("这次想补强什么") as HTMLInputElement).value).toBe("补一个结果面板");
+    expect((screen.getByLabelText("OSS / Release URL") as HTMLInputElement).value).toBe("https://oss.example.com/wasm-plugin.yqpack");
+    expect((screen.getByLabelText("SHA256") as HTMLInputElement).value).toBe("9".repeat(64));
   });
 
   it("turns real pack metadata into a guarded Xiaoyu modification task", async () => {
