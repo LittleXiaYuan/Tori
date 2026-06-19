@@ -8,6 +8,7 @@
     "start": "next start --port 3001",
     "typecheck": "tsc --noEmit",
     "check:sdk-boundaries": "node scripts/check-sdk-boundaries.mjs",
+    "check:pack-usability": "node ../../scripts/check-pack-usability.mjs --strict",
     "test": "node scripts/check-sdk-boundaries.mjs && vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"

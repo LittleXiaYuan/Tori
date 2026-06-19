@@ -18,7 +18,7 @@ DIST_DIR    := dist
 # Cross-compilation targets
 PLATFORMS   := linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64
 
-.PHONY: build build-full release clean test test-web test-all coverage lint lint-go lint-web vet setup openapi docs-api check check-all web-ensure web-build sbom vulncheck release-safe
+.PHONY: build build-full release clean test test-web test-all coverage lint lint-go lint-web vet setup openapi check-pack-usability docs-api check check-all web-ensure web-build sbom vulncheck release-safe
 
 ## web-ensure: Ensure apps/web/out/ exists (placeholder if no build)
 web-ensure:
@@ -112,6 +112,10 @@ setup:
 openapi:
 	go run ./cmd/openapi-gen
 	go test ./cmd/openapi-gen
+
+## check-pack-usability: Audit official packs for user-visible usefulness signals
+check-pack-usability:
+	node scripts/check-pack-usability.mjs --strict
 
 ## docs-api: Serve the API reference (Scalar, reads docs/openapi.yaml)
 ##           Open http://localhost:8000/api-reference.html in your browser.
