@@ -7,7 +7,6 @@ import (
 
 	"yunque-agent/internal/agentcore/session"
 	"yunque-agent/internal/apperror"
-	"yunque-agent/internal/controlplane/gateway/gwshared"
 	"yunque-agent/pkg/safego"
 )
 
@@ -29,20 +28,12 @@ type Handler struct {
 }
 
 // RouteSpecs returns the fork surface without mounting it. Pack Runtime uses
-// this to own route registration while preserving the existing handler
-// implementation.
+// this to own route registration.
 func (h *Handler) RouteSpecs() []Route {
 	return []Route{
 		{Methods: []string{http.MethodGet, http.MethodPost, http.MethodDelete}, Path: "/v1/fork", Description: "Read, create or delete a conversation fork.", Handler: h.handleFork},
 		{Method: http.MethodPost, Path: "/v1/fork/branch", Description: "Create a branch from an existing conversation fork.", Handler: h.handleBranch},
 		{Method: http.MethodGet, Path: "/v1/fork/list", Description: "List conversation forks for a session.", Handler: h.handleList},
-	}
-}
-
-// RegisterRoutes mounts all /v1/fork/* endpoints.
-func (h *Handler) RegisterRoutes(mux *http.ServeMux, auth gwshared.AuthFunc) {
-	for _, route := range h.RouteSpecs() {
-		mux.HandleFunc(route.Path, auth(route.Handler))
 	}
 }
 

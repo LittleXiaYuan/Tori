@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"yunque-agent/internal/apperror"
-	"yunque-agent/internal/controlplane/gateway/gwshared"
 	"yunque-agent/internal/execution/scheduler"
 )
 
@@ -26,20 +25,12 @@ type Handler struct {
 }
 
 // RouteSpecs returns the scheduler surface without mounting it. Pack Runtime
-// uses this to own route registration while preserving the existing handler
-// implementation.
+// uses this to own route registration.
 func (h *Handler) RouteSpecs() []Route {
 	return []Route{
 		{Method: http.MethodGet, Path: "/v1/scheduler/jobs", Description: "List scheduled jobs.", Handler: h.handleJobs},
 		{Method: http.MethodPost, Path: "/v1/scheduler/add", Description: "Add a scheduled job.", Handler: h.handleAdd},
 		{Method: http.MethodPost, Path: "/v1/scheduler/remove", Description: "Remove a scheduled job.", Handler: h.handleRemove},
-	}
-}
-
-// RegisterRoutes mounts all /v1/scheduler/* endpoints.
-func (h *Handler) RegisterRoutes(mux *http.ServeMux, auth gwshared.AuthFunc) {
-	for _, route := range h.RouteSpecs() {
-		mux.HandleFunc(route.Path, auth(route.Handler))
 	}
 }
 
@@ -64,10 +55,10 @@ func (h *Handler) handleJobs(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) handleAdd(w http.ResponseWriter, r *http.Request) {
 	sched := h.scheduler()
 	if sched == nil {
-		gwshared.WriteJSONStatus(w, http.StatusServiceUnavailable, map[string]any{"error": "scheduler not available"})
+		writeJSONStatus(w, http.StatusServiceUnavailable, map[string]any{"error": "scheduler not available"})
 		return
 	}
-	tid := gwshared.TenantFromCtx(r.Context())
+	tid := tenantFromCtx(r.Context())
 	var req struct {
 		Name     string `json:"name"`
 		Prompt   string `json:"prompt"`
@@ -98,7 +89,7 @@ func (h *Handler) handleAdd(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) handleRemove(w http.ResponseWriter, r *http.Request) {
 	sched := h.scheduler()
 	if sched == nil {
-		gwshared.WriteJSONStatus(w, http.StatusServiceUnavailable, map[string]any{"error": "scheduler not available"})
+		writeJSONStatus(w, http.StatusServiceUnavailable, map[string]any{"error": "scheduler not available"})
 		return
 	}
 	var req struct {

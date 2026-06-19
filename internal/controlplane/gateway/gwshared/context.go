@@ -4,21 +4,18 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+
+	"yunque-agent/internal/httpctx"
 )
-
-type ctxKey string
-
-const tenantKey ctxKey = "tenant_id"
 
 // ContextWithTenant stores the tenant ID in context.
 func ContextWithTenant(ctx context.Context, id string) context.Context {
-	return context.WithValue(ctx, tenantKey, id)
+	return httpctx.ContextWithTenant(ctx, id)
 }
 
 // TenantFromCtx extracts the tenant ID from context.
 func TenantFromCtx(ctx context.Context) string {
-	v, _ := ctx.Value(tenantKey).(string)
-	return v
+	return httpctx.TenantFromCtx(ctx)
 }
 
 // AuthFunc is a middleware that wraps an http.HandlerFunc with authentication.

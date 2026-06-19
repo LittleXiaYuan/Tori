@@ -5,15 +5,15 @@ import (
 	"sync/atomic"
 
 	"yunque-agent/internal/agentcore/session"
-	"yunque-agent/internal/controlplane/gateway/forkapi"
+	"yunque-agent/internal/packs/forks/forkapi"
 	"yunque-agent/pkg/packruntime"
 )
 
 const PackID = "yunque.pack.forks"
 
-// Handler exposes conversation branching as a native capability pack.
-// forkapi remains the business implementation; Pack Runtime owns lifecycle,
-// enablement and method gates.
+// Handler exposes conversation branching as a native capability pack. Pack
+// Runtime owns lifecycle, enablement and method gates, while forkapi contains
+// the pack-local business HTTP implementation.
 type Handler struct {
 	api     *forkapi.Handler
 	host    packruntime.Host

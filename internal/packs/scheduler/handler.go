@@ -4,16 +4,16 @@ import (
 	"context"
 	"sync/atomic"
 
-	"yunque-agent/internal/controlplane/gateway/schedulerapi"
 	"yunque-agent/internal/execution/scheduler"
+	"yunque-agent/internal/packs/scheduler/schedulerapi"
 	"yunque-agent/pkg/packruntime"
 )
 
 const PackID = "yunque.pack.scheduler"
 
-// Handler exposes scheduled job management as a native capability pack.
-// schedulerapi remains the business implementation; Pack Runtime owns
-// lifecycle, enablement and method gates.
+// Handler exposes scheduled job management as a native capability pack. Pack
+// Runtime owns lifecycle, enablement and method gates, while schedulerapi
+// contains the pack-local business HTTP implementation.
 type Handler struct {
 	api     *schedulerapi.Handler
 	host    packruntime.Host
