@@ -205,6 +205,12 @@ describe("PacksPageOptimized", () => {
     expect(screen.getByText("实验中")).toBeInTheDocument();
     expect(screen.getByText("优先补肉")).toBeInTheDocument();
     expect(screen.getByText("从缺入口、缺说明的包开始，交给小羽逐包补用途、示例、入口和回滚说明。")).toBeInTheDocument();
+    expect(screen.getByText("交付状态分布")).toBeInTheDocument();
+    expect(screen.getByText("可直接交付")).toBeInTheDocument();
+    expect(screen.getAllByText("后台支撑").length).toBeGreaterThan(0);
+    expect(screen.getByText("实验/计划")).toBeInTheDocument();
+    expect(screen.getByText("有明确入口、示例和结果验证路径。")).toBeInTheDocument();
+    expect(screen.getByText("在 Chat、任务、记忆、知识或设置里生效。")).toBeInTheDocument();
     expect(screen.getAllByText("说明完整").length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText("通常不单独当应用打开，而是在 Chat、任务、记忆、知识或设置页里生效。")).toBeInTheDocument();
 
@@ -216,6 +222,9 @@ describe("PacksPageOptimized", () => {
     expect(screen.getByText("开始生成文档")).toBeInTheDocument();
     expect(screen.getByText("查看最近产物")).toBeInTheDocument();
     expect(screen.getAllByText("启用后去哪用").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText("交付状态：后台支撑").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText("它不一定单独打开，而是在 Chat、任务、记忆、知识或设置流程里被云雀调用。").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText("下一步：从它声明的用户感知位置验证：能否在主路径里看到效果、结果或状态变化。").length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText("主入口：开始生成文档 · 帮我生成一份可下载的文档")).toBeInTheDocument();
     expect(screen.getByText("主入口：查看最近产物 · 列出我最近生成的文件")).toBeInTheDocument();
     expect(screen.getAllByText("固定方式：没有独立侧栏入口，通常在 Chat、任务或其他能力里自动生效。").length).toBeGreaterThanOrEqual(2);

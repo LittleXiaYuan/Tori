@@ -41,6 +41,7 @@ import {
   entryInstallRequest,
   formatPackInstallError,
   groupPackPermissions,
+  packDeliveryProfile,
   packInstallChecklist,
   packExamples,
   packFeatureFlags,
@@ -114,6 +115,19 @@ const SORT_MODE_LABELS: Record<SortMode, string> = {
   readiness: "按体检",
   status: "按阶段",
 };
+
+function deliveryToneStyle(tone: ReturnType<typeof packDeliveryProfile>["tone"]): { background: string; borderColor: string; color: string } {
+  if (tone === "danger") {
+    return { background: "rgba(239,68,68,0.08)", borderColor: "rgba(239,68,68,0.20)", color: "var(--yunque-danger)" };
+  }
+  if (tone === "warning") {
+    return { background: "rgba(245,158,11,0.08)", borderColor: "rgba(245,158,11,0.20)", color: "var(--yunque-warning)" };
+  }
+  if (tone === "primary") {
+    return { background: "rgba(59,130,246,0.08)", borderColor: "rgba(59,130,246,0.18)", color: "var(--yunque-primary)" };
+  }
+  return { background: "rgba(34,197,94,0.08)", borderColor: "rgba(34,197,94,0.18)", color: "var(--yunque-success)" };
+}
 
 function formatTime(value?: string): string {
   if (!value) return "-";
@@ -464,6 +478,15 @@ export default function PacksPageOptimized() {
       if (readiness.missing.includes("打开/使用入口")) counts.missingEntry += 1;
       if (readiness.missing.includes("后端能力声明")) counts.missingBackend += 1;
     }
+    return counts;
+  }, [packs, releaseEntries, catalogEntries]);
+  const deliveryStats = useMemo(() => {
+    const manifests = new Map<string, PackManifest>();
+    for (const pack of packs) manifests.set(pack.manifest.id, pack.manifest);
+    for (const entry of releaseEntries) manifests.set(entry.manifest.id, entry.manifest);
+    for (const entry of catalogEntries) manifests.set(entry.manifest.id, entry.manifest);
+    const counts = { ready: 0, support: 0, plan_only: 0, needs_meat: 0 };
+    for (const manifest of manifests.values()) counts[packDeliveryProfile(manifest).level] += 1;
     return counts;
   }, [packs, releaseEntries, catalogEntries]);
   const normalizedQuery = query.trim().toLowerCase();
@@ -841,6 +864,31 @@ export default function PacksPageOptimized() {
                 常见缺口：打开入口 {readinessStats.missingEntry}、后端声明 {readinessStats.missingBackend}。
               </div>
             </button>
+          </div>
+          <div className="mt-4 mb-3">
+            <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>交付状态分布</div>
+            <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
+              这层不是看 manifest 是否完整，而是看用户安装后能否直接验证价值。
+            </div>
+          </div>
+          <div className="grid gap-3 md:grid-cols-4">
+            {([
+              ["ready", "可直接交付", deliveryStats.ready, "有明确入口、示例和结果验证路径。"],
+              ["support", "后台支撑", deliveryStats.support, "在 Chat、任务、记忆、知识或设置里生效。"],
+              ["plan_only", "实验/计划", deliveryStats.plan_only, "先体验边界、计划和证据，不包装成稳定主路径。"],
+              ["needs_meat", "待补肉", deliveryStats.needs_meat, "缺用途、入口或能力声明，优先交给小羽。"],
+            ] as const).map(([key, label, value, detail]) => {
+              const style = deliveryToneStyle(key === "ready" ? "success" : key === "support" ? "primary" : key === "plan_only" ? "warning" : "danger");
+              return (
+                <div key={key} className="rounded-md border p-3" style={{ borderColor: style.borderColor, background: style.background }}>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>{label}</span>
+                    <span className="text-lg font-semibold" style={{ color: style.color }}>{value}</span>
+                  </div>
+                  <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>{detail}</div>
+                </div>
+              );
+            })}
           </div>
         </div>
 
@@ -1249,6 +1297,8 @@ export default function PacksPageOptimized() {
     const labels = capabilitySurfaceLabels(manifest);
     const usability = packUsability(manifest);
     const readiness = packReadiness(manifest);
+    const delivery = packDeliveryProfile(manifest);
+    const deliveryStyle = deliveryToneStyle(delivery.tone);
     const usageLines = packUsageExplanation(manifest).slice(0, 3);
     const installChecklist = packInstallChecklist(manifest, {
       sourceLabel: options.sourceLabel || options.source,
@@ -1279,6 +1329,9 @@ export default function PacksPageOptimized() {
                 color: readiness.level === "complete" ? "var(--yunque-success)" : readiness.level === "needs_context" ? "var(--yunque-warning)" : "var(--yunque-danger)",
               }}>
                 {readiness.label}
+              </Chip>
+              <Chip size="sm" style={{ background: deliveryStyle.background, color: deliveryStyle.color }}>
+                {delivery.label}
               </Chip>
             </div>
             {manifest.description && (
@@ -1321,6 +1374,12 @@ export default function PacksPageOptimized() {
         <div className="text-xs mb-3" style={{ color: "var(--yunque-text-muted)" }}>
           {usability.description}
           {usability.limitation ? ` 当前限制：${usability.limitation}` : ""}
+        </div>
+
+        <div className="mb-3 rounded-md border p-3" style={{ borderColor: deliveryStyle.borderColor, background: deliveryStyle.background }}>
+          <div className="mb-1 text-xs font-medium" style={{ color: deliveryStyle.color }}>交付状态：{delivery.label}</div>
+          <div className="text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>{delivery.description}</div>
+          <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>下一步：{delivery.nextStep}</div>
         </div>
 
         {usageLines.length > 0 && (
@@ -1417,6 +1476,8 @@ export default function PacksPageOptimized() {
     const permissionGroups = groupPackPermissions(manifest.backend?.permissions || []);
     const usability = packUsability(manifest);
     const readiness = packReadiness(manifest);
+    const delivery = packDeliveryProfile(manifest);
+    const deliveryStyle = deliveryToneStyle(delivery.tone);
     const usageLines = packUsageExplanation(manifest).slice(0, 3);
     const navItems = navItemsForPack(pack);
     const openPath = usability.primaryActionPath || manifest.frontend?.menus?.[0]?.path || manifest.frontend?.routes?.[0]?.path;
@@ -1449,6 +1510,9 @@ export default function PacksPageOptimized() {
                   color: readiness.level === "complete" ? "var(--yunque-success)" : readiness.level === "needs_context" ? "var(--yunque-warning)" : "var(--yunque-danger)",
                 }}>
                   {readiness.label}
+                </Chip>
+                <Chip size="sm" style={{ background: deliveryStyle.background, color: deliveryStyle.color }}>
+                  {delivery.label}
                 </Chip>
               </div>
               <div className="text-xs mt-1 font-mono" style={{ color: "var(--yunque-text-muted)" }}>{manifest.id}</div>
@@ -1483,6 +1547,12 @@ export default function PacksPageOptimized() {
           <div className="text-xs mb-3" style={{ color: "var(--yunque-text-muted)" }}>
             {usability.description}
             {usability.limitation ? ` 当前限制：${usability.limitation}` : ""}
+          </div>
+
+          <div className="mb-3 rounded-md border p-3" style={{ borderColor: deliveryStyle.borderColor, background: deliveryStyle.background }}>
+            <div className="mb-1 text-xs font-medium" style={{ color: deliveryStyle.color }}>交付状态：{delivery.label}</div>
+            <div className="text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>{delivery.description}</div>
+            <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>下一步：{delivery.nextStep}</div>
           </div>
 
           {usageLines.length > 0 && (

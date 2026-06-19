@@ -66,6 +66,14 @@ export type PackReadiness = {
   missing: string[];
 };
 
+export type PackDeliveryProfile = {
+  level: "ready" | "support" | "plan_only" | "needs_meat";
+  label: string;
+  description: string;
+  nextStep: string;
+  tone: "success" | "primary" | "warning" | "danger";
+};
+
 type EntryLike = {
   manifest: PackManifest;
   package_url?: string;
@@ -234,6 +242,63 @@ export function packReadiness(manifest: PackManifest): PackReadiness {
     label: "需补说明",
     description: "能力本体存在，但还需要补齐用户在哪里感知、如何使用或典型场景。",
     missing,
+  };
+}
+
+export function packDeliveryProfile(manifest: PackManifest): PackDeliveryProfile {
+  const readiness = packReadiness(manifest);
+  const usability = packUsability(manifest);
+  const flags = packFeatureFlags(manifest);
+  const limitation = usability.limitation || manifest.metadata?.limitation || "";
+  const planOnlyHint = [
+    manifest.id,
+    manifest.description,
+    limitation,
+    ...packExamples(manifest, 5),
+    ...(manifest.backend?.capabilities || []),
+    ...(manifest.backend?.routeSpecs || []).map((route) => route.description || ""),
+  ].join(" ").toLowerCase();
+
+  if (readiness.missing.length > 0) {
+    return {
+      level: "needs_meat",
+      label: "待补肉",
+      description: "资料还没把用途、入口或后端能力讲完整，用户装上后容易不知道怎么验证。",
+      nextStep: `交给小羽先补 ${readiness.missing.join("、")}，再预览 diff、审计并重新打包。`,
+      tone: "danger",
+    };
+  }
+
+  if (
+    usability.kind === "experimental" ||
+    flags.isIframeBundle ||
+    /plan-only|dry-run|计划|演示|参考包|不执行|不会自动|只生成|门禁|blocked|handoff/.test(planOnlyHint)
+  ) {
+    return {
+      level: "plan_only",
+      label: "实验/计划",
+      description: "可以体验、验证边界或生成计划，但不应包装成稳定可交付能力。",
+      nextStep: "先保留限制说明；如果要变成主路径，下一轮补真实执行、结果查看和回滚证据。",
+      tone: "warning",
+    };
+  }
+
+  if (usability.kind === "infrastructure" || usability.kind === "documented") {
+    return {
+      level: "support",
+      label: "后台支撑",
+      description: "它不一定单独打开，而是在 Chat、任务、记忆、知识或设置流程里被云雀调用。",
+      nextStep: "从它声明的用户感知位置验证：能否在主路径里看到效果、结果或状态变化。",
+      tone: "primary",
+    };
+  }
+
+  return {
+    level: "ready",
+    label: "可直接交付",
+    description: "有明确入口、示例和能力声明，用户可以直接打开或通过主路径验证结果。",
+    nextStep: "安装/启用后打开入口，确认能看到结果、产物、状态或下一步操作。",
+    tone: "success",
   };
 }
 

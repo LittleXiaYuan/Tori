@@ -6,6 +6,7 @@ import {
   entryInstallRequest,
   formatPackInstallError,
   groupPackPermissions,
+  packDeliveryProfile,
   packInstallChecklist,
   packFeatureFlags,
   packReadiness,
@@ -234,6 +235,58 @@ describe("pack-presentation", () => {
       primaryActionPath: "/missions",
     });
     expect(packUsageExplanation(infrastructure).join(" ")).toContain("任务中心与 Chat 任务进度");
+  });
+
+  it("separates delivery depth from basic manifest readiness", () => {
+    const ready: PackManifest = {
+      id: "yunque.pack.memory",
+      name: "Memory",
+      version: "0.1.0",
+      metadata: {
+        usability: "actionable",
+        primaryActionPath: "/memory",
+        usageSurface: "记忆页和 Chat 个性化上下文",
+        example1: "查看并整理长期偏好。",
+      },
+      backend: { capabilities: ["memory.recall"] },
+    };
+    const support: PackManifest = {
+      id: "yunque.pack.state",
+      name: "State",
+      version: "0.1.0",
+      metadata: {
+        usability: "infrastructure",
+        primaryActionPath: "/missions",
+        usageSurface: "任务中心与 Chat 任务进度",
+        example1: "为任务中心提供结构化状态。",
+      },
+      backend: { capabilities: ["state.read"] },
+    };
+    const planOnly: PackManifest = {
+      id: "yunque.pack.computer-use",
+      name: "Computer Use",
+      version: "0.1.0",
+      status: "alpha",
+      metadata: {
+        primaryActionPath: "/packs/computer-use",
+        usageSurface: "电脑使用页和 Chat 电脑使用计划",
+        example1: "把自然语言目标转成需审批的电脑使用计划。",
+        limitation: "当前只生成电脑使用计划，不执行本机桌面控制。",
+      },
+      backend: { capabilities: ["computer.use.plan"] },
+    };
+    const needsMeat: PackManifest = {
+      id: "yunque.pack.unclear",
+      name: "Unclear",
+      version: "0.1.0",
+      metadata: {},
+    };
+
+    expect(packDeliveryProfile(ready)).toMatchObject({ level: "ready", label: "可直接交付" });
+    expect(packDeliveryProfile(support)).toMatchObject({ level: "support", label: "后台支撑" });
+    expect(packDeliveryProfile(planOnly)).toMatchObject({ level: "plan_only", label: "实验/计划" });
+    expect(packDeliveryProfile(needsMeat)).toMatchObject({ level: "needs_meat", label: "待补肉" });
+    expect(packDeliveryProfile(needsMeat).nextStep).toContain("交给小羽");
   });
 
   it("summarizes whether pack cards have enough user-facing context", () => {
