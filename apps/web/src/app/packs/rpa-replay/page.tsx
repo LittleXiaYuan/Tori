@@ -16,6 +16,28 @@ function statusTone(status: RPAReplayStatus | null): { bg: string; fg: string } 
   return { bg: "rgba(250,204,21,0.12)", fg: "#facc15" };
 }
 
+const userFacingSteps = [
+  {
+    title: "1. 保存流程轨迹",
+    body: "把重复网页流程写成带参数的步骤，例如打开报表、选择月份、准备导出。",
+  },
+  {
+    title: "2. 生成回放计划",
+    body: "用参数替换模板，先得到 dry-run 计划和阻塞原因，不直接操作浏览器。",
+  },
+  {
+    title: "3. 导出交接证据",
+    body: "把轨迹、参数、Browser Intent/ActionTracer 交接计划打包给后续执行器审核。",
+  },
+];
+
+const boundaryItems = [
+  "不会点击网页、输入表单或下载文件。",
+  "不会消费 Browser Intent 会话或写浏览器状态。",
+  "不会访问外部目标站点或执行真实网络动作。",
+  "不会把 plan-only 轨迹当成已完成的自动化任务。",
+];
+
 function sampleTrace(slug: string) {
   return JSON.stringify({
     slug,
@@ -155,9 +177,42 @@ export default function RPAReplayPackPage() {
     <div className="page-root space-y-6 animate-fade-in-up">
       <PageHeader icon={<Workflow size={20} />} title="RPA 录制回放" />
 
+      <Card className="section-card overflow-hidden p-0">
+        <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="p-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <Chip size="sm" style={{ background: "rgba(245,158,11,0.12)", color: "var(--yunque-warning)" }}>实验中</Chip>
+              <Chip size="sm" variant="soft">只生成计划</Chip>
+              <Chip size="sm" variant="soft">可导出证据</Chip>
+            </div>
+            <div className="mt-3 text-base font-semibold" style={{ color: "var(--yunque-text)" }}>
+              这个能力包现在适合做什么
+            </div>
+            <div className="mt-2 max-w-3xl text-sm leading-6" style={{ color: "var(--yunque-text-secondary)" }}>
+              它用于把重复网页流程整理成可复用轨迹，并预演“如果交给未来执行器会怎么做”。当前阶段主要帮助你保存步骤、替换参数、生成 dry-run 回放计划和证据包；它还不是能直接接管浏览器的完整 RPA。
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              {userFacingSteps.map((item) => (
+                <div key={item.title} className="rounded-lg p-3" style={{ background: "var(--yunque-bg-hover)", border: "1px solid var(--yunque-border)" }}>
+                  <div className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>{item.title}</div>
+                  <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>{item.body}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="p-5" style={{ background: "rgba(245,158,11,0.08)", borderLeft: "1px solid var(--yunque-border)" }}>
+            <div className="mb-3 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>当前不会做什么</div>
+            <div className="space-y-2 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
+              {boundaryItems.map((item) => <div key={item}>{item}</div>)}
+            </div>
+          </div>
+        </div>
+      </Card>
+
       <Card className="section-card p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
+            <div className="mb-3 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>技术状态</div>
             <div className="mb-1 flex items-center gap-2">
               <Chip size="sm" style={{ background: tone.bg, color: tone.fg }}>
                 {status?.executor_ready ? "Executor ready" : "Pack shell"}
