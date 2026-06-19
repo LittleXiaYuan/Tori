@@ -88,6 +88,12 @@ export type PackStudioBatchDraftRequest = {
     source: string;
     missing: string[];
     readiness: string;
+    risk?: {
+      level: string;
+      label: string;
+      requiresAuthorization: boolean;
+    };
+    permissionSummary: string;
     delivery?: {
       level: string;
       label: string;
@@ -139,6 +145,16 @@ function deliverySummary(value: unknown): PackStudioBatchDraftRequest["packs"][n
   const nextStep = stringValue(record.next_step) || stringValue(record.nextStep);
   if (!level && !label && !description && !nextStep) return undefined;
   return { level, label, description, nextStep };
+}
+
+function riskSummary(value: unknown): PackStudioBatchDraftRequest["packs"][number]["risk"] | undefined {
+  const record = asRecord(value);
+  if (!record) return undefined;
+  const level = stringValue(record.level);
+  const label = stringValue(record.label);
+  const requiresAuthorization = record.requires_authorization === true || record.requiresAuthorization === true;
+  if (!level && !label && !requiresAuthorization) return undefined;
+  return { level, label, requiresAuthorization };
 }
 
 function displayTextWithoutJsonBlocks(text: string, marker?: string): string {
@@ -315,6 +331,7 @@ export function parsePackStudioBatchDraftRequestPrompt(text?: string): PackStudi
       packs: packs.map((item) => {
         const pack = asRecord(item) || {};
         const delivery = deliverySummary(pack.delivery);
+        const risk = riskSummary(pack.risk);
         return {
           id: stringValue(pack.id),
           name: stringValue(pack.name),
@@ -323,6 +340,8 @@ export function parsePackStudioBatchDraftRequestPrompt(text?: string): PackStudi
           source: stringValue(pack.source),
           missing: stringList(pack.missing),
           readiness: stringValue(pack.readiness),
+          ...(risk ? { risk } : {}),
+          permissionSummary: stringValue(pack.permission_summary) || stringValue(pack.permissionSummary),
           ...(delivery ? { delivery } : {}),
           studioUrl: stringValue(pack.studio_url),
           packageUrl: stringValue(pack.package_url),

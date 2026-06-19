@@ -254,6 +254,7 @@ function buildBatchReadinessPrompt(
     packs: items.map((item) => {
       const readiness = packReadiness(item.manifest);
       const delivery = packDeliveryProfile(item.manifest);
+      const risk = riskProfileForPack(item.manifest);
       return {
         id: item.manifest.id,
         name: item.manifest.name,
@@ -262,6 +263,12 @@ function buildBatchReadinessPrompt(
         source: item.sourceLabel,
         missing: readiness.missing,
         readiness: readiness.label,
+        risk: {
+          level: risk.level,
+          label: risk.label,
+          requires_authorization: risk.requiresAuthorization,
+        },
+        permission_summary: packPermissionSummary(item.manifest),
         delivery: {
           level: delivery.level,
           label: delivery.label,

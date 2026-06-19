@@ -1719,9 +1719,19 @@ export default function PackStudioPage() {
                               {pack.delivery.label || pack.delivery.level}
                             </Chip>
                           )}
+                          {pack.risk && (
+                            <Chip size="sm" color={pack.risk.level === "high" ? "danger" : pack.risk.level === "medium" ? "warning" : "success"}>
+                              风险：{pack.risk.label || pack.risk.level}
+                            </Chip>
+                          )}
                           <Chip size="sm" variant="soft">{pack.source || "来源未知"}</Chip>
                         </div>
                       </div>
+                      {pack.permissionSummary && (
+                        <div className="mt-2 rounded px-2 py-2 text-[11px] font-medium" style={{ background: "var(--yunque-bg-hover)", color: pack.risk?.requiresAuthorization ? "var(--yunque-warning)" : "var(--yunque-text-muted)" }}>
+                          {pack.permissionSummary}
+                        </div>
+                      )}
                       {pack.delivery && (
                         <div className="mt-2 rounded px-2 py-2 text-[11px] leading-5" style={{ background: "var(--yunque-bg-hover)", color: "var(--yunque-text-secondary)" }}>
                           交付状态：{pack.delivery.description || pack.delivery.label || pack.delivery.level}

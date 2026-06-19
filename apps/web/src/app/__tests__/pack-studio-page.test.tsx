@@ -504,6 +504,12 @@ describe("PackStudioPage", () => {
           source: "官方源",
           missing: ["使用示例", "用户感知位置"],
           readiness: "需补说明",
+          risk: {
+            level: "high",
+            label: "需要授权",
+            requires_authorization: true,
+          },
+          permission_summary: "权限：沙箱、联网、写入；需要授权后使用",
           delivery: {
             level: "plan_only",
             label: "实验/计划",
@@ -551,6 +557,8 @@ describe("PackStudioPage", () => {
     expect(screen.getByText("补：使用示例")).toBeInTheDocument();
     expect(screen.getAllByText("补：用户感知位置")).toHaveLength(2);
     expect(screen.getAllByText("实验/计划").length).toBeGreaterThan(0);
+    expect(screen.getByText("风险：需要授权")).toBeInTheDocument();
+    expect(screen.getAllByText("权限：沙箱、联网、写入；需要授权后使用").length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText(/交付状态：可以体验、验证边界或生成计划/)).toBeInTheDocument();
     expect(screen.getByText(/下一步：先保留限制说明/)).toBeInTheDocument();
     expect(screen.getAllByText("待载入").length).toBeGreaterThan(0);
