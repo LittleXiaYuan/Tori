@@ -88,6 +88,24 @@ function formatBytes(bytes?: number): string {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
 }
 
+function studioHrefForPack(params: {
+  manifest: PackManifest;
+  goal: string;
+  catalogEntry?: PackCatalogEntry;
+  releaseEntry?: PackReleaseCatalogEntry;
+}): string {
+  const query = new URLSearchParams({
+    packId: params.manifest.id,
+    goal: params.goal,
+  });
+  const catalogSHA = typeof params.catalogEntry?.sha256 === "string" ? params.catalogEntry.sha256 : undefined;
+  const packageUrl = params.catalogEntry?.package_url || params.releaseEntry?.package_url;
+  const sha256 = catalogSHA || params.releaseEntry?.sha256;
+  if (packageUrl) query.set("packageUrl", packageUrl);
+  if (sha256) query.set("sha256", sha256);
+  return `/packs/studio?${query.toString()}`;
+}
+
 export default function PackDetailClientPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -217,7 +235,7 @@ export default function PackDetailClientPage() {
     "如果它只是后台支撑能力，请告诉我应该从 Chat、任务、记忆、知识或能力包详情哪里感知它，不要把实验能力说成稳定能力。",
   ].filter(Boolean).join("\n");
   const studioGoal = `让 ${manifest.name} 更像一个用户能直接理解和使用的能力包，补齐用途、入口、示例、权限边界和回滚说明。`;
-  const studioHref = `/packs/studio?packId=${encodeURIComponent(manifest.id)}&goal=${encodeURIComponent(studioGoal)}`;
+  const studioHref = studioHrefForPack({ manifest, goal: studioGoal, catalogEntry, releaseEntry });
 
   const installFromCatalog = () => {
     const installEntry = catalogEntry || (releaseEntry ? { ...releaseEntry, source: releaseEntry.release_url } : undefined);

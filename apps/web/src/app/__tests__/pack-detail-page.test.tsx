@@ -132,6 +132,10 @@ describe("PackDetailClientPage", () => {
     render(<PackDetailClientPage />);
 
     expect(await screen.findByText("Needs Context Pack")).toBeInTheDocument();
+    const studioLinks = screen.getAllByRole("link", { name: /交给小羽补齐/ });
+    expect(studioLinks[0]).toHaveAttribute("href", expect.stringContaining("packageUrl=https%3A%2F%2Fexample.com%2Fneeds-context.yqpack"));
+    expect(studioLinks[0]).toHaveAttribute("href", expect.stringContaining("sha256=abc123"));
+
     fireEvent.click(screen.getByRole("button", { name: "安装" }));
 
     await waitFor(() => {
