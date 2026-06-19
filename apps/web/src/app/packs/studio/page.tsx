@@ -599,6 +599,7 @@ export default function PackStudioPage() {
   const [packagePath, setPackagePath] = useState(() => searchParams.get("packagePath") || "");
   const [packageUrl, setPackageUrl] = useState(() => searchParams.get("packageUrl") || "");
   const [packageSHA, setPackageSHA] = useState(() => searchParams.get("sha256") || "");
+  const prefilledPackageSource = Boolean(searchParams.get("packagePath") || searchParams.get("packageUrl") || searchParams.get("sha256"));
   const [inspecting, setInspecting] = useState(false);
   const [inspectReport, setInspectReport] = useState<YqpackInspectReport | null>(null);
   const [preparingWorkspace, setPreparingWorkspace] = useState(false);
@@ -1164,6 +1165,15 @@ export default function PackStudioPage() {
                   <Input placeholder="可选" />
                 </TextField>
               </div>
+              {prefilledPackageSource && !inspectReport && (
+                <div className="mt-3 flex gap-2 rounded-md border p-3 text-xs" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-bg-hover)", color: "var(--yunque-text-secondary)" }}>
+                  <ShieldCheck size={15} style={{ color: "var(--yunque-primary)", flex: "0 0 auto" }} />
+                  <div>
+                    <div className="font-medium" style={{ color: "var(--yunque-text)" }}>已从能力包中心带入检查信息</div>
+                    <div className="mt-1">可以直接只读检查远程包；这一步只校验 SHA、manifest 与文件分类，不会安装、启用或改动本地能力包。</div>
+                  </div>
+                </div>
+              )}
               <div className="mt-3 flex flex-wrap gap-2">
                 <Button variant="outline" onPress={inspectYqpack} isDisabled={inspecting}>
                   {inspecting ? <Spinner size="sm" /> : <FileSearch size={14} />} 只读检查

@@ -309,6 +309,8 @@ describe("PackStudioPage", () => {
     expect((screen.getByLabelText("这次想补强什么") as HTMLInputElement).value).toBe("补一个结果面板");
     expect((screen.getByLabelText("OSS / Release URL") as HTMLInputElement).value).toBe("https://oss.example.com/wasm-plugin.yqpack");
     expect((screen.getByLabelText("SHA256") as HTMLInputElement).value).toBe("9".repeat(64));
+    expect(screen.getByText("已从能力包中心带入检查信息")).toBeInTheDocument();
+    expect(screen.getByText("可以直接只读检查远程包；这一步只校验 SHA、manifest 与文件分类，不会安装、启用或改动本地能力包。")).toBeInTheDocument();
   });
 
   it("turns real pack metadata into a guarded Xiaoyu modification task", async () => {
