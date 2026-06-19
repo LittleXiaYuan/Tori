@@ -105,6 +105,24 @@
       "lifecycle": "active"
     },
     {
+      "id": "channels.groups.read",
+      "ownerPack": "yunque.pack.channels",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "channels.react",
+      "ownerPack": "yunque.pack.channels",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "channels.stickers.send",
+      "ownerPack": "yunque.pack.channels",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
       "id": "chaos_probe.alert.writeback.plan",
       "ownerPack": "yunque.pack.chaos-probe",
       "source": "official-pack-manifest",
@@ -185,6 +203,12 @@
     {
       "id": "chaos_probe.status",
       "ownerPack": "yunque.pack.chaos-probe",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "cogni.console",
+      "ownerPack": "yunque.pack.cogni-console",
       "source": "official-pack-manifest",
       "lifecycle": "optional"
     },
@@ -363,6 +387,354 @@
       "lifecycle": "optional"
     },
     {
+      "id": "cognitive_layer.status",
+      "ownerPack": "yunque.pack.cognitive-layer",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "cognitive_layer.toggle",
+      "ownerPack": "yunque.pack.cognitive-layer",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "computer.approval.gate_plan",
+      "ownerPack": "yunque.pack.computer-use",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "computer.intent.plan",
+      "ownerPack": "yunque.pack.computer-use",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "computer.permission.gate_plan",
+      "ownerPack": "yunque.pack.computer-use",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "computer.screenshot.browser",
+      "ownerPack": "yunque.pack.computer-use",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "computer.status",
+      "ownerPack": "yunque.pack.computer-use",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "connectors.connect",
+      "ownerPack": "yunque.pack.connectors",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "connectors.detail",
+      "ownerPack": "yunque.pack.connectors",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "connectors.disconnect",
+      "ownerPack": "yunque.pack.connectors",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "connectors.execute",
+      "ownerPack": "yunque.pack.connectors",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "connectors.list",
+      "ownerPack": "yunque.pack.connectors",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "control_plane.governance",
+      "ownerPack": "yunque.pack.control-plane",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "control_plane.ops",
+      "ownerPack": "yunque.pack.control-plane",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "cost.alerts",
+      "ownerPack": "yunque.pack.cost",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "cost.breakdown",
+      "ownerPack": "yunque.pack.cost",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "cost.budget",
+      "ownerPack": "yunque.pack.cost",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "cost.history",
+      "ownerPack": "yunque.pack.cost",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "cost.summary",
+      "ownerPack": "yunque.pack.cost",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "cost.task",
+      "ownerPack": "yunque.pack.cost",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "cron.jobs.read",
+      "ownerPack": "yunque.pack.cron",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "cron.jobs.run",
+      "ownerPack": "yunque.pack.cron",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "cron.jobs.write",
+      "ownerPack": "yunque.pack.cron",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "desktop.autostart.read",
+      "ownerPack": "yunque.pack.desktop",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "desktop.autostart.toggle",
+      "ownerPack": "yunque.pack.desktop",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "desktop.console.read",
+      "ownerPack": "yunque.pack.desktop",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "desktop.console.toggle",
+      "ownerPack": "yunque.pack.desktop",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "dispatch.enqueue",
+      "ownerPack": "yunque.pack.mcp-dispatch",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "dispatch.queue",
+      "ownerPack": "yunque.pack.mcp-dispatch",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "dlc.demo.ping",
+      "ownerPack": "yunque.pack.dlc-demo",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "documents.generate",
+      "ownerPack": "yunque.pack.documents",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "documents.templates.read",
+      "ownerPack": "yunque.pack.documents",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "emotion.history.read",
+      "ownerPack": "yunque.pack.emotion",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "emotion.stickers.read",
+      "ownerPack": "yunque.pack.emotion",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "emotion.stickers.write",
+      "ownerPack": "yunque.pack.emotion",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "experience.eval",
+      "ownerPack": "yunque.pack.experience",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "experience.preferences",
+      "ownerPack": "yunque.pack.experience",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "experience.recommend",
+      "ownerPack": "yunque.pack.experience",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "federation.capabilities",
+      "ownerPack": "yunque.pack.federation",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "federation.delegate",
+      "ownerPack": "yunque.pack.federation",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "federation.discover",
+      "ownerPack": "yunque.pack.federation",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "federation.peers",
+      "ownerPack": "yunque.pack.federation",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "federation.receive",
+      "ownerPack": "yunque.pack.federation",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "federation.stats",
+      "ownerPack": "yunque.pack.federation",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "files.download",
+      "ownerPack": "yunque.pack.files",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "files.list",
+      "ownerPack": "yunque.pack.files",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "files.preview",
+      "ownerPack": "yunque.pack.files",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "forks.branch",
+      "ownerPack": "yunque.pack.forks",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "forks.create",
+      "ownerPack": "yunque.pack.forks",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "forks.delete",
+      "ownerPack": "yunque.pack.forks",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "forks.list",
+      "ownerPack": "yunque.pack.forks",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "forks.read",
+      "ownerPack": "yunque.pack.forks",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "graph.context.read",
+      "ownerPack": "yunque.pack.graph",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "graph.entities.read",
+      "ownerPack": "yunque.pack.graph",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "graph.entities.write",
+      "ownerPack": "yunque.pack.graph",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "graph.relations.read",
+      "ownerPack": "yunque.pack.graph",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "graph.relations.write",
+      "ownerPack": "yunque.pack.graph",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "graph.stats.read",
+      "ownerPack": "yunque.pack.graph",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
       "id": "guardrail_fuzzer.alert.plan",
       "ownerPack": "yunque.pack.guardrail-fuzzer",
       "source": "official-pack-manifest",
@@ -441,6 +813,102 @@
       "lifecycle": "optional"
     },
     {
+      "id": "heartbeat.configure",
+      "ownerPack": "yunque.pack.heartbeat",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "heartbeat.logs",
+      "ownerPack": "yunque.pack.heartbeat",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "heartbeat.status",
+      "ownerPack": "yunque.pack.heartbeat",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "heartbeat.trigger",
+      "ownerPack": "yunque.pack.heartbeat",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "ide.review",
+      "ownerPack": "yunque.pack.ide",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "ide.status",
+      "ownerPack": "yunque.pack.ide",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "identity.profiles.read",
+      "ownerPack": "yunque.pack.identity",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "identity.resolve",
+      "ownerPack": "yunque.pack.identity",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "inner_life.curiosity",
+      "ownerPack": "yunque.pack.inner-life",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "inner_life.dreaming",
+      "ownerPack": "yunque.pack.inner-life",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "inner_life.reflection",
+      "ownerPack": "yunque.pack.inner-life",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "instructions.read",
+      "ownerPack": "yunque.pack.instructions",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "instructions.reorder",
+      "ownerPack": "yunque.pack.instructions",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "instructions.write",
+      "ownerPack": "yunque.pack.instructions",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "knowledge.ingest",
+      "ownerPack": "yunque.pack.knowledge",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "knowledge.search",
+      "ownerPack": "yunque.pack.knowledge",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
       "id": "lora.config",
       "ownerPack": "yunque.pack.lora",
       "source": "official-pack-manifest",
@@ -485,6 +953,30 @@
     {
       "id": "lora.trigger",
       "ownerPack": "yunque.pack.lora",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "market.skills.rank",
+      "ownerPack": "yunque.pack.market",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "market.skills.search",
+      "ownerPack": "yunque.pack.market",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "market.stats",
+      "ownerPack": "yunque.pack.market",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "mcp.dispatch",
+      "ownerPack": "yunque.pack.mcp-dispatch",
       "source": "official-pack-manifest",
       "lifecycle": "optional"
     },
@@ -645,6 +1137,390 @@
       "lifecycle": "optional"
     },
     {
+      "id": "memory.manage",
+      "ownerPack": "yunque.pack.memory",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "memory.recall",
+      "ownerPack": "yunque.pack.memory",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "micro_agent.react",
+      "ownerPack": "yunque.pack.micro-agent",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "micro_agent.registry",
+      "ownerPack": "yunque.pack.micro-agent",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "missions.parse",
+      "ownerPack": "yunque.pack.missions",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "modules.list",
+      "ownerPack": "yunque.pack.modules",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "night_school.distill",
+      "ownerPack": "yunque.pack.night-school",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "night_school.dreams",
+      "ownerPack": "yunque.pack.night-school",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "night_school.traits",
+      "ownerPack": "yunque.pack.night-school",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "notifications.add",
+      "ownerPack": "yunque.pack.notifications",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "notifications.channels",
+      "ownerPack": "yunque.pack.notifications",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "notifications.remove",
+      "ownerPack": "yunque.pack.notifications",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "notifications.share",
+      "ownerPack": "yunque.pack.notifications",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "notifications.test",
+      "ownerPack": "yunque.pack.notifications",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "notifications.toggle",
+      "ownerPack": "yunque.pack.notifications",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "orchestrator.adapters",
+      "ownerPack": "yunque.pack.orchestrator",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "orchestrator.detect",
+      "ownerPack": "yunque.pack.orchestrator",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "orchestrator.events",
+      "ownerPack": "yunque.pack.orchestrator",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "orchestrator.policy",
+      "ownerPack": "yunque.pack.orchestrator",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "orchestrator.sessions",
+      "ownerPack": "yunque.pack.orchestrator",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "orchestrator.status",
+      "ownerPack": "yunque.pack.orchestrator",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "orchestrator.toggle",
+      "ownerPack": "yunque.pack.orchestrator",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "persona.modes.read",
+      "ownerPack": "yunque.pack.persona-modes",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "persona.modes.write",
+      "ownerPack": "yunque.pack.persona-modes",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "persona.presets.read",
+      "ownerPack": "yunque.pack.persona",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "persona.presets.write",
+      "ownerPack": "yunque.pack.persona",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "persona.read",
+      "ownerPack": "yunque.pack.persona",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "persona.skills.read",
+      "ownerPack": "yunque.pack.persona",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "persona.skills.write",
+      "ownerPack": "yunque.pack.persona",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "persona.write",
+      "ownerPack": "yunque.pack.persona",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "planner_recovery.plan",
+      "ownerPack": "yunque.pack.planner-recovery",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "planner_recovery.read",
+      "ownerPack": "yunque.pack.planner-recovery",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "planner_recovery.resume",
+      "ownerPack": "yunque.pack.planner-recovery",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "plugin_api.agent_memory",
+      "ownerPack": "yunque.pack.plugin-api",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "plugin_api.channel_send",
+      "ownerPack": "yunque.pack.plugin-api",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "plugin_api.cron",
+      "ownerPack": "yunque.pack.plugin-api",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "plugin_api.extensions",
+      "ownerPack": "yunque.pack.plugin-api",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "plugin_api.knowledge",
+      "ownerPack": "yunque.pack.plugin-api",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "plugin_api.llm",
+      "ownerPack": "yunque.pack.plugin-api",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "plugin_api.memory",
+      "ownerPack": "yunque.pack.plugin-api",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "plugin_api.search",
+      "ownerPack": "yunque.pack.plugin-api",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "queue.cancel",
+      "ownerPack": "yunque.pack.session-queue",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "queue.read",
+      "ownerPack": "yunque.pack.session-queue",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "rbac.assign",
+      "ownerPack": "yunque.pack.rbac",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "rbac.check",
+      "ownerPack": "yunque.pack.rbac",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "rbac.revoke",
+      "ownerPack": "yunque.pack.rbac",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "rbac.roles.read",
+      "ownerPack": "yunque.pack.rbac",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "rbac.roles.write",
+      "ownerPack": "yunque.pack.rbac",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "reflection.experiences.read",
+      "ownerPack": "yunque.pack.reflection",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "reflection.experiences.write",
+      "ownerPack": "yunque.pack.reflection",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "reflection.strategies",
+      "ownerPack": "yunque.pack.reflection",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "retrieval.embeddings.embed",
+      "ownerPack": "yunque.pack.retrieval",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "retrieval.embeddings.list",
+      "ownerPack": "yunque.pack.retrieval",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "retrieval.search.providers",
+      "ownerPack": "yunque.pack.retrieval",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "retrieval.search.query",
+      "ownerPack": "yunque.pack.retrieval",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "reverie.actions.read",
+      "ownerPack": "yunque.pack.reverie",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "reverie.config.read",
+      "ownerPack": "yunque.pack.reverie",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "reverie.config.write",
+      "ownerPack": "yunque.pack.reverie",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "reverie.dream.status",
+      "ownerPack": "yunque.pack.reverie",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "reverie.journal.read",
+      "ownerPack": "yunque.pack.reverie",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "reverie.stats.read",
+      "ownerPack": "yunque.pack.reverie",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "reverie.targets.read",
+      "ownerPack": "yunque.pack.reverie",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "reverie.think",
+      "ownerPack": "yunque.pack.reverie",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "reverie.thought.delete",
+      "ownerPack": "yunque.pack.reverie",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
       "id": "rpa.action_tracer.handoff_plan",
       "ownerPack": "yunque.pack.rpa-replay",
       "source": "official-pack-manifest",
@@ -701,6 +1577,36 @@
     {
       "id": "rpa.trace.store",
       "ownerPack": "yunque.pack.rpa-replay",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "sandbox.desktop.create",
+      "ownerPack": "yunque.pack.sandbox",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "sandbox.desktop.destroy",
+      "ownerPack": "yunque.pack.sandbox",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "sandbox.desktop.status",
+      "ownerPack": "yunque.pack.sandbox",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "sandbox.exec",
+      "ownerPack": "yunque.pack.sandbox",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "sandbox.probe",
+      "ownerPack": "yunque.pack.sandbox",
       "source": "official-pack-manifest",
       "lifecycle": "optional"
     },
@@ -783,6 +1689,24 @@
       "lifecycle": "optional"
     },
     {
+      "id": "scheduler.add",
+      "ownerPack": "yunque.pack.scheduler",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "scheduler.jobs",
+      "ownerPack": "yunque.pack.scheduler",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "scheduler.remove",
+      "ownerPack": "yunque.pack.scheduler",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
       "id": "skill_anomaly.approval_manager.bridge.plan",
       "ownerPack": "yunque.pack.skill-anomaly",
       "source": "official-pack-manifest",
@@ -839,6 +1763,192 @@
     {
       "id": "skill_anomaly.status",
       "ownerPack": "yunque.pack.skill-anomaly",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "skillhub.analytics",
+      "ownerPack": "yunque.pack.skillhub",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "skillhub.install",
+      "ownerPack": "yunque.pack.skillhub",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "skillhub.policy",
+      "ownerPack": "yunque.pack.skillhub",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "skillhub.search",
+      "ownerPack": "yunque.pack.skillhub",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "skillhub.update",
+      "ownerPack": "yunque.pack.skillhub",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "skills.analytics",
+      "ownerPack": "yunque.pack.skills",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "skills.manage",
+      "ownerPack": "yunque.pack.skills",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "speech.stream",
+      "ownerPack": "yunque.pack.speech",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "speech.stt",
+      "ownerPack": "yunque.pack.speech",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "speech.tts",
+      "ownerPack": "yunque.pack.speech",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "speech.voices",
+      "ownerPack": "yunque.pack.speech",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "state.focus",
+      "ownerPack": "yunque.pack.state",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "state.goals",
+      "ownerPack": "yunque.pack.state",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "state.resources",
+      "ownerPack": "yunque.pack.state",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "state.snapshot",
+      "ownerPack": "yunque.pack.state",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "subagents.destroy",
+      "ownerPack": "yunque.pack.subagents",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "subagents.list",
+      "ownerPack": "yunque.pack.subagents",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "subagents.messages.append",
+      "ownerPack": "yunque.pack.subagents",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "subagents.spawn",
+      "ownerPack": "yunque.pack.subagents",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "tori.bind",
+      "ownerPack": "yunque.pack.tori",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "tori.health",
+      "ownerPack": "yunque.pack.tori",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "tori.status",
+      "ownerPack": "yunque.pack.tori",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "tori.unbind",
+      "ownerPack": "yunque.pack.tori",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "tori.usage",
+      "ownerPack": "yunque.pack.tori",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "trace.raw.read",
+      "ownerPack": "yunque.pack.trace",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "trace.read",
+      "ownerPack": "yunque.pack.trace",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "triggers.emit",
+      "ownerPack": "yunque.pack.triggers",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "triggers.events.read",
+      "ownerPack": "yunque.pack.triggers",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "triggers.read",
+      "ownerPack": "yunque.pack.triggers",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "triggers.runs.read",
+      "ownerPack": "yunque.pack.triggers",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "triggers.write",
+      "ownerPack": "yunque.pack.triggers",
       "source": "official-pack-manifest",
       "lifecycle": "optional"
     },
@@ -977,6 +2087,54 @@
     {
       "id": "wasm.status",
       "ownerPack": "yunque.pack.wasm-plugin",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "work.projects",
+      "ownerPack": "yunque.pack.work",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "work.tasks",
+      "ownerPack": "yunque.pack.work",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "work.workflows",
+      "ownerPack": "yunque.pack.work",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "workers.manage",
+      "ownerPack": "yunque.pack.mcp-dispatch",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "workers.read",
+      "ownerPack": "yunque.pack.mcp-dispatch",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "workspace.dashboard",
+      "ownerPack": "yunque.pack.workspace",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "world.causal",
+      "ownerPack": "yunque.pack.world-model",
+      "source": "official-pack-manifest",
+      "lifecycle": "optional"
+    },
+    {
+      "id": "world.state",
+      "ownerPack": "yunque.pack.world-model",
       "source": "official-pack-manifest",
       "lifecycle": "optional"
     }
