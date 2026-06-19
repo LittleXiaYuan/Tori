@@ -359,16 +359,27 @@ describe("PackStudioPage", () => {
     expect(screen.getByText("新包安装后若验证失败，执行 /v1/packs/disable 禁用新包。")).toBeInTheDocument();
     expect(screen.getByText("工作区是可编辑副本，不会启用能力包；安装新 yqpack 前仍需重新检查、测试和确认回滚路径。")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "生成 manifest 草稿" }));
+    expect(screen.getByText("小羽改造草稿队列")).toBeInTheDocument();
+    expect(screen.getByText("C:\\yunque\\packs\\studio\\frontend\\index.html")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "manifest 草稿" }));
     const manifestDraft = screen.getByLabelText("新的文件内容") as HTMLTextAreaElement;
     const draftJSON = JSON.parse(manifestDraft.value);
     expect(draftJSON.description).toBe("增加一个可查看运行结果的界面");
     expect(draftJSON.metadata.primaryActionPath).toBe("/packs/wasm-plugin");
     expect(draftJSON.metadata.example3).toContain("保存到记忆或知识");
     expect(draftJSON.metadata.studioGoal).toBe("增加一个可查看运行结果的界面");
-    expect(toastMock).toHaveBeenCalledWith("已生成 pack.json 草稿，请先预览 diff 再应用", "success");
+    expect(toastMock).toHaveBeenCalledWith("已生成 manifest 草稿，请先预览 diff 再应用", "success");
     expect(screen.getByText("草稿只会填入工作区改动框；真正写入仍需先预览 diff，并在应用后运行内置审计。")).toBeInTheDocument();
 
+    fireEvent.click(screen.getByRole("button", { name: "前端界面草稿" }));
+    const frontendDraft = screen.getByLabelText("新的文件内容") as HTMLTextAreaElement;
+    expect(screen.getByDisplayValue("C:\\yunque\\packs\\studio\\frontend\\index.html")).toBeInTheDocument();
+    expect(frontendDraft.value).toContain("<title>WASM 能力包</title>");
+    expect(frontendDraft.value).toContain("能力包界面草稿 · yunque.pack.wasm-plugin");
+    expect(frontendDraft.value).toContain("接入真实 bridge/API 前必须先预览 diff、运行审计并重新打包");
+
+    fireEvent.click(screen.getByRole("button", { name: "manifest 草稿" }));
     fireEvent.change(screen.getByLabelText("新的文件内容"), { target: { value: "{\n  \"description\": \"更清楚\"\n}" } });
     fireEvent.click(screen.getByRole("button", { name: "预览 diff" }));
     await waitFor(() => {

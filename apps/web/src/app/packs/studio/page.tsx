@@ -54,6 +54,14 @@ type StudioAnalysis = {
   prompt?: string;
 };
 
+type StudioDraftCandidate = {
+  key: string;
+  label: string;
+  filePath: string;
+  content: string;
+  summary: string;
+};
+
 function packSlug(manifest: PackManifest): string {
   return manifest.id.replace(/^yunque\.pack\./, "");
 }
@@ -97,6 +105,79 @@ function buildManifestDraftContent(manifest: PackManifest, goal: string): string
   draft.metadata = metadata;
 
   return `${JSON.stringify(draft, null, 2)}\n`;
+}
+
+function buildFrontendDraftContent(manifest: PackManifest, goal: string): string {
+  const safeGoal = goal.trim() || "让这个能力包更像一个用户能直接理解和使用的功能，而不是只看到存在。";
+  const primaryPath = packPrimaryPath(manifest) || "/chat";
+  const capabilities = (manifest.backend?.capabilities || []).join(", ") || "无";
+  const permissions = (manifest.backend?.permissions || []).join(", ") || "无";
+
+  return [
+    "<!doctype html>",
+    "<html lang=\"zh-CN\">",
+    "<head>",
+    "  <meta charset=\"utf-8\" />",
+    "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />",
+    `  <title>${manifest.name}</title>`,
+    "  <style>",
+    "    body { margin: 0; font-family: system-ui, sans-serif; background: #0f172a; color: #e5e7eb; }",
+    "    main { max-width: 760px; margin: 0 auto; padding: 32px 20px; }",
+    "    section { border: 1px solid rgba(148,163,184,.28); border-radius: 8px; padding: 16px; margin-top: 16px; background: rgba(15,23,42,.72); }",
+    "    .muted { color: #94a3b8; }",
+    "    .pill { display: inline-block; margin: 4px 6px 0 0; padding: 4px 8px; border-radius: 999px; background: rgba(59,130,246,.16); color: #bfdbfe; font-size: 12px; }",
+    "  </style>",
+    "</head>",
+    "<body>",
+    "  <main>",
+    `    <p class=\"muted\">能力包界面草稿 · ${manifest.id}</p>`,
+    `    <h1>${manifest.name}</h1>`,
+    `    <p>${safeGoal}</p>`,
+    "    <section>",
+    "      <h2>用户可以在这里做什么</h2>",
+    `      <p>从云雀对话或能力入口进入，查看目标、进度、结果和下一步操作。入口：${primaryPath}</p>`,
+    "    </section>",
+    "    <section>",
+    "      <h2>能力与权限</h2>",
+    `      <span class=\"pill\">能力：${capabilities}</span>`,
+    `      <span class=\"pill\">权限：${permissions}</span>`,
+    "      <p class=\"muted\">这只是 Pack Studio 草稿；接入真实 bridge/API 前必须先预览 diff、运行审计并重新打包。</p>",
+    "    </section>",
+    "  </main>",
+    "</body>",
+    "</html>",
+    "",
+  ].join("\n");
+}
+
+function buildStudioDraftCandidates(workspace: PackStudioWorkspaceReport, goal: string): StudioDraftCandidate[] {
+  const seen = new Set<string>();
+  const candidates: StudioDraftCandidate[] = [];
+  for (const filePath of workspace.editable_files || []) {
+    const normalized = filePath.replace(/\\/g, "/").toLowerCase();
+    if (seen.has(normalized)) continue;
+    seen.add(normalized);
+    if (normalized.endsWith("/pack.json") || normalized.endsWith("pack.json")) {
+      candidates.push({
+        key: `manifest:${filePath}`,
+        label: "manifest 草稿",
+        filePath,
+        content: buildManifestDraftContent(workspace.manifest, goal),
+        summary: "补用途、入口、示例、限制和 Studio 目标。",
+      });
+      continue;
+    }
+    if (normalized.includes("/frontend/") && normalized.endsWith(".html")) {
+      candidates.push({
+        key: `frontend:${filePath}`,
+        label: "前端界面草稿",
+        filePath,
+        content: buildFrontendDraftContent(workspace.manifest, goal),
+        summary: "补一个可感知的沙箱界面草稿。",
+      });
+    }
+  }
+  return candidates;
 }
 
 function sourceLabel(candidate: PackCandidate): string {
@@ -344,6 +425,10 @@ export default function PackStudioPage() {
   const analysis = studioPlan && studioPlan.packId === manifest?.id && studioPlan.goal === goal ? studioPlan : fallbackAnalysis;
   const prompt = manifest ? (analysis?.prompt || buildXiaoyuPrompt(manifest, goal)) : "";
   const chatHref = `/chat?q=${encodeURIComponent(prompt)}`;
+  const draftCandidates = useMemo(
+    () => workspaceReport ? buildStudioDraftCandidates(workspaceReport, goal) : [],
+    [workspaceReport, goal],
+  );
 
   const copyPrompt = async () => {
     if (!prompt) return;
@@ -437,16 +522,11 @@ export default function PackStudioPage() {
     }
   };
 
-  const fillManifestDraft = () => {
-    if (!workspaceReport) return;
-    const manifestFile = workspaceReport.editable_files.find((file) => file.replace(/\\/g, "/").endsWith("/pack.json"))
-      || workspaceReport.editable_files.find((file) => file.replace(/\\/g, "/").endsWith("pack.json"))
-      || workspaceReport.editable_files[0]
-      || "";
-    setPatchFile(manifestFile);
-    setPatchContent(buildManifestDraftContent(workspaceReport.manifest, goal));
+  const fillDraftCandidate = (candidate: StudioDraftCandidate) => {
+    setPatchFile(candidate.filePath);
+    setPatchContent(candidate.content);
     setPatchReport(null);
-    showToast("已生成 pack.json 草稿，请先预览 diff 再应用", "success");
+    showToast(`已生成 ${candidate.label}，请先预览 diff 再应用`, "success");
   };
 
   const auditWorkspace = async () => {
@@ -811,10 +891,26 @@ export default function PackStudioPage() {
                     <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
                       草稿只会填入工作区改动框；真正写入仍需先预览 diff，并在应用后运行内置审计。
                     </div>
+                    {draftCandidates.length > 0 && (
+                      <div className="mt-3 rounded-md p-2" style={{ background: "var(--yunque-bg-hover)" }}>
+                        <div className="mb-2 text-xs font-medium" style={{ color: "var(--yunque-text)" }}>小羽改造草稿队列</div>
+                        <div className="flex flex-wrap gap-2">
+                          {draftCandidates.map((candidate) => (
+                            <Button key={candidate.key} size="sm" variant="outline" onPress={() => fillDraftCandidate(candidate)}>
+                              <Sparkles size={13} /> {candidate.label}
+                            </Button>
+                          ))}
+                        </div>
+                        <div className="mt-2 space-y-1">
+                          {draftCandidates.map((candidate) => (
+                            <div key={`${candidate.key}:summary`} className="truncate text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
+                              <span className="font-mono">{candidate.filePath}</span> · {candidate.summary}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     <div className="mt-3 flex flex-wrap gap-2">
-                      <Button variant="outline" onPress={fillManifestDraft}>
-                        <Sparkles size={14} /> 生成 manifest 草稿
-                      </Button>
                       <Button variant="outline" onPress={() => submitPatch(false)} isDisabled={patching}>
                         {patching ? <Spinner size="sm" /> : <FileSearch size={14} />} 预览 diff
                       </Button>
