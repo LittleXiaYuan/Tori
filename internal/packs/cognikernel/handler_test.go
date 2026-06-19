@@ -30,6 +30,18 @@ type fakeBusProvider struct {
 
 func (p fakeBusProvider) CogniBus() *cogni.CogniBus { return p.bus }
 
+type fakeDependencyProvider struct {
+	bus        *cogni.CogniBus
+	federation *cogni.CogniFederation
+	tracker    *cogni.CostTracker
+}
+
+func (p fakeDependencyProvider) CogniBus() *cogni.CogniBus { return p.bus }
+
+func (p fakeDependencyProvider) CogniFederation() *cogni.CogniFederation { return p.federation }
+
+func (p fakeDependencyProvider) CogniCostTracker() *cogni.CostTracker { return p.tracker }
+
 func (fakeRuntimeReporter) CogniKernelRuntimeState() RuntimeStateReport {
 	return RuntimeStateReport{
 		PackID:                    PackID,
@@ -72,12 +84,6 @@ func TestCogniKernelHandlerRoutesExposeSurface(t *testing.T) {
 	if routes[1].Path != SubResourceRoute {
 		t.Fatalf("sub-resource route path = %q", routes[1].Path)
 	}
-	if routes[2].Path != RouteDecisionRoute {
-		t.Fatalf("route decision path = %q", routes[2].Path)
-	}
-	if routes[3].Path != RuntimePackStateRoute {
-		t.Fatalf("runtime state route path = %q", routes[3].Path)
-	}
 	mounted := map[string]map[string]bool{}
 	for _, route := range routes {
 		if mounted[route.Path] == nil {
@@ -94,6 +100,12 @@ func TestCogniKernelHandlerRoutesExposeSurface(t *testing.T) {
 		if !mounted[spec.Path][spec.Method] {
 			t.Fatalf("routeSpec %s %s not mounted by Routes()", spec.Method, spec.Path)
 		}
+	}
+	if !mounted[RouteDecisionRoute][http.MethodPost] {
+		t.Fatalf("route decision route is not mounted")
+	}
+	if !mounted[RuntimePackStateRoute][http.MethodGet] {
+		t.Fatalf("runtime state route is not mounted")
 	}
 
 	req := httptest.NewRequest(http.MethodGet, CollectionRoute, nil)
@@ -201,6 +213,116 @@ func TestCogniKernelRouterOwnsRouteDecision(t *testing.T) {
 	}
 	if len(result.SelectedIDs) != 1 || result.SelectedIDs[0] != "reviewer" {
 		t.Fatalf("expected reviewer to win, got %v (bids=%v)", result.SelectedIDs, result.AllBids)
+	}
+}
+
+func TestCogniKernelRouterOwnsFederationAndEconomics(t *testing.T) {
+	api := &fakeCogniAPI{}
+	registry := cogni.NewRegistry()
+	if err := registry.Add(&cogni.Declaration{ID: "reviewer"}, "test"); err != nil {
+		t.Fatalf("add cogni: %v", err)
+	}
+	federation := cogni.NewCogniFederation("local", "http://local", registry)
+	tracker := cogni.NewCostTracker()
+	tracker.Record(cogni.CostEntry{CogniID: "reviewer", Cost: 0.5, Tokens: 1000, Operation: "route"})
+	router := NewRouterWithDeps(api, fakeRuntimeReporter{}, Dependencies{
+		FederationProvider:  fakeDependencyProvider{federation: federation},
+		CostTrackerProvider: fakeDependencyProvider{tracker: tracker},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, FederationRoute, nil)
+	w := httptest.NewRecorder()
+	router.HandleFederationStatus(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("federation status=%d body=%s", w.Code, w.Body.String())
+	}
+	var status map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &status); err != nil {
+		t.Fatalf("decode status: %v", err)
+	}
+	if status["enabled"] != true || status["self_id"] != "local" {
+		t.Fatalf("unexpected federation status: %#v", status)
+	}
+
+	body, _ := json.Marshal(cogni.FederationPeer{ID: "peer-1", Name: "Peer", URL: "http://peer"})
+	req = httptest.NewRequest(http.MethodPost, FederationPeersRoute, bytes.NewReader(body))
+	w = httptest.NewRecorder()
+	router.HandleFederationPeers(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("add peer status=%d body=%s", w.Code, w.Body.String())
+	}
+	req = httptest.NewRequest(http.MethodGet, FederationPeersRoute, nil)
+	w = httptest.NewRecorder()
+	router.HandleFederationPeers(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("list peers status=%d body=%s", w.Code, w.Body.String())
+	}
+	var peers map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &peers); err != nil {
+		t.Fatalf("decode peers: %v", err)
+	}
+	if peers["count"].(float64) != 1 {
+		t.Fatalf("expected one peer, got %#v", peers)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, EconomicsRoute, nil)
+	w = httptest.NewRecorder()
+	router.HandleEconomics(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("economics status=%d body=%s", w.Code, w.Body.String())
+	}
+	var economics map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &economics); err != nil {
+		t.Fatalf("decode economics: %v", err)
+	}
+	if economics["enabled"] != true {
+		t.Fatalf("expected economics enabled, got %#v", economics)
+	}
+	summary := economics["summary"].(map[string]any)
+	if _, ok := summary["reviewer"]; !ok {
+		t.Fatalf("expected reviewer summary, got %#v", economics)
+	}
+	if api.called != 0 {
+		t.Fatalf("federation/economics should not delegate to API adapter, called=%d", api.called)
+	}
+}
+
+func TestCogniKernelRouterFederationAndEconomicsMissingDeps(t *testing.T) {
+	router := NewRouter(&fakeCogniAPI{}, fakeRuntimeReporter{})
+
+	req := httptest.NewRequest(http.MethodGet, FederationRoute, nil)
+	w := httptest.NewRecorder()
+	router.HandleFederationStatus(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("federation status=%d body=%s", w.Code, w.Body.String())
+	}
+	var status map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &status); err != nil {
+		t.Fatalf("decode federation status: %v", err)
+	}
+	if status["enabled"] != false {
+		t.Fatalf("expected disabled federation status, got %#v", status)
+	}
+
+	req = httptest.NewRequest(http.MethodPost, FederationDiscoverRoute, nil)
+	w = httptest.NewRecorder()
+	router.HandleFederationDiscover(w, req)
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("discover status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodGet, EconomicsRoute, nil)
+	w = httptest.NewRecorder()
+	router.HandleEconomics(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("economics status=%d body=%s", w.Code, w.Body.String())
+	}
+	var economics map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &economics); err != nil {
+		t.Fatalf("decode economics: %v", err)
+	}
+	if economics["enabled"] != false {
+		t.Fatalf("expected disabled economics, got %#v", economics)
 	}
 }
 

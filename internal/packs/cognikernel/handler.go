@@ -15,10 +15,14 @@ import (
 const PackID = "yunque.pack.cogni-kernel"
 
 const (
-	CollectionRoute       = "/v1/cognis"
-	SubResourceRoute      = "/v1/cognis/"
-	RouteDecisionRoute    = "/v1/cognis/route"
-	RuntimePackStateRoute = "/v1/cognis/runtime/pack-state"
+	CollectionRoute         = "/v1/cognis"
+	SubResourceRoute        = "/v1/cognis/"
+	FederationRoute         = "/v1/cognis/federation"
+	FederationPeersRoute    = "/v1/cognis/federation/peers"
+	FederationDiscoverRoute = "/v1/cognis/federation/discover"
+	EconomicsRoute          = "/v1/cognis/economics"
+	RouteDecisionRoute      = "/v1/cognis/route"
+	RuntimePackStateRoute   = "/v1/cognis/runtime/pack-state"
 )
 
 // API is the pack-owned Cogni Kernel HTTP surface. The current Gateway still
@@ -35,6 +39,20 @@ type RuntimeStateReporter interface {
 
 type BusProvider interface {
 	CogniBus() *cogni.CogniBus
+}
+
+type FederationProvider interface {
+	CogniFederation() *cogni.CogniFederation
+}
+
+type CostTrackerProvider interface {
+	CogniCostTracker() *cogni.CostTracker
+}
+
+type Dependencies struct {
+	BusProvider         BusProvider
+	FederationProvider  FederationProvider
+	CostTrackerProvider CostTrackerProvider
 }
 
 type RuntimeStateReport struct {
@@ -75,25 +93,17 @@ func NewHandler(api API) *Handler {
 }
 
 func NewHandlerWithRuntimeState(api API, reporter RuntimeStateReporter) *Handler {
-	var busProvider BusProvider
-	if inferred, ok := api.(BusProvider); ok {
-		busProvider = inferred
-	}
-	return NewHandlerWithDeps(api, reporter, busProvider)
+	return NewHandlerWithDeps(api, reporter, inferDependencies(api))
 }
 
-func NewHandlerWithDeps(api API, reporter RuntimeStateReporter, busProvider BusProvider) *Handler {
+func NewHandlerWithDeps(api API, reporter RuntimeStateReporter, deps Dependencies) *Handler {
 	if reporter == nil {
 		if inferred, ok := api.(RuntimeStateReporter); ok {
 			reporter = inferred
 		}
 	}
-	if busProvider == nil {
-		if inferred, ok := api.(BusProvider); ok {
-			busProvider = inferred
-		}
-	}
-	return &Handler{router: NewRouterWithBus(api, reporter, busProvider)}
+	deps = mergeDependencies(deps, inferDependencies(api))
+	return &Handler{router: NewRouterWithDeps(api, reporter, deps)}
 }
 
 // compile-time assertion: Cogni Kernel is a v2 capability Module (Tier 0 microkernel).
@@ -125,28 +135,40 @@ func (h *Handler) Stop(ctx context.Context) error {
 // pack-state as a first-class pack route and delegates declaration operations to
 // the supplied API adapter.
 type Router struct {
-	api         API
-	reporter    RuntimeStateReporter
-	busProvider BusProvider
+	api                API
+	reporter           RuntimeStateReporter
+	busProvider        BusProvider
+	federationProvider FederationProvider
+	costTracker        CostTrackerProvider
 }
 
 func NewRouter(api API, reporter RuntimeStateReporter) *Router {
-	return NewRouterWithBus(api, reporter, nil)
+	return NewRouterWithDeps(api, reporter, inferDependencies(api))
 }
 
 func NewRouterWithBus(api API, reporter RuntimeStateReporter, busProvider BusProvider) *Router {
-	if busProvider == nil {
-		if inferred, ok := api.(BusProvider); ok {
-			busProvider = inferred
-		}
+	return NewRouterWithDeps(api, reporter, Dependencies{BusProvider: busProvider})
+}
+
+func NewRouterWithDeps(api API, reporter RuntimeStateReporter, deps Dependencies) *Router {
+	deps = mergeDependencies(deps, inferDependencies(api))
+	return &Router{
+		api:                api,
+		reporter:           reporter,
+		busProvider:        deps.BusProvider,
+		federationProvider: deps.FederationProvider,
+		costTracker:        deps.CostTrackerProvider,
 	}
-	return &Router{api: api, reporter: reporter, busProvider: busProvider}
 }
 
 func (r *Router) Routes() []packruntime.BackendRoute {
 	routes := []packruntime.BackendRoute{
 		{Methods: []string{http.MethodGet, http.MethodPost}, Path: CollectionRoute, Handler: r.ServeCogniKernel},
 		{Methods: []string{http.MethodGet, http.MethodPost, http.MethodDelete}, Path: SubResourceRoute, Handler: r.ServeCogniKernel},
+		{Methods: []string{http.MethodGet}, Path: FederationRoute, Handler: r.HandleFederationStatus},
+		{Methods: []string{http.MethodGet, http.MethodPost}, Path: FederationPeersRoute, Handler: r.HandleFederationPeers},
+		{Methods: []string{http.MethodPost}, Path: FederationDiscoverRoute, Handler: r.HandleFederationDiscover},
+		{Methods: []string{http.MethodGet}, Path: EconomicsRoute, Handler: r.HandleEconomics},
 		{Methods: []string{http.MethodPost}, Path: RouteDecisionRoute, Handler: r.HandleRouteDecision},
 		{Methods: []string{http.MethodGet}, Path: RuntimePackStateRoute, Handler: r.HandleRuntimePackState},
 	}
@@ -175,6 +197,81 @@ func (r *Router) ServeCogniKernel(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	r.api.ServeCogniKernel(w, req)
+}
+
+func (r *Router) HandleFederationStatus(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET only")
+		return
+	}
+	federation := r.cogniFederation()
+	if federation == nil {
+		writeJSON(w, map[string]any{"enabled": false})
+		return
+	}
+	stats := federation.Stats()
+	stats["enabled"] = true
+	writeJSON(w, stats)
+}
+
+func (r *Router) HandleFederationPeers(w http.ResponseWriter, req *http.Request) {
+	federation := r.cogniFederation()
+	switch req.Method {
+	case http.MethodGet:
+		if federation == nil {
+			writeJSON(w, map[string]any{"peers": []any{}})
+			return
+		}
+		peers := federation.Peers()
+		writeJSON(w, map[string]any{"peers": peers, "count": len(peers)})
+	case http.MethodPost:
+		if federation == nil {
+			apperror.WriteCode(w, apperror.CodeInternal, "federation not configured")
+			return
+		}
+		var peer cogni.FederationPeer
+		if err := json.NewDecoder(req.Body).Decode(&peer); err != nil {
+			apperror.WriteCode(w, apperror.CodeBadRequest, err.Error())
+			return
+		}
+		federation.AddPeer(peer)
+		writeJSON(w, map[string]any{"status": "ok", "id": peer.ID})
+	default:
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET or POST")
+	}
+}
+
+func (r *Router) HandleFederationDiscover(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "POST only")
+		return
+	}
+	federation := r.cogniFederation()
+	if federation == nil {
+		apperror.WriteCode(w, apperror.CodeInternal, "federation not configured")
+		return
+	}
+	skills := federation.DiscoverRemoteSkills(req.Context())
+	writeJSON(w, map[string]any{
+		"skills": skills,
+		"count":  len(skills),
+	})
+}
+
+func (r *Router) HandleEconomics(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET only")
+		return
+	}
+	tracker := r.cogniCostTracker()
+	if tracker == nil {
+		writeJSON(w, map[string]any{"enabled": false})
+		return
+	}
+	writeJSON(w, map[string]any{
+		"enabled": true,
+		"summary": tracker.DailySummary(),
+	})
 }
 
 func (r *Router) HandleRouteDecision(w http.ResponseWriter, req *http.Request) {
@@ -211,6 +308,20 @@ func (r *Router) HandleRouteDecision(w http.ResponseWriter, req *http.Request) {
 	writeJSON(w, result)
 }
 
+func (r *Router) cogniFederation() *cogni.CogniFederation {
+	if r == nil || r.federationProvider == nil {
+		return nil
+	}
+	return r.federationProvider.CogniFederation()
+}
+
+func (r *Router) cogniCostTracker() *cogni.CostTracker {
+	if r == nil || r.costTracker == nil {
+		return nil
+	}
+	return r.costTracker.CogniCostTracker()
+}
+
 func (r *Router) HandleRuntimePackState(w http.ResponseWriter, req *http.Request) {
 	if req.Method != http.MethodGet {
 		writeJSONStatus(w, http.StatusMethodNotAllowed, map[string]any{"error": "GET only"})
@@ -242,7 +353,7 @@ func delegatedRouteSpecs() []delegatedRouteSpec {
 	var out []delegatedRouteSpec
 	for _, spec := range RouteSpecs() {
 		switch spec.Path {
-		case CollectionRoute, SubResourceRoute, RouteDecisionRoute, RuntimePackStateRoute:
+		case CollectionRoute, SubResourceRoute, FederationRoute, FederationPeersRoute, FederationDiscoverRoute, EconomicsRoute, RouteDecisionRoute, RuntimePackStateRoute:
 			continue
 		}
 		method := spec.Method
@@ -257,6 +368,33 @@ func delegatedRouteSpecs() []delegatedRouteSpec {
 		out = append(out, delegatedRouteSpec{path: spec.Path, methods: []string{method}})
 	}
 	return out
+}
+
+func inferDependencies(api API) Dependencies {
+	var deps Dependencies
+	if inferred, ok := api.(BusProvider); ok {
+		deps.BusProvider = inferred
+	}
+	if inferred, ok := api.(FederationProvider); ok {
+		deps.FederationProvider = inferred
+	}
+	if inferred, ok := api.(CostTrackerProvider); ok {
+		deps.CostTrackerProvider = inferred
+	}
+	return deps
+}
+
+func mergeDependencies(primary, fallback Dependencies) Dependencies {
+	if primary.BusProvider == nil {
+		primary.BusProvider = fallback.BusProvider
+	}
+	if primary.FederationProvider == nil {
+		primary.FederationProvider = fallback.FederationProvider
+	}
+	if primary.CostTrackerProvider == nil {
+		primary.CostTrackerProvider = fallback.CostTrackerProvider
+	}
+	return primary
 }
 
 func RouteSpecs() []packruntime.BackendRouteSpec {

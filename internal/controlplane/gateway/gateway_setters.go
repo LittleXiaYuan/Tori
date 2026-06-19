@@ -802,8 +802,14 @@ func (g *Gateway) SetCogniKernel(k *cognikernel.CogniKernel) { g.cogniKernel = k
 // SetCogniFederation attaches the federation manager.
 func (g *Gateway) SetCogniFederation(cf *cogni.CogniFederation) { g.cogniFederation = cf }
 
+// CogniFederation exposes federation state to the Cogni Kernel pack.
+func (g *Gateway) CogniFederation() *cogni.CogniFederation { return g.cogniFederation }
+
 // SetCogniCostTracker attaches the economics cost tracker.
 func (g *Gateway) SetCogniCostTracker(ct *cogni.CostTracker) { g.cogniCostTracker = ct }
+
+// CogniCostTracker exposes economics state to the Cogni Kernel pack.
+func (g *Gateway) CogniCostTracker() *cogni.CostTracker { return g.cogniCostTracker }
 
 // SetCogniBus attaches the bidding router for POST /v1/cognis/route.
 func (g *Gateway) SetCogniBus(b *cogni.CogniBus) { g.cogniBus = b }
