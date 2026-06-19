@@ -33,6 +33,7 @@ import (
 	memorypack "yunque-agent/internal/packs/memory"
 	missionspack "yunque-agent/internal/packs/missions"
 	modespack "yunque-agent/internal/packs/modes"
+	modulespack "yunque-agent/internal/packs/modules"
 	notificationspack "yunque-agent/internal/packs/notifications"
 	orchestratorpack "yunque-agent/internal/packs/orchestrator"
 	reflectionpack "yunque-agent/internal/packs/reflection"
@@ -84,6 +85,7 @@ var migrationPackPaths = map[string][]string{
 	heartbeatpack.PackID:     heartbeatpack.Paths(),
 	marketpack.PackID:        marketpack.Paths(),
 	mcpdispatchpack.PackID:   mcpdispatchpack.Paths(),
+	modulespack.PackID:       modulespack.Paths(),
 	notificationspack.PackID: notificationspack.Paths(),
 	orchestratorpack.PackID:  orchestratorpack.Paths(),
 	reflectionpack.PackID:    reflectionpack.Paths(),
@@ -123,6 +125,7 @@ var migrationPackNames = map[string]string{
 	heartbeatpack.PackID:     "Heartbeat",
 	marketpack.PackID:        "Skill Market",
 	mcpdispatchpack.PackID:   "MCP Dispatch",
+	modulespack.PackID:       "Runtime Modules",
 	notificationspack.PackID: "Notifications",
 	orchestratorpack.PackID:  "IDE Work Orchestrator",
 	reflectionpack.PackID:    "Reflection",
@@ -183,6 +186,7 @@ func registerMigrationPacks(gw *Gateway) {
 	_ = gw.RegisterModule(heartbeatpack.New(gw))
 	_ = gw.RegisterModule(marketpack.New(gw))
 	_ = gw.RegisterModule(mcpdispatchpack.New(gw))
+	_ = gw.RegisterModule(modulespack.New(gw))
 	_ = gw.RegisterModule(notificationspack.NewProvider(gw.Notifier))
 	_ = gw.RegisterModule(orchestratorpack.New(gw))
 	_ = gw.RegisterModule(reflectionpack.New(gw))
@@ -262,6 +266,8 @@ func newTestGatewayWithMigrationPack(t *testing.T, packID string, status packrun
 		_ = gw.RegisterModule(marketpack.New(nil))
 	case mcpdispatchpack.PackID:
 		_ = gw.RegisterModule(mcpdispatchpack.New(gw))
+	case modulespack.PackID:
+		_ = gw.RegisterModule(modulespack.New(gw))
 	case notificationspack.PackID:
 		_ = gw.RegisterModule(notificationspack.New(nil))
 	case orchestratorpack.PackID:
@@ -303,6 +309,7 @@ func TestMigrationPackRouteGating(t *testing.T) {
 		{"heartbeat", heartbeatpack.PackID, "/v1/heartbeat"},
 		{"market", marketpack.PackID, "/v1/market/search"},
 		{"mcp-dispatch", mcpdispatchpack.PackID, "/v1/workers"},
+		{"modules", modulespack.PackID, "/v1/modules"},
 		{"notifications", notificationspack.PackID, "/api/notify/channels"},
 		{"orchestrator", orchestratorpack.PackID, "/v1/orchestrator/status"},
 		{"reflection", reflectionpack.PackID, "/v1/reflect/experiences"},

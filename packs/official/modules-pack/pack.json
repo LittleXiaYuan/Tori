@@ -1,0 +1,47 @@
+{
+  "id": "yunque.pack.modules",
+  "name": "Runtime Modules (运行模块状态)",
+  "version": "0.1.0",
+  "description": "运行模块状态：查看当前运行配置档与热插拔模块状态，用于诊断云雀底座的启用、运行与错误状态。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": [
+      "modules.list"
+    ],
+    "routes": [
+      "/v1/modules"
+    ],
+    "permissions": [
+      "modules:read"
+    ],
+    "routeSpecs": [
+      {
+        "method": "GET",
+        "path": "/v1/modules",
+        "description": "List registered runtime modules and the current profile."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [],
+    "assets": {
+      "type": "builtin"
+    }
+  },
+  "sdk": {
+    "typescript": "yunque-client/modules"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "group": "runtime",
+    "phase": "A3",
+    "preload": "true",
+    "note": "Natively owns /v1/modules through the Pack Runtime gate and reads runtime module state via narrow host accessors."
+  },
+  "status": "beta"
+}

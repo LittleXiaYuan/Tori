@@ -243,17 +243,3 @@ func (g *Gateway) handleReviewStatus(w http.ResponseWriter, r *http.Request) {
 		"distill_enabled": g.distiller != nil,
 	})
 }
-
-// handleModules returns the list of registered modules and their status.
-func (g *Gateway) handleModules(w http.ResponseWriter, r *http.Request) {
-	if g.modules == nil {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{"modules": []any{}, "profile": ""})
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{
-		"modules": g.modules.List(),
-		"profile": g.profile,
-	})
-}

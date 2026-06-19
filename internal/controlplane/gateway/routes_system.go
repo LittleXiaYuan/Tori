@@ -132,8 +132,8 @@ func (g *Gateway) registerSystemRoutes() {
 	// Federation (/v1/federation*) is owned by the federation pack
 	// (internal/packs/federation), mounted via gw.RegisterModule.
 
-	// Modules (hot-pluggable subsystems)
-	g.mux.HandleFunc("/v1/modules", g.requireAuth(g.handleModules))
+	// Modules (/v1/modules) is owned by the modules pack
+	// (internal/packs/modules), mounted via gw.RegisterModule.
 
 	// NL Config — natural language → structured configuration
 	g.mux.HandleFunc("/v1/nl-config", g.requireAuth(g.handleNLConfig))

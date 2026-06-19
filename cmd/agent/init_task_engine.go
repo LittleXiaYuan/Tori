@@ -62,6 +62,7 @@ import (
 	microagentpack "yunque-agent/internal/packs/microagent"
 	missionspack "yunque-agent/internal/packs/missions"
 	modespack "yunque-agent/internal/packs/modes"
+	modulespack "yunque-agent/internal/packs/modules"
 	nightschoolpack "yunque-agent/internal/packs/nightschool"
 	notificationspack "yunque-agent/internal/packs/notifications"
 	orchestratorpack "yunque-agent/internal/packs/orchestrator"
@@ -225,6 +226,9 @@ func initTaskEngine(
 	// Speech pack — owns /v1/speech* natively via the shared speech registry,
 	// while reusing the gateway's WebSocket origin policy for STT streaming.
 	_ = gw.RegisterModule(speechpack.New(gw))
+	// Modules pack — owns /v1/modules natively. It resolves the module registry
+	// lazily because SetModuleRegistry runs near the end of initTasks.
+	_ = gw.RegisterModule(modulespack.New(gw))
 	// MCP Dispatch pack — owns /mcp/v1 plus worker-management routes natively.
 	// It keeps method-sensitive auth inside the pack: probe reads are open,
 	// JSON-RPC writes are authenticated through the host RequireAuth wrapper.

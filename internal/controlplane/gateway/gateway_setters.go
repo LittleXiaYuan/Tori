@@ -693,6 +693,12 @@ func (g *Gateway) SetModuleRegistry(r *agentrt.ModuleRegistry, profile string) {
 	g.profile = profile
 }
 
+// ModuleRegistry exposes the hot-pluggable module registry to the modules pack.
+func (g *Gateway) ModuleRegistry() *agentrt.ModuleRegistry { return g.modules }
+
+// ModuleProfile exposes the current runtime profile to the modules pack.
+func (g *Gateway) ModuleProfile() string { return g.profile }
+
 // SetCogniRegistry attaches the hot-pluggable Cogni registry plus the directory
 // it watches for declarative *.json files. Called by cmd/agent/module_cogni.go
 // after the runtime module starts.

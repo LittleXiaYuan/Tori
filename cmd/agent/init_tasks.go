@@ -728,6 +728,7 @@ func fallbackBuiltinPackManifestPaths() []string {
 		"packs/official/scheduler-pack/pack.json",
 		"packs/official/skillhub-pack/pack.json",
 		"packs/official/speech-pack/pack.json",
+		"packs/official/modules-pack/pack.json",
 		"packs/official/sbom-drift-pack/pack.json",
 		"packs/official/skill-anomaly-pack/pack.json",
 		"packs/official/wasm-plugin-pack/pack.json",
