@@ -168,12 +168,20 @@ describe("PacksPageOptimized", () => {
 
     expect(await screen.findByText("Documents (文档生成)")).toBeInTheDocument();
     expect(screen.getByText("Files (产物文件)")).toBeInTheDocument();
+    expect(screen.getByText("未启用筛选")).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("搜索能力包"), { target: { value: "文档" } });
 
     expect(screen.getByText("Documents (文档生成)")).toBeInTheDocument();
     expect(screen.queryByText("Files (产物文件)")).not.toBeInTheDocument();
     expect(screen.getByText(/匹配 1 个/)).toBeInTheDocument();
+    expect(screen.getByText("搜索：文档")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "清除搜索" }));
+
+    expect(screen.getByText("Documents (文档生成)")).toBeInTheDocument();
+    expect(screen.getByText("Files (产物文件)")).toBeInTheDocument();
+    expect(screen.getByText("未启用筛选")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "重置" }));
 
@@ -211,6 +219,8 @@ describe("PacksPageOptimized", () => {
     expect(screen.getByText("Remote Docs Pack")).toBeInTheDocument();
     expect(screen.queryByText("Documents (文档生成)")).not.toBeInTheDocument();
     expect(screen.getByText(/官方源 1/)).toBeInTheDocument();
+    expect(screen.getByText("状态：可安装")).toBeInTheDocument();
+    expect(screen.getByText("来源：官方源")).toBeInTheDocument();
     const remoteStudioLink = screen.getAllByRole("link", { name: /小羽优化/ })
       .find((link) => link.getAttribute("href")?.includes("yunque.pack.remote-docs"));
     expect(remoteStudioLink).toHaveAttribute("href", expect.stringContaining("packageUrl=https%3A%2F%2Fexample.com%2Fdocs.yqpack"));

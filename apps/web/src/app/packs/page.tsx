@@ -25,6 +25,7 @@ import {
   SlidersHorizontal,
   Store,
   Wrench,
+  X,
 } from "lucide-react";
 import PageHeader from "@/components/page-header";
 import { showToast } from "@/components/toast-provider";
@@ -62,6 +63,38 @@ type InstallFilter = "all" | "installed" | "enabled" | "disabled" | "available";
 type RiskFilter = "all" | "low" | "medium" | "high";
 type SourceFilter = "all" | "installed" | "official" | "private";
 type SortMode = "name" | "kind" | "risk" | "status";
+
+const KIND_FILTER_LABELS: Record<KindFilter, string> = {
+  all: "全部类型",
+  actionable: "可直接使用",
+  infrastructure: "基础能力",
+  experimental: "实验中",
+};
+const INSTALL_FILTER_LABELS: Record<InstallFilter, string> = {
+  all: "全部状态",
+  installed: "已安装",
+  enabled: "已启用",
+  disabled: "已禁用",
+  available: "可安装",
+};
+const RISK_FILTER_LABELS: Record<RiskFilter, string> = {
+  all: "全部风险",
+  low: "低风险",
+  medium: "需留意",
+  high: "需要授权",
+};
+const SOURCE_FILTER_LABELS: Record<SourceFilter, string> = {
+  all: "全部来源",
+  installed: "已安装",
+  official: "官方源",
+  private: "私有源",
+};
+const SORT_MODE_LABELS: Record<SortMode, string> = {
+  name: "按名称",
+  kind: "按类型",
+  risk: "按风险",
+  status: "按阶段",
+};
 
 function formatTime(value?: string): string {
   if (!value) return "-";
@@ -366,6 +399,44 @@ export default function PacksPageOptimized() {
     });
     showToast(pinned ? "已从侧边栏移除" : "已固定到侧边栏", "success");
   };
+  const activeFilters = [
+    ...(query.trim() ? [{
+      key: "query",
+      label: `搜索：${query.trim()}`,
+      clearLabel: "清除搜索",
+      clear: () => setQuery(""),
+    }] : []),
+    ...(kindFilter !== "all" ? [{
+      key: "kind",
+      label: `类型：${KIND_FILTER_LABELS[kindFilter]}`,
+      clearLabel: "清除类型",
+      clear: () => setKindFilter("all"),
+    }] : []),
+    ...(installFilter !== "all" ? [{
+      key: "install",
+      label: `状态：${INSTALL_FILTER_LABELS[installFilter]}`,
+      clearLabel: "清除状态",
+      clear: () => setInstallFilter("all"),
+    }] : []),
+    ...(riskFilter !== "all" ? [{
+      key: "risk",
+      label: `风险：${RISK_FILTER_LABELS[riskFilter]}`,
+      clearLabel: "清除风险",
+      clear: () => setRiskFilter("all"),
+    }] : []),
+    ...(sourceFilter !== "all" ? [{
+      key: "source",
+      label: `来源：${SOURCE_FILTER_LABELS[sourceFilter]}`,
+      clearLabel: "清除来源",
+      clear: () => setSourceFilter("all"),
+    }] : []),
+    ...(sortMode !== "name" ? [{
+      key: "sort",
+      label: `排序：${SORT_MODE_LABELS[sortMode]}`,
+      clearLabel: "恢复默认排序",
+      clear: () => setSortMode("name"),
+    }] : []),
+  ];
 
   if (loading) {
     return <div className="flex items-center justify-center h-[60vh]"><Spinner size="lg" /></div>;
@@ -511,6 +582,17 @@ export default function PacksPageOptimized() {
               ["risk", "风险"],
               ["status", "阶段"],
             ], sortMode, (value) => setSortMode(value as SortMode))}
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="text-xs font-medium" style={{ color: "var(--yunque-text-muted)" }}>当前条件</span>
+            {activeFilters.length === 0 ? (
+              <Chip size="sm" variant="soft">未启用筛选</Chip>
+            ) : activeFilters.map((filter) => (
+              <Button key={filter.key} size="sm" variant="ghost" onPress={filter.clear} aria-label={filter.clearLabel}>
+                <span className="text-xs">{filter.label}</span>
+                <X size={13} />
+              </Button>
+            ))}
           </div>
         </Card>
       </div>
