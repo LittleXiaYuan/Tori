@@ -183,6 +183,34 @@ function packStudioHandoffHref(pack: { id?: string }, goal: string | undefined, 
   return `/packs/studio${query ? `?${query}` : ""}${hash}`;
 }
 
+function packStudioBatchHandoffHref(request: PackStudioBatchDraftRequest): string {
+  const payload = {
+    kind: "yunque.pack_studio.batch_draft_request.v1",
+    goal: request.goal,
+    rules: request.rules,
+    packs: request.packs.map((pack) => ({
+      id: pack.id,
+      name: pack.name,
+      version: pack.version,
+      status: pack.status,
+      source: pack.source,
+      missing: pack.missing,
+      readiness: pack.readiness,
+      studio_url: pack.studioUrl,
+      package_url: pack.packageUrl,
+      sha256: pack.sha256,
+    })),
+  };
+  const batchText = [
+    "小羽收到批量补肉任务。",
+    "",
+    "```json",
+    JSON.stringify(payload, null, 2),
+    "```",
+  ].join("\n");
+  return `/packs/studio?batch=${encodeURIComponent(batchText)}`;
+}
+
 function renderPackStudioPlan(plan: PackStudioPatchPlanSummary) {
   return (
     <div
@@ -306,11 +334,11 @@ function renderPackStudioBatchDraftRequest(request: PackStudioBatchDraftRequest)
           </div>
         </div>
         <a
-          href="/packs#readiness-queue"
+          href={packStudioBatchHandoffHref(request)}
           className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1.5 text-[11px] font-medium"
           style={{ background: "var(--yunque-accent-muted)", color: "var(--yunque-accent)" }}
         >
-          返回队列 <ArrowRight size={11} />
+          导入 Studio 逐包处理 <ArrowRight size={11} />
         </a>
       </div>
       {request.goal && (
@@ -361,6 +389,11 @@ function renderPackStudioBatchDraftRequest(request: PackStudioBatchDraftRequest)
       )}
       <div className="mt-2 leading-5" style={{ color: "var(--yunque-text-muted)" }}>
         这只是批量生成请求，不会自动应用改动。每个包都要回到 Studio 预览 diff、运行 audit、重新打包并复检 SHA 后再安装或回滚。
+      </div>
+      <div className="mt-2">
+        <a href="/packs#readiness-queue" className="inline-flex items-center gap-1 text-[11px] font-medium" style={{ color: "var(--yunque-accent)" }}>
+          返回能力包中心队列 <ArrowRight size={10} />
+        </a>
       </div>
     </div>
   );

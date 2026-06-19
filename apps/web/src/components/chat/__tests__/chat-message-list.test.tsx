@@ -323,7 +323,13 @@ describe("ChatMessageList file preview", () => {
     expect(screen.getByText("打开/使用入口")).toBeInTheDocument();
     expect(screen.getByText(/预览 diff、运行 audit、重新打包并复检 SHA/)).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: /打开 Studio/ })[0]).toHaveAttribute("href", "/packs/studio?pack=yunque.pack.needs-entry");
-    expect(screen.getByRole("link", { name: /返回队列/ })).toHaveAttribute("href", "/packs#readiness-queue");
+    const batchStudioLink = screen.getByRole("link", { name: /导入 Studio 逐包处理/ });
+    expect(batchStudioLink).toHaveAttribute("href", expect.stringContaining("/packs/studio?batch="));
+    const batchParam = new URL(batchStudioLink.getAttribute("href")!, "http://localhost").searchParams.get("batch") || "";
+    expect(batchParam).toContain("yunque.pack_studio.batch_draft_request.v1");
+    expect(batchParam).toContain("yunque.pack.needs-entry");
+    expect(batchParam).toContain("studio_url");
+    expect(screen.getByRole("link", { name: /返回能力包中心队列/ })).toHaveAttribute("href", "/packs#readiness-queue");
     expect(screen.getByText("请批量补肉这批能力包。")).toBeInTheDocument();
     expect(screen.queryByText(/yunque.pack_studio.batch_draft_request.v1/)).not.toBeInTheDocument();
 
