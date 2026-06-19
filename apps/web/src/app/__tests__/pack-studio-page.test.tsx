@@ -390,6 +390,57 @@ describe("PackStudioPage", () => {
     });
     const task = screen.getByLabelText("小羽改包任务") as HTMLTextAreaElement;
     expect(task.value).toContain("请以“小羽改包”的方式改造能力包 WASM 能力包");
+
+    fireEvent.click(screen.getByRole("button", { name: /Documents/ }));
+
+    expect((screen.getByLabelText("OSS / Release URL") as HTMLInputElement).value).toBe("");
+    expect((screen.getByLabelText("SHA256") as HTMLInputElement).value).toBe("");
+    expect(screen.queryByText("已从能力包中心接入这个 yqpack")).not.toBeInTheDocument();
+  });
+
+  it("prefills yqpack source for private catalog candidates", async () => {
+    const privateManifest = {
+      ...documentsManifest,
+      id: "yunque.pack.private-docs",
+      name: "Private Docs",
+      description: "来自私有源的文档能力包。",
+    };
+    packsClientMock.installed.mockResolvedValueOnce({
+      packs: [{ manifest: wasmManifest, status: "enabled" }],
+      count: 1,
+    });
+    packsClientMock.catalog.mockResolvedValueOnce({
+      generated_at: "2026-06-19T00:00:00Z",
+      sources: ["https://oss.example.com/catalog.json"],
+      source_reports: [],
+      count: 1,
+      installed: 1,
+      enabled: 1,
+      downloadable: 1,
+      capabilities: 1,
+      entries: [{
+        source: "https://oss.example.com/catalog.json",
+        package_url: "https://oss.example.com/private-docs.yqpack",
+        sha256: "8".repeat(64),
+        installed: false,
+        enabled: false,
+        manifest: privateManifest,
+      }],
+    });
+    navigationMock.query = new URLSearchParams({
+      packId: "yunque.pack.private-docs",
+      goal: "补齐私有源入口",
+    }).toString();
+
+    render(<PackStudioPage />);
+
+    expect((await screen.findAllByText("Private Docs")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("私有源").length).toBeGreaterThan(0);
+    await waitFor(() => {
+      expect((screen.getByLabelText("OSS / Release URL") as HTMLInputElement).value).toBe("https://oss.example.com/private-docs.yqpack");
+      expect((screen.getByLabelText("SHA256") as HTMLInputElement).value).toBe("8".repeat(64));
+    });
+    expect(screen.getByText("已从能力包中心接入这个 yqpack")).toBeInTheDocument();
   });
 
   it("imports a batch readiness request and lets users continue pack by pack", async () => {

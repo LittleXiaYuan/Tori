@@ -648,6 +648,8 @@ export default function PackStudioPage() {
           source: "catalog",
           enabled: Boolean(entry.enabled),
           installed: Boolean(entry.installed),
+          packageUrl: typeof entry.package_url === "string" ? entry.package_url : undefined,
+          sha256: typeof entry.sha256 === "string" ? entry.sha256 : undefined,
         });
       }
     }
@@ -732,20 +734,16 @@ export default function PackStudioPage() {
   }, [candidateQuery, candidateSourceFilter, candidates.length]);
 
   useEffect(() => {
-    if (!selected || selected.source !== "release") return;
-    if (selected.packageUrl && !packageUrl.trim()) setPackageUrl(selected.packageUrl);
+    if (!selected || (!selected.packageUrl && !selected.sha256)) return;
+    if (selected.packageUrl && !packagePath.trim() && !packageUrl.trim()) setPackageUrl(selected.packageUrl);
     if (selected.sha256 && !packageSHA.trim()) setPackageSHA(selected.sha256);
-  }, [packageSHA, packageUrl, selected]);
+  }, [packagePath, packageSHA, packageUrl, selected]);
 
   const selectCandidate = (candidate: PackCandidate) => {
     setSelectedId(candidate.manifest.id);
-    if (candidate.source === "release") {
-      if (candidate.packageUrl) {
-        setPackagePath("");
-        setPackageUrl(candidate.packageUrl);
-      }
-      if (candidate.sha256) setPackageSHA(candidate.sha256);
-    }
+    setPackagePath("");
+    setPackageUrl(candidate.packageUrl || "");
+    setPackageSHA(candidate.sha256 || "");
     setInspectReport(null);
     setWorkspaceReport(null);
     setPatchReport(null);
