@@ -83,6 +83,11 @@ describe("PackDetailClientPage", () => {
     expect(screen.getByText("用户能拿它做什么")).toBeInTheDocument();
     expect(screen.getByText("能力包体检")).toBeInTheDocument();
     expect(screen.getByText(/还缺：使用示例/)).toBeInTheDocument();
+    expect(screen.getByText("确认来源")).toBeInTheDocument();
+    expect(screen.getByText(/来源：本机已安装记录/)).toBeInTheDocument();
+    expect(screen.getByText("能力边界")).toBeInTheDocument();
+    expect(screen.getAllByText(/不会自动泄露 API Key/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/此包未声明版本回滚/).length).toBeGreaterThan(0);
 
     const chatLink = screen.getByRole("link", { name: /问云雀怎么用/ });
     expect(chatLink).toHaveAttribute("href", expect.stringContaining("/chat?q="));
@@ -137,6 +142,8 @@ describe("PackDetailClientPage", () => {
     expect(screen.getByText("https://example.com/needs-context.yqpack")).toBeInTheDocument();
     expect(screen.getByText("SHA256 abc123")).toBeInTheDocument();
     expect(screen.getByText("4 KB")).toBeInTheDocument();
+    expect(screen.getByText(/来源：官方发布源 · example.com/)).toBeInTheDocument();
+    expect(screen.getByText(/安装前可先在 Studio 只读检查包内容、SHA 与 manifest/)).toBeInTheDocument();
 
     const sourceStudioLink = screen.getByRole("link", { name: /先在 Studio 只读检查/ });
     expect(sourceStudioLink).toHaveAttribute("href", expect.stringContaining("/packs/studio?"));

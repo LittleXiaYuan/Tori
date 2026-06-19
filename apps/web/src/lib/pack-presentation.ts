@@ -25,6 +25,13 @@ export type PackRiskProfile = {
   requiresAuthorization: boolean;
 };
 
+export type PackInstallChecklistItem = {
+  key: "source" | "permissions" | "boundary" | "rollback";
+  label: string;
+  detail: string;
+  tone: "safe" | "warning" | "danger";
+};
+
 export type PackFeatureFlags = {
   hasFrontend: boolean;
   hasBackend: boolean;
@@ -318,6 +325,60 @@ export function riskProfileForPack(manifest: PackManifest): PackRiskProfile {
     description: "主要读取状态或提供界面入口，不会默认执行高危操作。",
     requiresAuthorization: false,
   };
+}
+
+export function packInstallChecklist(
+  manifest: PackManifest,
+  options: { sourceLabel?: string; installed?: boolean; enabled?: boolean } = {},
+): PackInstallChecklistItem[] {
+  const groups = groupPackPermissions(manifest.backend?.permissions || []);
+  const risk = riskProfileForPack(manifest);
+  const flags = packFeatureFlags(manifest);
+  const sourceDetail = options.sourceLabel
+    ? `来源：${options.sourceLabel}。安装前可先在 Studio 只读检查包内容、SHA 与 manifest。`
+    : options.installed
+      ? "来源：本机已安装记录。可从详情页查看版本、入口和权限声明。"
+      : "来源：未标注安装源。建议先确认发布者、SHA 和 manifest 后再安装。";
+  const permissionDetail = groups.length > 0
+    ? `会声明 ${groups.map((group) => group.label).join("、")} 等能力；具体动作仍受云雀 route、权限和用户确认约束。`
+    : "未声明额外权限；启用后主要按 manifest 暴露入口或说明，不会默认获得额外写入能力。";
+  const boundaryDetail = manifest.id === "yunque.pack.computer-use"
+    ? "边界：当前只让 Planner 生成电脑使用计划，不执行本机桌面控制。"
+    : risk.requiresAuthorization
+      ? "边界：需要授权的高风险能力不会自动越权执行；启用前应确认来源可信，启用后按具体动作授权。"
+      : "边界：不会自动泄露 API Key，不会绕过权限声明，也不能调用未声明 route。";
+  const rollbackDetail = flags.canRollback
+    ? "回滚：声明支持版本回滚；也可以随时禁用能力包。"
+    : options.enabled
+      ? "回滚：当前可先禁用；此包未声明版本回滚。"
+      : "回滚：安装后可禁用；此包未声明版本回滚。";
+
+  return [
+    {
+      key: "source",
+      label: "确认来源",
+      detail: sourceDetail,
+      tone: options.sourceLabel || options.installed ? "safe" : "warning",
+    },
+    {
+      key: "permissions",
+      label: "理解权限",
+      detail: permissionDetail,
+      tone: groups.some((group) => ["computer", "browser", "sandbox", "admin"].includes(group.key)) ? "warning" : "safe",
+    },
+    {
+      key: "boundary",
+      label: "能力边界",
+      detail: boundaryDetail,
+      tone: risk.requiresAuthorization ? "danger" : "safe",
+    },
+    {
+      key: "rollback",
+      label: "回滚路径",
+      detail: rollbackDetail,
+      tone: flags.canRollback ? "safe" : "warning",
+    },
+  ];
 }
 
 export function packUsageExplanation(manifest: PackManifest): string[] {

@@ -6,6 +6,7 @@ import {
   entryInstallRequest,
   formatPackInstallError,
   groupPackPermissions,
+  packInstallChecklist,
   packFeatureFlags,
   packReadiness,
   packUsageExplanation,
@@ -57,6 +58,13 @@ describe("pack-presentation", () => {
     });
     expect(packUsageExplanation(manifest).join(" ")).toContain("当前阶段只做计划");
     expect(packUsageExplanation(manifest).join(" ")).toContain("不执行本机控制");
+    expect(packInstallChecklist(manifest, { sourceLabel: "官方发布源 · example.com" })).toMatchObject([
+      { key: "source", tone: "safe" },
+      { key: "permissions", tone: "warning" },
+      { key: "boundary", tone: "danger" },
+      { key: "rollback", tone: "warning" },
+    ]);
+    expect(packInstallChecklist(manifest)[2].detail).toContain("不执行本机桌面控制");
   });
 
   it("marks financial trading permissions as high risk", () => {

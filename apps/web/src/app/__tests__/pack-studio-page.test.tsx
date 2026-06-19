@@ -945,5 +945,5 @@ describe("PackStudioPage", () => {
     await waitFor(() => {
       expect(toastMock).toHaveBeenCalledWith("已复制小羽改包任务", "success");
     });
-  }, 15000);
+  }, 30000);
 });

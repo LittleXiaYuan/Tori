@@ -40,6 +40,7 @@ import {
   entryInstallRequest,
   formatPackInstallError,
   groupPackPermissions,
+  packInstallChecklist,
   packFeatureFlags,
   packReadiness,
   packUsageExplanation,
@@ -267,6 +268,11 @@ export default function PackDetailClientPage() {
   const readiness = packReadiness(manifest);
   const openPath = usability.primaryActionPath || menus[0]?.path || routesFrontend[0]?.path;
   const installSource = installSourceForPack({ manifest, catalogEntry, releaseEntry });
+  const installChecklist = packInstallChecklist(manifest, {
+    sourceLabel: installSource?.label,
+    installed,
+    enabled,
+  });
   const usagePrompt = [
     `我正在查看云雀能力包：${manifest.name} (${manifest.id})。`,
     "请用普通用户能理解的话告诉我：它能做什么、适合哪些任务、第一句话该怎么说、启用前要注意什么。",
@@ -533,6 +539,21 @@ export default function PackDetailClientPage() {
                 {update?.rollback ? "支持回滚到上一版本；也可以随时禁用。" : "可以随时禁用；此包未声明版本回滚。"}
               </div>
             </div>
+          </div>
+          <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+            {installChecklist.map((item) => (
+              <div
+                key={item.key}
+                className="rounded-md border p-3 text-xs"
+                style={{
+                  borderColor: item.tone === "danger" ? "rgba(239,68,68,0.22)" : item.tone === "warning" ? "rgba(245,158,11,0.22)" : "var(--yunque-border)",
+                  background: item.tone === "danger" ? "rgba(239,68,68,0.08)" : item.tone === "warning" ? "rgba(245,158,11,0.08)" : "var(--yunque-bg-hover)",
+                }}
+              >
+                <div className="mb-1 font-medium" style={{ color: "var(--yunque-text)" }}>{item.label}</div>
+                <div className="leading-5" style={{ color: "var(--yunque-text-secondary)" }}>{item.detail}</div>
+              </div>
+            ))}
           </div>
           {risk.requiresAuthorization && (
             <div className="mt-3 flex items-start gap-2 rounded-md p-3" style={{ background: "rgba(239,68,68,0.10)", color: "var(--yunque-warning)" }}>
