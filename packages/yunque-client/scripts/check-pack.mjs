@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 
 // Keep a small buffer for the richer focused pack slice docs and SBOM drift
 // type surface; the dynamic export/capability growth gates still catch real
@@ -44,22 +44,14 @@ const wasmPluginManifestPath = "../../sdk/manifest/wasm-plugin-pack-sdk.json";
 const wasmPluginManifest = existsSync(wasmPluginManifestPath)
   ? JSON.parse(readFileSync(wasmPluginManifestPath, "utf8"))
   : { routes: [] };
-const officialPackManifests = [
-  "../../packs/official/backup-pack/pack.json",
-  "../../packs/official/browser-intent-pack/pack.json",
-  "../../packs/official/chaos-probe-pack/pack.json",
-  "../../packs/official/cogni-kernel-pack/pack.json",
-  "../../packs/official/cognitive-canary-pack/pack.json",
-  "../../packs/official/guardrail-fuzzer-pack/pack.json",
-  "../../packs/official/lora-pack/pack.json",
-  "../../packs/official/memory-time-travel-pack/pack.json",
-  "../../packs/official/rpa-replay-pack/pack.json",
-  "../../packs/official/sbom-drift-pack/pack.json",
-  "../../packs/official/skill-anomaly-pack/pack.json",
-  "../../packs/official/wasm-plugin-pack/pack.json",
-]
-  .filter(existsSync)
-  .map((path) => JSON.parse(readFileSync(path, "utf8")));
+const officialPackDir = "../../packs/official";
+const officialPackManifests = existsSync(officialPackDir)
+  ? readdirSync(officialPackDir, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => `${officialPackDir}/${entry.name}/pack.json`)
+      .filter(existsSync)
+      .map((path) => JSON.parse(readFileSync(path, "utf8")))
+  : [];
 const packsSource = existsSync("src/packs.ts") ? readFileSync("src/packs.ts", "utf8") : "";
 const rootIndexSource = existsSync("src/index.ts") ? readFileSync("src/index.ts", "utf8") : "";
 
@@ -171,7 +163,9 @@ const wasmPluginRouteCount = Array.isArray(wasmPluginManifest.routes)
   : 0;
 const packSdkHelperExports = (packsSource.match(/export function (summarizeCatalogSourceReports|hasCatalogSourceIssues)\b/g) ?? []).length;
 const packSdkPrepareSummaryHelperExports = (packsSource.match(/export function summarizeCapabilityPrepare\b/g) ?? []).length;
-const styledOfficialPackCount = officialPackManifests.filter((manifest) => manifest.metadata?.descriptionStyle === "one-line-plus-three-examples").length;
+const styledOfficialPackCount = officialPackManifests.filter((manifest) =>
+  ["example1", "example2", "example3"].every((key) => typeof manifest.metadata?.[key] === "string" && manifest.metadata[key].trim() !== "")
+).length;
 const maxUnpackedSize = baseUnpackedSize
   + Math.max(0, exportedFiles.size - baseExportedFiles) * maxUnpackedGrowthPerExport
   + Math.max(0, manifestCapabilityCount - baseManifestCapabilities) * maxUnpackedGrowthPerManifestCapability

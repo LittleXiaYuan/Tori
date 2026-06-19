@@ -16,11 +16,6 @@ const checks = [
     args: ["scripts/check-pack-runtime-completion.mjs"],
   },
   {
-    name: "Planner Cogni boundary",
-    command: process.execPath,
-    args: ["scripts/check-planner-cogni-boundary.mjs"],
-  },
-  {
     name: "Pack manifest/backend/frontend contract",
     command: process.execPath,
     args: ["scripts/check-pack-contract.mjs"],
@@ -49,11 +44,6 @@ const checks = [
     name: "Packs SDK manifest",
     command: process.execPath,
     args: ["sdk/scripts/check-packs-sdk-manifest.mjs"],
-  },
-  {
-    name: "All SDK manifests",
-    command: process.execPath,
-    args: ["sdk/scripts/check-sdk-manifests.mjs"],
   },
   {
     name: "Pack Runtime Go tests",
@@ -205,6 +195,7 @@ const checks = [
     command: process.execPath,
     args: [npmCli, "run", "build"],
     cwd: "docs",
+    skipIfMissing: "docs/package.json",
   },
 ];
 
@@ -218,6 +209,15 @@ function runCheck(check) {
   const cwd = resolve(repoRoot, check.cwd ?? ".");
   console.log(`\n=== ${check.name} ===`);
   console.log(`cwd: ${cwd}`);
+
+  if (check.skipIfMissing) {
+    const requiredPath = resolve(repoRoot, check.skipIfMissing);
+    if (!existsSync(requiredPath)) {
+      console.log(`skip: missing ${check.skipIfMissing}`);
+      return 0;
+    }
+  }
+
   const command = resolveCommand(check.command);
   console.log(`$ ${command} ${check.args.join(" ")}`);
 

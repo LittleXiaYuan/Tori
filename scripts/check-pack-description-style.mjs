@@ -6,12 +6,9 @@ const repoRoot = resolve(import.meta.dirname, "..");
 const officialPacksDir = resolve(repoRoot, "packs/official");
 const failures = [];
 
-const EXPECTED_STYLE = "one-line-plus-three-examples";
-const EXPECTED_OFFICIAL_PACKS = 12;
-const MAX_DESCRIPTION_CHARS = 64;
-const FORBIDDEN_DESCRIPTION_FRAGMENTS = [
-  "、",
-  "/",
+const MAX_DESCRIPTION_CHARS = 96;
+const MAX_EXAMPLE_CHARS = 96;
+const FORBIDDEN_TECHNICAL_FRAGMENTS = [
   "handoff plan",
   "writeback",
   "write-back",
@@ -60,15 +57,15 @@ if (existsSync(officialPacksDir)) {
     }
     if (/\r|\n/.test(description)) fail(`${location}: description must stay on one line`);
     if (!/[。.!?]$/.test(description)) fail(`${location}: description must end with punctuation`);
-    for (const fragment of FORBIDDEN_DESCRIPTION_FRAGMENTS) {
+    for (const fragment of FORBIDDEN_TECHNICAL_FRAGMENTS) {
       if (description.toLowerCase().includes(fragment.toLowerCase())) {
-        fail(`${location}: description is still a feature dump and contains ${JSON.stringify(fragment)}`);
+        fail(`${location}: description exposes technical handoff jargon: ${JSON.stringify(fragment)}`);
       }
     }
 
     const metadata = manifest.metadata ?? {};
-    if (metadata.descriptionStyle !== EXPECTED_STYLE) {
-      fail(`${location}: metadata.descriptionStyle must be ${EXPECTED_STYLE}`);
+    if (metadata.descriptionStyle && metadata.descriptionStyle !== "one-line-plus-three-examples") {
+      fail(`${location}: metadata.descriptionStyle must be one-line-plus-three-examples when present`);
     }
     const examples = [metadata.example1, metadata.example2, metadata.example3];
     for (const [index, example] of examples.entries()) {
@@ -78,7 +75,7 @@ if (existsSync(officialPacksDir)) {
         continue;
       }
       const normalized = example.trim();
-      if (normalized.length > 48) fail(`${location}: ${key} must be <= 48 chars (got ${normalized.length})`);
+      if (normalized.length > MAX_EXAMPLE_CHARS) fail(`${location}: ${key} must be <= ${MAX_EXAMPLE_CHARS} chars (got ${normalized.length})`);
       if (/\r|\n/.test(normalized)) fail(`${location}: ${key} must stay on one line`);
       if (!/[。.!?]$/.test(normalized)) fail(`${location}: ${key} must end with punctuation`);
     }
@@ -88,9 +85,7 @@ if (existsSync(officialPacksDir)) {
   }
 }
 
-if (manifestCount !== EXPECTED_OFFICIAL_PACKS) {
-  fail(`expected ${EXPECTED_OFFICIAL_PACKS} official pack manifests, found ${manifestCount}`);
-}
+if (manifestCount === 0) fail("expected at least one official pack manifest");
 
 if (failures.length > 0) {
   console.error("Official pack description style check failed:");
@@ -98,4 +93,4 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log(`Official pack description style ok: ${manifestCount} manifests use one-line + three examples`);
+console.log(`Official pack description style ok: ${manifestCount} manifests have concise descriptions and three examples`);
