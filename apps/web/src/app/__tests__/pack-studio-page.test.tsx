@@ -365,6 +365,26 @@ describe("PackStudioPage", () => {
     expect(screen.getByText("原因：HTML 前端资源可在 yqpack 工作区内预览和替换，适合补独立界面、权限说明和结果区。")).toBeInTheDocument();
     expect(screen.getByText("Pack 可用性扫描")).toBeInTheDocument();
     expect(screen.getByText("复检 yqpack")).toBeInTheDocument();
+    expect(screen.getByText("结构化计划只包含目标文件、风险、原因、门禁和内容摘要；真正内容仍需载入草稿后预览 diff。")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "复制 Patch Plan JSON" }));
+    const patchPlanText = vi.mocked(navigator.clipboard.writeText).mock.calls.at(-1)?.[0] || "";
+    const patchPlan = JSON.parse(patchPlanText);
+    expect(patchPlan.kind).toBe("yunque.pack_studio.patch_plan.v1");
+    expect(patchPlan.pack.id).toBe("yunque.pack.wasm-plugin");
+    expect(patchPlan.workspace.id).toBe("yunque.pack.wasm-plugin-0.1.0-aaaaaaaaaaaa");
+    expect(patchPlan.candidates).toHaveLength(2);
+    expect(patchPlan.candidates[0]).toMatchObject({
+      label: "manifest 草稿",
+      risk_level: "low",
+      applyable: true,
+    });
+    expect(patchPlan.candidates[1].gates).toContain("复检 yqpack");
+    expect(patchPlan.candidates[1].content_summary.length).toBeGreaterThan(100);
+    expect(patchPlanText).not.toContain("<!doctype html>");
+    await waitFor(() => {
+      expect(toastMock).toHaveBeenCalledWith("已复制结构化 Patch Plan", "success");
+    });
 
     const draftButtons = screen.getAllByRole("button", { name: "载入草稿" });
     fireEvent.click(draftButtons[0]);

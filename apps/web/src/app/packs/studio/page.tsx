@@ -192,6 +192,14 @@ function buildStudioDraftCandidates(workspace: PackStudioWorkspaceReport, goal: 
   return candidates;
 }
 
+function stableStringHash(value: string): string {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+  }
+  return hash.toString(16).padStart(8, "0");
+}
+
 function sourceLabel(candidate: PackCandidate): string {
   if (candidate.installed && candidate.enabled) return "已启用";
   if (candidate.installed) return "已安装";
@@ -446,6 +454,45 @@ export default function PackStudioPage() {
     if (!prompt) return;
     await navigator.clipboard?.writeText(prompt);
     showToast("已复制小羽改包任务", "success");
+  };
+
+  const copyDraftPlan = async () => {
+    if (!workspaceReport || draftCandidates.length === 0) return;
+    const plan = {
+      kind: "yunque.pack_studio.patch_plan.v1",
+      pack: {
+        id: workspaceReport.manifest.id,
+        name: workspaceReport.manifest.name,
+        version: workspaceReport.manifest.version,
+      },
+      goal,
+      workspace: {
+        id: workspaceReport.workspace_id,
+        path: workspaceReport.workspace_path,
+        original_sha256: workspaceReport.original_sha256,
+      },
+      rules: [
+        "Only load one candidate into the workspace patch editor at a time.",
+        "Preview diff before applying.",
+        "Run built-in audit after applying.",
+        "Repack, reinspect sha256, then install or rollback explicitly.",
+      ],
+      candidates: draftCandidates.map((candidate) => ({
+        key: candidate.key,
+        label: candidate.label,
+        file_path: candidate.filePath,
+        risk_level: candidate.riskLevel,
+        applyable: candidate.applyable,
+        reason: candidate.reason,
+        gates: candidate.gates,
+        content_summary: {
+          length: candidate.content.length,
+          hash: stableStringHash(candidate.content),
+        },
+      })),
+    };
+    await navigator.clipboard?.writeText(JSON.stringify(plan, null, 2));
+    showToast("已复制结构化 Patch Plan", "success");
   };
 
   const inspectYqpack = async () => {
@@ -905,7 +952,15 @@ export default function PackStudioPage() {
                     </div>
                     {draftCandidates.length > 0 && (
                       <div className="mt-3 rounded-md p-2" style={{ background: "var(--yunque-bg-hover)" }}>
-                        <div className="mb-2 text-xs font-medium" style={{ color: "var(--yunque-text)" }}>小羽改造草稿队列</div>
+                        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                          <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>小羽改造草稿队列</div>
+                          <Button size="sm" variant="ghost" onPress={copyDraftPlan}>
+                            <Copy size={13} /> 复制 Patch Plan JSON
+                          </Button>
+                        </div>
+                        <div className="mb-2 text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
+                          结构化计划只包含目标文件、风险、原因、门禁和内容摘要；真正内容仍需载入草稿后预览 diff。
+                        </div>
                         <div className="grid gap-2 lg:grid-cols-2">
                           {draftCandidates.map((candidate) => (
                             <div key={candidate.key} className="rounded-md border p-2" style={{ borderColor: "var(--yunque-border)" }}>
