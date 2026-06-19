@@ -27,6 +27,7 @@ import {
   groupPackPermissions,
   packDeliveryProfile,
   packFeatureFlags,
+  packPermissionSummary,
   packReadiness,
   packUsability,
   riskProfileForPack,
@@ -1552,6 +1553,8 @@ export default function PackStudioPage() {
                   const usability = packUsability(candidate.manifest);
                   const readiness = packReadiness(candidate.manifest);
                   const delivery = packDeliveryProfile(candidate.manifest);
+                  const risk = riskProfileForPack(candidate.manifest);
+                  const permissionSummary = packPermissionSummary(candidate.manifest);
                   const active = candidate.manifest.id === (manifest?.id || "");
                   return (
                     <button
@@ -1577,6 +1580,9 @@ export default function PackStudioPage() {
                       </div>
                       <div className="mt-2 line-clamp-2 text-[11px] leading-5" style={{ color: "var(--yunque-text-muted)" }}>
                         {delivery.nextStep}
+                      </div>
+                      <div className="mt-2 text-[11px] font-medium" style={{ color: risk.requiresAuthorization ? "var(--yunque-warning)" : "var(--yunque-text-muted)" }}>
+                        {permissionSummary}
                       </div>
                     </button>
                   );

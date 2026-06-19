@@ -326,6 +326,8 @@ describe("PackStudioPage", () => {
     expect(screen.getByText("从只读检查到启用/回滚都在同一条路径里推进；小羽只生成计划和草稿，真正写入、打包、安装都需要你确认。")).toBeInTheDocument();
     expect(screen.getByText("当前包：WASM 能力包")).toBeInTheDocument();
     expect(screen.getByText("0/8 已完成")).toBeInTheDocument();
+    expect(screen.getByText("权限：沙箱、联网、写入；需要授权后使用")).toBeInTheDocument();
+    expect(screen.getByText("权限：写入；启用前建议确认")).toBeInTheDocument();
     expect(screen.getAllByText("下一步：填写路径/URL 后点击只读检查").length).toBeGreaterThan(0);
     expect(screen.getByRole("link", { name: /跳到当前操作/ })).toHaveAttribute("href", "#yqpack-check");
     expect(screen.getByText("已从能力包中心接入这个 yqpack")).toBeInTheDocument();
