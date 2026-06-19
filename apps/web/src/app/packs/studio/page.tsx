@@ -747,6 +747,51 @@ export default function PackStudioPage() {
     repackReport,
     workspaceReport,
   ]);
+  const releaseChecklist = useMemo(() => [
+    {
+      label: "原包已只读检查",
+      ready: Boolean(inspectReport?.sha256_match),
+      detail: inspectReport
+        ? `${inspectReport.entry_count} 个文件，${inspectReport.editable_count} 个可改`
+        : "先确认来源包、manifest、SHA 和文件分类。",
+    },
+    {
+      label: "可编辑工作区已准备",
+      ready: Boolean(workspaceReport),
+      detail: workspaceReport
+        ? workspaceReport.workspace_id
+        : "工作区是改包副本，不直接修改已安装能力包。",
+    },
+    {
+      label: "内置审计已通过",
+      ready: auditReport?.allowed === true,
+      detail: auditReport
+        ? `风险 ${auditReport.risk_level}，${auditReport.change_count} 个改动`
+        : "确认没有越权文件、不可改内容和高风险权限扩大。",
+    },
+    {
+      label: "重打包产物已生成",
+      ready: Boolean(repackReport),
+      detail: repackReport
+        ? `${repackReport.size_bytes.toLocaleString()} bytes`
+        : "重新打包不会覆盖原包。",
+    },
+    {
+      label: "新 yqpack 已复检",
+      ready: Boolean(reinspectReport?.sha256_match),
+      detail: reinspectReport
+        ? `${reinspectReport.entry_count} 个文件，SHA ${reinspectReport.sha256_match ? "匹配" : "不匹配"}`
+        : "上传 OSS 或安装前必须复检新包 SHA。",
+    },
+    {
+      label: "回滚路径已记录",
+      ready: Boolean(workspaceReport?.rollback_commands?.length),
+      detail: workspaceReport?.rollback_commands?.length
+        ? `已记录 ${workspaceReport.rollback_commands.length} 条禁用/回滚命令`
+        : "保留禁用、回滚或恢复上一版本的路径。",
+    },
+  ], [auditReport, inspectReport, reinspectReport, repackReport, workspaceReport]);
+  const releaseReady = releaseChecklist.every((item) => item.ready);
   const deliverySummary = useMemo(() => buildDeliverySummary({
     manifest,
     goal,
@@ -1285,6 +1330,30 @@ export default function PackStudioPage() {
                           </div>
                         </div>
                       ))}
+                    </div>
+                    <div className="mt-4 rounded-md border p-3" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-surface)" }}>
+                      <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                          <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>上传 OSS 前检查清单</div>
+                          <div className="mt-1 text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
+                            全部就绪后再把新 yqpack 放到 Release 或 OSS；清单不会替你上传，也不会自动启用能力包。
+                          </div>
+                        </div>
+                        <Chip size="sm" color={releaseReady ? "success" : "warning"}>
+                          {releaseReady ? "可上传/发布" : "继续检查"}
+                        </Chip>
+                      </div>
+                      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                        {releaseChecklist.map((item) => (
+                          <div key={item.label} className="rounded px-2 py-2 text-xs" style={{ background: "var(--yunque-bg-hover)", color: "var(--yunque-text-secondary)" }}>
+                            <div className="mb-1 flex items-center justify-between gap-2">
+                              <span className="font-medium" style={{ color: "var(--yunque-text)" }}>{item.label}</span>
+                              <Chip size="sm" color={item.ready ? "success" : "warning"}>{item.ready ? "就绪" : "待完成"}</Chip>
+                            </div>
+                            <div className="break-all text-[11px] leading-5">{item.detail}</div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
                   <div className="mt-4 rounded-md border p-3" style={{ borderColor: "var(--yunque-border)" }}>

@@ -394,6 +394,10 @@ describe("PackStudioPage", () => {
     expect(screen.getByText("小羽可以帮你生成计划和草稿，但每一步都必须经过 diff、审计、复检和显式安装确认。")).toBeInTheDocument();
     expect(screen.getByText("不自动应用")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "复制交付摘要" })).toBeInTheDocument();
+    expect(screen.getByText("上传 OSS 前检查清单")).toBeInTheDocument();
+    expect(screen.getByText("全部就绪后再把新 yqpack 放到 Release 或 OSS；清单不会替你上传，也不会自动启用能力包。")).toBeInTheDocument();
+    expect(screen.getByText("继续检查")).toBeInTheDocument();
+    expect(screen.getByText("回滚路径已记录")).toBeInTheDocument();
     expect(screen.getByText("Plan / Draft")).toBeInTheDocument();
     expect(screen.getAllByText("下一步：载入草稿或交给小羽生成 Draft").length).toBeGreaterThan(0);
 
@@ -614,6 +618,7 @@ describe("PackStudioPage", () => {
     });
     expect(await screen.findByText("复检 SHA 匹配")).toBeInTheDocument();
     expect(screen.getAllByText("下一步：安装新包").length).toBeGreaterThan(0);
+    expect(screen.getByText("可上传/发布")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "安装新包" }));
     await waitFor(() => {
