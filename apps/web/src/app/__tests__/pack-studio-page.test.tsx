@@ -885,7 +885,8 @@ describe("PackStudioPage", () => {
     });
     expect(await screen.findByText("已安装未启用")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /打开入口/ })).toHaveAttribute("href", "/packs/wasm-plugin");
-    expect(screen.getByRole("link", { name: /查看详情/ })).toHaveAttribute("href", "/packs/detail?id=yunque.pack.wasm-plugin");
+    expect(screen.getByRole("link", { name: /查看权限与来源/ })).toHaveAttribute("href", "/packs/detail?id=yunque.pack.wasm-plugin");
+    expect(screen.getByRole("link", { name: /回中心管理/ })).toHaveAttribute("href", "/packs");
     expect(screen.getAllByText("下一步：确认权限后启用或回滚").length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole("button", { name: "启用" }));

@@ -2103,7 +2103,10 @@ export default function PackStudioPage() {
                                 {postInstallBusy === "rollback" ? <Spinner size="sm" /> : <RotateCcw size={14} />} 回滚
                               </Button>
                               <Link href={`/packs/detail?id=${encodeURIComponent(installedRepack.manifest.id)}`}>
-                                <Button size="sm" variant="ghost">查看详情 <ArrowRight size={14} /></Button>
+                                <Button size="sm" variant="ghost">查看权限与来源 <ArrowRight size={14} /></Button>
+                              </Link>
+                              <Link href="/packs">
+                                <Button size="sm" variant="ghost">回中心管理 <ArrowRight size={14} /></Button>
                               </Link>
                             </div>
                           </div>
