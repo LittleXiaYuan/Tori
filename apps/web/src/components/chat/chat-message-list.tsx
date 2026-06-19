@@ -175,6 +175,14 @@ function displayMessageContentForTools(msg: Message): string {
   return displayMessageContent(msg);
 }
 
+function packStudioHandoffHref(pack: { id?: string }, goal: string | undefined, hash: string): string {
+  const params = new URLSearchParams();
+  if (pack.id) params.set("packId", pack.id);
+  if (goal) params.set("goal", goal);
+  const query = params.toString();
+  return `/packs/studio${query ? `?${query}` : ""}${hash}`;
+}
+
 function renderPackStudioPlan(plan: PackStudioPatchPlanSummary) {
   return (
     <div
@@ -196,7 +204,7 @@ function renderPackStudioPlan(plan: PackStudioPatchPlanSummary) {
           </div>
         </div>
         <a
-          href="/packs/studio#import-plan"
+          href={packStudioHandoffHref(plan.pack, plan.goal, "#import-plan")}
           className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1.5 text-[11px] font-medium"
           style={{ background: "var(--yunque-accent-muted)", color: "var(--yunque-accent)" }}
         >
@@ -248,7 +256,7 @@ function renderPackStudioDraft(draft: PackStudioPatchDraft) {
           </div>
         </div>
         <a
-          href="/packs/studio#import-draft"
+          href={packStudioHandoffHref(draft.pack, draft.goal, "#import-draft")}
           className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1.5 text-[11px] font-medium"
           style={{ background: "var(--yunque-success-muted)", color: "var(--yunque-success)" }}
         >
@@ -379,7 +387,7 @@ function renderPackStudioDraftRequest(request: PackStudioPatchDraftRequest) {
           </div>
         </div>
         <a
-          href="/packs/studio#draft-queue"
+          href={packStudioHandoffHref(request.pack, request.goal, "#draft-queue")}
           className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1.5 text-[11px] font-medium"
           style={{ background: "var(--yunque-accent-muted)", color: "var(--yunque-accent)" }}
         >
