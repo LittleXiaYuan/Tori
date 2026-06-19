@@ -648,6 +648,12 @@ describe("PackStudioPage", () => {
     expect(screen.getByText("小羽可以帮你生成计划和草稿，但每一步都必须经过 diff、审计、复检和显式安装确认。")).toBeInTheDocument();
     expect(screen.getByText("不自动应用")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "复制交付摘要" })).toBeInTheDocument();
+    expect(screen.getByText("交付闭环")).toBeInTheDocument();
+    expect(screen.getByText("改包完成不是停在 diff；新 yqpack 需要复检、安装验证，再回能力包中心刷新来源与入口。")).toBeInTheDocument();
+    expect(screen.getByText("还需继续检查")).toBeInTheDocument();
+    expect(screen.getByText("本地复检")).toBeInTheDocument();
+    expect(screen.getByText("本地安装验证")).toBeInTheDocument();
+    expect(screen.getByText("刷新能力包中心")).toBeInTheDocument();
     expect(screen.getByText("上传 OSS 前检查清单")).toBeInTheDocument();
     expect(screen.getByText("全部就绪后再把新 yqpack 放到 Release 或 OSS；清单不会替你上传，也不会自动启用能力包。")).toBeInTheDocument();
     expect(screen.getByText("继续检查")).toBeInTheDocument();
@@ -886,9 +892,11 @@ describe("PackStudioPage", () => {
     expect(screen.getByText("SHA256：" + "d".repeat(64))).toBeInTheDocument();
     expect(screen.getByText("发布与验证路径")).toBeInTheDocument();
     expect(screen.getByText("新 yqpack 不会自动上传或启用；先本地复检，再安装验证，最后更新发布源并回能力包中心刷新。")).toBeInTheDocument();
-    expect(screen.getByText("上传 package_path 并保留 SHA256：" + "d".repeat(64))).toBeInTheDocument();
-    expect(screen.getByText("更新 catalog/release 后回 /packs 刷新官方源/私有源。")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /回能力包中心/ })).toHaveAttribute("href", "/packs");
+    expect(screen.getAllByText("上传 package_path 并保留 SHA256：" + "d".repeat(64)).length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText("更新 catalog/release 后回 /packs 刷新官方源/私有源。").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByRole("link", { name: /回能力包中心/ }).some((link) => link.getAttribute("href") === "/packs")).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "复制新包信息" }));
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(`package=C:\\yunque\\packs\\studio\\yunque.pack.wasm-plugin-0.1.0-studio.yqpack\nsha256=${"d".repeat(64)}`);
     expect(screen.getAllByText("下一步：复检新包 SHA").length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole("button", { name: "复检新包" }));
@@ -902,6 +910,7 @@ describe("PackStudioPage", () => {
     expect(await screen.findByText("复检 SHA 匹配")).toBeInTheDocument();
     expect(screen.getAllByText("下一步：安装新包").length).toBeGreaterThan(0);
     expect(screen.getByText("可上传/发布")).toBeInTheDocument();
+    expect(screen.getAllByText("SHA 匹配，3 个文件").length).toBeGreaterThanOrEqual(2);
 
     fireEvent.click(screen.getByRole("button", { name: "安装新包" }));
     await waitFor(() => {
@@ -912,6 +921,7 @@ describe("PackStudioPage", () => {
       });
     });
     expect(await screen.findByText("已安装未启用")).toBeInTheDocument();
+    expect(screen.getAllByText("WASM 能力包 · 已安装未启用").length).toBeGreaterThanOrEqual(2);
     expect(screen.getByRole("link", { name: /打开入口/ })).toHaveAttribute("href", "/packs/wasm-plugin");
     expect(screen.getByRole("link", { name: /查看权限与来源/ })).toHaveAttribute("href", "/packs/detail?id=yunque.pack.wasm-plugin");
     expect(screen.getByRole("link", { name: /回中心管理/ })).toHaveAttribute("href", "/packs");

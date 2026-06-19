@@ -1610,6 +1610,53 @@ export default function PackStudioPage() {
           </div>
         </Card>
 
+        <Card className="section-card p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
+                <PackageCheck size={16} style={{ color: "var(--yunque-accent)" }} />
+                交付闭环
+              </div>
+              <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
+                改包完成不是停在 diff；新 yqpack 需要复检、安装验证，再回能力包中心刷新来源与入口。
+              </div>
+            </div>
+            <Chip size="sm" color={releaseReady ? "success" : "warning"}>
+              {releaseReady ? "可进入发布验证" : "还需继续检查"}
+            </Chip>
+          </div>
+          <div className="mt-3 grid gap-2 md:grid-cols-4">
+            {publishHandoffChecklist.map((item) => (
+              <div
+                key={item.label}
+                className="rounded-md border p-3"
+                style={{
+                  borderColor: item.ready ? "rgba(34,197,94,0.22)" : "var(--yunque-border)",
+                  background: item.ready ? "rgba(34,197,94,0.08)" : "var(--yunque-bg-hover)",
+                }}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>{item.label}</span>
+                  <Chip size="sm" color={item.ready ? "success" : "default"}>{item.ready ? "就绪" : "待办"}</Chip>
+                </div>
+                <div className="mt-2 text-[11px] leading-5" style={{ color: "var(--yunque-text-secondary)" }}>{item.detail}</div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {repackReport && (
+              <Button size="sm" variant="ghost" onPress={() => navigator.clipboard?.writeText(`package=${repackReport.package_path}\nsha256=${repackReport.sha256}`)}>
+                <Copy size={13} /> 复制新包信息
+              </Button>
+            )}
+            <Link href="/packs">
+              <Button size="sm" variant="ghost">
+                回能力包中心 <ArrowRight size={13} />
+              </Button>
+            </Link>
+          </div>
+        </Card>
+
         {manifest && analysis && (
           <>
             <Card id="yqpack-check" className="section-card p-4">
