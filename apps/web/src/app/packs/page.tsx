@@ -61,6 +61,12 @@ type SourceFilter = "all" | "installed" | "official" | "private";
 type StabilityFilter = "all" | "stable" | "beta" | "alpha";
 type ReadinessFilter = "all" | "complete" | "needs_context" | "needs_entry";
 type SortMode = "name" | "kind" | "risk" | "readiness" | "status";
+type ReadinessQueueItem = {
+  manifest: PackManifest;
+  sourceLabel: string;
+  packageUrl?: string;
+  sha256?: string;
+};
 
 const KIND_FILTER_LABELS: Record<KindFilter, string> = {
   all: "全部类型",
@@ -297,6 +303,43 @@ export default function PacksPageOptimized() {
     installed: packs.length,
     enabled: packs.filter((p) => p.status === "enabled").length,
   }), [packs, privateCatalogEntries.length, releaseEntries]);
+  const readinessQueue = useMemo<ReadinessQueueItem[]>(() => {
+    const seen = new Map<string, ReadinessQueueItem>();
+    for (const pack of packs) {
+      seen.set(pack.manifest.id, { manifest: pack.manifest, sourceLabel: pack.status === "enabled" ? "已安装 · 已启用" : "已安装" });
+    }
+    for (const entry of releaseEntries) {
+      if (!seen.has(entry.manifest.id)) {
+        seen.set(entry.manifest.id, {
+          manifest: entry.manifest,
+          sourceLabel: releaseSourceLabel(entry),
+          packageUrl: typeof entry.package_url === "string" ? entry.package_url : undefined,
+          sha256: typeof entry.sha256 === "string" ? entry.sha256 : undefined,
+        });
+      }
+    }
+    for (const entry of privateCatalogEntries) {
+      if (!seen.has(entry.manifest.id)) {
+        seen.set(entry.manifest.id, {
+          manifest: entry.manifest,
+          sourceLabel: privateSourceLabel(entry),
+          packageUrl: typeof entry.package_url === "string" ? entry.package_url : undefined,
+          sha256: typeof entry.sha256 === "string" ? entry.sha256 : undefined,
+        });
+      }
+    }
+    const order = { needs_entry: 0, needs_context: 1, complete: 2 } as const;
+    return [...seen.values()]
+      .filter((item) => packReadiness(item.manifest).missing.length > 0)
+      .sort((a, b) => {
+        const ra = packReadiness(a.manifest);
+        const rb = packReadiness(b.manifest);
+        return order[ra.level] - order[rb.level]
+          || rb.missing.length - ra.missing.length
+          || a.manifest.name.localeCompare(b.manifest.name);
+      })
+      .slice(0, 6);
+  }, [packs, releaseEntries, privateCatalogEntries]);
   const packKindStats = useMemo(() => {
     const manifests = new Map<string, PackManifest>();
     for (const pack of packs) manifests.set(pack.manifest.id, pack.manifest);
@@ -552,6 +595,49 @@ export default function PacksPageOptimized() {
             </div>
           </div>
         </div>
+
+        {readinessQueue.length > 0 && (
+          <div className="mt-4 rounded-lg border p-4" style={{ borderColor: "rgba(245,158,11,0.22)", background: "rgba(245,158,11,0.07)" }}>
+            <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>补肉优先队列</div>
+                <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
+                  按体检缺口自动挑出最需要小羽补用途、入口、示例或能力边界的能力包。
+                </div>
+              </div>
+              <Button size="sm" variant="outline" onPress={() => {
+                setReadinessFilter("needs_entry");
+                setSortMode("readiness");
+              }}>
+                只看需补入口
+              </Button>
+            </div>
+            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+              {readinessQueue.map((item) => {
+                const readiness = packReadiness(item.manifest);
+                return (
+                  <div key={item.manifest.id} className="rounded-md border p-3" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-surface)" }}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-medium" style={{ color: "var(--yunque-text)" }}>{item.manifest.name}</div>
+                        <div className="mt-1 truncate text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>{item.sourceLabel}</div>
+                      </div>
+                      <Chip size="sm" color={readiness.level === "needs_entry" ? "danger" : "warning"}>{readiness.label}</Chip>
+                    </div>
+                    <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
+                      还缺：{readiness.missing.join("、")}
+                    </div>
+                    <div className="mt-2">
+                      <Link href={packStudioHref(item.manifest, { packageUrl: item.packageUrl, sha256: item.sha256 })}>
+                        <Button size="sm" variant="ghost">交给小羽补齐 <Wrench size={14} /></Button>
+                      </Link>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         <div className="flex items-center gap-3 mt-4">
           <Link href="/packs/studio">

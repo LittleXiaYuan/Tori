@@ -120,6 +120,22 @@ const needsContextManifest = {
   },
 };
 
+const needsEntryManifest = {
+  ...filesManifest,
+  id: "yunque.pack.needs-entry",
+  name: "Needs Entry Pack",
+  backend: {
+    capabilities: [],
+    permissions: [],
+  },
+  frontend: {
+    menus: [],
+    routes: [],
+    assets: { type: "builtin" },
+  },
+  metadata: {},
+};
+
 const alphaManifest = {
   ...filesManifest,
   id: "yunque.pack.alpha",
@@ -292,25 +308,40 @@ describe("PacksPageOptimized", () => {
       packs: [
         { manifest: documentsManifest, status: "enabled", updatedAt: "2026-06-19T00:00:00Z" },
         { manifest: needsContextManifest, status: "disabled", updatedAt: "2026-06-19T00:00:00Z" },
+        { manifest: needsEntryManifest, status: "disabled", updatedAt: "2026-06-19T00:00:00Z" },
       ],
-      count: 2,
+      count: 3,
     });
 
     render(<PacksPageOptimized />);
 
-    expect(await screen.findByText("Needs Context Pack")).toBeInTheDocument();
+    expect((await screen.findAllByText("Needs Context Pack")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Needs Entry Pack").length).toBeGreaterThan(0);
     expect(screen.getByText("Documents (文档生成)")).toBeInTheDocument();
+    expect(screen.getByText("补肉优先队列")).toBeInTheDocument();
+    expect(screen.getByText("按体检缺口自动挑出最需要小羽补用途、入口、示例或能力边界的能力包。")).toBeInTheDocument();
+    expect(screen.getByText("还缺：使用示例、用户感知位置、打开/使用入口、后端能力声明")).toBeInTheDocument();
+    const queueStudioLink = screen.getAllByRole("link", { name: /交给小羽补齐/ })
+      .find((link) => link.getAttribute("href")?.includes("yunque.pack.needs-entry"));
+    expect(queueStudioLink).toHaveAttribute("href", expect.stringContaining("/packs/studio?"));
+
+    fireEvent.click(screen.getByRole("button", { name: "只看需补入口" }));
+
+    expect(screen.getAllByText("Needs Entry Pack").length).toBeGreaterThan(0);
+    expect(screen.getByText("体检：需补入口")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "清除体检" }));
 
     fireEvent.click(screen.getByRole("button", { name: "补说明" }));
 
-    expect(screen.getByText("Needs Context Pack")).toBeInTheDocument();
+    expect(screen.getAllByText("Needs Context Pack").length).toBeGreaterThan(0);
     expect(screen.queryByText("Documents (文档生成)")).not.toBeInTheDocument();
     expect(screen.getByText("体检：需补说明")).toBeInTheDocument();
     expect(screen.getByText("可用性体检：还缺 用户感知位置。可以交给小羽优化补齐用途、入口或使用说明。")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "清除体检" }));
 
-    expect(screen.getByText("Needs Context Pack")).toBeInTheDocument();
+    expect(screen.getAllByText("Needs Context Pack").length).toBeGreaterThan(0);
     expect(screen.getByText("Documents (文档生成)")).toBeInTheDocument();
   });
 
