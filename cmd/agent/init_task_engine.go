@@ -72,6 +72,7 @@ import (
 	retrievalpack "yunque-agent/internal/packs/retrieval"
 	reveriepack "yunque-agent/internal/packs/reverie"
 	schedulerpack "yunque-agent/internal/packs/scheduler"
+	sessionqueuepack "yunque-agent/internal/packs/sessionqueue"
 	skillhubpack "yunque-agent/internal/packs/skillhub"
 	skillspack "yunque-agent/internal/packs/skills"
 	speechpack "yunque-agent/internal/packs/speech"
@@ -215,6 +216,9 @@ func initTaskEngine(
 	// Scheduler pack — owns /v1/scheduler/* natively. The execution scheduler is
 	// provided by the gateway config and can be swapped in tests via SetScheduler.
 	_ = gw.RegisterModule(schedulerpack.NewProvider(gw.Scheduler))
+	// Session Queue pack — owns /v1/sessions/queue* natively through the shared
+	// queue manager.
+	_ = gw.RegisterModule(sessionqueuepack.New(gw))
 	// Forks pack — owns /v1/fork* natively. The fork tree/persister are wired by
 	// session auth init, so the pack resolves them lazily per request.
 	_ = gw.RegisterModule(forkspack.NewProvider(gw.ForkTree, gw.ForkPersister))

@@ -39,6 +39,7 @@ func TestDiscoverBuiltinPackManifestPaths(t *testing.T) {
 		"packs/official/reflection-pack/pack.json",
 		"packs/official/retrieval-pack/pack.json",
 		"packs/official/scheduler-pack/pack.json",
+		"packs/official/session-queue-pack/pack.json",
 		"packs/official/speech-pack/pack.json",
 		"packs/official/modules-pack/pack.json",
 		"packs/official/cogni-console-pack/pack.json",

@@ -571,6 +571,9 @@ func (g *Gateway) SetApprovalManager(m *approval.Manager) { g.approvalMgr = m }
 // SetQueueManager attaches the session task queue manager.
 func (g *Gateway) SetQueueManager(qm *session.QueueManager) { g.queueMgr = qm }
 
+// QueueManager exposes the session task queue manager to the session-queue pack.
+func (g *Gateway) QueueManager() *session.QueueManager { return g.queueMgr }
+
 // SetSSEBroker attaches the SSE event stream broker.
 func (g *Gateway) SetSSEBroker(b *SSEBroker) { g.sseBroker = b }
 

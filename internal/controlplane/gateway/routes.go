@@ -233,8 +233,8 @@ func (g *Gateway) registerSetupRoutes() {
 }
 
 func (g *Gateway) registerQueueRoutes() {
-	g.mux.HandleFunc("/v1/sessions/queue", g.requireAuth(g.handleSessionQueue))
-	g.mux.HandleFunc("/v1/sessions/queue/cancel", g.requireAuth(g.handleSessionQueueCancel))
+	// Session queue routes (/v1/sessions/queue*) are owned by the session-queue
+	// pack (internal/packs/sessionqueue), mounted via gw.RegisterModule.
 }
 
 func (g *Gateway) registerSSERoutes() {

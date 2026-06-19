@@ -163,6 +163,23 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 		t.Fatal("expected Scheduler add routeSpec")
 	}
 
+	sessionQueue, ok := registry.Get("yunque.pack.session-queue")
+	if !ok {
+		t.Fatal("expected Session Queue builtin pack to be installed")
+	}
+	if sessionQueue.Status != packruntime.PackStatusEnabled {
+		t.Fatalf("expected Session Queue default enabled, got %s", sessionQueue.Status)
+	}
+	if sessionQueue.Manifest.SDK.TypeScript != "yunque-client/session-queue" {
+		t.Fatalf("unexpected Session Queue SDK import: %s", sessionQueue.Manifest.SDK.TypeScript)
+	}
+	if !hasRouteSpec(sessionQueue.Manifest.Backend.RouteSpecs, "GET", "/v1/sessions/queue") {
+		t.Fatal("expected Session Queue list routeSpec")
+	}
+	if !hasRouteSpec(sessionQueue.Manifest.Backend.RouteSpecs, "POST", "/v1/sessions/queue/cancel") {
+		t.Fatal("expected Session Queue cancel routeSpec")
+	}
+
 	heartbeat, ok := registry.Get("yunque.pack.heartbeat")
 	if !ok {
 		t.Fatal("expected Heartbeat builtin pack to be installed")
@@ -560,7 +577,7 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 	// Count reflects the current packs/official/ set (incl. the newer
 	// console/control-plane/knowledge/memory/skills/work/workspace packs and the
 	// cognitive-layer/state packs). Adjust if the builtin pack set changes.
-	if got := len(registry.List()); got != 47 {
+	if got := len(registry.List()); got != 48 {
 		t.Fatalf("expected idempotent builtin install, got %d packs", got)
 	}
 }

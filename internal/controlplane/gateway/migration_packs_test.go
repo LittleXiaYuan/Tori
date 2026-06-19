@@ -42,6 +42,7 @@ import (
 	retrievalpack "yunque-agent/internal/packs/retrieval"
 	reveriepack "yunque-agent/internal/packs/reverie"
 	schedulerpack "yunque-agent/internal/packs/scheduler"
+	sessionqueuepack "yunque-agent/internal/packs/sessionqueue"
 	skillhubpack "yunque-agent/internal/packs/skillhub"
 	skillspack "yunque-agent/internal/packs/skills"
 	speechpack "yunque-agent/internal/packs/speech"
@@ -98,6 +99,7 @@ var migrationPackPaths = map[string][]string{
 	reflectionpack.PackID:    reflectionpack.Paths(),
 	retrievalpack.PackID:     retrievalpack.Paths(),
 	schedulerpack.PackID:     schedulerpack.Paths(),
+	sessionqueuepack.PackID:  sessionqueuepack.Paths(),
 	skillhubpack.PackID:      skillhubpack.Paths(),
 	speechpack.PackID:        speechpack.Paths(),
 	subagentspack.PackID:     subagentspack.Paths(),
@@ -143,6 +145,7 @@ var migrationPackNames = map[string]string{
 	reflectionpack.PackID:    "Reflection",
 	retrievalpack.PackID:     "Retrieval",
 	schedulerpack.PackID:     "Scheduler",
+	sessionqueuepack.PackID:  "Session Queue",
 	skillhubpack.PackID:      "SkillHub",
 	speechpack.PackID:        "Speech",
 	subagentspack.PackID:     "Subagents",
@@ -209,6 +212,7 @@ func registerMigrationPacks(gw *Gateway) {
 	_ = gw.RegisterModule(reflectionpack.New(gw))
 	_ = gw.RegisterModule(retrievalpack.New(gw))
 	_ = gw.RegisterModule(schedulerpack.NewProvider(gw.Scheduler))
+	_ = gw.RegisterModule(sessionqueuepack.New(gw))
 	_ = gw.RegisterModule(skillhubpack.New(gw))
 	_ = gw.RegisterModule(speechpack.New(gw))
 	_ = gw.RegisterModule(subagentspack.New(gw))
@@ -302,6 +306,8 @@ func newTestGatewayWithMigrationPack(t *testing.T, packID string, status packrun
 		_ = gw.RegisterModule(retrievalpack.New(gw))
 	case schedulerpack.PackID:
 		_ = gw.RegisterModule(schedulerpack.New(nil))
+	case sessionqueuepack.PackID:
+		_ = gw.RegisterModule(sessionqueuepack.New(gw))
 	case skillhubpack.PackID:
 		_ = gw.RegisterModule(skillhubpack.New(nil))
 	case speechpack.PackID:
@@ -347,6 +353,7 @@ func TestMigrationPackRouteGating(t *testing.T) {
 		{"reflection", reflectionpack.PackID, "/v1/reflect/experiences"},
 		{"retrieval", retrievalpack.PackID, "/v1/search/providers"},
 		{"scheduler", schedulerpack.PackID, "/v1/scheduler/jobs"},
+		{"session-queue", sessionqueuepack.PackID, "/v1/sessions/queue"},
 		{"skillhub", skillhubpack.PackID, "/api/skillhub/search"},
 		{"speech", speechpack.PackID, "/v1/speech/voices"},
 		{"subagents", subagentspack.PackID, "/v1/subagent"},
