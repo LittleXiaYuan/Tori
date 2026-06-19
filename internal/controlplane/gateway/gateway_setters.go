@@ -149,6 +149,30 @@ func (g *Gateway) RequireAdmin(next http.HandlerFunc) http.HandlerFunc {
 	return g.requireAdmin(next)
 }
 
+func (g *Gateway) HandlePlannerCheckpoints(w http.ResponseWriter, r *http.Request) {
+	g.handlePlannerCheckpoints(w, r)
+}
+
+func (g *Gateway) HandlePlannerExecutionState(w http.ResponseWriter, r *http.Request) {
+	g.handlePlannerExecutionState(w, r)
+}
+
+func (g *Gateway) HandlePlannerCheckpointRecover(w http.ResponseWriter, r *http.Request) {
+	g.handlePlannerCheckpointRecover(w, r)
+}
+
+func (g *Gateway) HandlePlannerCheckpointResumeTask(w http.ResponseWriter, r *http.Request) {
+	g.handlePlannerCheckpointResumeTask(w, r)
+}
+
+func (g *Gateway) HandlePlannerCheckpointResumePlan(w http.ResponseWriter, r *http.Request) {
+	g.handlePlannerCheckpointResumePlan(w, r)
+}
+
+func (g *Gateway) HandlePlannerCheckpointResumePlanJob(w http.ResponseWriter, r *http.Request) {
+	g.handlePlannerCheckpointResumePlanJob(w, r)
+}
+
 // SetHeartbeat attaches a heartbeat service.
 func (g *Gateway) SetHeartbeat(hb *heartbeat.Service) { g.heartbeat = hb }
 

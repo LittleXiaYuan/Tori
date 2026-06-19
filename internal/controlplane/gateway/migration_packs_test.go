@@ -38,6 +38,7 @@ import (
 	notificationspack "yunque-agent/internal/packs/notifications"
 	orchestratorpack "yunque-agent/internal/packs/orchestrator"
 	personapack "yunque-agent/internal/packs/persona"
+	plannerrecoverypack "yunque-agent/internal/packs/plannerrecovery"
 	rbacpack "yunque-agent/internal/packs/rbac"
 	reflectionpack "yunque-agent/internal/packs/reflection"
 	retrievalpack "yunque-agent/internal/packs/retrieval"
@@ -83,29 +84,30 @@ var migrationPackPaths = map[string][]string{
 	},
 	// control-plane is an always-on core pack; its owned route set grows per
 	// migration slice, so derive it from the package to avoid drift.
-	channelspack.PackID:      channelspack.Paths(),
-	connectorspack.PackID:    connectorspack.Paths(),
-	controlplanepack.PackID:  controlplanepack.Paths,
-	costpack.PackID:          costpack.Paths(),
-	federationpack.PackID:    federationpack.Paths(),
-	forkspack.PackID:         forkspack.Paths(),
-	heartbeatpack.PackID:     heartbeatpack.Paths(),
-	identitypack.PackID:      identitypack.Paths(),
-	marketpack.PackID:        marketpack.Paths(),
-	mcpdispatchpack.PackID:   mcpdispatchpack.Paths(),
-	modulespack.PackID:       modulespack.Paths(),
-	notificationspack.PackID: notificationspack.Paths(),
-	orchestratorpack.PackID:  orchestratorpack.Paths(),
-	personapack.PackID:       personapack.Paths(),
-	rbacpack.PackID:          rbacpack.Paths(),
-	reflectionpack.PackID:    reflectionpack.Paths(),
-	retrievalpack.PackID:     retrievalpack.Paths(),
-	schedulerpack.PackID:     schedulerpack.Paths(),
-	sessionqueuepack.PackID:  sessionqueuepack.Paths(),
-	skillhubpack.PackID:      skillhubpack.Paths(),
-	speechpack.PackID:        speechpack.Paths(),
-	subagentspack.PackID:     subagentspack.Paths(),
-	tracepack.PackID:         tracepack.Paths(),
+	channelspack.PackID:        channelspack.Paths(),
+	connectorspack.PackID:      connectorspack.Paths(),
+	controlplanepack.PackID:    controlplanepack.Paths,
+	costpack.PackID:            costpack.Paths(),
+	federationpack.PackID:      federationpack.Paths(),
+	forkspack.PackID:           forkspack.Paths(),
+	heartbeatpack.PackID:       heartbeatpack.Paths(),
+	identitypack.PackID:        identitypack.Paths(),
+	marketpack.PackID:          marketpack.Paths(),
+	mcpdispatchpack.PackID:     mcpdispatchpack.Paths(),
+	modulespack.PackID:         modulespack.Paths(),
+	notificationspack.PackID:   notificationspack.Paths(),
+	orchestratorpack.PackID:    orchestratorpack.Paths(),
+	personapack.PackID:         personapack.Paths(),
+	plannerrecoverypack.PackID: plannerrecoverypack.Paths(),
+	rbacpack.PackID:            rbacpack.Paths(),
+	reflectionpack.PackID:      reflectionpack.Paths(),
+	retrievalpack.PackID:       retrievalpack.Paths(),
+	schedulerpack.PackID:       schedulerpack.Paths(),
+	sessionqueuepack.PackID:    sessionqueuepack.Paths(),
+	skillhubpack.PackID:        skillhubpack.Paths(),
+	speechpack.PackID:          speechpack.Paths(),
+	subagentspack.PackID:       subagentspack.Paths(),
+	tracepack.PackID:           tracepack.Paths(),
 	// Monolith route groups extracted into native packs (Tier 0 microkernel).
 	modespack.PackID: {"/v1/persona/modes", "/v1/persona/mode", "/v1/persona/mode/current"},
 	reveriepack.PackID: {
@@ -126,41 +128,42 @@ var migrationPackPaths = map[string][]string{
 }
 
 var migrationPackNames = map[string]string{
-	knowledgepack.PackID:     "Knowledge",
-	memorypack.PackID:        "Memory",
-	skillspack.PackID:        "Skills",
-	workpack.PackID:          "Work",
-	channelspack.PackID:      "Channels",
-	connectorspack.PackID:    "Connectors",
-	controlplanepack.PackID:  "Control Plane",
-	costpack.PackID:          "Cost",
-	federationpack.PackID:    "Federation",
-	forkspack.PackID:         "Forks",
-	heartbeatpack.PackID:     "Heartbeat",
-	identitypack.PackID:      "Identity",
-	marketpack.PackID:        "Skill Market",
-	mcpdispatchpack.PackID:   "MCP Dispatch",
-	modulespack.PackID:       "Runtime Modules",
-	notificationspack.PackID: "Notifications",
-	orchestratorpack.PackID:  "IDE Work Orchestrator",
-	personapack.PackID:       "Persona",
-	rbacpack.PackID:          "RBAC",
-	reflectionpack.PackID:    "Reflection",
-	retrievalpack.PackID:     "Retrieval",
-	schedulerpack.PackID:     "Scheduler",
-	sessionqueuepack.PackID:  "Session Queue",
-	skillhubpack.PackID:      "SkillHub",
-	speechpack.PackID:        "Speech",
-	subagentspack.PackID:     "Subagents",
-	tracepack.PackID:         "Trace",
-	modespack.PackID:         "Persona Modes",
-	reveriepack.PackID:       "Reverie",
-	idepack.PackID:           "IDE",
-	cronpack.PackID:          "Cron",
-	triggerspack.PackID:      "Triggers",
-	documentspack.PackID:     "Documents",
-	missionspack.PackID:      "Missions",
-	statepack.PackID:         "State Kernel",
+	knowledgepack.PackID:       "Knowledge",
+	memorypack.PackID:          "Memory",
+	skillspack.PackID:          "Skills",
+	workpack.PackID:            "Work",
+	channelspack.PackID:        "Channels",
+	connectorspack.PackID:      "Connectors",
+	controlplanepack.PackID:    "Control Plane",
+	costpack.PackID:            "Cost",
+	federationpack.PackID:      "Federation",
+	forkspack.PackID:           "Forks",
+	heartbeatpack.PackID:       "Heartbeat",
+	identitypack.PackID:        "Identity",
+	marketpack.PackID:          "Skill Market",
+	mcpdispatchpack.PackID:     "MCP Dispatch",
+	modulespack.PackID:         "Runtime Modules",
+	notificationspack.PackID:   "Notifications",
+	orchestratorpack.PackID:    "IDE Work Orchestrator",
+	personapack.PackID:         "Persona",
+	plannerrecoverypack.PackID: "Planner Recovery",
+	rbacpack.PackID:            "RBAC",
+	reflectionpack.PackID:      "Reflection",
+	retrievalpack.PackID:       "Retrieval",
+	schedulerpack.PackID:       "Scheduler",
+	sessionqueuepack.PackID:    "Session Queue",
+	skillhubpack.PackID:        "SkillHub",
+	speechpack.PackID:          "Speech",
+	subagentspack.PackID:       "Subagents",
+	tracepack.PackID:           "Trace",
+	modespack.PackID:           "Persona Modes",
+	reveriepack.PackID:         "Reverie",
+	idepack.PackID:             "IDE",
+	cronpack.PackID:            "Cron",
+	triggerspack.PackID:        "Triggers",
+	documentspack.PackID:       "Documents",
+	missionspack.PackID:        "Missions",
+	statepack.PackID:           "State Kernel",
 }
 
 // newMigrationPackRegistry returns a registry with the migrated core packs
@@ -212,6 +215,7 @@ func registerMigrationPacks(gw *Gateway) {
 	_ = gw.RegisterModule(notificationspack.NewProvider(gw.Notifier))
 	_ = gw.RegisterModule(orchestratorpack.New(gw))
 	_ = gw.RegisterModule(personapack.New(gw))
+	_ = gw.RegisterModule(plannerrecoverypack.New(gw))
 	_ = gw.RegisterModule(rbacpack.New(gw))
 	_ = gw.RegisterModule(reflectionpack.New(gw))
 	_ = gw.RegisterModule(retrievalpack.New(gw))
@@ -304,6 +308,8 @@ func newTestGatewayWithMigrationPack(t *testing.T, packID string, status packrun
 		_ = gw.RegisterModule(orchestratorpack.New(gw))
 	case personapack.PackID:
 		_ = gw.RegisterModule(personapack.New(gw))
+	case plannerrecoverypack.PackID:
+		_ = gw.RegisterModule(plannerrecoverypack.New(gw))
 	case rbacpack.PackID:
 		_ = gw.RegisterModule(rbacpack.New(gw))
 	case reflectionpack.PackID:
@@ -356,6 +362,7 @@ func TestMigrationPackRouteGating(t *testing.T) {
 		{"notifications", notificationspack.PackID, "/api/notify/channels"},
 		{"orchestrator", orchestratorpack.PackID, "/v1/orchestrator/status"},
 		{"persona", personapack.PackID, "/v1/persona"},
+		{"planner-recovery", plannerrecoverypack.PackID, "/v1/planner/checkpoints"},
 		{"rbac", rbacpack.PackID, "/v1/rbac/my-roles"},
 		{"reflection", reflectionpack.PackID, "/v1/reflect/experiences"},
 		{"retrieval", retrievalpack.PackID, "/v1/search/providers"},

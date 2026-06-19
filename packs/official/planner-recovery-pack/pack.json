@@ -1,0 +1,80 @@
+{
+  "id": "yunque.pack.planner-recovery",
+  "name": "Planner Recovery (任务恢复)",
+  "version": "0.1.0",
+  "description": "任务与规划恢复能力：查看可恢复现场、生成恢复方案、创建恢复任务、直接续跑规划并查询异步续跑状态。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": [
+      "planner_recovery.read",
+      "planner_recovery.plan",
+      "planner_recovery.resume"
+    ],
+    "routes": [
+      "/v1/planner/checkpoints",
+      "/v1/planner/execution-state",
+      "/v1/planner/checkpoints/recover",
+      "/v1/planner/checkpoints/resume",
+      "/v1/planner/checkpoints/resume-plan",
+      "/v1/planner/checkpoints/resume-plan/jobs"
+    ],
+    "permissions": [
+      "planner_recovery:read",
+      "planner_recovery:write"
+    ],
+    "routeSpecs": [
+      {
+        "method": "GET",
+        "path": "/v1/planner/checkpoints",
+        "description": "List recoverable planner checkpoints."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/planner/execution-state",
+        "description": "Read a normalized planner recovery scene."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/planner/checkpoints/recover",
+        "description": "Build a recovery prompt and recovery plan from a checkpoint."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/planner/checkpoints/resume",
+        "description": "Create a task from a planner checkpoint recovery plan."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/planner/checkpoints/resume-plan",
+        "description": "Resume a planner checkpoint directly through the planner DAG runner."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/planner/checkpoints/resume-plan/jobs",
+        "description": "Read async planner resume job status."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [],
+    "assets": {
+      "type": "builtin"
+    }
+  },
+  "sdk": {
+    "typescript": "yunque-client/planner-recovery"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "group": "work",
+    "phase": "A3",
+    "preload": "true",
+    "note": "Owns planner checkpoint and resume-plan routes through Pack Runtime. Business logic still delegates through narrow gateway handlers while the recovery service is carved out."
+  },
+  "status": "beta"
+}

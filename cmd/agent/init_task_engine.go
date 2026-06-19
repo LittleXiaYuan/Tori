@@ -68,6 +68,7 @@ import (
 	notificationspack "yunque-agent/internal/packs/notifications"
 	orchestratorpack "yunque-agent/internal/packs/orchestrator"
 	personapack "yunque-agent/internal/packs/persona"
+	plannerrecoverypack "yunque-agent/internal/packs/plannerrecovery"
 	rbacpack "yunque-agent/internal/packs/rbac"
 	reflectionpack "yunque-agent/internal/packs/reflection"
 	retrievalpack "yunque-agent/internal/packs/retrieval"
@@ -197,6 +198,9 @@ func initTaskEngine(
 	// Work pack — owns the task (/v1/tasks/*) + project (/v1/projects/*)
 	// surfaces natively. Workflows remain in the workflowapi sub-package.
 	_ = gw.RegisterModule(workpack.NewHandler(gw))
+	// Planner Recovery pack — owns checkpoint listing, execution-state hydration
+	// and resume-plan routes through Pack Runtime enablement.
+	_ = gw.RegisterModule(plannerrecoverypack.New(gw))
 	// Reflection pack — owns /v1/reflect/* natively, keeping experience capture
 	// and strategy compilation Pack-gated while sharing the canonical loop.
 	_ = gw.RegisterModule(reflectionpack.New(gw))

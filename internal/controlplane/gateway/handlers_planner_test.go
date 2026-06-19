@@ -37,7 +37,7 @@ func (s plannerGatewayTestSkill) Execute(ctx context.Context, args map[string]an
 }
 
 func TestPlannerCheckpointsRequiresAuth(t *testing.T) {
-	gw, _ := newTestGateway()
+	gw, _ := newTestGatewayMigrationEnabled()
 	req := httptest.NewRequest(http.MethodGet, "/v1/planner/checkpoints", nil)
 	w := httptest.NewRecorder()
 
@@ -49,7 +49,7 @@ func TestPlannerCheckpointsRequiresAuth(t *testing.T) {
 }
 
 func TestPlannerCheckpointsListCompactByDefault(t *testing.T) {
-	gw, tm := newTestGateway()
+	gw, tm := newTestGatewayMigrationEnabled()
 	tenant := tm.Register("planner-checkpoints")
 	store := planner.NewFileLongHorizonCheckpointStore(filepath.Join(t.TempDir(), "checkpoints.jsonl"))
 	gw.planner.SetLongHorizonCheckpointStore(store)
@@ -121,7 +121,7 @@ func TestPlannerCheckpointsListCompactByDefault(t *testing.T) {
 }
 
 func TestPlannerCheckpointsAreScopedToTenant(t *testing.T) {
-	gw, tm := newTestGateway()
+	gw, tm := newTestGatewayMigrationEnabled()
 	owner := tm.Register("planner-checkpoints-owner")
 	other := tm.Register("planner-checkpoints-other")
 	third := tm.Register("planner-checkpoints-third")
@@ -181,7 +181,7 @@ func TestPlannerCheckpointsAreScopedToTenant(t *testing.T) {
 }
 
 func TestPlannerCheckpointsCanIncludeSnapshot(t *testing.T) {
-	gw, tm := newTestGateway()
+	gw, tm := newTestGatewayMigrationEnabled()
 	tenant := tm.Register("planner-checkpoint-detail")
 	store := planner.NewFileLongHorizonCheckpointStore(filepath.Join(t.TempDir(), "checkpoints.jsonl"))
 	gw.planner.SetLongHorizonCheckpointStore(store)
@@ -223,7 +223,7 @@ func TestPlannerCheckpointsCanIncludeSnapshot(t *testing.T) {
 }
 
 func TestPlannerCheckpointsCanFilterByPlanID(t *testing.T) {
-	gw, tm := newTestGateway()
+	gw, tm := newTestGatewayMigrationEnabled()
 	tenant := tm.Register("planner-checkpoint-filter")
 	store := planner.NewFileLongHorizonCheckpointStore(filepath.Join(t.TempDir(), "checkpoints.jsonl"))
 	gw.planner.SetLongHorizonCheckpointStore(store)
@@ -286,7 +286,7 @@ func TestPlannerCheckpointsCanFilterByPlanID(t *testing.T) {
 }
 
 func TestPlannerCheckpointKnownErrorsAreDisplayedFriendly(t *testing.T) {
-	gw, tm := newTestGateway()
+	gw, tm := newTestGatewayMigrationEnabled()
 	tenant := tm.Register("planner-checkpoint-friendly-error")
 	store := planner.NewFileLongHorizonCheckpointStore(filepath.Join(t.TempDir(), "checkpoints.jsonl"))
 	gw.planner.SetLongHorizonCheckpointStore(store)
@@ -351,7 +351,7 @@ func TestPlannerCheckpointKnownErrorsAreDisplayedFriendly(t *testing.T) {
 }
 
 func TestPlannerCheckpointKnownDiagnosticsInCompletedResultAreDisplayedFriendly(t *testing.T) {
-	gw, tm := newTestGateway()
+	gw, tm := newTestGatewayMigrationEnabled()
 	tenant := tm.Register("planner-checkpoint-friendly-result")
 	store := planner.NewFileLongHorizonCheckpointStore(filepath.Join(t.TempDir(), "checkpoints.jsonl"))
 	gw.planner.SetLongHorizonCheckpointStore(store)
@@ -437,7 +437,7 @@ func TestPlannerKnownFriendlyErrorCoversToolExecutionFailures(t *testing.T) {
 }
 
 func TestPlannerCheckpointRecoverBuildsBackendPrompt(t *testing.T) {
-	gw, tm := newTestGateway()
+	gw, tm := newTestGatewayMigrationEnabled()
 	tenant := tm.Register("planner-checkpoint-recover")
 	store := planner.NewFileLongHorizonCheckpointStore(filepath.Join(t.TempDir(), "checkpoints.jsonl"))
 	gw.planner.SetLongHorizonCheckpointStore(store)
@@ -514,7 +514,7 @@ func TestNormalizeCheckpointActionAcceptsUiAliases(t *testing.T) {
 }
 
 func TestPlannerCheckpointRecoverValidatesRequest(t *testing.T) {
-	gw, tm := newTestGateway()
+	gw, tm := newTestGatewayMigrationEnabled()
 	tenant := tm.Register("planner-checkpoint-recover-validation")
 	store := planner.NewFileLongHorizonCheckpointStore(filepath.Join(t.TempDir(), "checkpoints.jsonl"))
 	gw.planner.SetLongHorizonCheckpointStore(store)
@@ -545,7 +545,7 @@ func TestPlannerCheckpointRecoverValidatesRequest(t *testing.T) {
 }
 
 func TestPlannerCheckpointResumeTaskCreatesSelectedTaskSteps(t *testing.T) {
-	gw, tm := newTestGateway()
+	gw, tm := newTestGatewayMigrationEnabled()
 	tenant := tm.Register("planner-checkpoint-resume-task")
 	store := planner.NewFileLongHorizonCheckpointStore(filepath.Join(t.TempDir(), "checkpoints.jsonl"))
 	gw.planner.SetLongHorizonCheckpointStore(store)
@@ -630,7 +630,7 @@ func TestPlannerCheckpointResumeTaskCreatesSelectedTaskSteps(t *testing.T) {
 }
 
 func TestPlannerCheckpointResumeTaskRejectsUnsafeDependencies(t *testing.T) {
-	gw, tm := newTestGateway()
+	gw, tm := newTestGatewayMigrationEnabled()
 	tenant := tm.Register("planner-checkpoint-resume-block")
 	store := planner.NewFileLongHorizonCheckpointStore(filepath.Join(t.TempDir(), "checkpoints.jsonl"))
 	gw.planner.SetLongHorizonCheckpointStore(store)
@@ -667,7 +667,7 @@ func TestPlannerCheckpointResumeTaskRejectsUnsafeDependencies(t *testing.T) {
 }
 
 func TestPlannerCheckpointResumePlanRunsDAGWithoutRerunningCompleted(t *testing.T) {
-	gw, tm := newTestGateway()
+	gw, tm := newTestGatewayMigrationEnabled()
 	tenant := tm.Register("planner-checkpoint-resume-plan")
 	store := planner.NewFileLongHorizonCheckpointStore(filepath.Join(t.TempDir(), "checkpoints.jsonl"))
 	gw.planner = planner.NewPlanner(nil, gw.registry, 8)
@@ -725,7 +725,7 @@ func TestPlannerCheckpointResumePlanRunsDAGWithoutRerunningCompleted(t *testing.
 }
 
 func TestPlannerCheckpointResumePlanPartialReturnsCompletedAttachmentEvidence(t *testing.T) {
-	gw, tm := newTestGateway()
+	gw, tm := newTestGatewayMigrationEnabled()
 	tenant := tm.Register("planner-checkpoint-resume-plan-partial-attachment")
 	store := planner.NewFileLongHorizonCheckpointStore(filepath.Join(t.TempDir(), "checkpoints.jsonl"))
 	gw.planner = planner.NewPlanner(nil, gw.registry, 8)
@@ -788,7 +788,7 @@ func TestPlannerCheckpointResumePlanPartialReturnsCompletedAttachmentEvidence(t 
 }
 
 func TestPlannerCheckpointResumePlanPartialAsyncJobCompletesWithEvidence(t *testing.T) {
-	gw, tm := newTestGateway()
+	gw, tm := newTestGatewayMigrationEnabled()
 	tenant := tm.Register("planner-checkpoint-resume-plan-partial-async")
 	store := planner.NewFileLongHorizonCheckpointStore(filepath.Join(t.TempDir(), "checkpoints.jsonl"))
 	gw.planner = planner.NewPlanner(nil, gw.registry, 8)
@@ -860,7 +860,7 @@ func TestPlannerCheckpointResumePlanPartialAsyncJobCompletesWithEvidence(t *test
 }
 
 func TestPlannerCheckpointResumePlanSyncFailureReturnsFriendlyAdvice(t *testing.T) {
-	gw, tm := newTestGateway()
+	gw, tm := newTestGatewayMigrationEnabled()
 	tenant := tm.Register("planner-checkpoint-resume-plan-sync-failed")
 	store := planner.NewFileLongHorizonCheckpointStore(filepath.Join(t.TempDir(), "checkpoints.jsonl"))
 	mock := mockLLMServer("[]")
@@ -915,7 +915,7 @@ func TestPlannerCheckpointResumePlanSyncFailureReturnsFriendlyAdvice(t *testing.
 }
 
 func TestPlannerCheckpointResumePlanAsyncJobCanBePolled(t *testing.T) {
-	gw, tm := newTestGateway()
+	gw, tm := newTestGatewayMigrationEnabled()
 	tenant := tm.Register("planner-checkpoint-resume-plan-async")
 	store := planner.NewFileLongHorizonCheckpointStore(filepath.Join(t.TempDir(), "checkpoints.jsonl"))
 	gw.planner = planner.NewPlanner(nil, gw.registry, 8)
@@ -985,7 +985,7 @@ func TestPlannerCheckpointResumePlanAsyncJobCanBePolled(t *testing.T) {
 }
 
 func TestPlannerCheckpointResumePlanAsyncDeduplicatesRunningJob(t *testing.T) {
-	gw, tm := newTestGateway()
+	gw, tm := newTestGatewayMigrationEnabled()
 	tenant := tm.Register("planner-checkpoint-resume-plan-async-dedup")
 	store := planner.NewFileLongHorizonCheckpointStore(filepath.Join(t.TempDir(), "checkpoints.jsonl"))
 	gw.planner = planner.NewPlanner(nil, gw.registry, 8)
@@ -1071,7 +1071,7 @@ func TestPlannerCheckpointResumePlanAsyncDeduplicatesRunningJob(t *testing.T) {
 }
 
 func TestPlannerCheckpointResumePlanAsyncJobReturnsFriendlyFailureAdvice(t *testing.T) {
-	gw, tm := newTestGateway()
+	gw, tm := newTestGatewayMigrationEnabled()
 	tenant := tm.Register("planner-checkpoint-resume-plan-async-failed")
 	store := planner.NewFileLongHorizonCheckpointStore(filepath.Join(t.TempDir(), "checkpoints.jsonl"))
 	mock := mockLLMServer("[]")
@@ -1156,7 +1156,7 @@ func TestPlannerCheckpointResumePlanAsyncJobReturnsFriendlyFailureAdvice(t *test
 }
 
 func TestPlannerResumePlanJobEndpointSanitizesStoredRawFailure(t *testing.T) {
-	gw, tm := newTestGateway()
+	gw, tm := newTestGatewayMigrationEnabled()
 	tenant := tm.Register("planner-resume-job-sanitized")
 	raw := `handoff agent "file_exec" execution failed: planner fc step 1: all fallback LLM clients failed (FC): chat with tools: Post "https://api.moonshot.ai/v1/chat/completions": EOF; context deadline exceeded`
 	gw.savePlannerResumeJob(plannerCheckpointResumePlanJob{
@@ -1200,7 +1200,7 @@ func TestPlannerResumePlanJobEndpointSanitizesStoredRawFailure(t *testing.T) {
 }
 
 func TestPlannerResumePlanJobEndpointScopesJobsToTenant(t *testing.T) {
-	gw, tm := newTestGateway()
+	gw, tm := newTestGatewayMigrationEnabled()
 	owner := tm.Register("planner-resume-job-owner")
 	other := tm.Register("planner-resume-job-other")
 	gw.savePlannerResumeJob(plannerCheckpointResumePlanJob{
@@ -1234,7 +1234,7 @@ func TestPlannerResumePlanJobEndpointScopesJobsToTenant(t *testing.T) {
 }
 
 func TestPlannerResumePlanEventBroadcastCarriesTenant(t *testing.T) {
-	gw, _ := newTestGateway()
+	gw, _ := newTestGatewayMigrationEnabled()
 	broker := NewSSEBroker()
 	gw.SetSSEBroker(broker)
 	_, ch, cleanup := broker.Subscribe()
@@ -1395,7 +1395,7 @@ func TestPlannerResumePlanJobPersistsAcrossGatewayInstances(t *testing.T) {
 }
 
 func TestPlannerResumePlanJobCanBeResolvedByPlanID(t *testing.T) {
-	gw, tm := newTestGateway()
+	gw, tm := newTestGatewayMigrationEnabled()
 	tenant := tm.Register("planner-resume-job-by-plan")
 	gw.savePlannerResumeJob(plannerCheckpointResumePlanJob{
 		ID:        "resume-plan-old",
@@ -1430,7 +1430,7 @@ func TestPlannerResumePlanJobCanBeResolvedByPlanID(t *testing.T) {
 }
 
 func TestPlannerExecutionStateUnifiesCheckpointLatestJobAndFailureSummary(t *testing.T) {
-	gw, tm := newTestGateway()
+	gw, tm := newTestGatewayMigrationEnabled()
 	tenant := tm.Register("planner-execution-state")
 	store := planner.NewFileLongHorizonCheckpointStore(filepath.Join(t.TempDir(), "checkpoints.jsonl"))
 	gw.planner = planner.NewPlanner(nil, gw.registry, 8)
@@ -1512,7 +1512,7 @@ func TestPlannerExecutionStateUnifiesCheckpointLatestJobAndFailureSummary(t *tes
 }
 
 func TestPlannerExecutionStateRecoveryPromptKeepsParsedAttachmentEvidence(t *testing.T) {
-	gw, tm := newTestGateway()
+	gw, tm := newTestGatewayMigrationEnabled()
 	tenant := tm.Register("planner-execution-state-attachment")
 	store := planner.NewFileLongHorizonCheckpointStore(filepath.Join(t.TempDir(), "checkpoints.jsonl"))
 	gw.planner = planner.NewPlanner(nil, gw.registry, 8)
@@ -1593,7 +1593,7 @@ func TestPlannerExecutionStateRecoveryPromptKeepsParsedAttachmentEvidence(t *tes
 }
 
 func TestPlannerExecutionStateHidesRawCompletedResultDiagnostics(t *testing.T) {
-	gw, tm := newTestGateway()
+	gw, tm := newTestGatewayMigrationEnabled()
 	tenant := tm.Register("planner-execution-state-friendly-result")
 	store := planner.NewFileLongHorizonCheckpointStore(filepath.Join(t.TempDir(), "checkpoints.jsonl"))
 	gw.planner = planner.NewPlanner(nil, gw.registry, 8)
@@ -1669,7 +1669,7 @@ func TestPlannerExecutionStateHidesRawCompletedResultDiagnostics(t *testing.T) {
 }
 
 func TestPlannerExecutionStateIncludesCogniSummaryFromEventTrail(t *testing.T) {
-	gw, tm := newTestGateway()
+	gw, tm := newTestGatewayMigrationEnabled()
 	tenant := tm.Register("planner-execution-state-cogni")
 	store := planner.NewFileLongHorizonCheckpointStore(filepath.Join(t.TempDir(), "checkpoints.jsonl"))
 	gw.planner = planner.NewPlanner(nil, gw.registry, 8)

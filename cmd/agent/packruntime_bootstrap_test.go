@@ -590,11 +590,28 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 		t.Fatal("expected RBAC assign routeSpec")
 	}
 
+	plannerRecoveryPack, ok := registry.Get("yunque.pack.planner-recovery")
+	if !ok {
+		t.Fatal("expected Planner Recovery builtin pack to be installed")
+	}
+	if plannerRecoveryPack.Status != packruntime.PackStatusEnabled {
+		t.Fatalf("expected Planner Recovery default enabled, got %s", plannerRecoveryPack.Status)
+	}
+	if plannerRecoveryPack.Manifest.SDK.TypeScript != "yunque-client/planner-recovery" {
+		t.Fatalf("unexpected Planner Recovery SDK import: %s", plannerRecoveryPack.Manifest.SDK.TypeScript)
+	}
+	if !hasRouteSpec(plannerRecoveryPack.Manifest.Backend.RouteSpecs, "GET", "/v1/planner/checkpoints") {
+		t.Fatal("expected Planner Recovery checkpoints routeSpec")
+	}
+	if !hasRouteSpec(plannerRecoveryPack.Manifest.Backend.RouteSpecs, "POST", "/v1/planner/checkpoints/resume-plan") {
+		t.Fatal("expected Planner Recovery resume-plan routeSpec")
+	}
+
 	ensureBuiltinPacks(registry)
 	// Count reflects the current packs/official/ set (incl. the newer
 	// console/control-plane/knowledge/memory/skills/work/workspace packs and the
 	// cognitive-layer/state packs). Adjust if the builtin pack set changes.
-	if got := len(registry.List()); got != 49 {
+	if got := len(registry.List()); got != 50 {
 		t.Fatalf("expected idempotent builtin install, got %d packs", got)
 	}
 }
