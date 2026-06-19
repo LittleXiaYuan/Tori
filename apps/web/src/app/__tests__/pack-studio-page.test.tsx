@@ -319,6 +319,7 @@ describe("PackStudioPage", () => {
     expect(screen.getByText("当前能力包：WASM 能力包")).toBeInTheDocument();
     expect(screen.getByText("已带 yqpack 来源")).toBeInTheDocument();
     expect(screen.getByText("先在这里做只读检查、工作区、diff、审计和重新打包；完成后回详情确认权限，或回能力包中心刷新入口与状态。")).toBeInTheDocument();
+    expect(screen.getByText("当前阶段：只读检查 · 下一步：填写路径/URL 后点击只读检查。小羽只生成计划和草稿，不会自动应用改动。")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /查看详情/ })).toHaveAttribute("href", "/packs/detail?id=yunque.pack.wasm-plugin");
     expect(screen.getByRole("link", { name: /打开能力入口/ })).toHaveAttribute("href", "/packs/wasm-plugin");
     expect(screen.getByText("改包流程导轨")).toBeInTheDocument();

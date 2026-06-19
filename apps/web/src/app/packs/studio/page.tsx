@@ -1452,6 +1452,9 @@ export default function PackStudioPage() {
                 <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
                   先在这里做只读检查、工作区、diff、审计和重新打包；完成后回详情确认权限，或回能力包中心刷新入口与状态。
                 </div>
+                <div className="mt-2 rounded-md border px-3 py-2 text-xs" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-bg-hover)", color: "var(--yunque-text-secondary)" }}>
+                  当前阶段：{currentWorkflowStep?.title || "等待开始"} · 下一步：{currentWorkflowStep?.action || "先选择能力包"}。小羽只生成计划和草稿，不会自动应用改动。
+                </div>
                 <div className="mt-2 text-[11px] font-mono break-all" style={{ color: "var(--yunque-text-muted)" }}>
                   {manifest.id}
                 </div>
