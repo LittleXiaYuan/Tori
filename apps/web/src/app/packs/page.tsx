@@ -24,6 +24,7 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   Store,
+  Wrench,
 } from "lucide-react";
 import PageHeader from "@/components/page-header";
 import { showToast } from "@/components/toast-provider";
@@ -426,6 +427,11 @@ export default function PacksPageOptimized() {
         </div>
 
         <div className="flex items-center gap-3 mt-4">
+          <Link href="/packs/studio">
+            <Button size="sm" variant="outline">
+              <Wrench size={14} /> Pack Studio
+            </Button>
+          </Link>
           <Button size="sm" variant="ghost" onPress={() => setShowAdvanced(!showAdvanced)}>
             {showAdvanced ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
             {showAdvanced ? "隐藏" : "显示"}技术详情

@@ -145,6 +145,7 @@ describe("PacksPageOptimized", () => {
     expect(await screen.findByText("Documents (文档生成)")).toBeInTheDocument();
     expect(screen.getByText("Files (产物文件)")).toBeInTheDocument();
     expect(screen.getByText("能力包不是都要单独打开")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Pack Studio/ })).toHaveAttribute("href", "/packs/studio");
     expect(screen.getByText("可直接使用")).toBeInTheDocument();
     expect(screen.getByText("基础能力")).toBeInTheDocument();
     expect(screen.getByText("实验中")).toBeInTheDocument();
