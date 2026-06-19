@@ -516,6 +516,16 @@ describe("PackStudioPage", () => {
     expect(screen.getByText(/工作区或原始 SHA 与当前工作区不一致/)).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "填入文件" })[0]).toBeDisabled();
 
+    fireEvent.change(screen.getByLabelText("导入 Patch Draft JSON"), {
+      target: { value: draftRequestPrompt },
+    });
+    expect(screen.getByText("这是 Patch Draft Request，还不是可导入 Draft")).toBeInTheDocument();
+    expect(screen.getByText("Request 工作区匹配")).toBeInTheDocument();
+    expect(screen.getByText(/生成出的 yunque\.pack_studio\.patch_draft\.v1 才能载入 diff 预览/)).toBeInTheDocument();
+    expect(screen.getByText(/starter [\d,]+ chars/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /交给 Chat 生成 Draft/ })).toHaveAttribute("href", expect.stringContaining("/chat?q="));
+    expect(screen.queryByText("未识别到 yunque.pack_studio.patch_draft.v1。Patch Draft 必须包含 file_path 和 content。")).not.toBeInTheDocument();
+
     const patchDraft = {
       kind: "yunque.pack_studio.patch_draft.v1",
       pack: {

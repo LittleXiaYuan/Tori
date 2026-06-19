@@ -32,6 +32,7 @@ import {
 } from "@/lib/pack-presentation";
 import {
   packStudioWorkspaceMatches,
+  parsePackStudioPatchDraftRequestPrompt,
   parsePackStudioPatchDraftPrompt,
   parsePackStudioPatchPlanPrompt,
 } from "@/lib/pack-studio-chat";
@@ -705,12 +706,19 @@ export default function PackStudioPage() {
     () => parsePackStudioPatchDraftPrompt(importedPatchDraftText),
     [importedPatchDraftText],
   );
+  const importedPatchDraftRequest = useMemo(
+    () => parsePackStudioPatchDraftRequestPrompt(importedPatchDraftText),
+    [importedPatchDraftText],
+  );
   const importedPatchPlanMatchesWorkspace = useMemo(() => {
     return packStudioWorkspaceMatches(importedPatchPlan?.workspace, workspaceReport);
   }, [importedPatchPlan, workspaceReport]);
   const importedPatchDraftMatchesWorkspace = useMemo(() => {
     return packStudioWorkspaceMatches(importedPatchDraft?.workspace, workspaceReport);
   }, [importedPatchDraft, workspaceReport]);
+  const importedPatchDraftRequestMatchesWorkspace = useMemo(() => {
+    return packStudioWorkspaceMatches(importedPatchDraftRequest?.workspace, workspaceReport);
+  }, [importedPatchDraftRequest, workspaceReport]);
   const workflowSteps = useMemo<StudioWorkflowStep[]>(() => {
     const hasDraftQueue = draftCandidates.length > 0;
     const hasPreparedDraft = Boolean(patchContent.trim())
@@ -1535,9 +1543,49 @@ export default function PackStudioPage() {
                         >
                           <Label>Patch Draft JSON 或 Chat 消息</Label>
                         </TextArea>
-                        {importedPatchDraftText.trim() && !importedPatchDraft && (
+                        {importedPatchDraftText.trim() && !importedPatchDraft && !importedPatchDraftRequest && (
                           <div className="mt-2 rounded px-2 py-1 text-[11px]" style={{ background: "rgba(248,113,113,0.08)", color: "var(--yunque-danger)" }}>
                             未识别到 yunque.pack_studio.patch_draft.v1。Patch Draft 必须包含 file_path 和 content。
+                          </div>
+                        )}
+                        {!importedPatchDraft && importedPatchDraftRequest && (
+                          <div className="mt-3 rounded-md border p-2" style={{ borderColor: "rgba(245,158,11,0.35)", background: "rgba(245,158,11,0.08)" }}>
+                            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                              <div>
+                                <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>这是 Patch Draft Request，还不是可导入 Draft</div>
+                                <div className="mt-1 text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
+                                  Request 只告诉小羽要生成什么文件；生成出的 {importedPatchDraftRequest.expectedKind || "yunque.pack_studio.patch_draft.v1"} 才能载入 diff 预览。
+                                </div>
+                              </div>
+                              <Chip size="sm" color={importedPatchDraftRequestMatchesWorkspace ? "success" : "warning"}>
+                                {importedPatchDraftRequestMatchesWorkspace ? "Request 工作区匹配" : "Request 待确认"}
+                              </Chip>
+                            </div>
+                            {!importedPatchDraftRequestMatchesWorkspace && (
+                              <div className="mb-2 rounded px-2 py-1 text-[11px]" style={{ background: "rgba(245,158,11,0.12)", color: "var(--yunque-warning)" }}>
+                                这个 Request 的工作区或原始 SHA 与当前工作区不一致。请先确认你正在处理同一个 yqpack。
+                              </div>
+                            )}
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="min-w-0">
+                                <div className="truncate font-mono text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>{importedPatchDraftRequest.target.filePath}</div>
+                                <div className="mt-1 flex flex-wrap gap-1">
+                                  {importedPatchDraftRequest.target.riskLevel && <Chip size="sm" variant="soft">风险：{importedPatchDraftRequest.target.riskLevel}</Chip>}
+                                  <Chip size="sm" variant="soft">starter {importedPatchDraftRequest.starterContentLength.toLocaleString()} chars</Chip>
+                                  {importedPatchDraftRequest.target.gates.map((gate) => (
+                                    <Chip key={`draft-request-import:${gate}`} size="sm" variant="soft">{gate}</Chip>
+                                  ))}
+                                </div>
+                              </div>
+                              <Link href={`/chat?q=${encodeURIComponent(importedPatchDraftText)}`}>
+                                <Button size="sm" className="btn-accent">
+                                  <ArrowRight size={13} /> 交给 Chat 生成 Draft
+                                </Button>
+                              </Link>
+                            </div>
+                            {importedPatchDraftRequest.target.reason && (
+                              <div className="mt-2 text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>原因：{importedPatchDraftRequest.target.reason}</div>
+                            )}
                           </div>
                         )}
                         {importedPatchDraft && (
