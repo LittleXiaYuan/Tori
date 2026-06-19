@@ -44,6 +44,7 @@ type fakeDependencyProvider struct {
 	sentinel    *cogni.Sentinel
 	dir         string
 	genesis     *cogni.Genesis
+	evolution   *cogni.EvolutionEngine
 }
 
 func (p fakeDependencyProvider) CogniBus() *cogni.CogniBus { return p.bus }
@@ -67,6 +68,8 @@ func (p fakeDependencyProvider) CogniSentinel() *cogni.Sentinel { return p.senti
 func (p fakeDependencyProvider) CogniDirectory() string { return p.dir }
 
 func (p fakeDependencyProvider) CogniGenesis() *cogni.Genesis { return p.genesis }
+
+func (p fakeDependencyProvider) CogniEvolution() *cogni.EvolutionEngine { return p.evolution }
 
 func (fakeRuntimeReporter) CogniKernelRuntimeState() RuntimeStateReport {
 	return RuntimeStateReport{
@@ -201,7 +204,7 @@ func TestCogniKernelRouterOwnsRuntimeStateBeforeAPIDelegation(t *testing.T) {
 		t.Fatalf("runtime pack-state should not delegate to API adapter, called=%d", api.called)
 	}
 
-	req = httptest.NewRequest(http.MethodPost, SubResourceRoute+"reviewer/evolve", nil)
+	req = httptest.NewRequest(http.MethodPost, SubResourceRoute+"reviewer/expose", nil)
 	w = httptest.NewRecorder()
 	router.ServeCogniKernel(w, req)
 	if w.Code != http.StatusNoContent || api.called != 1 {
@@ -552,6 +555,95 @@ func TestCogniKernelRouterGenerateValidation(t *testing.T) {
 	router.ServeCogniKernel(w, req)
 	if w.Code != http.StatusInternalServerError {
 		t.Fatalf("missing genesis status=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestCogniKernelRouterOwnsEvolution(t *testing.T) {
+	api := &fakeCogniAPI{}
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	evolution := cogni.NewEvolutionEngine(cogni.DefaultEvolutionConfig(), "")
+	evolution.SetBenchFunc(func(ctx context.Context, cogniID string) (*cogni.BenchResult, error) {
+		if cogniID != "reviewer" {
+			t.Fatalf("unexpected cogni id: %s", cogniID)
+		}
+		select {
+		case <-entered:
+		default:
+			close(entered)
+		}
+		<-release
+		return &cogni.BenchResult{
+			Score:    1,
+			Total:    1,
+			Passed:   1,
+			Failures: nil,
+		}, nil
+	})
+	evolution.SetAnalyzeFunc(func(ctx context.Context, failures []cogni.TaskFailure) ([]cogni.SkillMutation, error) {
+		return nil, nil
+	})
+	router := NewRouterWithDeps(api, fakeRuntimeReporter{}, Dependencies{
+		EvolutionProvider: fakeDependencyProvider{evolution: evolution},
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/cognis/reviewer/evolve", nil)
+	w := httptest.NewRecorder()
+	router.ServeCogniKernel(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("evolve status=%d body=%s", w.Code, w.Body.String())
+	}
+	<-entered
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/cognis/reviewer/evolution", nil)
+	w = httptest.NewRecorder()
+	router.ServeCogniKernel(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("evolution by id status=%d body=%s", w.Code, w.Body.String())
+	}
+	var byID map[string]any
+	if err := json.NewDecoder(w.Body).Decode(&byID); err != nil {
+		t.Fatalf("decode by id: %v", err)
+	}
+	if byID["id"] != "reviewer" || byID["running"] != true {
+		t.Fatalf("unexpected evolution by id: %#v", byID)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/cognis/evolution", nil)
+	w = httptest.NewRecorder()
+	router.ServeCogniKernel(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("evolution list status=%d body=%s", w.Code, w.Body.String())
+	}
+	close(release)
+
+	if api.called != 0 {
+		t.Fatalf("evolution routes should not delegate to API adapter, called=%d", api.called)
+	}
+}
+
+func TestCogniKernelRouterEvolutionMissingDeps(t *testing.T) {
+	router := NewRouter(&fakeCogniAPI{}, fakeRuntimeReporter{})
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/cognis/evolution", nil)
+	w := httptest.NewRecorder()
+	router.ServeCogniKernel(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("missing evolution list status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/cognis/reviewer/evolution", nil)
+	w = httptest.NewRecorder()
+	router.ServeCogniKernel(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("missing evolution by id status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/cognis/reviewer/evolve", nil)
+	w = httptest.NewRecorder()
+	router.ServeCogniKernel(w, req)
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("missing evolve status=%d body=%s", w.Code, w.Body.String())
 	}
 }
 
@@ -1080,7 +1172,7 @@ func TestCogniKernelRouterRouteDecisionRequiresBus(t *testing.T) {
 func TestCogniKernelRouterReportsMissingAPIAdapter(t *testing.T) {
 	router := NewRouter(nil, fakeRuntimeReporter{})
 
-	req := httptest.NewRequest(http.MethodPost, SubResourceRoute+"reviewer/evolve", nil)
+	req := httptest.NewRequest(http.MethodPost, SubResourceRoute+"reviewer/expose", nil)
 	w := httptest.NewRecorder()
 	router.ServeCogniKernel(w, req)
 	if w.Code != http.StatusServiceUnavailable {

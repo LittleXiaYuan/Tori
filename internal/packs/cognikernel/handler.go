@@ -82,6 +82,10 @@ type GenesisProvider interface {
 	CogniGenesis() *cogni.Genesis
 }
 
+type EvolutionProvider interface {
+	CogniEvolution() *cogni.EvolutionEngine
+}
+
 type Dependencies struct {
 	BusProvider         BusProvider
 	FederationProvider  FederationProvider
@@ -93,6 +97,7 @@ type Dependencies struct {
 	SentinelProvider    SentinelProvider
 	DirectoryProvider   DirectoryProvider
 	GenesisProvider     GenesisProvider
+	EvolutionProvider   EvolutionProvider
 }
 
 type RuntimeStateReport struct {
@@ -187,6 +192,7 @@ type Router struct {
 	sentinelProvider   SentinelProvider
 	directoryProvider  DirectoryProvider
 	genesisProvider    GenesisProvider
+	evolutionProvider  EvolutionProvider
 }
 
 func NewRouter(api API, reporter RuntimeStateReporter) *Router {
@@ -212,6 +218,7 @@ func NewRouterWithDeps(api API, reporter RuntimeStateReporter, deps Dependencies
 		sentinelProvider:   deps.SentinelProvider,
 		directoryProvider:  deps.DirectoryProvider,
 		genesisProvider:    deps.GenesisProvider,
+		evolutionProvider:  deps.EvolutionProvider,
 	}
 }
 
@@ -232,6 +239,7 @@ func (r *Router) Routes() []packruntime.BackendRoute {
 		{Methods: []string{http.MethodGet, http.MethodPost}, Path: "/v1/cognis/export", Handler: r.HandleExportBundle},
 		{Methods: []string{http.MethodPost}, Path: "/v1/cognis/import", Handler: r.HandleImportBundle},
 		{Methods: []string{http.MethodPost}, Path: "/v1/cognis/generate", Handler: r.HandleGenerate},
+		{Methods: []string{http.MethodGet}, Path: "/v1/cognis/evolution", Handler: r.HandleEvolutionList},
 		{Methods: []string{http.MethodPost}, Path: RouteDecisionRoute, Handler: r.HandleRouteDecision},
 		{Methods: []string{http.MethodGet}, Path: RuntimePackStateRoute, Handler: r.HandleRuntimePackState},
 	}
@@ -297,6 +305,10 @@ func (r *Router) serveRegistry(w http.ResponseWriter, req *http.Request) bool {
 		r.HandleGenerate(w, req)
 		return true
 	}
+	if path == "evolution" {
+		r.HandleEvolutionList(w, req)
+		return true
+	}
 
 	segs := strings.Split(path, "/")
 	if len(segs) == 1 {
@@ -313,6 +325,12 @@ func (r *Router) serveRegistry(w http.ResponseWriter, req *http.Request) bool {
 			return true
 		case "disable":
 			r.HandleSetEnabled(w, req, segs[0], false)
+			return true
+		case "evolve":
+			r.HandleEvolve(w, req, segs[0])
+			return true
+		case "evolution":
+			r.HandleEvolutionByID(w, req, segs[0])
 			return true
 		}
 	}
@@ -589,6 +607,66 @@ func (r *Router) saveGeneratedDeclaration(decl *cogni.Declaration) error {
 		return cogni.SaveDeclaration(decl, filepath.Join(dir, decl.ID+".json"))
 	}
 	return nil
+}
+
+func (r *Router) HandleEvolve(w http.ResponseWriter, req *http.Request, id string) {
+	if req.Method != http.MethodPost {
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "POST only")
+		return
+	}
+	evolution := r.cogniEvolution()
+	if evolution == nil {
+		apperror.WriteCode(w, apperror.CodeInternal, "evolution engine not configured")
+		return
+	}
+	if evolution.IsRunning(id) {
+		apperror.WriteCode(w, apperror.CodeBadRequest, "evolution already running for "+id)
+		return
+	}
+
+	go func() {
+		experiments, err := evolution.Run(context.Background(), id)
+		if err != nil {
+			slog.Error("evolution failed", "cogni", id, "err", err)
+			return
+		}
+		slog.Info("evolution complete", "cogni", id, "experiments", len(experiments))
+	}()
+
+	writeJSON(w, map[string]any{
+		"status": "started",
+		"id":     id,
+	})
+}
+
+func (r *Router) HandleEvolutionByID(w http.ResponseWriter, req *http.Request, id string) {
+	if req.Method != http.MethodGet {
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET only")
+		return
+	}
+	evolution := r.cogniEvolution()
+	if evolution == nil {
+		writeJSON(w, map[string]any{"experiments": []any{}, "running": false})
+		return
+	}
+	writeJSON(w, map[string]any{
+		"id":          id,
+		"experiments": evolution.Experiments(id),
+		"running":     evolution.IsRunning(id),
+	})
+}
+
+func (r *Router) HandleEvolutionList(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET only")
+		return
+	}
+	evolution := r.cogniEvolution()
+	if evolution == nil {
+		writeJSON(w, map[string]any{"experiments": map[string]any{}})
+		return
+	}
+	writeJSON(w, map[string]any{"experiments": evolution.AllExperiments()})
 }
 
 func (r *Router) HandleFederationStatus(w http.ResponseWriter, req *http.Request) {
@@ -1179,6 +1257,13 @@ func (r *Router) cogniGenesis() *cogni.Genesis {
 	return r.genesisProvider.CogniGenesis()
 }
 
+func (r *Router) cogniEvolution() *cogni.EvolutionEngine {
+	if r == nil || r.evolutionProvider == nil {
+		return nil
+	}
+	return r.evolutionProvider.CogniEvolution()
+}
+
 func (r *Router) cogniFederation() *cogni.CogniFederation {
 	if r == nil || r.federationProvider == nil {
 		return nil
@@ -1252,6 +1337,7 @@ func delegatedRouteSpecs() []delegatedRouteSpec {
 			"/v1/cognis/export",
 			"/v1/cognis/import",
 			"/v1/cognis/generate",
+			"/v1/cognis/evolution",
 			RouteDecisionRoute,
 			RuntimePackStateRoute:
 			continue
@@ -1302,6 +1388,9 @@ func inferDependencies(api API) Dependencies {
 	if inferred, ok := api.(GenesisProvider); ok {
 		deps.GenesisProvider = inferred
 	}
+	if inferred, ok := api.(EvolutionProvider); ok {
+		deps.EvolutionProvider = inferred
+	}
 	return deps
 }
 
@@ -1335,6 +1424,9 @@ func mergeDependencies(primary, fallback Dependencies) Dependencies {
 	}
 	if primary.GenesisProvider == nil {
 		primary.GenesisProvider = fallback.GenesisProvider
+	}
+	if primary.EvolutionProvider == nil {
+		primary.EvolutionProvider = fallback.EvolutionProvider
 	}
 	return primary
 }

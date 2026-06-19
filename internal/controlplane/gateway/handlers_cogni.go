@@ -53,7 +53,7 @@ func (g *Gateway) handleCognis(w http.ResponseWriter, r *http.Request) {
 	case path == "import":
 		apperror.WriteCode(w, apperror.CodeNotFound, "cogni import is owned by cogni-kernel pack")
 	case path == "evolution":
-		g.cogniEvolutionList(w, r)
+		apperror.WriteCode(w, apperror.CodeNotFound, "cogni evolution is owned by cogni-kernel pack")
 	default:
 		segs := strings.SplitN(path, "/", 3)
 		id := segs[0]
@@ -65,9 +65,9 @@ func (g *Gateway) handleCognis(w http.ResponseWriter, r *http.Request) {
 		case len(segs) == 2 && segs[1] == "disable":
 			apperror.WriteCode(w, apperror.CodeNotFound, "cogni disable route is owned by cogni-kernel pack")
 		case len(segs) == 2 && segs[1] == "evolve":
-			g.cogniEvolve(w, r, id)
+			apperror.WriteCode(w, apperror.CodeNotFound, "cogni evolve route is owned by cogni-kernel pack")
 		case len(segs) == 2 && segs[1] == "evolution":
-			g.cogniEvolutionByID(w, r, id)
+			apperror.WriteCode(w, apperror.CodeNotFound, "cogni evolution route is owned by cogni-kernel pack")
 		case len(segs) == 2 && segs[1] == "expose":
 			g.cogniFederationExpose(w, r, id, true)
 		case len(segs) == 2 && segs[1] == "unexpose":
