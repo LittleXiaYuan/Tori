@@ -128,6 +128,7 @@
     "usability": "experimental",
     "primaryActionLabel": "查看异常报告",
     "primaryActionPath": "/packs/skill-anomaly",
+    "usageSurface": "Skill 异常页、技能行为画像、异常检测报告与审批队列计划",
     "limitation": "当前主要做本地事件对比和异常报告，不会自动禁用技能或修改策略。"
   },
   "status": "alpha"

@@ -133,6 +133,7 @@
     "usability": "experimental",
     "primaryActionLabel": "查看 Canary 面板",
     "primaryActionPath": "/packs/cognitive-canary",
+    "usageSurface": "Cognitive Canary 面板、认知场景评估、灰度放行报告与回滚证据",
     "limitation": "当前主要运行本地确定性评估和计划生成，不会自动镜像真实流量、调用线上 Judge、发布指标或回滚版本。"
   },
   "status": "alpha"

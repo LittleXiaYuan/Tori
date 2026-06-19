@@ -133,6 +133,7 @@
     "usability": "experimental",
     "primaryActionLabel": "查看演练面板",
     "primaryActionPath": "/packs/chaos-probe",
+    "usageSurface": "Chaos Probe 面板、安全演练报告、降级治理计划与证据导出",
     "limitation": "当前主要用于安全演练和治理计划，调度、指标写回、告警写回仍是计划/本地记录，不会直接改动生产降级状态。"
   },
   "status": "alpha"

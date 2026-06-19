@@ -235,6 +235,7 @@
     "usability": "experimental",
     "primaryActionLabel": "查看记忆快照",
     "primaryActionPath": "/packs/memory-time-travel",
+    "usageSurface": "Memory Time Travel 页、记忆快照列表、diff/回滚计划与审计证据",
     "limitation": "当前主要用于快照、diff、回滚计划和 pack-local 记录；原生 Ledger kv_history 深度联动仍在接入中。"
   },
   "status": "alpha"

@@ -191,6 +191,7 @@
     "usability": "experimental",
     "primaryActionLabel": "查看 WASM 插件",
     "primaryActionPath": "/packs/wasm-plugin",
+    "usageSurface": "WASM 插件页、插件清单、沙箱执行结果、远程安装审批与证据导出",
     "limitation": "当前远程安装和真实运行时 host 仍受严格门禁；多数安装链路先生成计划或写 pack-local 记录。"
   },
   "status": "alpha"

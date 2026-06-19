@@ -56,6 +56,7 @@
     "usability": "experimental",
     "primaryActionLabel": "打开沙箱界面",
     "primaryActionPath": "/packs/dlc-demo",
+    "usageSurface": "DLC 演示页、iframe 沙箱界面、postMessage bridge 调试与 WASM 参考包验证",
     "limitation": "这是 DLC/iframe/WASM 的参考包，用于验证热插拔界面和 bridge 权限，不是业务功能。",
     "descriptionStyle": "one-line-plus-three-examples",
     "example1": "在沙箱 iframe 中加载自带前端，握手后自适应高度。",

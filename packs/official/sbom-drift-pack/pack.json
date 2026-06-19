@@ -137,6 +137,7 @@
     "usability": "experimental",
     "primaryActionLabel": "查看 SBOM 漂移",
     "primaryActionPath": "/packs/sbom-drift",
+    "usageSurface": "SBOM 漂移页、依赖快照、drift diff、CycloneDX 导出与 CI gate 计划",
     "limitation": "当前主要做本地 SBOM 快照、diff 和证据导出，不会自动修改依赖或提交修复。"
   },
   "status": "alpha"

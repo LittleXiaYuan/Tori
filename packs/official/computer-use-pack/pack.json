@@ -81,6 +81,7 @@
     "usability": "experimental",
     "primaryActionLabel": "查看电脑使用计划",
     "primaryActionPath": "/packs/computer-use",
+    "usageSurface": "电脑使用页、Chat 电脑使用计划、浏览器截图证据与人工审批提示",
     "limitation": "当前只生成电脑使用计划、权限门禁和浏览器截图证据，不执行本机桌面控制。",
     "descriptionStyle": "one-line-plus-three-examples",
     "example1": "检查浏览器、云桌面、本机桌面的可用状态。",

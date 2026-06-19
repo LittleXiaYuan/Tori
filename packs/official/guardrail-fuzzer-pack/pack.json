@@ -126,6 +126,7 @@
     "usability": "experimental",
     "primaryActionLabel": "查看 Fuzzer 面板",
     "primaryActionPath": "/packs/guardrail-fuzzer",
+    "usageSurface": "Guardrail Fuzzer 面板、绕过测试报告、CI gate 计划与安全证据导出",
     "limitation": "当前主要运行本地 mutation 探针和计划生成，不会自动写入生产规则、触发 CI fuzz 或发布告警。"
   },
   "status": "alpha"
