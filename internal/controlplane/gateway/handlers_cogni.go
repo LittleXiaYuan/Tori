@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"yunque-agent/internal/apperror"
@@ -52,18 +51,6 @@ func (g *Gateway) handleCognis(w http.ResponseWriter, r *http.Request) {
 		g.cogniKernelRuntimeState(w, r)
 	case path == "reload":
 		g.cogniReload(w, r)
-	case path == "traces":
-		g.cogniTracesAll(w, r)
-	case path == "stats":
-		g.cogniTraceStats(w, r)
-	case path == "health":
-		g.cogniHealthAll(w, r)
-	case path == "alerts":
-		g.cogniAlerts(w, r)
-	case path == "alerts/scan":
-		g.cogniAlertsScan(w, r)
-	case path == "verify":
-		g.cogniVerifyAll(w, r)
 	case path == "generate":
 		g.cogniGenerate(w, r)
 	case path == "export":
@@ -82,12 +69,6 @@ func (g *Gateway) handleCognis(w http.ResponseWriter, r *http.Request) {
 			g.cogniSetEnabled(w, r, id, true)
 		case len(segs) == 2 && segs[1] == "disable":
 			g.cogniSetEnabled(w, r, id, false)
-		case len(segs) == 2 && segs[1] == "trace":
-			g.cogniTracesByID(w, r, id)
-		case len(segs) == 2 && segs[1] == "health":
-			g.cogniHealthByID(w, r, id)
-		case len(segs) == 2 && segs[1] == "verify":
-			g.cogniVerifyByID(w, r, id)
 		case len(segs) == 2 && segs[1] == "evolve":
 			g.cogniEvolve(w, r, id)
 		case len(segs) == 2 && segs[1] == "evolution":
@@ -108,52 +89,6 @@ func (g *Gateway) handleCognis(w http.ResponseWriter, r *http.Request) {
 // are extracted behind a standalone Cogni service in later reversible steps.
 func (g *Gateway) ServeCogniKernel(w http.ResponseWriter, r *http.Request) {
 	g.handleCognis(w, r)
-}
-
-func (g *Gateway) cogniHealthAll(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET only")
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	if g.cogniTraces == nil {
-		json.NewEncoder(w).Encode(map[string]any{"health": []any{}, "count": 0})
-		return
-	}
-	mon := cogni.NewMonitor(g.cogniTraces)
-	out := mon.ComputeAll(traceLimit(r))
-	json.NewEncoder(w).Encode(map[string]any{
-		"health": out,
-		"count":  len(out),
-	})
-}
-
-func (g *Gateway) cogniAlerts(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET only")
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	if g.cogniSentinel == nil {
-		json.NewEncoder(w).Encode(map[string]any{"alerts": []any{}, "count": 0})
-		return
-	}
-	alerts := g.cogniSentinel.Alerts()
-	json.NewEncoder(w).Encode(map[string]any{"alerts": alerts, "count": len(alerts)})
-}
-
-func (g *Gateway) cogniAlertsScan(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "POST only")
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	if g.cogniSentinel == nil {
-		apperror.WriteCode(w, apperror.CodeInternal, "cogni sentinel not configured")
-		return
-	}
-	alerts := g.cogniSentinel.Scan()
-	json.NewEncoder(w).Encode(map[string]any{"alerts": alerts, "count": len(alerts)})
 }
 
 func (g *Gateway) cogniExportBundle(w http.ResponseWriter, r *http.Request) {
@@ -244,132 +179,6 @@ func (g *Gateway) cogniImportBundle(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(summary)
-}
-
-func (g *Gateway) cogniVerifyAll(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost && r.Method != http.MethodGet {
-		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET or POST")
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	if g.cogniRegistry == nil {
-		json.NewEncoder(w).Encode(map[string]any{"results": map[string]any{}, "failures": []any{}})
-		return
-	}
-	results := g.cogniRegistry.VerifyAll()
-	json.NewEncoder(w).Encode(map[string]any{
-		"results":  results,
-		"failures": cogni.FailedChecks(results),
-	})
-}
-
-func (g *Gateway) cogniVerifyByID(w http.ResponseWriter, r *http.Request, id string) {
-	if r.Method != http.MethodPost && r.Method != http.MethodGet {
-		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET or POST")
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	if g.cogniRegistry == nil {
-		apperror.WriteCode(w, apperror.CodeInternal, "cogni registry not configured")
-		return
-	}
-	decl, ok := g.cogniRegistry.Get(id)
-	if !ok {
-		apperror.WriteCode(w, apperror.CodeNotFound, "cogni not found: "+id)
-		return
-	}
-	results := cogni.VerifyDeclaration(decl, nil)
-	passed, failed := 0, 0
-	for _, r := range results {
-		if r.Passed {
-			passed++
-		} else if r.Reason != "no assertion configured (ignored)" {
-			failed++
-		}
-	}
-	json.NewEncoder(w).Encode(map[string]any{
-		"id":      id,
-		"results": results,
-		"passed":  passed,
-		"failed":  failed,
-	})
-}
-
-func (g *Gateway) cogniHealthByID(w http.ResponseWriter, r *http.Request, id string) {
-	if r.Method != http.MethodGet {
-		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET only")
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	if g.cogniTraces == nil {
-		json.NewEncoder(w).Encode(cogni.HealthMetrics{ID: id, Status: "idle"})
-		return
-	}
-	json.NewEncoder(w).Encode(cogni.NewMonitor(g.cogniTraces).ComputeFor(id, traceLimit(r)))
-}
-
-func (g *Gateway) cogniTracesAll(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET only")
-		return
-	}
-	limit := traceLimit(r)
-	w.Header().Set("Content-Type", "application/json")
-	if g.cogniTraces == nil {
-		json.NewEncoder(w).Encode(map[string]any{"traces": []any{}, "count": 0})
-		return
-	}
-	traces := g.cogniTraces.Recent(limit)
-	json.NewEncoder(w).Encode(map[string]any{
-		"traces": traces,
-		"count":  len(traces),
-	})
-}
-
-func (g *Gateway) cogniTracesByID(w http.ResponseWriter, r *http.Request, id string) {
-	if r.Method != http.MethodGet {
-		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET only")
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	if g.cogniTraces == nil {
-		json.NewEncoder(w).Encode(map[string]any{"traces": []any{}, "count": 0})
-		return
-	}
-	limit := traceLimit(r)
-	traces := g.cogniTraces.ByCogni(id, limit)
-	json.NewEncoder(w).Encode(map[string]any{
-		"id":     id,
-		"traces": traces,
-		"count":  len(traces),
-	})
-}
-
-func (g *Gateway) cogniTraceStats(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET only")
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	if g.cogniTraces == nil {
-		json.NewEncoder(w).Encode(cogni.TraceStats{})
-		return
-	}
-	json.NewEncoder(w).Encode(g.cogniTraces.Stats())
-}
-
-// traceLimit reads ?limit=N (defaults to 50, capped at 500).
-func traceLimit(r *http.Request) int {
-	limit := 50
-	if raw := r.URL.Query().Get("limit"); raw != "" {
-		if n, err := strconv.Atoi(raw); err == nil && n > 0 {
-			limit = n
-		}
-	}
-	if limit > 500 {
-		limit = 500
-	}
-	return limit
 }
 
 func (g *Gateway) cogniCollection(w http.ResponseWriter, r *http.Request) {

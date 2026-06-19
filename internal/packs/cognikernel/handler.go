@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -62,6 +63,14 @@ type WorkflowEngineProvider interface {
 	CogniWorkflowEngine() *cogni.WorkflowEngine
 }
 
+type TraceStoreProvider interface {
+	CogniTraceStore() cogni.TraceStore
+}
+
+type SentinelProvider interface {
+	CogniSentinel() *cogni.Sentinel
+}
+
 type Dependencies struct {
 	BusProvider         BusProvider
 	FederationProvider  FederationProvider
@@ -69,6 +78,8 @@ type Dependencies struct {
 	ExperienceProvider  ExperienceProvider
 	RegistryProvider    RegistryProvider
 	WorkflowProvider    WorkflowEngineProvider
+	TraceStoreProvider  TraceStoreProvider
+	SentinelProvider    SentinelProvider
 }
 
 type RuntimeStateReport struct {
@@ -159,6 +170,8 @@ type Router struct {
 	experienceProvider ExperienceProvider
 	registryProvider   RegistryProvider
 	workflowProvider   WorkflowEngineProvider
+	traceProvider      TraceStoreProvider
+	sentinelProvider   SentinelProvider
 }
 
 func NewRouter(api API, reporter RuntimeStateReporter) *Router {
@@ -180,6 +193,8 @@ func NewRouterWithDeps(api API, reporter RuntimeStateReporter, deps Dependencies
 		experienceProvider: deps.ExperienceProvider,
 		registryProvider:   deps.RegistryProvider,
 		workflowProvider:   deps.WorkflowProvider,
+		traceProvider:      deps.TraceStoreProvider,
+		sentinelProvider:   deps.SentinelProvider,
 	}
 }
 
@@ -191,6 +206,12 @@ func (r *Router) Routes() []packruntime.BackendRoute {
 		{Methods: []string{http.MethodGet, http.MethodPost}, Path: FederationPeersRoute, Handler: r.HandleFederationPeers},
 		{Methods: []string{http.MethodPost}, Path: FederationDiscoverRoute, Handler: r.HandleFederationDiscover},
 		{Methods: []string{http.MethodGet}, Path: EconomicsRoute, Handler: r.HandleEconomics},
+		{Methods: []string{http.MethodGet}, Path: "/v1/cognis/traces", Handler: r.HandleTracesAll},
+		{Methods: []string{http.MethodGet}, Path: "/v1/cognis/stats", Handler: r.HandleTraceStats},
+		{Methods: []string{http.MethodGet}, Path: "/v1/cognis/health", Handler: r.HandleHealthAll},
+		{Methods: []string{http.MethodGet}, Path: "/v1/cognis/alerts", Handler: r.HandleAlerts},
+		{Methods: []string{http.MethodPost}, Path: "/v1/cognis/alerts/scan", Handler: r.HandleAlertsScan},
+		{Methods: []string{http.MethodGet, http.MethodPost}, Path: "/v1/cognis/verify", Handler: r.HandleVerifyAll},
 		{Methods: []string{http.MethodPost}, Path: RouteDecisionRoute, Handler: r.HandleRouteDecision},
 		{Methods: []string{http.MethodGet}, Path: RuntimePackStateRoute, Handler: r.HandleRuntimePackState},
 	}
@@ -215,6 +236,9 @@ func (r *Router) ServeCogniKernel(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	if r.serveWorkflow(w, req) {
+		return
+	}
+	if r.serveObservability(w, req) {
 		return
 	}
 	if r == nil || r.api == nil {
@@ -299,6 +323,161 @@ func (r *Router) HandleEconomics(w http.ResponseWriter, req *http.Request) {
 	writeJSON(w, map[string]any{
 		"enabled": true,
 		"summary": tracker.DailySummary(),
+	})
+}
+
+func (r *Router) HandleHealthAll(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET only")
+		return
+	}
+	traces := r.cogniTraceStore()
+	if traces == nil {
+		writeJSON(w, map[string]any{"health": []any{}, "count": 0})
+		return
+	}
+	out := cogni.NewMonitor(traces).ComputeAll(traceLimit(req))
+	writeJSON(w, map[string]any{
+		"health": out,
+		"count":  len(out),
+	})
+}
+
+func (r *Router) HandleHealthByID(w http.ResponseWriter, req *http.Request, id string) {
+	if req.Method != http.MethodGet {
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET only")
+		return
+	}
+	traces := r.cogniTraceStore()
+	if traces == nil {
+		writeJSON(w, cogni.HealthMetrics{ID: id, Status: "idle"})
+		return
+	}
+	writeJSON(w, cogni.NewMonitor(traces).ComputeFor(id, traceLimit(req)))
+}
+
+func (r *Router) HandleTracesAll(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET only")
+		return
+	}
+	traces := r.cogniTraceStore()
+	if traces == nil {
+		writeJSON(w, map[string]any{"traces": []any{}, "count": 0})
+		return
+	}
+	out := traces.Recent(traceLimit(req))
+	writeJSON(w, map[string]any{
+		"traces": out,
+		"count":  len(out),
+	})
+}
+
+func (r *Router) HandleTracesByID(w http.ResponseWriter, req *http.Request, id string) {
+	if req.Method != http.MethodGet {
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET only")
+		return
+	}
+	traces := r.cogniTraceStore()
+	if traces == nil {
+		writeJSON(w, map[string]any{"traces": []any{}, "count": 0})
+		return
+	}
+	out := traces.ByCogni(id, traceLimit(req))
+	writeJSON(w, map[string]any{
+		"id":     id,
+		"traces": out,
+		"count":  len(out),
+	})
+}
+
+func (r *Router) HandleTraceStats(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET only")
+		return
+	}
+	traces := r.cogniTraceStore()
+	if traces == nil {
+		writeJSON(w, cogni.TraceStats{})
+		return
+	}
+	writeJSON(w, traces.Stats())
+}
+
+func (r *Router) HandleAlerts(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET only")
+		return
+	}
+	sentinel := r.cogniSentinel()
+	if sentinel == nil {
+		writeJSON(w, map[string]any{"alerts": []any{}, "count": 0})
+		return
+	}
+	alerts := sentinel.Alerts()
+	writeJSON(w, map[string]any{"alerts": alerts, "count": len(alerts)})
+}
+
+func (r *Router) HandleAlertsScan(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "POST only")
+		return
+	}
+	sentinel := r.cogniSentinel()
+	if sentinel == nil {
+		apperror.WriteCode(w, apperror.CodeInternal, "cogni sentinel not configured")
+		return
+	}
+	alerts := sentinel.Scan()
+	writeJSON(w, map[string]any{"alerts": alerts, "count": len(alerts)})
+}
+
+func (r *Router) HandleVerifyAll(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost && req.Method != http.MethodGet {
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET or POST")
+		return
+	}
+	registry := r.cogniRegistry()
+	if registry == nil {
+		writeJSON(w, map[string]any{"results": map[string]any{}, "failures": []any{}})
+		return
+	}
+	results := registry.VerifyAll()
+	writeJSON(w, map[string]any{
+		"results":  results,
+		"failures": cogni.FailedChecks(results),
+	})
+}
+
+func (r *Router) HandleVerifyByID(w http.ResponseWriter, req *http.Request, id string) {
+	if req.Method != http.MethodPost && req.Method != http.MethodGet {
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET or POST")
+		return
+	}
+	registry := r.cogniRegistry()
+	if registry == nil {
+		apperror.WriteCode(w, apperror.CodeInternal, "cogni registry not configured")
+		return
+	}
+	decl, ok := registry.Get(id)
+	if !ok {
+		apperror.WriteCode(w, apperror.CodeNotFound, "cogni not found: "+id)
+		return
+	}
+	results := cogni.VerifyDeclaration(decl, nil)
+	passed, failed := 0, 0
+	for _, result := range results {
+		if result.Passed {
+			passed++
+		} else if result.Reason != "no assertion configured (ignored)" {
+			failed++
+		}
+	}
+	writeJSON(w, map[string]any{
+		"id":      id,
+		"results": results,
+		"passed":  passed,
+		"failed":  failed,
 	})
 }
 
@@ -505,6 +684,37 @@ func (r *Router) serveWorkflow(w http.ResponseWriter, req *http.Request) bool {
 	return true
 }
 
+func (r *Router) serveObservability(w http.ResponseWriter, req *http.Request) bool {
+	id, rest, ok := dynamicSubresourceRoute(req.URL.Path)
+	if !ok {
+		return false
+	}
+	switch rest {
+	case "trace":
+		r.HandleTracesByID(w, req, id)
+	case "health":
+		r.HandleHealthByID(w, req, id)
+	case "verify":
+		r.HandleVerifyByID(w, req, id)
+	default:
+		return false
+	}
+	return true
+}
+
+func dynamicSubresourceRoute(path string) (id, rest string, ok bool) {
+	path = strings.TrimPrefix(path, SubResourceRoute)
+	path = strings.Trim(path, "/")
+	if path == "" {
+		return "", "", false
+	}
+	segs := strings.SplitN(path, "/", 2)
+	if len(segs) != 2 || segs[0] == "" || segs[1] == "" {
+		return "", "", false
+	}
+	return segs[0], segs[1], true
+}
+
 func workflowRoute(path string) (id, rest string, ok bool) {
 	path = strings.TrimPrefix(path, SubResourceRoute)
 	path = strings.Trim(path, "/")
@@ -601,6 +811,20 @@ func (r *Router) cogniWorkflowEngine() *cogni.WorkflowEngine {
 	return r.workflowProvider.CogniWorkflowEngine()
 }
 
+func (r *Router) cogniTraceStore() cogni.TraceStore {
+	if r == nil || r.traceProvider == nil {
+		return nil
+	}
+	return r.traceProvider.CogniTraceStore()
+}
+
+func (r *Router) cogniSentinel() *cogni.Sentinel {
+	if r == nil || r.sentinelProvider == nil {
+		return nil
+	}
+	return r.sentinelProvider.CogniSentinel()
+}
+
 func (r *Router) cogniFederation() *cogni.CogniFederation {
 	if r == nil || r.federationProvider == nil {
 		return nil
@@ -613,6 +837,19 @@ func (r *Router) cogniCostTracker() *cogni.CostTracker {
 		return nil
 	}
 	return r.costTracker.CogniCostTracker()
+}
+
+func traceLimit(req *http.Request) int {
+	limit := 50
+	if raw := req.URL.Query().Get("limit"); raw != "" {
+		if n, err := strconv.Atoi(raw); err == nil && n > 0 {
+			limit = n
+		}
+	}
+	if limit > 500 {
+		limit = 500
+	}
+	return limit
 }
 
 func (r *Router) HandleRuntimePackState(w http.ResponseWriter, req *http.Request) {
@@ -646,7 +883,20 @@ func delegatedRouteSpecs() []delegatedRouteSpec {
 	var out []delegatedRouteSpec
 	for _, spec := range RouteSpecs() {
 		switch spec.Path {
-		case CollectionRoute, SubResourceRoute, FederationRoute, FederationPeersRoute, FederationDiscoverRoute, EconomicsRoute, RouteDecisionRoute, RuntimePackStateRoute:
+		case CollectionRoute,
+			SubResourceRoute,
+			FederationRoute,
+			FederationPeersRoute,
+			FederationDiscoverRoute,
+			EconomicsRoute,
+			"/v1/cognis/traces",
+			"/v1/cognis/stats",
+			"/v1/cognis/health",
+			"/v1/cognis/alerts",
+			"/v1/cognis/alerts/scan",
+			"/v1/cognis/verify",
+			RouteDecisionRoute,
+			RuntimePackStateRoute:
 			continue
 		}
 		method := spec.Method
@@ -683,6 +933,12 @@ func inferDependencies(api API) Dependencies {
 	if inferred, ok := api.(WorkflowEngineProvider); ok {
 		deps.WorkflowProvider = inferred
 	}
+	if inferred, ok := api.(TraceStoreProvider); ok {
+		deps.TraceStoreProvider = inferred
+	}
+	if inferred, ok := api.(SentinelProvider); ok {
+		deps.SentinelProvider = inferred
+	}
 	return deps
 }
 
@@ -704,6 +960,12 @@ func mergeDependencies(primary, fallback Dependencies) Dependencies {
 	}
 	if primary.WorkflowProvider == nil {
 		primary.WorkflowProvider = fallback.WorkflowProvider
+	}
+	if primary.TraceStoreProvider == nil {
+		primary.TraceStoreProvider = fallback.TraceStoreProvider
+	}
+	if primary.SentinelProvider == nil {
+		primary.SentinelProvider = fallback.SentinelProvider
 	}
 	return primary
 }

@@ -783,8 +783,14 @@ func (g *Gateway) SetCogniKernelRuntimeStateHandler(handler http.HandlerFunc) {
 // /v1/cognis/{id}/trace endpoints.
 func (g *Gateway) SetCogniTraceStore(s cogni.TraceStore) { g.cogniTraces = s }
 
+// CogniTraceStore exposes the trace store to the Cogni Kernel pack.
+func (g *Gateway) CogniTraceStore() cogni.TraceStore { return g.cogniTraces }
+
 // SetCogniSentinel attaches the sentinel (alert + auto-disable engine).
 func (g *Gateway) SetCogniSentinel(s *cogni.Sentinel) { g.cogniSentinel = s }
+
+// CogniSentinel exposes the sentinel to the Cogni Kernel pack.
+func (g *Gateway) CogniSentinel() *cogni.Sentinel { return g.cogniSentinel }
 
 // SetCogniWorkflowEngine attaches the workflow engine for /v1/cognis/{id}/workflows/*.
 func (g *Gateway) SetCogniWorkflowEngine(we *cogni.WorkflowEngine) { g.cogniWorkflowEngine = we }

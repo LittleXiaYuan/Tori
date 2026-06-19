@@ -14,6 +14,8 @@ import (
 	"yunque-agent/pkg/packruntime"
 )
 
+func boolRef(v bool) *bool { return &v }
+
 func TestCogniKernelPackServesWorkflowListAndRun(t *testing.T) {
 	gw, tm := newTestGatewayWithCogniKernelPack(t, packruntime.PackStatusEnabled)
 	tenant := tm.Register("cogni-workflow")
@@ -71,6 +73,77 @@ func TestCogniKernelPackServesWorkflowListAndRun(t *testing.T) {
 	}
 	if !result.Success || result.Outputs["summary"] != "summary:pack" {
 		t.Fatalf("unexpected workflow result: %#v", result)
+	}
+}
+
+func TestCogniKernelPackServesObservabilityAndVerify(t *testing.T) {
+	gw, tm := newTestGatewayWithCogniKernelPack(t, packruntime.PackStatusEnabled)
+	tenant := tm.Register("cogni-observe")
+
+	reg := cogni.NewRegistry()
+	if err := reg.Add(&cogni.Declaration{
+		ID: "reviewer",
+		Activation: cogni.ActivationRules{
+			Keywords: []string{"review"},
+			MinScore: 0.2,
+		},
+		Checks: []cogni.ActivationCheck{{
+			Name:         "review matches",
+			Message:      "please review",
+			ExpectActive: boolRef(true),
+		}},
+	}, "test"); err != nil {
+		t.Fatalf("add cogni declaration: %v", err)
+	}
+	gw.SetCogniRegistry(reg, t.TempDir())
+	traces := cogni.NewInMemoryTraceStore(10)
+	traces.Record(cogni.Trace{
+		Activations: []cogni.TraceActivation{{
+			ID:        "reviewer",
+			Activated: true,
+			Score:     0.9,
+		}},
+		DurationMs: 12,
+	})
+	gw.SetCogniTraceStore(traces)
+	gw.SetCogniSentinel(cogni.NewSentinel(traces, reg, cogni.SentinelPolicy{}))
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/cognis/traces", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("traces status = %d, body = %s", w.Code, w.Body.String())
+	}
+	var traceBody map[string]any
+	if err := json.NewDecoder(w.Body).Decode(&traceBody); err != nil {
+		t.Fatalf("decode traces: %v", err)
+	}
+	if traceBody["count"].(float64) != 1 {
+		t.Fatalf("expected one trace, got %#v", traceBody)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/cognis/reviewer/verify", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("verify status = %d, body = %s", w.Code, w.Body.String())
+	}
+	var verify map[string]any
+	if err := json.NewDecoder(w.Body).Decode(&verify); err != nil {
+		t.Fatalf("decode verify: %v", err)
+	}
+	if verify["id"] != "reviewer" || verify["passed"].(float64) != 1 {
+		t.Fatalf("unexpected verify response: %#v", verify)
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/cognis/alerts/scan", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("alerts scan status = %d, body = %s", w.Code, w.Body.String())
 	}
 }
 

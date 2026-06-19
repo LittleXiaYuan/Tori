@@ -38,6 +38,8 @@ type fakeDependencyProvider struct {
 	experiences map[string]*cogni.ExperienceStore
 	registry    *cogni.Registry
 	workflow    *cogni.WorkflowEngine
+	traces      cogni.TraceStore
+	sentinel    *cogni.Sentinel
 }
 
 func (p fakeDependencyProvider) CogniBus() *cogni.CogniBus { return p.bus }
@@ -53,6 +55,10 @@ func (p fakeDependencyProvider) CogniExperiences() map[string]*cogni.ExperienceS
 func (p fakeDependencyProvider) CogniRegistry() *cogni.Registry { return p.registry }
 
 func (p fakeDependencyProvider) CogniWorkflowEngine() *cogni.WorkflowEngine { return p.workflow }
+
+func (p fakeDependencyProvider) CogniTraceStore() cogni.TraceStore { return p.traces }
+
+func (p fakeDependencyProvider) CogniSentinel() *cogni.Sentinel { return p.sentinel }
 
 func (fakeRuntimeReporter) CogniKernelRuntimeState() RuntimeStateReport {
 	return RuntimeStateReport{
@@ -467,6 +473,140 @@ func TestCogniKernelRouterOwnsWorkflow(t *testing.T) {
 		t.Fatalf("workflow routes should not delegate to API adapter, called=%d", api.called)
 	}
 }
+
+func TestCogniKernelRouterOwnsObservability(t *testing.T) {
+	api := &fakeCogniAPI{}
+	store := cogni.NewInMemoryTraceStore(10)
+	store.Record(cogni.Trace{
+		Activations: []cogni.TraceActivation{{
+			ID:        "reviewer",
+			Activated: true,
+			Score:     0.9,
+		}},
+		DurationMs: 12,
+	})
+	router := NewRouterWithDeps(api, fakeRuntimeReporter{}, Dependencies{
+		TraceStoreProvider: fakeDependencyProvider{traces: store},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/cognis/traces", nil)
+	w := httptest.NewRecorder()
+	router.HandleTracesAll(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("traces status=%d body=%s", w.Code, w.Body.String())
+	}
+	var traces map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &traces); err != nil {
+		t.Fatalf("decode traces: %v", err)
+	}
+	if traces["count"].(float64) != 1 {
+		t.Fatalf("expected one trace, got %#v", traces)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/cognis/reviewer/health", nil)
+	w = httptest.NewRecorder()
+	router.ServeCogniKernel(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("health status=%d body=%s", w.Code, w.Body.String())
+	}
+	var health cogni.HealthMetrics
+	if err := json.Unmarshal(w.Body.Bytes(), &health); err != nil {
+		t.Fatalf("decode health: %v", err)
+	}
+	if health.ID != "reviewer" || health.Status == "" {
+		t.Fatalf("unexpected health: %#v", health)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/cognis/stats", nil)
+	w = httptest.NewRecorder()
+	router.HandleTraceStats(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("stats status=%d body=%s", w.Code, w.Body.String())
+	}
+	var stats cogni.TraceStats
+	if err := json.Unmarshal(w.Body.Bytes(), &stats); err != nil {
+		t.Fatalf("decode stats: %v", err)
+	}
+	if stats.TotalTurns != 1 || stats.PerCogni["reviewer"] != 1 {
+		t.Fatalf("unexpected stats: %#v", stats)
+	}
+	if api.called != 0 {
+		t.Fatalf("observability routes should not delegate to API adapter, called=%d", api.called)
+	}
+}
+
+func TestCogniKernelRouterOwnsAlertsAndVerify(t *testing.T) {
+	api := &fakeCogniAPI{}
+	registry := cogni.NewRegistry()
+	if err := registry.Add(&cogni.Declaration{
+		ID: "reviewer",
+		Activation: cogni.ActivationRules{
+			Keywords: []string{"review"},
+			MinScore: 0.2,
+		},
+		Checks: []cogni.ActivationCheck{{
+			Name:         "review matches",
+			Message:      "please review",
+			ExpectActive: boolRef(true),
+		}},
+	}, "test"); err != nil {
+		t.Fatalf("add cogni: %v", err)
+	}
+	store := cogni.NewInMemoryTraceStore(10)
+	sentinel := cogni.NewSentinel(store, registry, cogni.SentinelPolicy{})
+	router := NewRouterWithDeps(api, fakeRuntimeReporter{}, Dependencies{
+		RegistryProvider:   fakeDependencyProvider{registry: registry},
+		SentinelProvider:   fakeDependencyProvider{sentinel: sentinel},
+		TraceStoreProvider: fakeDependencyProvider{traces: store},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/cognis/verify", nil)
+	w := httptest.NewRecorder()
+	router.HandleVerifyAll(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("verify all status=%d body=%s", w.Code, w.Body.String())
+	}
+	var verify map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &verify); err != nil {
+		t.Fatalf("decode verify: %v", err)
+	}
+	results := verify["results"].(map[string]any)
+	if _, ok := results["reviewer"]; !ok {
+		t.Fatalf("expected reviewer verify results, got %#v", verify)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/cognis/reviewer/verify", nil)
+	w = httptest.NewRecorder()
+	router.ServeCogniKernel(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("verify by id status=%d body=%s", w.Code, w.Body.String())
+	}
+	var byID map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &byID); err != nil {
+		t.Fatalf("decode by id: %v", err)
+	}
+	if byID["id"] != "reviewer" || byID["passed"].(float64) != 1 {
+		t.Fatalf("unexpected verify by id: %#v", byID)
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/cognis/alerts/scan", nil)
+	w = httptest.NewRecorder()
+	router.HandleAlertsScan(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("alerts scan status=%d body=%s", w.Code, w.Body.String())
+	}
+	req = httptest.NewRequest(http.MethodGet, "/v1/cognis/alerts", nil)
+	w = httptest.NewRecorder()
+	router.HandleAlerts(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("alerts status=%d body=%s", w.Code, w.Body.String())
+	}
+	if api.called != 0 {
+		t.Fatalf("alerts/verify should not delegate to API adapter, called=%d", api.called)
+	}
+}
+
+func boolRef(v bool) *bool { return &v }
 
 func TestCogniKernelRouterWorkflowErrors(t *testing.T) {
 	registry := cogni.NewRegistry()
