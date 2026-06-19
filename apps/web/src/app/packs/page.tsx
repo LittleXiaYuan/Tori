@@ -703,8 +703,16 @@ export default function PacksPageOptimized() {
             </div>
             <Chip size="sm" variant="soft">按当前来源统计</Chip>
           </div>
-          <div className="grid gap-3 md:grid-cols-3">
-            <div className="rounded-md p-3" style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.18)" }}>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <button
+              type="button"
+              className="rounded-md p-3 text-left transition-colors hover:bg-white/5"
+              style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.18)" }}
+              onClick={() => {
+                setKindFilter("actionable");
+                setSortMode("kind");
+              }}
+            >
               <div className="flex items-center justify-between gap-2">
                 <span className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>可直接使用</span>
                 <span className="text-lg font-semibold" style={{ color: "var(--yunque-success)" }}>{packKindStats.actionable}</span>
@@ -712,8 +720,16 @@ export default function PacksPageOptimized() {
               <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
                 有明确页面或主入口，适合用户查看、编辑、执行或继续处理。
               </div>
-            </div>
-            <div className="rounded-md p-3" style={{ background: "rgba(59,130,246,0.08)", border: "1px solid rgba(59,130,246,0.18)" }}>
+            </button>
+            <button
+              type="button"
+              className="rounded-md p-3 text-left transition-colors hover:bg-white/5"
+              style={{ background: "rgba(59,130,246,0.08)", border: "1px solid rgba(59,130,246,0.18)" }}
+              onClick={() => {
+                setKindFilter("infrastructure");
+                setSortMode("kind");
+              }}
+            >
               <div className="flex items-center justify-between gap-2">
                 <span className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>基础能力</span>
                 <span className="text-lg font-semibold" style={{ color: "var(--yunque-primary)" }}>{packKindStats.infrastructure + packKindStats.documented}</span>
@@ -721,8 +737,17 @@ export default function PacksPageOptimized() {
               <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
                 通常不单独当应用打开，而是在 Chat、任务、记忆、知识或设置页里生效。
               </div>
-            </div>
-            <div className="rounded-md p-3" style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.20)" }}>
+            </button>
+            <button
+              type="button"
+              className="rounded-md p-3 text-left transition-colors hover:bg-white/5"
+              style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.20)" }}
+              onClick={() => {
+                setKindFilter("experimental");
+                setStabilityFilter("alpha");
+                setSortMode("kind");
+              }}
+            >
               <div className="flex items-center justify-between gap-2">
                 <span className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>实验中</span>
                 <span className="text-lg font-semibold" style={{ color: "var(--yunque-warning)" }}>{packKindStats.experimental}</span>
@@ -730,7 +755,24 @@ export default function PacksPageOptimized() {
               <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
                 可体验但不作为稳定主路径；启用前先看限制、权限和风险说明。
               </div>
-            </div>
+            </button>
+            <button
+              type="button"
+              className="rounded-md p-3 text-left transition-colors hover:bg-white/5"
+              style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.18)" }}
+              onClick={() => {
+                setReadinessFilter("needs_entry");
+                setSortMode("readiness");
+              }}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>优先补肉</span>
+                <span className="text-lg font-semibold" style={{ color: "var(--yunque-danger)" }}>{readinessQueueTotal}</span>
+              </div>
+              <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
+                从缺入口、缺说明的包开始，交给小羽逐包补用途、示例、入口和回滚说明。
+              </div>
+            </button>
           </div>
         </div>
 

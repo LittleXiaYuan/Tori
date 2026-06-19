@@ -203,6 +203,8 @@ describe("PacksPageOptimized", () => {
     expect(screen.getByText("可直接使用")).toBeInTheDocument();
     expect(screen.getByText("基础能力")).toBeInTheDocument();
     expect(screen.getByText("实验中")).toBeInTheDocument();
+    expect(screen.getByText("优先补肉")).toBeInTheDocument();
+    expect(screen.getByText("从缺入口、缺说明的包开始，交给小羽逐包补用途、示例、入口和回滚说明。")).toBeInTheDocument();
     expect(screen.getAllByText("说明完整").length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText("通常不单独当应用打开，而是在 Chat、任务、记忆、知识或设置页里生效。")).toBeInTheDocument();
 
@@ -358,6 +360,7 @@ describe("PacksPageOptimized", () => {
     expect(screen.getByText("补肉优先队列").closest("#readiness-queue")).not.toBeNull();
     expect(screen.getByText("能力包体检总览")).toBeInTheDocument();
     expect(screen.getByText("已体检 3 个能力包，按用途说明、用户能感知的位置、入口和后端能力声明判断是否需要补肉。")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /优先补肉2/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /说明完整1/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /需补说明1/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /需补入口1/ })).toBeInTheDocument();
@@ -390,6 +393,16 @@ describe("PacksPageOptimized", () => {
     expect(screen.getByText("体检：需补入口")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "清除体检" }));
+
+    fireEvent.click(screen.getByRole("button", { name: /优先补肉2/ }));
+
+    expect(screen.getAllByText("Needs Entry Pack").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Documents (文档生成)")).not.toBeInTheDocument();
+    expect(screen.getByText("体检：需补入口")).toBeInTheDocument();
+    expect(screen.getByText("排序：按体检")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "清除体检" }));
+    fireEvent.click(screen.getByRole("button", { name: "恢复默认排序" }));
 
     fireEvent.click(screen.getByRole("button", { name: /需补入口1/ }));
 
@@ -467,6 +480,16 @@ describe("PacksPageOptimized", () => {
 
     expect(await screen.findByText("Alpha Pack")).toBeInTheDocument();
     expect(screen.getByText("Documents (文档生成)")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /实验中1/ }));
+
+    expect(screen.getByText("Alpha Pack")).toBeInTheDocument();
+    expect(screen.queryByText("Documents (文档生成)")).not.toBeInTheDocument();
+    expect(screen.getByText("类型：实验中")).toBeInTheDocument();
+    expect(screen.getByText("稳定性：开发中")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "清除类型" }));
+    fireEvent.click(screen.getByRole("button", { name: "清除稳定性" }));
 
     fireEvent.click(screen.getByRole("button", { name: "开发中" }));
 
