@@ -7,6 +7,7 @@ import {
   Card,
   Chip,
   Input,
+  Label,
   Spinner,
   TextArea,
   TextField,
@@ -592,6 +593,7 @@ export default function ChaosProbePackPage() {
               </Button>
             </div>
             <TextField value={definitionJSON} onChange={setDefinitionJSON}>
+              <Label>Probe definitions JSON</Label>
               <TextArea
                 rows={9}
                 aria-label="Chaos probe definitions JSON"
@@ -621,6 +623,7 @@ export default function ChaosProbePackPage() {
                   value={probeIDs}
                   onChange={setProbeIDs}
                 >
+                  <Label>Probe ID 列表</Label>
                   <Input placeholder="probe ids" />
                 </TextField>
                 <Button
@@ -684,6 +687,7 @@ export default function ChaosProbePackPage() {
                   value={JSON.stringify(selectedReport, null, 2)}
                   onChange={() => undefined}
                 >
+                  <Label>运行报告 JSON</Label>
                   <TextArea
                     rows={18}
                     aria-label="Chaos probe report JSON"
@@ -725,6 +729,7 @@ export default function ChaosProbePackPage() {
                 value={JSON.stringify(schedulerPlan, null, 2)}
                 onChange={() => undefined}
               >
+                <Label>Scheduler 计划 JSON</Label>
                 <TextArea
                   rows={12}
                   aria-label="Chaos Probe Scheduler Plan JSON"
@@ -766,6 +771,7 @@ export default function ChaosProbePackPage() {
                 value={JSON.stringify(degradeWriteback, null, 2)}
                 onChange={() => undefined}
               >
+                <Label>本地降级状态 JSON</Label>
                 <TextArea
                   rows={12}
                   aria-label="Chaos Probe Degrade State Writeback JSON"
@@ -808,6 +814,7 @@ export default function ChaosProbePackPage() {
                 value={JSON.stringify(enginePlan, null, 2)}
                 onChange={() => undefined}
               >
+                <Label>Engine handoff JSON</Label>
                 <TextArea
                   rows={12}
                   aria-label="Chaos Probe Degrade Engine Plan JSON"

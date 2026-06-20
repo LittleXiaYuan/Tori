@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Button, Card, Chip, Input, Spinner, TextArea, TextField } from "@heroui/react";
+import { Button, Card, Chip, Input, Label, Spinner, TextArea, TextField } from "@heroui/react";
 import { Activity, AlertTriangle, ClipboardCheck, ClipboardList, Download, Radar, RefreshCw, Send, ShieldAlert } from "lucide-react";
 import PageHeader from "@/components/page-header";
 import { showToast } from "@/components/toast-provider";
@@ -391,9 +391,13 @@ export default function SkillAnomalyPackPage() {
           <Card className="section-card p-4">
             <div className="mb-3 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2 text-sm font-semibold"><Activity size={16} />写入基线事件</div>
-              <TextField className="w-56" value={skillSlug} onChange={(value) => { setSkillSlug(value); setNormalJSON(sampleEvent(value)); setCandidateJSON(sampleEvent(value, true)); }}><Input placeholder="skill slug" /></TextField>
+              <TextField className="w-56" value={skillSlug} onChange={(value) => { setSkillSlug(value); setNormalJSON(sampleEvent(value)); setCandidateJSON(sampleEvent(value, true)); }}>
+                <Label>Skill 标识</Label>
+                <Input placeholder="skill slug" />
+              </TextField>
             </div>
             <TextField value={normalJSON} onChange={setNormalJSON}>
+              <Label>正常行为事件 JSON</Label>
               <TextArea rows={8} aria-label="Skill anomaly observation JSON" className="font-mono text-xs" />
             </TextField>
             <div className="mt-3 flex justify-end"><Button className="btn-accent" isPending={busy === "observe"} onPress={observeEvent}>写入 / 校验事件</Button></div>
@@ -414,12 +418,14 @@ export default function SkillAnomalyPackPage() {
               </div>
             </div>
             <TextField value={candidateJSON} onChange={setCandidateJSON}>
+              <Label>候选行为 JSON</Label>
               <TextArea rows={7} aria-label="Skill anomaly candidate JSON" className="font-mono text-xs" />
             </TextField>
             {result ? (
               <Card className="mt-3 p-3" style={{ background: "rgba(255,255,255,0.03)" }}>
                 <div className="mb-2 flex items-center gap-2 text-sm font-medium"><Chip size="sm" style={{ background: tone.bg, color: tone.fg }}>{result.severity}</Chip><span>score {result.score}</span></div>
                 <TextField value={JSON.stringify(result, null, 2)} onChange={() => undefined}>
+                  <Label>检测结果 JSON</Label>
                   <TextArea rows={12} aria-label="Skill anomaly result JSON" className="font-mono text-xs" readOnly />
                 </TextField>
               </Card>
@@ -437,6 +443,7 @@ export default function SkillAnomalyPackPage() {
                   非破坏性预览：计划路由不会写 Merkle Chain，不追加 Merkle Chain，不会扣 Trust Score，也不会释放 runtime action；真实队列按钮只写 pack-local approval-queue-store.json，不接全局审批中心。
                 </div>
                 <TextField value={JSON.stringify(auditPlan, null, 2)} onChange={() => undefined}>
+                  <Label>Audit hook 计划 JSON</Label>
                   <TextArea rows={12} aria-label="Skill anomaly audit hook plan JSON" className="font-mono text-xs" readOnly />
                 </TextField>
               </Card>
@@ -453,6 +460,7 @@ export default function SkillAnomalyPackPage() {
                   已生成 approval-queue-record.json 语义证据；不会追加 Merkle Chain，不会扣 Trust Score，不会批准或释放 runtime action，也不接全局 Approval Manager。
                 </div>
                 <TextField value={JSON.stringify(approvalWriteback, null, 2)} onChange={() => undefined}>
+                  <Label>审批队列写回 JSON</Label>
                   <TextArea rows={12} aria-label="Skill anomaly approval queue writeback JSON" className="font-mono text-xs" readOnly />
                 </TextField>
               </Card>
@@ -470,6 +478,7 @@ export default function SkillAnomalyPackPage() {
                   该桥接计划只把 pack-local approval-queue-record.json 映射成未来全局 Approval Manager 请求形状；global_approval_enqueue_ready=false，不调用全局审批中心，不追加 Merkle Chain，不扣 Trust Score，也不会释放 runtime action。
                 </div>
                 <TextField value={JSON.stringify(approvalBridgePlan, null, 2)} onChange={() => undefined}>
+                  <Label>审批中心桥计划 JSON</Label>
                   <TextArea rows={12} aria-label="Skill anomaly approval manager bridge plan JSON" className="font-mono text-xs" readOnly />
                 </TextField>
               </Card>

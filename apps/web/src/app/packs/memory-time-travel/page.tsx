@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Button, Card, Chip, Input, Spinner, TextArea, TextField } from "@heroui/react";
+import { Button, Card, Chip, Input, Label, Spinner, TextArea, TextField } from "@heroui/react";
 import { AlertTriangle, Clock3, DatabaseZap, Download, GitCompare, History, Link2, RefreshCw, RotateCcw, Save, ShieldCheck, Trash2, UnlockKeyhole } from "lucide-react";
 import PageHeader from "@/components/page-header";
 import { showToast } from "@/components/toast-provider";
@@ -641,8 +641,14 @@ export default function MemoryTimeTravelPackPage() {
           </div>
         </div>
         <div className="mb-3 grid grid-cols-1 gap-3 md:grid-cols-3">
-          <TextField value={baseId} onChange={setBaseId}><Input placeholder="target snapshot id" /></TextField>
-          <TextField value={approvalId} onChange={setApprovalId}><Input placeholder="approval id / request key" /></TextField>
+          <TextField value={baseId} onChange={setBaseId}>
+            <Label>目标快照 ID（回滚到）</Label>
+            <Input placeholder="target snapshot id" />
+          </TextField>
+          <TextField value={approvalId} onChange={setApprovalId}>
+            <Label>审批 ID / 请求键</Label>
+            <Input placeholder="approval id / request key" />
+          </TextField>
           <div className="rounded-xl border p-3 text-xs" style={{ borderColor: "var(--yunque-border)", color: "var(--yunque-text-muted)" }}>
             store ready: {String(status?.rollback_writeback_store_ready ?? false)} · executor plan: {String(status?.rollback_writeback_executor_plan_ready ?? false)} · writeback ready: {String(status?.rollback_writeback_ready ?? false)}
           </div>
@@ -656,6 +662,7 @@ export default function MemoryTimeTravelPackPage() {
               <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>Ledger writes {approvedRollbackPlan.writes_ledger_kv ? "enabled" : "blocked"} · Merkle {approvedRollbackPlan.merkle_append_ready ? "ready" : "blocked"}</div>
             </div>
             <TextField value={JSON.stringify(approvedRollbackPlan, null, 2)} onChange={() => undefined}>
+              <Label>已审批回滚计划 JSON</Label>
               <TextArea rows={10} aria-label="Memory Time Travel approved rollback writeback plan JSON" className="font-mono text-xs" readOnly />
             </TextField>
           </div>
@@ -691,6 +698,7 @@ export default function MemoryTimeTravelPackPage() {
               <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>writes_native_kv_history {String(nativeKVHistoryPlan.writes_native_kv_history)} · migrates {String(nativeKVHistoryPlan.migrates_kv_history)}</div>
             </div>
             <TextField value={JSON.stringify(nativeKVHistoryPlan, null, 2)} onChange={() => undefined}>
+              <Label>Native kv_history 计划 JSON</Label>
               <TextArea rows={10} aria-label="Memory Time Travel native kv_history plan JSON" className="font-mono text-xs" readOnly />
             </TextField>
           </div>
@@ -710,6 +718,7 @@ export default function MemoryTimeTravelPackPage() {
               <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>documents {nativeKVHistoryPreview.scanned_document_count} · writes {String(nativeKVHistoryPreview.writes_native_kv_history)}</div>
             </div>
             <TextField value={JSON.stringify(nativeKVHistoryPreview, null, 2)} onChange={() => undefined}>
+              <Label>Native kv_history 预览 JSON</Label>
               <TextArea rows={10} aria-label="Memory Time Travel native kv_history migration preview JSON" className="font-mono text-xs" readOnly />
             </TextField>
           </div>
@@ -726,6 +735,7 @@ export default function MemoryTimeTravelPackPage() {
               <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>switches adapter {String(kvHistoryDualReadParity.switches_temporal_adapter)} · writes Ledger {String(kvHistoryDualReadParity.writes_ledger_kv)}</div>
             </div>
             <TextField value={JSON.stringify(kvHistoryDualReadParity, null, 2)} onChange={() => undefined}>
+              <Label>双读校验 JSON</Label>
               <TextArea rows={10} aria-label="Memory Time Travel kv_history dual-read parity JSON" className="font-mono text-xs" readOnly />
             </TextField>
           </div>
@@ -742,6 +752,7 @@ export default function MemoryTimeTravelPackPage() {
               <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>switches adapter {String(kvHistoryCutoverPlan.switches_temporal_adapter)} · writes Ledger {String(kvHistoryCutoverPlan.dual_write_plan.writes_ledger_kv)}</div>
             </div>
             <TextField value={JSON.stringify(kvHistoryCutoverPlan, null, 2)} onChange={() => undefined}>
+              <Label>Cutover 计划 JSON</Label>
               <TextArea rows={10} aria-label="Memory Time Travel kv_history cutover plan JSON" className="font-mono text-xs" readOnly />
             </TextField>
           </div>
@@ -758,6 +769,7 @@ export default function MemoryTimeTravelPackPage() {
               <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>switches adapter {String(kvHistoryCutoverReadiness.switches_temporal_adapter)} · writes Ledger {String(kvHistoryCutoverReadiness.writes_ledger_kv)}</div>
             </div>
             <TextField value={JSON.stringify(kvHistoryCutoverReadiness, null, 2)} onChange={() => undefined}>
+              <Label>Cutover 就绪检查 JSON</Label>
               <TextArea rows={10} aria-label="Memory Time Travel kv_history cutover readiness JSON" className="font-mono text-xs" readOnly />
             </TextField>
           </div>
@@ -787,6 +799,7 @@ export default function MemoryTimeTravelPackPage() {
               <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>reclaimable {retentionPlan.reclaimable_bytes} bytes · prune {retentionPlan.temporal_prune_ready ? "ready" : "not wired"}</div>
             </div>
             <TextField value={JSON.stringify(retentionPlan, null, 2)} onChange={() => undefined}>
+              <Label>Retention 计划 JSON</Label>
               <TextArea rows={8} aria-label="Memory Time Travel retention plan JSON" className="font-mono text-xs" readOnly />
             </TextField>
           </div>
@@ -804,6 +817,7 @@ export default function MemoryTimeTravelPackPage() {
               <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>prune {retentionPrunePlan.prune_ready ? "ready" : "blocked"} · reclaimable {retentionPrunePlan.reclaimable_bytes} bytes</div>
             </div>
             <TextField value={JSON.stringify(retentionPrunePlan, null, 2)} onChange={() => undefined}>
+              <Label>Retention prune dry-run JSON</Label>
               <TextArea rows={8} aria-label="Memory Time Travel retention prune plan JSON" className="font-mono text-xs" readOnly />
             </TextField>
           </div>
@@ -820,6 +834,7 @@ export default function MemoryTimeTravelPackPage() {
               <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>writes native {String(retentionPruneExecute.writes_native_kv_history)} · cron {String(retentionPruneExecute.cron_ready)}</div>
             </div>
             <TextField value={JSON.stringify(retentionPruneExecute, null, 2)} onChange={() => undefined}>
+              <Label>Retention prune execute JSON</Label>
               <TextArea rows={8} aria-label="Memory Time Travel retention prune execute JSON" className="font-mono text-xs" readOnly />
             </TextField>
           </div>
@@ -837,6 +852,7 @@ export default function MemoryTimeTravelPackPage() {
               <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>artifact rollback-writeback-store.json · rollback-writeback-record.json</div>
             </div>
             <TextField value={JSON.stringify(rollbackWritebackStore, null, 2)} onChange={() => undefined}>
+              <Label>Rollback 写回 store JSON</Label>
               <TextArea rows={10} aria-label="Memory Time Travel rollback writeback store JSON" className="font-mono text-xs" readOnly />
             </TextField>
           </div>
@@ -854,6 +870,7 @@ export default function MemoryTimeTravelPackPage() {
               <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>artifact rollback-writeback-executor-plan.json · rollback-executor-handoff-plan.json · rollback-executor-audit-plan.json</div>
             </div>
             <TextField value={JSON.stringify(rollbackWritebackExecutorPlan, null, 2)} onChange={() => undefined}>
+              <Label>Rollback executor handoff JSON</Label>
               <TextArea rows={10} aria-label="Memory Time Travel rollback executor handoff plan JSON" className="font-mono text-xs" readOnly />
             </TextField>
           </div>
@@ -885,6 +902,7 @@ export default function MemoryTimeTravelPackPage() {
               <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>native kv_history {auditLinks.native_kv_history_ready ? "ready" : "not wired"}</div>
             </div>
             <TextField value={JSON.stringify(auditLinks, null, 2)} onChange={() => undefined}>
+              <Label>KV audit proof links JSON</Label>
               <TextArea rows={8} aria-label="Memory Time Travel KV audit links JSON" className="font-mono text-xs" readOnly />
             </TextField>
           </div>
@@ -905,6 +923,7 @@ export default function MemoryTimeTravelPackPage() {
               <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>writes Ledger {String(auditLinkPreview.writes_ledger_kv)} · writes native {String(auditLinkPreview.writes_native_kv_history)}</div>
             </div>
             <TextField value={JSON.stringify(auditLinkPreview, null, 2)} onChange={() => undefined}>
+              <Label>KV audit proof-link 预览 JSON</Label>
               <TextArea rows={10} aria-label="Memory Time Travel KV audit proof-link preview JSON" className="font-mono text-xs" readOnly />
             </TextField>
           </div>
@@ -921,6 +940,7 @@ export default function MemoryTimeTravelPackPage() {
               <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>writes Ledger {String(auditLinkWritebackPlan.writes_ledger_kv)} · global enqueue {String(auditLinkWritebackPlan.global_approval_enqueue_ready)}</div>
             </div>
             <TextField value={JSON.stringify(auditLinkWritebackPlan, null, 2)} onChange={() => undefined}>
+              <Label>KV audit proof-link 写回计划 JSON</Label>
               <TextArea rows={10} aria-label="Memory Time Travel KV audit proof-link writeback plan JSON" className="font-mono text-xs" readOnly />
             </TextField>
           </div>
@@ -938,6 +958,7 @@ export default function MemoryTimeTravelPackPage() {
               <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>Ledger {String(auditLinkWritebackStore.writes_ledger_kv)} · native {String(auditLinkWritebackStore.writes_native_kv_history)} · Merkle {String(auditLinkWritebackStore.appends_merkle)}</div>
             </div>
             <TextField value={JSON.stringify(auditLinkWritebackStore, null, 2)} onChange={() => undefined}>
+              <Label>KV audit proof-link 写回 store JSON</Label>
               <TextArea rows={10} aria-label="Memory Time Travel KV audit proof-link writeback store JSON" className="font-mono text-xs" readOnly />
             </TextField>
           </div>
@@ -955,6 +976,7 @@ export default function MemoryTimeTravelPackPage() {
               <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>artifact audit-link-writeback-executor-plan.json · audit-link-executor-handoff-plan.json · audit-link-executor-audit-plan.json</div>
             </div>
             <TextField value={JSON.stringify(auditLinkWritebackExecutorPlan, null, 2)} onChange={() => undefined}>
+              <Label>KV audit executor handoff JSON</Label>
               <TextArea rows={10} aria-label="Memory Time Travel KV audit proof-link executor handoff plan JSON" className="font-mono text-xs" readOnly />
             </TextField>
           </div>
@@ -982,6 +1004,7 @@ export default function MemoryTimeTravelPackPage() {
               <div className="mt-2 truncate text-xs" style={{ color: "var(--yunque-text-muted)" }}>{auditVerification.last_hash || "no hash"}</div>
             </div>
             <TextField value={JSON.stringify(auditVerification, null, 2)} onChange={() => undefined}>
+              <Label>Audit verification JSON</Label>
               <TextArea rows={8} aria-label="Memory Time Travel audit verification JSON" className="font-mono text-xs" readOnly />
             </TextField>
           </div>
@@ -1012,10 +1035,17 @@ export default function MemoryTimeTravelPackPage() {
           <Card className="section-card p-4">
             <div className="mb-3 flex items-center gap-2 text-sm font-semibold"><Save size={16} />保存记忆快照</div>
             <div className="mb-3 grid grid-cols-1 gap-3 md:grid-cols-2">
-              <TextField value={namespace} onChange={setNamespace}><Input placeholder="memory_snapshot" /></TextField>
-              <TextField value={snapshotId} onChange={setSnapshotId}><Input placeholder="baseline id" /></TextField>
+              <TextField value={namespace} onChange={setNamespace}>
+                <Label>命名空间</Label>
+                <Input placeholder="memory_snapshot" />
+              </TextField>
+              <TextField value={snapshotId} onChange={setSnapshotId}>
+                <Label>快照 ID</Label>
+                <Input placeholder="baseline id" />
+              </TextField>
             </div>
             <TextField value={valuesJSON} onChange={setValuesJSON}>
+              <Label>快照值 JSON</Label>
               <TextArea rows={8} aria-label="Memory snapshot values JSON" className="font-mono text-xs" />
             </TextField>
             <div className="mt-3 flex justify-end"><Button className="btn-accent" isPending={busy === "save"} onPress={saveSnapshot}>保存快照</Button></div>
@@ -1031,9 +1061,18 @@ export default function MemoryTimeTravelPackPage() {
               </div>
             </div>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-              <TextField value={baseId} onChange={setBaseId}><Input placeholder="base snapshot id" /></TextField>
-              <TextField value={targetId} onChange={setTargetId}><Input placeholder="target snapshot id" /></TextField>
-              <TextField value={at} onChange={setAt}><Input placeholder="2026-05-15T12:00:00Z" /></TextField>
+              <TextField value={baseId} onChange={setBaseId}>
+                <Label>Base 快照 ID</Label>
+                <Input placeholder="base snapshot id" />
+              </TextField>
+              <TextField value={targetId} onChange={setTargetId}>
+                <Label>Target 快照 ID</Label>
+                <Input placeholder="target snapshot id" />
+              </TextField>
+              <TextField value={at} onChange={setAt}>
+                <Label>回溯时间点</Label>
+                <Input placeholder="2026-05-15T12:00:00Z" />
+              </TextField>
             </div>
             <div className="mt-3 flex justify-end"><Button variant="outline" isPending={busy === "snapshot-at"} onPress={reconstruct}><Clock3 size={14} />重建时间点</Button></div>
 
@@ -1041,6 +1080,7 @@ export default function MemoryTimeTravelPackPage() {
               <Card className="mt-3 p-3" style={{ background: "rgba(255,255,255,0.03)" }}>
                 <div className="mb-2 text-sm font-medium">snapshot-at: {snapshotAt.status} {snapshotAt.matched_id ? `· ${snapshotAt.matched_id}` : ""}</div>
                 <TextField value={JSON.stringify(snapshotAt.values, null, 2)} onChange={() => undefined}>
+                  <Label>时间点快照 JSON</Label>
                   <TextArea rows={6} aria-label="Snapshot at values JSON" className="font-mono text-xs" readOnly />
                 </TextField>
               </Card>
@@ -1053,6 +1093,7 @@ export default function MemoryTimeTravelPackPage() {
                   <span>{diff.added_count} added / {diff.changed_count} changed / {diff.removed_count} removed · drift {diff.drift_score}</span>
                 </div>
                 <TextField value={JSON.stringify(diff, null, 2)} onChange={() => undefined}>
+                  <Label>记忆漂移 diff JSON</Label>
                   <TextArea rows={12} aria-label="Memory Time Travel diff JSON" className="font-mono text-xs" readOnly />
                 </TextField>
               </Card>

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Button, Card, Chip, Input, Spinner, TextArea, TextField } from "@heroui/react";
+import { Button, Card, Chip, Input, Label, Spinner, TextArea, TextField } from "@heroui/react";
 import { AlertTriangle, ClipboardList, Download, FileJson, GitCompare, PackageSearch, RefreshCw, Send, ShieldCheck } from "lucide-react";
 import PageHeader from "@/components/page-header";
 import { showToast } from "@/components/toast-provider";
@@ -395,8 +395,14 @@ export default function SBOMDriftPackPage() {
           <Card className="section-card p-4">
             <div className="mb-3 flex items-center gap-2 text-sm font-semibold"><PackageSearch size={16} />创建基线快照</div>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <TextField value={snapshotId} onChange={setSnapshotId}><Input placeholder="baseline-20260515" /></TextField>
-              <TextField value={source} onChange={setSource}><Input placeholder="manual-baseline" /></TextField>
+              <TextField value={snapshotId} onChange={setSnapshotId}>
+                <Label>基线 ID</Label>
+                <Input placeholder="baseline-20260515" />
+              </TextField>
+              <TextField value={source} onChange={setSource}>
+                <Label>来源说明</Label>
+                <Input placeholder="manual-baseline" />
+              </TextField>
             </div>
             <div className="mt-3 flex justify-end"><Button className="btn-accent" isPending={busy === "snapshot"} onPress={createSnapshot}>生成快照</Button></div>
           </Card>
@@ -423,6 +429,7 @@ export default function SBOMDriftPackPage() {
                   <span>{diff.added.length} added / {diff.changed.length} changed / {diff.removed.length} removed</span>
                 </div>
                 <TextField value={JSON.stringify(diff, null, 2)} onChange={() => undefined}>
+                  <Label>SBOM drift JSON</Label>
                   <TextArea rows={14} aria-label="SBOM Drift JSON" className="font-mono text-xs" readOnly />
                 </TextField>
               </Card>
@@ -459,6 +466,7 @@ export default function SBOMDriftPackPage() {
                 </div>
               )}
               <TextField value={JSON.stringify({ cyclonedx: cycloneDX, ci_gate_plan: ciGatePlan, baseline_artifact_source_plan: artifactSourcePlan, ci_baseline_writeback: ciBaselineWriteback, ci_workflow_writeback_plan: ciWorkflowPlan }, null, 2)} onChange={() => undefined}>
+                <Label>CycloneDX 与 CI Gate JSON</Label>
                 <TextArea rows={12} aria-label="SBOM CycloneDX and CI Gate JSON" className="font-mono text-xs" readOnly />
               </TextField>
               <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>

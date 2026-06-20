@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Button, Card, Chip, Input, Spinner, TextArea, TextField } from "@heroui/react";
+import { Button, Card, Chip, Input, Label, Spinner, TextArea, TextField } from "@heroui/react";
 import { Activity, AlertTriangle, CalendarClock, ClipboardList, Download, GitCompareArrows, RefreshCw, Send, ShieldCheck, Sparkles, Workflow } from "lucide-react";
 import PageHeader from "@/components/page-header";
 import { showToast } from "@/components/toast-provider";
@@ -391,6 +391,7 @@ export default function CognitiveCanaryPackPage() {
               <Button variant="outline" isPending={busy === "scenarios"} onPress={saveScenarios}>保存 Scenarios</Button>
             </div>
             <TextField value={scenarioJSON} onChange={setScenarioJSON}>
+              <Label>Scenario set JSON</Label>
               <TextArea rows={13} aria-label="Cognitive Canary scenarios JSON" className="font-mono text-xs" />
             </TextField>
           </Card>
@@ -402,9 +403,18 @@ export default function CognitiveCanaryPackPage() {
                 <div className="mt-1 text-xs" style={{ color: "var(--yunque-text-muted)" }}>本阶段为 pack-shell：用本地确定性规则计算 cognitive_quality_score / delta / safety / latency gate，并生成 shadow traffic / LLM-as-Judge / metrics / rollback plan；真实执行后续接。</div>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <TextField className="min-w-40" value={stableVersion} onChange={setStableVersion}><Input placeholder="stable version" /></TextField>
-                <TextField className="min-w-40" value={candidateVersion} onChange={setCandidateVersion}><Input placeholder="candidate version" /></TextField>
-                <TextField className="min-w-64" value={scenarioIDs} onChange={setScenarioIDs}><Input placeholder="scenario ids" /></TextField>
+                <TextField className="min-w-40" value={stableVersion} onChange={setStableVersion}>
+                  <Label>稳定版本</Label>
+                  <Input placeholder="stable version" />
+                </TextField>
+                <TextField className="min-w-40" value={candidateVersion} onChange={setCandidateVersion}>
+                  <Label>候选版本</Label>
+                  <Input placeholder="candidate version" />
+                </TextField>
+                <TextField className="min-w-64" value={scenarioIDs} onChange={setScenarioIDs}>
+                  <Label>场景 ID</Label>
+                  <Input placeholder="scenario ids" />
+                </TextField>
                 <Button variant="outline" isPending={busy === "shadow"} onPress={planShadow}><CalendarClock size={14} />Shadow 计划</Button>
                 <Button variant="outline" isPending={busy === "collector"} onPress={writeCollectorStore}><ShieldCheck size={14} />写入 Collector Store</Button>
                 <Button variant="outline" isPending={busy === "pipeline"} onPress={planCollectorPipeline}><Workflow size={14} />Collector Pipeline 计划</Button>
@@ -421,6 +431,7 @@ export default function CognitiveCanaryPackPage() {
                   <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>{selectedReport.stable_version || "stable"} → {selectedReport.candidate_version || "candidate"}</span>
                 </div>
                 <TextField value={JSON.stringify(selectedReport, null, 2)} onChange={() => undefined}>
+                  <Label>评估报告 JSON</Label>
                   <TextArea rows={20} aria-label="Cognitive Canary report JSON" className="font-mono text-xs" readOnly />
                 </TextField>
               </Card>
@@ -442,6 +453,7 @@ export default function CognitiveCanaryPackPage() {
                 <Chip size="sm">auto_rollback_ready: {String(shadowPlan.auto_rollback_ready)}</Chip>
               </div>
               <TextField value={JSON.stringify(shadowPlan, null, 2)} onChange={() => undefined}>
+                <Label>Shadow 计划 JSON</Label>
                 <TextArea rows={12} aria-label="Cognitive Canary Shadow Plan JSON" className="font-mono text-xs" readOnly />
               </TextField>
               <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
@@ -463,6 +475,7 @@ export default function CognitiveCanaryPackPage() {
                 <Chip size="sm">shadow_ready: {String(collectorWriteback.shadow_traffic_ready)}</Chip>
               </div>
               <TextField value={JSON.stringify(collectorWriteback, null, 2)} onChange={() => undefined}>
+                <Label>Collector 写回 JSON</Label>
                 <TextArea rows={12} aria-label="Cognitive Canary Response Collector Writeback JSON" className="font-mono text-xs" readOnly />
               </TextField>
               <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
@@ -484,6 +497,7 @@ export default function CognitiveCanaryPackPage() {
                 <Chip size="sm">writes_files: {String(pipelinePlan.writes_files)}</Chip>
               </div>
               <TextField value={JSON.stringify(pipelinePlan, null, 2)} onChange={() => undefined}>
+                <Label>Collector Pipeline JSON</Label>
                 <TextArea rows={12} aria-label="Cognitive Canary Response Collector Pipeline Plan JSON" className="font-mono text-xs" readOnly />
               </TextField>
               <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>

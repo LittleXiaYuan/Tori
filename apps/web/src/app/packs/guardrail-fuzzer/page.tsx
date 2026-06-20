@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Button, Card, Chip, Input, Spinner, TextArea, TextField } from "@heroui/react";
+import { Button, Card, Chip, Input, Label, Spinner, TextArea, TextField } from "@heroui/react";
 import { AlertTriangle, CalendarClock, ClipboardList, Download, FileCode2, Play, RefreshCw, Send, ShieldAlert, Sparkles } from "lucide-react";
 import PageHeader from "@/components/page-header";
 import { showToast } from "@/components/toast-provider";
@@ -348,6 +348,7 @@ export default function GuardrailFuzzerPackPage() {
               <div className="flex gap-2"><Button variant="outline" isPending={busy === "corpus"} onPress={saveCorpus}>保存 Corpus</Button></div>
             </div>
             <TextField value={corpusJSON} onChange={setCorpusJSON}>
+              <Label>Corpus JSON</Label>
               <TextArea rows={9} aria-label="Guardrail fuzzer corpus JSON" className="font-mono text-xs" />
             </TextField>
           </Card>
@@ -359,7 +360,10 @@ export default function GuardrailFuzzerPackPage() {
                 <div className="mt-1 text-xs" style={{ color: "var(--yunque-text-muted)" }}>本阶段为 pack-shell，本地 deterministic sanitizer probe；CI gate 与 rule write-back 后续接。</div>
               </div>
               <div className="flex items-center gap-2">
-                <TextField className="w-32" value={mutantsPerSeed} onChange={setMutantsPerSeed}><Input placeholder="mutants" /></TextField>
+                <TextField className="w-32" value={mutantsPerSeed} onChange={setMutantsPerSeed}>
+                  <Label>每条变体数</Label>
+                  <Input placeholder="6" />
+                </TextField>
                 <Button variant="outline" isPending={busy === "evidence"} onPress={exportEvidence} isDisabled={!selectedReport && reports.length === 0}><Download size={14} />导出证据包</Button>
                 <Button variant="outline" isPending={busy === "ciGate"} onPress={planCIGate}><CalendarClock size={14} />CI Gate 计划</Button>
                 <Button variant="outline" isPending={busy === "nativeCorpus"} onPress={planNativeCorpus}><FileCode2 size={14} />Native Corpus 计划</Button>
@@ -375,6 +379,7 @@ export default function GuardrailFuzzerPackPage() {
               <Card className="p-3" style={{ background: "rgba(255,255,255,0.03)" }}>
                 <div className="mb-2 flex items-center gap-2 text-sm font-medium"><Chip size="sm" style={{ background: tone.bg, color: tone.fg }}>{selectedReport.risk_level}</Chip><span>{selectedReport.id}</span></div>
                 <TextField value={JSON.stringify(selectedReport, null, 2)} onChange={() => undefined}>
+                  <Label>检测报告 JSON</Label>
                   <TextArea rows={18} aria-label="Guardrail fuzzer report JSON" className="font-mono text-xs" readOnly />
                 </TextField>
               </Card>
@@ -393,6 +398,7 @@ export default function GuardrailFuzzerPackPage() {
                   <Chip size="sm">alert_ready: {String(ciGatePlan.alert_ready)}</Chip>
                 </div>
                 <TextField value={JSON.stringify(ciGatePlan, null, 2)} onChange={() => undefined}>
+                  <Label>CI Gate 计划 JSON</Label>
                   <TextArea rows={14} aria-label="Guardrail fuzzer CI gate plan JSON" className="font-mono text-xs" readOnly />
                 </TextField>
               </Card>
@@ -414,6 +420,7 @@ export default function GuardrailFuzzerPackPage() {
                   非破坏性边界：只预览 corpus 文件映射、SHA-256 内容哈希、would_create / would_update / would_skip 动作和未来 go fuzz 命令；不写 testdata/fuzz、不修改 FuzzSanitizer、不执行 go test -fuzz、不上传 artifacts。
                 </div>
                 <TextField value={JSON.stringify(nativeCorpusPlan, null, 2)} onChange={() => undefined}>
+                  <Label>Native Corpus 计划 JSON</Label>
                   <TextArea rows={14} aria-label="Guardrail fuzzer native corpus plan JSON" className="font-mono text-xs" readOnly />
                 </TextField>
               </Card>
