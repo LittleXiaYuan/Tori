@@ -22,9 +22,25 @@ const kernelActions = [
 
 const boundaryItems = [
   "不会替代能力包本身的安装、权限授权或启用流程。",
+  "不会假装已经吞掉 Skill 或 MCP 生态；第一阶段是兼容、组织和减少无效上下文。",
   "不会直接执行本机电脑控制、联网写入或高风险动作。",
   "不会绕过 Pack Runtime 门禁；能力包停用后 Cogni 只能看到受限状态。",
   "更适合作为底层运行治理包，普通用户优先从 /cognis 管理 Cogni。",
+];
+
+const relationItems = [
+  {
+    term: "能力包",
+    desc: "扩展云雀底座：安装、启用、权限、路由、前端界面、WASM/DLC 都在这里被治理。",
+  },
+  {
+    term: "Cogni",
+    desc: "增设模型可选择的能力声明：把技能、MCP、能力包、记忆和经验组织成更省上下文的调用线索。",
+  },
+  {
+    term: "Skill / MCP",
+    desc: "外部生态入口：Cogni 应该兼容并观察它们的可用性，而不是在当前阶段宣称完全替代。",
+  },
 ];
 
 export default function PacksCognisPage() {
@@ -55,7 +71,7 @@ export default function PacksCognisPage() {
               这个能力包现在能做什么
             </div>
             <div className="mt-2 max-w-3xl text-sm leading-6" style={{ color: "var(--yunque-text-secondary)" }}>
-              它不是一个单独给用户日常操作的应用，而是 Cogni 的运行内核：负责声明注册、路由选择、健康检查、运行轨迹和能力包状态门禁。你真正管理 Cogni 的入口在「我的 Cogni」页面。
+              它不是一个单独给用户日常操作的应用，而是 Cogni 的运行内核：负责声明注册、路由选择、健康检查、运行轨迹和能力包状态门禁。Cogni 不是能力包的替代品，它更像模型侧的能力目录和选择层；你真正管理 Cogni 的入口在「我的 Cogni」页面。
             </div>
             <div className="mt-4 grid gap-3 md:grid-cols-3">
               {kernelActions.map((item) => (
@@ -79,6 +95,18 @@ export default function PacksCognisPage() {
             </div>
           </div>
         </div>
+      </Card>
+
+      <Card className="section-card p-4">
+        <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>Pack / Cogni / Skill / MCP 的关系</div>
+        <dl className="mt-3 grid gap-3 md:grid-cols-3">
+          {relationItems.map((item) => (
+            <div key={item.term} className="rounded-lg p-3" style={{ background: "var(--yunque-bg-hover)", border: "1px solid var(--yunque-border)" }}>
+              <dt className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>{item.term}</dt>
+              <dd className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>{item.desc}</dd>
+            </div>
+          ))}
+        </dl>
       </Card>
 
       <Card className="section-card p-4">

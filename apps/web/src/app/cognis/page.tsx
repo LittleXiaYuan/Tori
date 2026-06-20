@@ -76,6 +76,30 @@ const BUILTIN_TEMPLATES: TemplateMetadata[] = [
   { id: "task-scheduler", display_name: "任务调度助手", description: "智能调度任务、管理优先级、自动执行", category: "效率" },
 ];
 
+const COGNI_DELIVERY_SECTIONS = [
+  {
+    title: "现在可稳定交付",
+    tone: "success",
+    items: ["创建、导入、导出、启用和停用 Cogni 声明。", "查看健康、运行轨迹、工作流、经验与演化建议。", "通过 Cogni 内核感知能力包启停状态和运行门禁。"],
+  },
+  {
+    title: "Beta 继续观察",
+    tone: "warning",
+    items: ["Planner 自动选择 Cogni 的命中质量。", "经验确认和演化建议是否真的减少重复说明。", "Cogni 与记忆、任务、知识、Skill/MCP 的组合效果。"],
+  },
+  {
+    title: "暂不作为稳定承诺",
+    tone: "danger",
+    items: ["自主执行高风险动作或本机电脑控制。", "完全替代 Skill 与 MCP 生态。", "不经能力包权限和门禁直接调用底层能力。"],
+  },
+];
+
+const COGNI_USAGE_NOTES = [
+  "能力包扩展云雀底座：提供路由、界面、权限、WASM/DLC 或后端能力。",
+  "Cogni 增设模型侧能力声明：告诉模型何时选择 Skill、MCP、能力包、记忆和工作流。",
+  "如果某个能力包被禁用，Cogni 只能看到受限状态，不能绕过 Pack Runtime。",
+];
+
 function healthColor(status: string): { bg: string; fg: string } {
   switch (status) {
     case "healthy":
@@ -368,6 +392,53 @@ export default function CognisPage() {
       />
 
       <PackSurfaceGuide surface="cognis" />
+
+      <Card className="section-card p-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="max-w-2xl">
+            <h2 className="text-base font-semibold" style={{ color: "var(--yunque-text)" }}>
+              Cogni 的正式交付口径
+            </h2>
+            <p className="mt-2 text-sm leading-6" style={{ color: "var(--yunque-text-secondary)" }}>
+              Cogni 现在适合交付为「模型能力组织层」：它兼容 Skill、MCP 和能力包，把可用工具、经验、记忆与触发方式整理成更省上下文的声明。它不是能力包商店，也不是无边界的电脑控制。
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Chip size="sm" color="success">可交付</Chip>
+            <Chip size="sm" color="warning">需观察</Chip>
+            <Chip size="sm" color="danger">不夸大</Chip>
+          </div>
+        </div>
+        <div className="mt-4 grid gap-3 lg:grid-cols-3">
+          {COGNI_DELIVERY_SECTIONS.map((section) => (
+            <section
+              key={section.title}
+              className="rounded-lg p-3"
+              aria-labelledby={`cogni-delivery-${section.tone}`}
+              style={{ background: "var(--yunque-bg-hover)", border: "1px solid var(--yunque-border)" }}
+            >
+              <h3 id={`cogni-delivery-${section.tone}`} className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>
+                {section.title}
+              </h3>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
+                {section.items.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </section>
+          ))}
+        </div>
+        <div className="mt-4 rounded-lg p-3" style={{ background: "rgba(255,255,255,0.025)", border: "1px solid var(--yunque-border)" }}>
+          <h3 className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>
+            云雀如何使用它
+          </h3>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
+            {COGNI_USAGE_NOTES.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </div>
+      </Card>
 
       {packOff && (
         <Card className="section-card p-4 border-l-4" style={{ borderLeftColor: "#ffaa00" }}>

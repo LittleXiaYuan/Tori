@@ -20,6 +20,11 @@ describe("PacksCognisPage", () => {
     expect(screen.getByText("连接能力包状态")).toBeInTheDocument();
     expect(screen.getByText("当前边界")).toBeInTheDocument();
     expect(screen.getByText("不会替代能力包本身的安装、权限授权或启用流程。")).toBeInTheDocument();
+    expect(screen.getByText("不会假装已经吞掉 Skill 或 MCP 生态；第一阶段是兼容、组织和减少无效上下文。")).toBeInTheDocument();
+    expect(screen.getByText("Pack / Cogni / Skill / MCP 的关系")).toBeInTheDocument();
+    expect(screen.getByText("扩展云雀底座：安装、启用、权限、路由、前端界面、WASM/DLC 都在这里被治理。")).toBeInTheDocument();
+    expect(screen.getByText("增设模型可选择的能力声明：把技能、MCP、能力包、记忆和经验组织成更省上下文的调用线索。")).toBeInTheDocument();
+    expect(screen.getByText("外部生态入口：Cogni 应该兼容并观察它们的可用性，而不是在当前阶段宣称完全替代。")).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: /打开 Cogni 管理/ })[0]).toHaveAttribute("href", "/cognis");
   });
 });
