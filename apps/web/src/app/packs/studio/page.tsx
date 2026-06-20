@@ -1972,6 +1972,20 @@ export default function PackStudioPage() {
                 回能力包中心 <ArrowRight size={13} />
               </Button>
             </Link>
+            {manifest && (
+              <Link href={`/packs/detail?id=${encodeURIComponent(manifest.id)}`}>
+                <Button size="sm" variant="ghost">
+                  回详情验收 <FileSearch size={13} />
+                </Button>
+              </Link>
+            )}
+            {primaryPath && (
+              <Link href={primaryPath}>
+                <Button size="sm" variant="ghost">
+                  打开入口复验 <ExternalLink size={13} />
+                </Button>
+              </Link>
+            )}
           </div>
         </Card>
 
@@ -2588,6 +2602,20 @@ export default function PackStudioPage() {
                                   回能力包中心 <ArrowRight size={13} />
                                 </Button>
                               </Link>
+                              {manifest && (
+                                <Link href={`/packs/detail?id=${encodeURIComponent(manifest.id)}`}>
+                                  <Button size="sm" variant="outline">
+                                    回详情验收 <FileSearch size={13} />
+                                  </Button>
+                                </Link>
+                              )}
+                              {primaryPath && (
+                                <Link href={primaryPath}>
+                                  <Button size="sm" variant="outline">
+                                    打开入口复验 <ExternalLink size={13} />
+                                  </Button>
+                                </Link>
+                              )}
                             </div>
                           </div>
                           <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
