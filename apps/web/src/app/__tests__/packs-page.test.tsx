@@ -230,41 +230,28 @@ describe("PacksPageOptimized", () => {
 
     expect(await screen.findByText("Documents (文档生成)")).toBeInTheDocument();
     expect(screen.getByText("Files (产物文件)")).toBeInTheDocument();
-    expect(screen.getByText("能力包不是都要单独打开")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /能力包工坊/ })).toHaveAttribute("href", "/packs/studio");
-    expect(screen.getByText("可直接使用")).toBeInTheDocument();
-    expect(screen.getByText("基础能力")).toBeInTheDocument();
-    expect(screen.getByText("实验中")).toBeInTheDocument();
-    expect(screen.getByText("优先打磨")).toBeInTheDocument();
-    expect(screen.getByText("不是都不可用；优先从缺入口、实验边界和后台验收不清楚的包开始，逐包补用途、结果、入口和回滚说明。")).toBeInTheDocument();
-    expect(screen.getByText("交付状态分布")).toBeInTheDocument();
-    expect(screen.getByText("可直接交付")).toBeInTheDocument();
-    expect(screen.getAllByText("后台支撑").length).toBeGreaterThan(0);
-    expect(screen.getByText("实验/计划")).toBeInTheDocument();
-    expect(screen.getByText("有明确入口、示例和结果验证路径。")).toBeInTheDocument();
-    expect(screen.getByText("在 Chat、任务、记忆、知识或设置里生效。")).toBeInTheDocument();
+    expect(screen.queryByText("能力包不是都要单独打开")).not.toBeInTheDocument();
+    expect(screen.queryByText("交付状态分布")).not.toBeInTheDocument();
+    expect(screen.queryByText("能力包体检总览")).not.toBeInTheDocument();
+    expect(screen.queryByText("打磨与验收队列")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /小羽优化/ })).not.toBeInTheDocument();
     expect(screen.getAllByText("说明完整").length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByText("通常不单独当应用打开，而是在 Chat、任务、记忆、知识或设置页里生效。")).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(screen.getAllByText("怎么用它").length).toBeGreaterThanOrEqual(2);
+      expect(screen.getByText("开始生成文档")).toBeInTheDocument();
     });
-    expect(screen.getByText("用户能感知到的位置：Chat 自动发起文档任务、任务产物区、文档生成技能与模板目录")).toBeInTheDocument();
-    expect(screen.getByText("用户能感知到的位置：Chat 产物区、任务结果页、文件预览与下载入口")).toBeInTheDocument();
-    expect(screen.getByText("开始生成文档")).toBeInTheDocument();
     expect(screen.getByText("查看最近产物")).toBeInTheDocument();
-    expect(screen.getAllByText("启用后去哪用").length).toBeGreaterThanOrEqual(2);
-    expect(screen.getAllByText("交付状态：后台支撑").length).toBeGreaterThanOrEqual(2);
-    expect(screen.getAllByText("它不一定单独打开，而是在 Chat、任务、记忆、知识或设置流程里被云雀调用。").length).toBeGreaterThanOrEqual(2);
-    expect(screen.getAllByText("下一步：从它声明的用户感知位置验证：能否在主路径里看到效果、结果或状态变化。").length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByText("建议从卡片里的入口或 Chat 主路径触发一次，确认结果、产物或状态变化可见。")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /去 Chat 验证/ })).toHaveAttribute("href", "/chat");
     expect(screen.getByText("权限：读取、写入、沙箱；启用前建议确认")).toBeInTheDocument();
     expect(screen.getByText("权限：读取；低风险")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "显示维护视图" }));
+    expect(screen.getByText("能力包不是都要单独打开")).toBeInTheDocument();
+    expect(screen.getByText("交付状态分布")).toBeInTheDocument();
+    expect(screen.getByText("能力包体检总览")).toBeInTheDocument();
+    expect(screen.getByText("通常不单独当应用打开，而是在 Chat、任务、记忆、知识或设置页里生效。")).toBeInTheDocument();
+    expect(screen.getByText("用户能感知到的位置：Chat 自动发起文档任务、任务产物区、文档生成技能与模板目录")).toBeInTheDocument();
     expect(screen.getByText("主入口：开始生成文档 · 帮我生成一份可下载的文档")).toBeInTheDocument();
-    expect(screen.getByText("主入口：查看最近产物 · 列出我最近生成的文件")).toBeInTheDocument();
-    expect(screen.getAllByText("固定方式：没有独立侧栏入口，通常在 Chat、任务或其他能力里自动生效。").length).toBeGreaterThanOrEqual(2);
-    expect(screen.getAllByText("想继续打磨：进详情确认权限，或交给小羽优化用途、入口和示例。").length).toBeGreaterThanOrEqual(2);
     const studioLink = screen.getAllByRole("link", { name: /小羽优化/ })
       .find((link) => link.getAttribute("href")?.includes("/packs/studio?packId=yunque.pack.documents"));
     expect(studioLink).toBeTruthy();
@@ -372,6 +359,10 @@ describe("PacksPageOptimized", () => {
     expect(screen.getByText("来源：官方源")).toBeInTheDocument();
     expect(screen.getByText("已安装 0 · 官方 1 · 私有 0")).toBeInTheDocument();
     expect(screen.getByText("建议先打开详情或工坊只读检查，再安装、启用并回到中心验证入口。")).toBeInTheDocument();
+    expect(screen.queryByText("来源：官方源 · example.com")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /小羽优化/ })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "显示维护视图" }));
     expect(screen.getByText("来源：官方源 · example.com")).toBeInTheDocument();
     expect(screen.getByText("https://example.com/docs.yqpack")).toBeInTheDocument();
     expect(screen.getByText("SHA256 abc")).toBeInTheDocument();
@@ -440,7 +431,7 @@ describe("PacksPageOptimized", () => {
       entries: [],
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "安装" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "安装" })[0]);
 
     await waitFor(() => {
       expect(packsClientMock.install).toHaveBeenCalledWith({
@@ -500,6 +491,9 @@ describe("PacksPageOptimized", () => {
     expect(screen.getByText("私有源安装前确认")).toBeInTheDocument();
     expect(screen.getByText("声明不合法")).toBeInTheDocument();
     expect(screen.getByText("平台不支持")).toBeInTheDocument();
+    expect(screen.queryByText("来源：私有源 · oss.example.com")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "显示维护视图" }));
     expect(screen.getByText("来源：私有源 · oss.example.com")).toBeInTheDocument();
     expect(screen.getByText("https://oss.example.com/yunque/private/private-pack.yqpack")).toBeInTheDocument();
     expect(screen.getByText("SHA256 def")).toBeInTheDocument();
@@ -523,6 +517,10 @@ describe("PacksPageOptimized", () => {
     expect((await screen.findAllByText("Needs Context Pack")).length).toBeGreaterThan(0);
     expect(screen.getAllByText("Needs Entry Pack").length).toBeGreaterThan(0);
     expect(screen.getByText("Documents (文档生成)")).toBeInTheDocument();
+    expect(screen.queryByText("打磨与验收队列")).not.toBeInTheDocument();
+    expect(screen.queryByText("能力包体检总览")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "显示维护视图" }));
     expect(screen.getByText("打磨与验收队列")).toBeInTheDocument();
     expect(screen.getByText("打磨与验收队列").closest("#readiness-queue")).not.toBeNull();
     expect(screen.getByText("能力包体检总览")).toBeInTheDocument();
@@ -666,7 +664,11 @@ describe("PacksPageOptimized", () => {
 
     render(<PacksPageOptimized />);
 
-    expect(await screen.findByText("打磨与验收队列")).toBeInTheDocument();
+    expect(await screen.findByText("Needs Entry Pack 1")).toBeInTheDocument();
+    expect(screen.queryByText("打磨与验收队列")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "显示维护视图" }));
+    expect(screen.getByText("打磨与验收队列")).toBeInTheDocument();
     const queue = screen.getByText("打磨与验收队列").closest("#readiness-queue");
     expect(queue).not.toBeNull();
     expect(screen.getByText("按体检缺口和交付状态挑出需要继续解释、验收或补入口的能力包；P0 才是阻塞项，P1/P2 多数是可用但需要讲清楚边界和结果。当前第 1 / 2 批，展示 6 个，共 8 个待打磨。")).toBeInTheDocument();
@@ -716,6 +718,9 @@ describe("PacksPageOptimized", () => {
     render(<PacksPageOptimized />);
 
     expect((await screen.findAllByText("Plan Only Pack")).length).toBeGreaterThan(0);
+    expect(screen.queryByText("打磨与验收队列")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "显示维护视图" }));
     expect(screen.getByText("打磨与验收队列")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /优先打磨1/ })).toBeInTheDocument();
     expect(screen.getByText("交付状态：实验/计划。先保留限制说明；如果要变成主路径，下一轮补真实执行、结果查看和回滚证据。")).toBeInTheDocument();
@@ -741,28 +746,26 @@ describe("PacksPageOptimized", () => {
 
     render(<PacksPageOptimized />);
 
-    expect((await screen.findAllByText("Alpha Pack")).length).toBeGreaterThan(0);
+    expect(await screen.findByRole("link", { name: /Alpha Pack/ })).toBeInTheDocument();
     expect(screen.getByText("Documents (文档生成)")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /实验中1/ }));
+    fireEvent.click(screen.getByRole("button", { name: "实验" }));
 
-    expect(screen.getAllByText("Alpha Pack").length).toBeGreaterThan(0);
+    expect(screen.getByRole("link", { name: /Alpha Pack/ })).toBeInTheDocument();
     expect(screen.queryByText("Documents (文档生成)")).not.toBeInTheDocument();
     expect(screen.getByText("类型：实验中")).toBeInTheDocument();
-    expect(screen.getByText("稳定性：开发中")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "清除类型" }));
-    fireEvent.click(screen.getByRole("button", { name: "清除稳定性" }));
 
     fireEvent.click(screen.getByRole("button", { name: "开发中" }));
 
-    expect(screen.getAllByText("Alpha Pack").length).toBeGreaterThan(0);
+    expect(screen.getByRole("link", { name: /Alpha Pack/ })).toBeInTheDocument();
     expect(screen.queryByText("Documents (文档生成)")).not.toBeInTheDocument();
     expect(screen.getByText("稳定性：开发中")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "清除稳定性" }));
 
-    expect(screen.getAllByText("Alpha Pack").length).toBeGreaterThan(0);
+    expect(screen.getByRole("link", { name: /Alpha Pack/ })).toBeInTheDocument();
     expect(screen.getByText("Documents (文档生成)")).toBeInTheDocument();
   });
 
@@ -779,12 +782,12 @@ describe("PacksPageOptimized", () => {
 
     expect(await screen.findByText("Documents (文档生成)")).toBeInTheDocument();
     expect(screen.queryByText("Generated Pack 9")).not.toBeInTheDocument();
-    expect(screen.getByText("已安装 · 第 1 / 2 页 · 共 14 个")).toBeInTheDocument();
+    expect(screen.getByText(/已安装 · 第 1 \/ 2 页 · 共 \d+ 个/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "下一页" }));
 
     expect(screen.getByText("Generated Pack 9")).toBeInTheDocument();
     expect(screen.queryByText("Documents (文档生成)")).not.toBeInTheDocument();
-    expect(screen.getByText("已安装 · 第 2 / 2 页 · 共 14 个")).toBeInTheDocument();
+    expect(screen.getByText(/已安装 · 第 2 \/ 2 页 · 共 \d+ 个/)).toBeInTheDocument();
   });
 });

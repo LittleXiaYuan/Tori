@@ -50,6 +50,7 @@ import {
   packFeatureFlags,
   packPermissionSummary,
   packReadiness,
+  packSafeOpenPath,
   packUsageExplanation,
   packUsability,
   packVerificationSteps,
@@ -374,7 +375,7 @@ function buildBatchReadinessPrompt(
       const risk = riskProfileForPack(item.manifest);
       const guidance = packPolishGuidance(item.manifest);
       const priority = packPolishPriority(item.manifest);
-      const primaryPath = packUsability(item.manifest).primaryActionPath || item.manifest.frontend?.menus?.[0]?.path || item.manifest.frontend?.routes?.[0]?.path;
+      const primaryPath = packSafeOpenPath(item.manifest);
       return {
         id: item.manifest.id,
         name: item.manifest.name,
@@ -476,7 +477,7 @@ function packCenterReportItem(item: ReadinessQueueItem) {
   const priority = packPolishPriority(manifest);
   const risk = riskProfileForPack(manifest);
   const guidance = packPolishGuidance(manifest);
-  const open = usability.primaryActionPath || manifest.frontend?.menus?.[0]?.path || manifest.frontend?.routes?.[0]?.path || "";
+  const open = packSafeOpenPath(manifest) || "";
   return {
     id: manifest.id,
     name: manifest.name,
@@ -998,7 +999,7 @@ export default function PacksPageOptimized() {
   });
   const noticeForEnabled = (manifest: PackManifest): CenterActionNotice => {
     const usability = packUsability(manifest);
-    const openPath = usability.primaryActionPath || manifest.frontend?.menus?.[0]?.path || manifest.frontend?.routes?.[0]?.path;
+    const openPath = packSafeOpenPath(manifest);
     return {
       title: "能力包已启用",
       detail: openPath ? "可以打开入口验证结果；如果它有侧栏入口，也可以固定到侧栏减少下次寻找。" : "这个包没有独立入口，启用后会在 Chat、任务、记忆或知识流程中被云雀感知。",
@@ -1069,7 +1070,7 @@ export default function PacksPageOptimized() {
     || privateCatalogEntries.find((entry) => entry.manifest.id === id)?.manifest;
   const studioReturnManifest = returnedFromStudio ? manifestById(searchFocus) : undefined;
   const studioReturnOpenPath = studioReturnManifest
-    ? packUsability(studioReturnManifest).primaryActionPath || studioReturnManifest.frontend?.menus?.[0]?.path || studioReturnManifest.frontend?.routes?.[0]?.path
+    ? packSafeOpenPath(studioReturnManifest)
     : undefined;
   const studioReturnDelivery = studioReturnManifest ? packDeliveryProfile(studioReturnManifest) : undefined;
   const studioReturnRisk = studioReturnManifest ? riskProfileForPack(studioReturnManifest) : undefined;
@@ -1307,6 +1308,8 @@ export default function PacksPageOptimized() {
           </div>
         )}
 
+        {showAdvanced && (
+          <>
         <div className="mt-4 rounded-lg border p-4" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-bg-hover)" }}>
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
@@ -1617,6 +1620,9 @@ export default function PacksPageOptimized() {
           </div>
         )}
 
+          </>
+        )}
+
         <div className="flex items-center gap-3 mt-4">
           <Link href="/packs/studio">
             <Button size="sm" variant="outline">
@@ -1625,7 +1631,7 @@ export default function PacksPageOptimized() {
           </Link>
           <Button size="sm" variant="ghost" onPress={() => setShowAdvanced(!showAdvanced)}>
             {showAdvanced ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-            {showAdvanced ? "隐藏" : "显示"}技术详情
+            {showAdvanced ? "隐藏" : "显示"}维护视图
           </Button>
         </div>
 
@@ -2048,7 +2054,7 @@ export default function PacksPageOptimized() {
     });
     const actionBusyKey = options.action.kind === "enable" ? `enable:${manifest.id}` : options.busyKey;
     const disabled = options.action.disabled || busy === actionBusyKey;
-    const primaryPath = usability.primaryActionPath || manifest.frontend?.menus?.[0]?.path || manifest.frontend?.routes?.[0]?.path;
+    const primaryPath = packSafeOpenPath(manifest);
 
     return (
       <Card key={options.key} className="section-card p-4 hover-lift">
@@ -2120,6 +2126,8 @@ export default function PacksPageOptimized() {
           {usability.limitation ? ` 当前限制：${usability.limitation}` : ""}
         </div>
 
+        {showAdvanced && (
+          <>
         <div className="mb-3 rounded-md border p-3" style={{ borderColor: deliveryStyle.borderColor, background: deliveryStyle.background }}>
           <div className="mb-1 text-xs font-medium" style={{ color: deliveryStyle.color }}>交付状态：{delivery.label}</div>
           <div className="text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>{delivery.description}</div>
@@ -2202,6 +2210,8 @@ export default function PacksPageOptimized() {
             })}
           </div>
         </div>
+          </>
+        )}
 
         <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>
           v{manifest.version}
@@ -2212,9 +2222,11 @@ export default function PacksPageOptimized() {
           <Link href={`/packs/detail?id=${encodeURIComponent(manifest.id)}`}>
             <Button size="sm" variant="ghost">查看详情 <ArrowRight size={14} /></Button>
           </Link>
-          <Link href={packStudioHref(manifest, { packageUrl: options.packageUrl, sha256: options.sha256 })}>
-            <Button size="sm" variant="ghost">小羽优化 <Wrench size={14} /></Button>
-          </Link>
+          {showAdvanced && (
+            <Link href={packStudioHref(manifest, { packageUrl: options.packageUrl, sha256: options.sha256 })}>
+              <Button size="sm" variant="ghost">小羽优化 <Wrench size={14} /></Button>
+            </Link>
+          )}
           {primaryPath && (
             <Link href={primaryPath}>
               <Button size="sm" variant="ghost">{usability.primaryActionLabel || "打开入口"} <ExternalLink size={14} /></Button>
@@ -2244,8 +2256,9 @@ export default function PacksPageOptimized() {
     const usageLines = packUsageExplanation(manifest).slice(0, 3);
     const verificationSteps = packVerificationSteps(manifest).slice(0, 2);
     const navItems = navItemsForPack(pack);
-    const openPath = usability.primaryActionPath || manifest.frontend?.menus?.[0]?.path || manifest.frontend?.routes?.[0]?.path;
-    const entryHint = describePackEntry(usability.primaryActionLabel, openPath);
+    const declaredOpenPath = usability.primaryActionPath || manifest.frontend?.menus?.[0]?.path || manifest.frontend?.routes?.[0]?.path;
+    const openPath = packSafeOpenPath(manifest, declaredOpenPath);
+    const entryHint = describePackEntry(usability.primaryActionLabel, declaredOpenPath);
     const pinHint = navItems.length > 0
       ? pack.status === "enabled"
         ? "可固定到侧栏，之后从侧栏或命令菜单直接打开。"
@@ -2316,6 +2329,8 @@ export default function PacksPageOptimized() {
             {usability.limitation ? ` 当前限制：${usability.limitation}` : ""}
           </div>
 
+          {showAdvanced && (
+            <>
           <div className="mb-3 rounded-md border p-3" style={{ borderColor: deliveryStyle.borderColor, background: deliveryStyle.background }}>
             <div className="mb-1 text-xs font-medium" style={{ color: deliveryStyle.color }}>交付状态：{delivery.label}</div>
             <div className="text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>{delivery.description}</div>
@@ -2382,6 +2397,8 @@ export default function PacksPageOptimized() {
               {permissionGroups.length > 4 && <Chip size="sm" variant="soft">+{permissionGroups.length - 4}</Chip>}
             </div>
           )}
+            </>
+          )}
         </Link>
 
         <div className="flex items-center gap-2 flex-wrap">
@@ -2412,11 +2429,13 @@ export default function PacksPageOptimized() {
               {isPackPinned(pack) ? "取消侧栏" : "固定侧栏"}
             </Button>
           )}
-          <Link href={packStudioHref(manifest)}>
-            <Button size="sm" variant="ghost">
-              <Wrench size={14} /> 小羽优化
-            </Button>
-          </Link>
+          {showAdvanced && (
+            <Link href={packStudioHref(manifest)}>
+              <Button size="sm" variant="ghost">
+                <Wrench size={14} /> 小羽优化
+              </Button>
+            </Link>
+          )}
           <Link href={`/packs/detail?id=${encodeURIComponent(manifest.id)}`} className="ml-auto">
             <Button size="sm" variant="ghost">详情 <ArrowRight size={14} /></Button>
           </Link>

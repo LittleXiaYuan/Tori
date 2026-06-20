@@ -5,6 +5,7 @@ import { BrainCircuit, CircuitBoard, HardDriveDownload, Package, Puzzle } from "
 import { createPacksClient } from "yunque-client/packs";
 import type { InstalledPack, PackBackendRouteSpec, PackDistributionManifest, PackFrontendAssets, PackFrontendMenu } from "yunque-client/packs";
 import { createYunqueSDKClientOptions } from "@/lib/sdk-client";
+import { packSafeOpenPath } from "@/lib/pack-presentation";
 
 
 export interface PackSdkEntrypoint {
@@ -102,16 +103,22 @@ export function buildPackNavItems(packs: InstalledPack[]): PackNavItem[] {
     .flatMap((pack) => {
       const manifest = pack.manifest;
       const menus = manifest.frontend?.menus || [];
-      return menus.map((menu: PackFrontendMenu) => ({
-        href: menu.path,
-        label: menu.label,
-        labelEn: menu.label,
-        icon: resolvePackIcon(menu.icon),
-        packId: manifest.id,
-        packName: manifest.name,
-        order: menu.order ?? 999,
-        keywords: `${manifest.id} ${manifest.name} ${manifest.description || ""} ${menu.key} ${menu.label} pack 能力包`,
-      }));
+      return menus
+        .map((menu: PackFrontendMenu) => {
+          const href = packSafeOpenPath(manifest, menu.path);
+          if (!href) return null;
+          return {
+            href,
+            label: menu.label,
+            labelEn: menu.label,
+            icon: resolvePackIcon(menu.icon),
+            packId: manifest.id,
+            packName: manifest.name,
+            order: menu.order ?? 999,
+            keywords: `${manifest.id} ${manifest.name} ${manifest.description || ""} ${menu.key} ${menu.label} pack 能力包`,
+          };
+        })
+        .filter((item): item is PackNavItem => Boolean(item));
     })
     .sort((a, b) => a.order - b.order || a.label.localeCompare(b.label));
 }

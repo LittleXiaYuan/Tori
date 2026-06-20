@@ -89,7 +89,8 @@ describe("PackDetailClientPage", () => {
 
     expect(await screen.findByText("Needs Context Pack")).toBeInTheDocument();
     expect(screen.getByText("从这里继续")).toBeInTheDocument();
-    expect(screen.getAllByText("打开能力入口").length).toBeGreaterThan(0);
+    expect(screen.queryByText("打开能力入口")).not.toBeInTheDocument();
+    expect(screen.getAllByText("回能力包中心管理").length).toBeGreaterThan(0);
     expect(screen.getAllByText("回中心管理和固定").length).toBeGreaterThan(0);
     expect(screen.getByText(/如果用户觉得它像空壳/)).toBeInTheDocument();
     expect(screen.getByText("用户能拿它做什么")).toBeInTheDocument();
@@ -113,7 +114,7 @@ describe("PackDetailClientPage", () => {
     expect(screen.getByText("怎么验收")).toBeInTheDocument();
     expect(screen.getByText("不合适时")).toBeInTheDocument();
     expect(screen.getByText("验收出口：")).toBeInTheDocument();
-    expect(screen.getByText(/回中心确认状态，进详情复查权限，再打开入口复验。/)).toBeInTheDocument();
+    expect(screen.getByText(/回中心确认状态，进详情复查权限；这个包没有独立入口/)).toBeInTheDocument();
     expect(screen.getByText("确认来源")).toBeInTheDocument();
     expect(screen.getByText(/来源：本机已安装记录/)).toBeInTheDocument();
     expect(screen.getByText("能力边界")).toBeInTheDocument();
@@ -135,7 +136,8 @@ describe("PackDetailClientPage", () => {
     const handoffStudioLink = screen.getByRole("link", { name: /带上下文进入工坊/ });
     expect(handoffStudioLink).toHaveAttribute("href", expect.stringContaining("/packs/studio?packId=yunque.pack.needs-context"));
     expect(decodeURIComponent(handoffStudioLink.getAttribute("href") || "")).toContain("优先补齐+使用示例");
-    expect(screen.getByRole("link", { name: /打开能力入口/ })).toHaveAttribute("href", "/packs/needs-context");
+    expect(screen.queryByRole("link", { name: /打开能力入口/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /回能力包中心管理/ })).toHaveAttribute("href", "/packs?q=yunque.pack.needs-context");
   });
 
   it("loads release-only packs from official sources and installs the yqpack asset", async () => {
@@ -294,8 +296,8 @@ describe("PackDetailClientPage", () => {
       expect(showToastMock).toHaveBeenCalledWith("能力包已启用", "success");
     });
     expect(await screen.findByText("能力包已启用")).toBeInTheDocument();
-    expect(screen.getByText("现在可以打开能力入口验证结果；也可以回能力包中心固定侧栏或继续查看权限来源。")).toBeInTheDocument();
-    expect(screen.getAllByRole("link", { name: /打开能力入口/ }).some((link) => link.getAttribute("href") === "/packs/needs-context")).toBe(true);
+    expect(screen.getByText("这个包没有独立入口，启用后会在 Chat、任务、记忆或知识流程中被云雀感知；可回中心确认状态。")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /打开能力入口/ })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: /回中心管理/ })).toHaveAttribute("href", "/packs?q=yunque.pack.needs-context");
   });
 });

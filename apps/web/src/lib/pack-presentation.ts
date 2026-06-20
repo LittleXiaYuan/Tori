@@ -166,6 +166,51 @@ const HIGH_RISK_PACK_IDS = new Set([
   "yunque.pack.browser-intent",
 ]);
 
+// Production web is statically exported for the desktop shell. Unknown
+// `/packs/<slug>` pages cannot be created at runtime, so the center should only
+// link to pack routes that are present in the app bundle. Unknown yqpack routes
+// still show up in details, but users enter them through the detail/fallback
+// surface instead of hitting a static 404.
+const STATIC_PACK_PAGE_PATHS = new Set([
+  "/packs/backup",
+  "/packs/browser",
+  "/packs/chaos-probe",
+  "/packs/cognis",
+  "/packs/cognitive-canary",
+  "/packs/computer-use",
+  "/packs/experience",
+  "/packs/guardrail-fuzzer",
+  "/packs/inner-life",
+  "/packs/lora",
+  "/packs/memory-time-travel",
+  "/packs/micro-agent",
+  "/packs/night-school",
+  "/packs/rpa-replay",
+  "/packs/sbom-drift",
+  "/packs/skill-anomaly",
+  "/packs/wasm-plugin",
+  "/packs/world-model",
+]);
+
+function normalizeOpenPath(path?: string): string {
+  if (!path) return "";
+  try {
+    const url = new URL(path, "http://yunque.local");
+    return url.pathname.replace(/\/+$/, "") || "/";
+  } catch {
+    return path.trim().replace(/\/+$/, "");
+  }
+}
+
+export function packSafeOpenPath(manifest: PackManifest, candidate?: string): string | undefined {
+  const raw = candidate || packUsability(manifest).primaryActionPath || manifest.frontend?.menus?.[0]?.path || manifest.frontend?.routes?.[0]?.path;
+  const normalized = normalizeOpenPath(raw);
+  if (!raw || !normalized) return undefined;
+  if (!normalized.startsWith("/packs/")) return raw;
+  if (normalized.startsWith("/packs/detail") || normalized.startsWith("/packs/studio")) return raw;
+  return STATIC_PACK_PAGE_PATHS.has(normalized) ? raw : undefined;
+}
+
 export function packExamples(manifest: PackManifest, limit = 3): string[] {
   const metadata = manifest.metadata || {};
   return ["example1", "example2", "example3", "example4", "example5"]

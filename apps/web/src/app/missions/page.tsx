@@ -14,7 +14,6 @@ import { showToast } from "@/components/toast-provider";
 import { STATUS_COLORS, STATUS_LABELS } from "@/lib/constants";
 import EmptyState from "@/components/empty-state";
 import { formatErrorMessage } from "@/lib/error-utils";
-import PackSurfaceGuide from "@/components/pack-surface-guide";
 
 type MissionTab = "tasks" | "cron" | "triggers" | "templates";
 type FilterTab = "all" | "active" | "scheduled" | "event" | "completed" | "failed";
@@ -242,8 +241,6 @@ export default function MissionsPage() {
           </Button>
         </div>
       </div>
-
-      <PackSurfaceGuide surface="missions" />
 
       {/* Summary stats */}
       <div className="stat-grid-5 stagger-children">

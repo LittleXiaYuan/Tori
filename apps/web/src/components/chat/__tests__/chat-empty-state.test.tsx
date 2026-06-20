@@ -40,44 +40,38 @@ describe("ChatEmptyState", () => {
     localStorage.setItem("yunque_locale", "zh");
   });
 
-  it("presents a chat-first scene selector without architecture terms", () => {
+  it("presents a lightweight chat-first empty state without architecture terms", () => {
     renderEmptyState();
 
-    expect(screen.getByText("选择工作伙伴")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "今天想让云雀怎么帮你？" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "通用云雀" })).toHaveAttribute("aria-current", "true");
-    expect(screen.getByRole("button", { name: "任务执行" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "知识整理" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "记忆沉淀" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "能力扩展" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "电脑使用计划" })).toBeInTheDocument();
+    expect(screen.queryByText("选择工作伙伴")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /你说，我在听/ })).toBeInTheDocument();
+    expect(screen.getByText("问答、任务、知识和记忆都从这一句话开始。")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "解释概念" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "整理知识" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "记住偏好" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "写周报" })).toBeInTheDocument();
     expect(screen.getByText("用通俗的话解释一个概念并举例。")).toBeInTheDocument();
     expect(screen.getByText("把资料沉淀成可复用知识条目。")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "能力扩展" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "电脑使用计划" })).not.toBeInTheDocument();
 
     const text = document.body.textContent || "";
     expect(text).not.toMatch(/\bPack\b|Cogni|微内核|WASM|DLC/);
   });
 
-  it("switches scene prompts and keeps computer use plan-only", () => {
+  it("fills the composer from compact starter chips", () => {
     const { chatD } = renderEmptyState();
 
-    fireEvent.click(screen.getByRole("button", { name: "能力扩展" }));
-    expect(screen.getByText("描述现有能力哪里不够，先生成可验收的补强方案。")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "补强能力" }));
+    fireEvent.click(screen.getByRole("button", { name: "整理知识" }));
     expect(chatD).toHaveBeenCalledWith({
       type: "SET_INPUT",
-      value: expect.stringContaining("可验收的改进清单"),
+      value: expect.stringContaining("整理成知识库条目"),
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "记忆沉淀" }));
-    expect(screen.getByText("把你的习惯写进长期记忆。")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "电脑使用计划" }));
-    expect(screen.getByText("先规划浏览器或桌面动作，当前不会直接控制本机。")).toBeInTheDocument();
-    fireEvent.click(screen.getAllByRole("button", { name: "电脑使用计划" })[1]);
+    fireEvent.click(screen.getByRole("button", { name: "写周报" }));
     expect(chatD).toHaveBeenLastCalledWith({
       type: "SET_INPUT",
-      value: expect.stringContaining("暂时不要执行本机控制"),
+      value: expect.stringContaining("整理成周报"),
     });
   });
 

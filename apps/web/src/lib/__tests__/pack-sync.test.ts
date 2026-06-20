@@ -110,9 +110,12 @@ describe("pack-sync frontend runtime", () => {
   it("builds sorted nav items from enabled pack menus", () => {
     const items = buildPackNavItems([laterPack, backupPack, loraPack, cogniKernelPack]);
 
-    expect(items.map((item) => item.href)).toEqual(["/packs/backup", "/packs/later", "/packs/lora"]);
+    expect(items.map((item) => item.href)).toEqual(["/packs/backup", "/packs/lora"]);
     expect(items[0]).toMatchObject({ packId: "yunque.pack.backup", label: "备份恢复", order: 20 });
     expect(items[0]?.keywords).toContain("yunque.pack.backup");
+    // Unknown dynamic /packs/<slug> routes are not exported in the desktop build,
+    // so the nav must not create links that land on a static 404.
+    expect(items.find((item) => item.packId === "yunque.pack.later")).toBeUndefined();
     // cogni-kernel is backend-only now (assistant UI moved to core /cognis), so it adds no nav item.
     expect(items.find((item) => item.packId === "yunque.pack.cogni-kernel")).toBeUndefined();
   });

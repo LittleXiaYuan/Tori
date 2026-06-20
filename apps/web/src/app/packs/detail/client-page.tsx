@@ -46,6 +46,7 @@ import {
   packFeatureFlags,
   packPermissionSummary,
   packReadiness,
+  packSafeOpenPath,
   packUsageExplanation,
   packUsability,
   packVerificationSteps,
@@ -317,7 +318,8 @@ export default function PackDetailClientPage() {
   const delivery = packDeliveryProfile(manifest);
   const deliveryLabel = displayDeliveryLabel(delivery.label, delivery.level);
   const deliveryStyle = deliveryToneStyle(delivery.tone);
-  const openPath = usability.primaryActionPath || menus[0]?.path || routesFrontend[0]?.path;
+  const declaredOpenPath = usability.primaryActionPath || menus[0]?.path || routesFrontend[0]?.path;
+  const openPath = packSafeOpenPath(manifest, declaredOpenPath);
   const installSource = installSourceForPack({ manifest, catalogEntry, releaseEntry });
   const installChecklist = packInstallChecklist(manifest, {
     sourceLabel: installSource?.label,

@@ -4,7 +4,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { AlertTriangle } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import type { ChatDispatch } from "@/lib/chat-state";
-import { CHAT_AGENT_SCENES, CHAT_EMPTY_SCENARIOS, PRODUCT_SCENARIOS, type ProductScenario } from "@/lib/product-scenarios";
+import { CHAT_EMPTY_SCENARIOS, PRODUCT_SCENARIOS, type ProductScenario } from "@/lib/product-scenarios";
 
 interface StarterChip {
   id: string;
@@ -57,13 +57,10 @@ function useGreetingKey(): string {
 
 export function ChatEmptyState({ setupNeeded, chatD, inputRef, composer }: ChatEmptyStateProps) {
   const { t } = useI18n();
-  const [activeSceneId, setActiveSceneId] = useState(CHAT_AGENT_SCENES[0]?.id || "general");
   const greetingKey = useGreetingKey();
   const greeting = t(`chat.empty.greet.${greetingKey}`);
-  const activeScene = CHAT_AGENT_SCENES.find((scene) => scene.id === activeSceneId) || CHAT_AGENT_SCENES[0];
   const chips = useMemo<StarterChip[]>(() => {
-    const ids = activeScene?.promptIds?.length ? activeScene.promptIds : FALLBACK_SCENARIO_IDS;
-    return ids
+    return FALLBACK_SCENARIO_IDS
       .map((id) => SCENARIO_BY_ID.get(id))
       .filter((s): s is ProductScenario => Boolean(s))
       .map((s) => ({
@@ -72,7 +69,7 @@ export function ChatEmptyState({ setupNeeded, chatD, inputRef, composer }: ChatE
         description: s.description,
         prompt: t(`scenario.${s.id}.prompt`),
       }));
-  }, [activeScene, t]);
+  }, [t]);
 
   const pickChip = (prompt: string) => {
     chatD({ type: "SET_INPUT", value: prompt });
@@ -103,33 +100,8 @@ export function ChatEmptyState({ setupNeeded, chatD, inputRef, composer }: ChatE
 
       <div className="chat-empty__composer">{composer}</div>
 
-      <section className="chat-empty__scene" aria-labelledby="chat-scene-title">
-        <div className="chat-empty__scene-copy">
-          <p className="chat-empty__scene-eyebrow">{t("chat.scene.eyebrow")}</p>
-          <h2 id="chat-scene-title" className="chat-empty__scene-title">{t("chat.scene.title")}</h2>
-          <p className="chat-empty__scene-desc">{t(`chat.scene.${activeScene.id}.desc`)}</p>
-        </div>
-
-        <ul className="chat-empty__scene-list" aria-label={t("chat.scene.options")}>
-          {CHAT_AGENT_SCENES.map((scene) => {
-            const active = scene.id === activeScene.id;
-            return (
-              <li key={scene.id}>
-                <button
-                  type="button"
-                  className="chat-empty__scene-btn"
-                  data-active={active ? "true" : undefined}
-                  aria-current={active ? "true" : undefined}
-                  onClick={() => setActiveSceneId(scene.id)}
-                >
-                  <span className="chat-empty__scene-icon" aria-hidden>{scene.icon}</span>
-                  <span>{t(`chat.scene.${scene.id}.label`)}</span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-
+      <section className="chat-empty__quick" aria-labelledby="chat-empty-quick-title">
+        <h2 id="chat-empty-quick-title" className="sr-only">{t("chat.empty.suggestions")}</h2>
         <ul className="chat-empty__chips" aria-label={t("chat.empty.suggestions")}>
           {chips.map((chip) => (
             <li key={chip.id}>
