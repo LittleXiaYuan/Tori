@@ -638,6 +638,34 @@ export default function PacksPageOptimized() {
     }
     return counts;
   }, [filteredInstalledPacks, filteredReleaseEntries, filteredPrivateCatalogEntries]);
+  const visibleDeliveryStats = useMemo(() => {
+    const manifests = [
+      ...filteredInstalledPacks.map((pack) => pack.manifest),
+      ...filteredReleaseEntries.map((entry) => entry.manifest),
+      ...filteredPrivateCatalogEntries.map((entry) => entry.manifest),
+    ];
+    const counts = { ready: 0, support: 0, plan_only: 0, needs_meat: 0 };
+    for (const manifest of manifests) counts[packDeliveryProfile(manifest).level] += 1;
+    return counts;
+  }, [filteredInstalledPacks, filteredReleaseEntries, filteredPrivateCatalogEntries]);
+  const visibleReadinessStats = useMemo(() => {
+    const manifests = [
+      ...filteredInstalledPacks.map((pack) => pack.manifest),
+      ...filteredReleaseEntries.map((entry) => entry.manifest),
+      ...filteredPrivateCatalogEntries.map((entry) => entry.manifest),
+    ];
+    const counts = { complete: 0, needs_context: 0, needs_entry: 0 };
+    for (const manifest of manifests) counts[packReadiness(manifest).level] += 1;
+    return counts;
+  }, [filteredInstalledPacks, filteredReleaseEntries, filteredPrivateCatalogEntries]);
+  const currentViewAdvice = useMemo(() => {
+    if (totalMatches === 0) return "建议清空搜索或放宽筛选，先恢复可见候选。";
+    if (visibleDeliveryStats.needs_meat > 0) return "建议先导入补肉队列或逐个交给小羽，补用途、入口、示例和能力边界。";
+    if (visibleDeliveryStats.plan_only > 0) return "建议先查看实验限制、风险和验证路径，不要把计划能力当成稳定主路径。";
+    if (filteredReleaseEntries.length + filteredPrivateCatalogEntries.length > 0) return "建议先打开详情或工坊只读检查，再安装、启用并回到中心验证入口。";
+    if (filteredInstalledPacks.some((pack) => pack.status !== "enabled")) return "建议先查看详情确认权限，再启用；启用后按入口提示验证结果。";
+    return "建议从卡片里的入口或 Chat 主路径触发一次，确认结果、产物或状态变化可见。";
+  }, [filteredInstalledPacks, filteredPrivateCatalogEntries.length, filteredReleaseEntries.length, totalMatches, visibleDeliveryStats]);
   const installedPageCount = pageCountFor(filteredInstalledPacks.length);
   const currentInstalledPage = Math.min(installedPage, installedPageCount);
   const pagedInstalledPacks = paginate(filteredInstalledPacks, currentInstalledPage);
@@ -1263,6 +1291,32 @@ export default function PacksPageOptimized() {
             {totalMatches === 0
               ? "没有匹配的能力包。可以清空搜索或放宽类型、风险、稳定性筛选。"
               : `共 ${totalMatches} 个，${visibleKindStats.actionable} 个可直接使用、${visibleKindStats.infrastructure} 个作为 Chat/任务/记忆/知识的底座能力、${visibleKindStats.experimental} 个仍建议先看边界再启用。`}
+          </div>
+          <div className="mt-3 grid gap-2 md:grid-cols-4">
+            <div className="rounded-md border p-3" style={{ borderColor: "var(--yunque-border)", background: "rgba(255,255,255,0.03)" }}>
+              <div className="text-[11px] font-medium" style={{ color: "var(--yunque-text-muted)" }}>来源构成</div>
+              <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
+                已安装 {filteredInstalledPacks.length} · 官方 {filteredReleaseEntries.length} · 私有 {filteredPrivateCatalogEntries.length}
+              </div>
+            </div>
+            <div className="rounded-md border p-3" style={{ borderColor: "var(--yunque-border)", background: "rgba(255,255,255,0.03)" }}>
+              <div className="text-[11px] font-medium" style={{ color: "var(--yunque-text-muted)" }}>交付构成</div>
+              <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
+                可交付 {visibleDeliveryStats.ready} · 后台 {visibleDeliveryStats.support} · 实验 {visibleDeliveryStats.plan_only} · 待补 {visibleDeliveryStats.needs_meat}
+              </div>
+            </div>
+            <div className="rounded-md border p-3" style={{ borderColor: "var(--yunque-border)", background: "rgba(255,255,255,0.03)" }}>
+              <div className="text-[11px] font-medium" style={{ color: "var(--yunque-text-muted)" }}>体检构成</div>
+              <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
+                完整 {visibleReadinessStats.complete} · 补说明 {visibleReadinessStats.needs_context} · 补入口 {visibleReadinessStats.needs_entry}
+              </div>
+            </div>
+            <div className="rounded-md border p-3" style={{ borderColor: "rgba(59,130,246,0.18)", background: "rgba(59,130,246,0.06)" }}>
+              <div className="text-[11px] font-medium" style={{ color: "var(--yunque-primary)" }}>建议下一步</div>
+              <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
+                {currentViewAdvice}
+              </div>
+            </div>
           </div>
         </Card>
       </div>

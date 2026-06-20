@@ -279,6 +279,14 @@ describe("PacksPageOptimized", () => {
     expect(screen.getByText(/匹配 1 个/)).toBeInTheDocument();
     expect(screen.getByText("当前视图：")).toBeInTheDocument();
     expect(screen.getByText("共 1 个，0 个可直接使用、1 个作为 Chat/任务/记忆/知识的底座能力、0 个仍建议先看边界再启用。")).toBeInTheDocument();
+    expect(screen.getByText("来源构成")).toBeInTheDocument();
+    expect(screen.getByText("已安装 1 · 官方 0 · 私有 0")).toBeInTheDocument();
+    expect(screen.getByText("交付构成")).toBeInTheDocument();
+    expect(screen.getByText("可交付 0 · 后台 1 · 实验 0 · 待补 0")).toBeInTheDocument();
+    expect(screen.getByText("体检构成")).toBeInTheDocument();
+    expect(screen.getByText("完整 1 · 补说明 0 · 补入口 0")).toBeInTheDocument();
+    expect(screen.getByText("建议下一步")).toBeInTheDocument();
+    expect(screen.getByText("建议从卡片里的入口或 Chat 主路径触发一次，确认结果、产物或状态变化可见。")).toBeInTheDocument();
     expect(screen.getByText("搜索：文档")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "清除搜索" }));
@@ -337,6 +345,8 @@ describe("PacksPageOptimized", () => {
     expect(screen.getByText(/官方源 1/)).toBeInTheDocument();
     expect(screen.getByText("状态：可安装")).toBeInTheDocument();
     expect(screen.getByText("来源：官方源")).toBeInTheDocument();
+    expect(screen.getByText("已安装 0 · 官方 1 · 私有 0")).toBeInTheDocument();
+    expect(screen.getByText("建议先打开详情或工坊只读检查，再安装、启用并回到中心验证入口。")).toBeInTheDocument();
     expect(screen.getByText("来源：官方源 · example.com")).toBeInTheDocument();
     expect(screen.getByText("https://example.com/docs.yqpack")).toBeInTheDocument();
     expect(screen.getByText("安装前看这几点")).toBeInTheDocument();
@@ -456,6 +466,9 @@ describe("PacksPageOptimized", () => {
     expect(screen.getByText("能力包体检总览")).toBeInTheDocument();
     expect(screen.getByText("已体检 3 个能力包，按用途说明、用户能感知的位置、入口和后端能力声明判断是否需要补肉。")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /优先打磨2/ })).toBeInTheDocument();
+    expect(screen.getByText("可交付 0 · 后台 1 · 实验 0 · 待补 2")).toBeInTheDocument();
+    expect(screen.getByText("完整 1 · 补说明 1 · 补入口 1")).toBeInTheDocument();
+    expect(screen.getByText("建议先导入补肉队列或逐个交给小羽，补用途、入口、示例和能力边界。")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /说明完整1/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /需补说明1/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /需补入口1/ })).toBeInTheDocument();
