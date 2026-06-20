@@ -327,6 +327,11 @@ describe("PackStudioPage", () => {
     expect(screen.getByText("从只读检查到启用/回滚都在同一条路径里推进；小羽只生成计划和草稿，真正写入、打包、安装都需要你确认。")).toBeInTheDocument();
     expect(screen.getByText("当前包：WASM 能力包")).toBeInTheDocument();
     expect(screen.getByText("0/8 已完成")).toBeInTheDocument();
+    expect(screen.getByText("最终验收出口：")).toBeInTheDocument();
+    expect(screen.getByText(/回中心确认状态，进详情复查权限，再打开入口复验。/)).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: /能力包中心/ }).some((link) => link.getAttribute("href") === "/packs?q=yunque.pack.wasm-plugin&from=studio")).toBe(true);
+    expect(screen.getAllByRole("link", { name: /权限与详情/ }).some((link) => link.getAttribute("href") === "/packs/detail?id=yunque.pack.wasm-plugin")).toBe(true);
+    expect(screen.getAllByRole("link", { name: /^打开入口/ }).some((link) => link.getAttribute("href") === "/packs/wasm-plugin")).toBe(true);
     expect(screen.getByText("权限：沙箱、联网、写入；需要授权后使用")).toBeInTheDocument();
     expect(screen.getByText("权限：写入；启用前建议确认")).toBeInTheDocument();
     expect(screen.getAllByText("下一步：填写路径/URL 后点击只读检查").length).toBeGreaterThan(0);
@@ -1085,7 +1090,7 @@ describe("PackStudioPage", () => {
     expect(screen.getAllByText("已安装").length).toBeGreaterThan(0);
     expect(screen.getAllByText("需要授权").length).toBeGreaterThan(0);
     expect(screen.getAllByText("权限：沙箱、联网、写入；需要授权后使用").length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByRole("link", { name: /^打开入口$/ })).toHaveAttribute("href", "/packs/wasm-plugin");
+    expect(screen.getAllByRole("link", { name: /^打开入口$/ }).some((link) => link.getAttribute("href") === "/packs/wasm-plugin")).toBe(true);
     expect(screen.getByRole("link", { name: /查看权限与来源/ })).toHaveAttribute("href", "/packs/detail?id=yunque.pack.wasm-plugin");
     expect(screen.getByRole("link", { name: /回中心管理/ })).toHaveAttribute("href", "/packs?q=yunque.pack.wasm-plugin&from=studio");
     expect(screen.getByText("下一步：确认权限后再启用")).toBeInTheDocument();

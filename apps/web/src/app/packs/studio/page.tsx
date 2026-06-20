@@ -1188,6 +1188,10 @@ export default function PackStudioPage() {
     () => workflowSteps.filter((step) => step.state === "done").length,
     [workflowSteps],
   );
+  const workflowVerificationManifest = installedRepack?.manifest || manifest;
+  const workflowOpenPath = workflowVerificationManifest ? packPrimaryPath(workflowVerificationManifest) : undefined;
+  const workflowCenterHref = packCenterFocusHref(workflowVerificationManifest?.id);
+  const workflowDetailHref = workflowVerificationManifest ? `/packs/detail?id=${encodeURIComponent(workflowVerificationManifest.id)}` : "";
   const batchActiveStage = useMemo(() => {
     if (!batchActivePack) return "未载入";
     if (installedRepack?.manifest.id === batchActivePack.id && installedRepack.status === "enabled") return "已启用";
@@ -2103,6 +2107,25 @@ export default function PackStudioPage() {
                   跳到当前操作 <ArrowRight size={12} />
                 </a>
               )}
+              <div className="mt-3 rounded border px-2 py-2 text-[11px] leading-5" style={{ borderColor: "rgba(59,130,246,0.20)", background: "rgba(59,130,246,0.06)", color: "var(--yunque-text-secondary)" }}>
+                <span className="font-medium" style={{ color: "var(--yunque-text)" }}>最终验收出口：</span>
+                回中心确认状态，进详情复查权限{workflowOpenPath ? "，再打开入口复验。" : "；没有独立入口时，从 Chat、任务、记忆或知识流程复验。"}
+                <div className="mt-1 flex flex-wrap gap-2">
+                  <a href={workflowCenterHref} className="inline-flex items-center gap-1 font-medium" style={{ color: "var(--yunque-accent)" }}>
+                    能力包中心 <ArrowRight size={10} />
+                  </a>
+                  {workflowDetailHref && (
+                    <a href={workflowDetailHref} className="inline-flex items-center gap-1 font-medium" style={{ color: "var(--yunque-accent)" }}>
+                      权限与详情 <ArrowRight size={10} />
+                    </a>
+                  )}
+                  {workflowOpenPath && (
+                    <a href={workflowOpenPath} className="inline-flex items-center gap-1 font-medium" style={{ color: "var(--yunque-success)" }}>
+                      打开入口 <ExternalLink size={10} />
+                    </a>
+                  )}
+                </div>
+              </div>
             </div>
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
               {workflowSteps.map((step, index) => (
