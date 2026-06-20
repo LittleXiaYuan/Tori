@@ -126,7 +126,7 @@ function packStudioToolSummary(content: string): string | null {
     return [
       batchRequest.displayText,
       `小羽批量打磨任务: ${batchRequest.packs.length} 个能力包`,
-      batchRequest.batch?.total ? `队列批次：第 ${batchRequest.batch.page || 1} / ${batchRequest.batch.pageCount || 1} 批；总计 ${batchRequest.batch.total} 个待补肉` : "",
+      batchRequest.batch?.total ? `队列批次：第 ${batchRequest.batch.page || 1} / ${batchRequest.batch.pageCount || 1} 批；总计 ${batchRequest.batch.total} 个待打磨` : "",
       batchRequest.goal ? `目标：${batchRequest.goal}` : "",
       batchRequest.rules.length ? `规则：${batchRequest.rules.join(" / ")}` : "",
       ...packLines,
@@ -305,7 +305,7 @@ function packStudioBatchHandoffHref(request: PackStudioBatchDraftRequest): strin
     })),
   };
   const batchText = [
-    "小羽收到批量补肉任务。",
+    "小羽收到批量打磨任务。",
     "",
     "```json",
     JSON.stringify(payload, null, 2),
@@ -436,7 +436,7 @@ function renderPackStudioBatchDraftRequest(request: PackStudioBatchDraftRequest)
           </div>
           <div className="mt-1 truncate" style={{ color: "var(--yunque-text-muted)" }}>
             {request.batch?.total
-              ? `第 ${request.batch.page || 1} / ${request.batch.pageCount || 1} 批 · 本批 ${request.packs.length} 个 · 总计 ${request.batch.total} 个待补肉`
+              ? `第 ${request.batch.page || 1} / ${request.batch.pageCount || 1} 批 · 本批 ${request.packs.length} 个 · 总计 ${request.batch.total} 个待打磨`
               : `${request.packs.length} 个能力包 · 小羽逐包生成改包草稿请求`}
           </div>
         </div>

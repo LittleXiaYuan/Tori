@@ -377,7 +377,7 @@ export function parsePackStudioBatchDraftRequestPrompt(text?: string): PackStudi
       const summary = asRecord(root.summary);
       const queueSummary = asRecord(summary?.queue);
       return {
-        goal: "按能力包体检报告逐包补齐用途、入口、示例、权限边界和回滚说明。",
+        goal: "按能力包体检报告逐包打磨用途、入口、示例、权限边界和回滚说明。",
         rules: [
           "不要自动应用改动。",
           "优先处理报告 queue 中的 P0/P1 项；每个包仍需只读检查、差异预览、审计、重新打包和复检。",

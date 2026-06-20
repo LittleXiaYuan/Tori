@@ -572,7 +572,7 @@ describe("PackStudioPage", () => {
       ],
     };
     navigationMock.query = new URLSearchParams({
-      batch: `小羽收到批量补肉任务。\n\n\`\`\`json\n${JSON.stringify(batchRequest, null, 2)}\n\`\`\``,
+      batch: `小羽收到批量打磨任务。\n\n\`\`\`json\n${JSON.stringify(batchRequest, null, 2)}\n\`\`\``,
     }).toString();
 
     render(<PackStudioPage />);

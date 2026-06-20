@@ -278,7 +278,7 @@ describe("ChatMessageList file preview", () => {
   it("renders ability package workshop batch draft requests as a guarded queue card", () => {
     const onCopy = vi.fn();
     const batchMessage = [
-      "请批量补肉这批能力包。",
+      "请批量打磨这批能力包。",
       "",
       "```json",
       JSON.stringify({
@@ -358,7 +358,7 @@ describe("ChatMessageList file preview", () => {
     })} />);
 
     expect(screen.getByText("小羽批量打磨任务")).toBeInTheDocument();
-    expect(screen.getByText(/第 2 \/ 4 批 · 本批 2 个 · 总计 20 个待补肉/)).toBeInTheDocument();
+    expect(screen.getByText(/第 2 \/ 4 批 · 本批 2 个 · 总计 20 个待打磨/)).toBeInTheDocument();
     expect(screen.getByText("Needs Entry Pack")).toBeInTheDocument();
     expect(screen.getByText("Experimental Pack")).toBeInTheDocument();
     expect(screen.getByText("需补入口")).toBeInTheDocument();
@@ -386,13 +386,13 @@ describe("ChatMessageList file preview", () => {
     expect(batchParam).toContain("polish_guidance");
     expect(batchParam).toContain("/packs/needs-entry");
     expect(screen.getByRole("link", { name: /返回能力包中心队列/ })).toHaveAttribute("href", "/packs#readiness-queue");
-    expect(screen.getByText("请批量补肉这批能力包。")).toBeInTheDocument();
+    expect(screen.getByText("请批量打磨这批能力包。")).toBeInTheDocument();
     expect(screen.queryByText(/yunque.pack_studio.batch_draft_request.v1/)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId("copy").closest("button")!);
     expect(onCopy).toHaveBeenCalledTimes(1);
     expect(onCopy.mock.calls[0][1]).toContain("小羽批量打磨任务: 2 个能力包");
-    expect(onCopy.mock.calls[0][1]).toContain("队列批次：第 2 / 4 批；总计 20 个待补肉");
+    expect(onCopy.mock.calls[0][1]).toContain("队列批次：第 2 / 4 批；总计 20 个待打磨");
     expect(onCopy.mock.calls[0][1]).toContain("Needs Entry Pack");
     expect(onCopy.mock.calls[0][1]).toContain("验收：中心 /packs?q=yunque.pack.needs-entry&from=studio");
     expect(onCopy.mock.calls[0][1]).toContain("入口 /packs/needs-entry");

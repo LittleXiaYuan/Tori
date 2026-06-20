@@ -301,7 +301,7 @@ describe("pack-presentation", () => {
     expect(packDeliveryProfile(ready)).toMatchObject({ level: "ready", label: "可直接交付" });
     expect(packDeliveryProfile(support)).toMatchObject({ level: "support", label: "后台支撑" });
     expect(packDeliveryProfile(planOnly)).toMatchObject({ level: "plan_only", label: "实验/计划" });
-    expect(packDeliveryProfile(needsMeat)).toMatchObject({ level: "needs_meat", label: "待补肉" });
+    expect(packDeliveryProfile(needsMeat)).toMatchObject({ level: "needs_meat", label: "需打磨" });
     expect(packDeliveryProfile(needsMeat).nextStep).toContain("交给小羽");
   });
 

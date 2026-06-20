@@ -173,7 +173,7 @@ describe("parsePackStudioPatchDraftRequestPrompt", () => {
 describe("parsePackStudioBatchDraftRequestPrompt", () => {
   it("extracts a batch draft request and hides the structured JSON from display text", () => {
     const parsed = parsePackStudioBatchDraftRequestPrompt([
-      "请批量补肉这些能力包。",
+      "请批量打磨这些能力包。",
       "",
       "```json",
       JSON.stringify({
@@ -244,7 +244,7 @@ describe("parsePackStudioBatchDraftRequestPrompt", () => {
       },
     });
     expect(parsed?.packs[0].missing).toEqual(["使用示例", "打开/使用入口"]);
-    expect(parsed?.displayText).toBe("请批量补肉这些能力包。");
+    expect(parsed?.displayText).toBe("请批量打磨这些能力包。");
     expect(parsed?.displayText).not.toContain("yunque.pack_studio.batch_draft_request.v1");
   });
 
