@@ -864,7 +864,7 @@ export default function PacksPageOptimized() {
   }, [filteredInstalledPacks, filteredReleaseEntries, filteredPrivateCatalogEntries]);
   const currentViewAdvice = useMemo(() => {
     if (totalMatches === 0) return "建议清空搜索或放宽筛选，先恢复可见候选。";
-    if (visibleDeliveryStats.needs_meat > 0) return "建议先导入补肉队列或逐个交给小羽，补用途、入口、示例和能力边界。";
+    if (visibleDeliveryStats.needs_meat > 0) return "建议先进入打磨队列：P0 修可用路径，P1/P2 补说明、边界和主路径验收。";
     if (visibleDeliveryStats.plan_only > 0) return "建议先查看实验限制、风险和验证路径，不要把计划能力当成稳定主路径。";
     if (filteredReleaseEntries.length + filteredPrivateCatalogEntries.length > 0) return "建议先打开详情或工坊只读检查，再安装、启用并回到中心验证入口。";
     if (filteredInstalledPacks.some((pack) => pack.status !== "enabled")) return "建议先查看详情确认权限，再启用；启用后按入口提示验证结果。";
@@ -986,7 +986,7 @@ export default function PacksPageOptimized() {
 
   const noticeForInstalled = (manifest: PackManifest): CenterActionNotice => ({
     title: "能力包已安装",
-    detail: "下一步先查看详情确认权限和入口，再启用；也可以继续筛选、固定或交给小羽补肉。",
+    detail: "下一步先查看详情确认权限和入口，再启用；也可以继续筛选、固定或交给小羽打磨。",
     href: `/packs/detail?id=${encodeURIComponent(manifest.id)}`,
     actionLabel: "查看详情并启用",
     inlineActionLabel: "立即启用",
@@ -1227,7 +1227,7 @@ export default function PacksPageOptimized() {
                 </div>
                 <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
                   {studioReturnManifest
-                    ? `已聚焦 ${studioReturnManifest.name}。先确认来源、权限和交付状态，再打开入口验证；如果结果不符合预期，可以继续回工坊补肉或禁用/回滚。`
+                    ? `已聚焦 ${studioReturnManifest.name}。先确认来源、权限和交付状态，再打开入口验证；如果结果不符合预期，可以继续回工坊打磨或禁用/回滚。`
                     : `已按 ${searchFocus} 聚焦搜索。没有找到本机或源里的同名能力包时，先刷新官方源/私有源，或回工坊复检 yqpack 的包 ID。`}
                 </div>
                 {studioReturnManifest && (
@@ -1381,7 +1381,7 @@ export default function PacksPageOptimized() {
                 <span className="text-lg font-semibold" style={{ color: "var(--yunque-danger)" }}>{readinessQueueTotal}</span>
               </div>
               <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
-                从缺入口、实验计划和不易验证的包开始，交给小羽逐包补用途、结果、入口和回滚说明。
+                不是都不可用；优先从缺入口、实验边界和后台验收不清楚的包开始，逐包补用途、结果、入口和回滚说明。
               </div>
             </button>
           </div>
@@ -1392,7 +1392,7 @@ export default function PacksPageOptimized() {
             <div>
               <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>能力包体检总览</div>
               <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
-                已体检 {readinessStats.total} 个能力包，按用途说明、用户能感知的位置、入口和后端能力声明判断是否需要补肉。
+                已体检 {readinessStats.total} 个能力包，按用途说明、用户能感知的位置、入口和后端能力声明判断是否需要继续打磨；只有 P0 才代表会阻塞用户验证。
               </div>
             </div>
             <a href="#readiness-queue">
@@ -1467,7 +1467,7 @@ export default function PacksPageOptimized() {
               ["ready", "可直接交付", deliveryStats.ready, "有明确入口、示例和结果验证路径。"],
               ["support", "后台支撑", deliveryStats.support, "在 Chat、任务、记忆、知识或设置里生效。"],
               ["plan_only", "实验/计划", deliveryStats.plan_only, "先体验边界、计划和证据，不包装成稳定主路径。"],
-              ["needs_meat", "待补肉", deliveryStats.needs_meat, "缺用途、入口或能力声明，优先交给小羽。"],
+              ["needs_meat", "需打磨", deliveryStats.needs_meat, "不等于不可用，通常是缺用途、入口说明或验收路径。"],
             ] as const).map(([key, label, value, detail]) => {
               const style = deliveryToneStyle(key === "ready" ? "success" : key === "support" ? "primary" : key === "plan_only" ? "warning" : "danger");
               return (
@@ -1487,9 +1487,9 @@ export default function PacksPageOptimized() {
           <div id="readiness-queue" className="mt-4 scroll-mt-24 rounded-lg border p-4" style={{ borderColor: "rgba(245,158,11,0.22)", background: "rgba(245,158,11,0.07)" }}>
             <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
               <div>
-                <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>补肉优先队列</div>
+                <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>打磨与验收队列</div>
                 <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
-                  按体检缺口和交付状态自动挑出最需要小羽补用途、入口、示例、真实结果或能力边界的能力包。当前第 {currentReadinessQueuePage} / {readinessQueuePageCount} 批，展示 {readinessQueue.length} 个，共 {readinessQueueTotal} 个待打磨。
+                  按体检缺口和交付状态挑出需要继续解释、验收或补入口的能力包；P0 才是阻塞项，P1/P2 多数是可用但需要讲清楚边界和结果。当前第 {currentReadinessQueuePage} / {readinessQueuePageCount} 批，展示 {readinessQueue.length} 个，共 {readinessQueueTotal} 个待打磨。
                 </div>
               </div>
               <Button size="sm" variant="outline" onPress={() => {
@@ -1525,7 +1525,7 @@ export default function PacksPageOptimized() {
               <div className="rounded-md border p-3" style={{ borderColor: "rgba(59,130,246,0.18)", background: "rgba(59,130,246,0.06)" }}>
                 <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>处理顺序</div>
                 <div className="mt-1 text-[11px] leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
-                  先看权限与来源，再进工坊只读检查；每包都走差异预览、审计、重新打包和复检。
+                  P0 先进工坊只读检查和差异预览；P1/P2 先复验真实入口，再决定是否需要重新打包。
                 </div>
               </div>
               <div className="rounded-md border p-3" style={{ borderColor: "rgba(34,197,94,0.18)", background: "rgba(34,197,94,0.06)" }}>
@@ -1580,7 +1580,7 @@ export default function PacksPageOptimized() {
                     >
                       <div><span className="font-medium" style={{ color: "var(--yunque-text)" }}>来源：</span>{item.sourceLabel}{item.packageUrl ? ` · ${item.packageUrl}` : ""}</div>
                       <div><span className="font-medium" style={{ color: "var(--yunque-text)" }}>权限：</span>{permissionSummary}</div>
-                      <div><span className="font-medium" style={{ color: "var(--yunque-text)" }}>先做：</span>{risk.requiresAuthorization ? "先验收权限、来源和回滚，再进入工坊补肉。" : "可直接进工坊补说明；启用前仍要回详情确认权限。"}</div>
+                      <div><span className="font-medium" style={{ color: "var(--yunque-text)" }}>先做：</span>{priority.level === "P0" ? "先看详情确认是否缺入口或能力声明，再进工坊只读检查。" : risk.requiresAuthorization ? "先验收权限、来源和回滚，再进入工坊打磨边界。" : "先按入口或主路径复验；仍说不清楚时再交给小羽打磨。"}</div>
                     </div>
                     <div className="mt-2 rounded-md border p-2 text-[11px] leading-5" style={{ borderColor: "rgba(245,158,11,0.18)", background: "rgba(245,158,11,0.06)", color: "var(--yunque-text-secondary)" }}>
                       <div><span className="font-medium" style={{ color: "var(--yunque-text)" }}>{priority.label}：</span>{priority.reason}</div>
@@ -1593,7 +1593,7 @@ export default function PacksPageOptimized() {
                         <Button size="sm" variant={risk.requiresAuthorization ? "outline" : "ghost"}>先看权限与来源 <ShieldCheck size={14} /></Button>
                       </Link>
                       <Link href={packStudioHref(item.manifest, { packageUrl: item.packageUrl, sha256: item.sha256 })}>
-                        <Button size="sm" variant="ghost">交给小羽补齐 <Wrench size={14} /></Button>
+                        <Button size="sm" variant="ghost">交给小羽打磨 <Wrench size={14} /></Button>
                       </Link>
                     </div>
                   </div>
@@ -1602,7 +1602,7 @@ export default function PacksPageOptimized() {
             </div>
             <div className="mt-3">
               {renderPagination(
-                "补肉队列",
+                "打磨队列",
                 currentReadinessQueuePage,
                 readinessQueuePageCount,
                 readinessQueueTotal,

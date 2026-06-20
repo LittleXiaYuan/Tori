@@ -236,7 +236,7 @@ describe("PacksPageOptimized", () => {
     expect(screen.getByText("基础能力")).toBeInTheDocument();
     expect(screen.getByText("实验中")).toBeInTheDocument();
     expect(screen.getByText("优先打磨")).toBeInTheDocument();
-    expect(screen.getByText("从缺入口、实验计划和不易验证的包开始，交给小羽逐包补用途、结果、入口和回滚说明。")).toBeInTheDocument();
+    expect(screen.getByText("不是都不可用；优先从缺入口、实验边界和后台验收不清楚的包开始，逐包补用途、结果、入口和回滚说明。")).toBeInTheDocument();
     expect(screen.getByText("交付状态分布")).toBeInTheDocument();
     expect(screen.getByText("可直接交付")).toBeInTheDocument();
     expect(screen.getAllByText("后台支撑").length).toBeGreaterThan(0);
@@ -316,7 +316,7 @@ describe("PacksPageOptimized", () => {
     expect((screen.getByLabelText("搜索能力包") as HTMLInputElement).value).toBe("yunque.pack.files");
     expect(screen.queryByText("Documents (文档生成)")).not.toBeInTheDocument();
     expect(screen.getByText("工坊返回验收")).toBeInTheDocument();
-    expect(screen.getByText("已聚焦 Files (产物文件)。先确认来源、权限和交付状态，再打开入口验证；如果结果不符合预期，可以继续回工坊补肉或禁用/回滚。")).toBeInTheDocument();
+    expect(screen.getByText("已聚焦 Files (产物文件)。先确认来源、权限和交付状态，再打开入口验证；如果结果不符合预期，可以继续回工坊打磨或禁用/回滚。")).toBeInTheDocument();
     expect(screen.getByText("搜索已聚焦")).toBeInTheDocument();
     const returnPanel = screen.getByText("工坊返回验收").closest("div")?.parentElement?.parentElement;
     expect(returnPanel).not.toBeNull();
@@ -444,7 +444,7 @@ describe("PacksPageOptimized", () => {
       });
     });
     expect(await screen.findByText("能力包已安装")).toBeInTheDocument();
-    expect(screen.getByText("下一步先查看详情确认权限和入口，再启用；也可以继续筛选、固定或交给小羽补肉。")).toBeInTheDocument();
+    expect(screen.getByText("下一步先查看详情确认权限和入口，再启用；也可以继续筛选、固定或交给小羽打磨。")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /立即启用/ })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /查看详情并启用/ })).toHaveAttribute("href", "/packs/detail?id=yunque.pack.remote-docs");
     expect(screen.getByRole("link", { name: /交给小羽补齐/ })).toHaveAttribute("href", expect.stringContaining("/packs/studio?packId=yunque.pack.remote-docs"));
@@ -512,24 +512,24 @@ describe("PacksPageOptimized", () => {
     expect((await screen.findAllByText("Needs Context Pack")).length).toBeGreaterThan(0);
     expect(screen.getAllByText("Needs Entry Pack").length).toBeGreaterThan(0);
     expect(screen.getByText("Documents (文档生成)")).toBeInTheDocument();
-    expect(screen.getByText("补肉优先队列")).toBeInTheDocument();
-    expect(screen.getByText("补肉优先队列").closest("#readiness-queue")).not.toBeNull();
+    expect(screen.getByText("打磨与验收队列")).toBeInTheDocument();
+    expect(screen.getByText("打磨与验收队列").closest("#readiness-queue")).not.toBeNull();
     expect(screen.getByText("能力包体检总览")).toBeInTheDocument();
-    expect(screen.getByText("已体检 3 个能力包，按用途说明、用户能感知的位置、入口和后端能力声明判断是否需要补肉。")).toBeInTheDocument();
+    expect(screen.getByText((_, node) => node?.textContent === "已体检 3 个能力包，按用途说明、用户能感知的位置、入口和后端能力声明判断是否需要继续打磨；只有 P0 才代表会阻塞用户验证。")).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: /复制体检报告 JSON/ }).length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: /优先打磨2/ })).toBeInTheDocument();
     expect(screen.getByText("可交付 0 · 后台 1 · 实验 0 · 待补 2")).toBeInTheDocument();
     expect(screen.getByText("完整 1 · 补说明 1 · 补入口 1")).toBeInTheDocument();
-    expect(screen.getByText("建议先导入补肉队列或逐个交给小羽，补用途、入口、示例和能力边界。")).toBeInTheDocument();
+    expect(screen.getByText("建议先进入打磨队列：P0 修可用路径，P1/P2 补说明、边界和主路径验收。")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /说明完整1/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /需补说明1/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /需补入口1/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /查看打磨队列/ })).toBeInTheDocument();
-    expect(screen.getByText("按体检缺口和交付状态自动挑出最需要小羽补用途、入口、示例、真实结果或能力边界的能力包。当前第 1 / 1 批，展示 2 个，共 2 个待打磨。")).toBeInTheDocument();
+    expect(screen.getByText("按体检缺口和交付状态挑出需要继续解释、验收或补入口的能力包；P0 才是阻塞项，P1/P2 多数是可用但需要讲清楚边界和结果。当前第 1 / 1 批，展示 2 个，共 2 个待打磨。")).toBeInTheDocument();
     expect(screen.getByText("本批焦点")).toBeInTheDocument();
     expect(screen.getByText("P0 1 · P1 1 · P2 0；先处理缺入口 1 个，再补说明 1 个。")).toBeInTheDocument();
     expect(screen.getByText("处理顺序")).toBeInTheDocument();
-    expect(screen.getByText("先看权限与来源，再进工坊只读检查；每包都走差异预览、审计、重新打包和复检。")).toBeInTheDocument();
+    expect(screen.getByText("P0 先进工坊只读检查和差异预览；P1/P2 先复验真实入口，再决定是否需要重新打包。")).toBeInTheDocument();
     expect(screen.getByText("验收出口")).toBeInTheDocument();
     expect(screen.getByText("1 个有入口可打开复验；其余从 Chat、任务、记忆或知识流程观察结果。")).toBeInTheDocument();
     expect(screen.getByText("边界提醒")).toBeInTheDocument();
@@ -547,7 +547,7 @@ describe("PacksPageOptimized", () => {
     expect(screen.getByText("改完回到能力包详情与 Chat/任务主路径验证：用户是否知道怎么触发、结果在哪里、出问题怎么禁用或回滚。")).toBeInTheDocument();
     expect(screen.getAllByText((_, node) => node?.textContent === "来源：已安装").length).toBeGreaterThan(0);
     expect(screen.getAllByText((_, node) => node?.textContent === "权限：权限：未声明额外权限；低风险").length).toBeGreaterThan(0);
-    expect(screen.getAllByText((_, node) => node?.textContent === "先做：可直接进工坊补说明；启用前仍要回详情确认权限。").length).toBeGreaterThan(0);
+    expect(screen.getAllByText((_, node) => node?.textContent === "先做：先看详情确认是否缺入口或能力声明，再进工坊只读检查。").length).toBeGreaterThan(0);
     const queueDetailLink = screen.getAllByRole("link", { name: /先看权限与来源/ })
       .find((link) => link.getAttribute("href") === "/packs/detail?id=yunque.pack.needs-entry");
     expect(queueDetailLink).toBeTruthy();
@@ -606,7 +606,7 @@ describe("PacksPageOptimized", () => {
     expect(report.queue[0].handoff_links.studio).toContain("/packs/studio?");
     expect(report.queue[0].next_step).toContain("后端能力");
     expect(toastMock).toHaveBeenCalledWith("已复制能力包体检报告", "success");
-    const queueStudioLink = screen.getAllByRole("link", { name: /交给小羽补齐/ })
+    const queueStudioLink = screen.getAllByRole("link", { name: /交给小羽打磨/ })
       .find((link) => link.getAttribute("href")?.includes("yunque.pack.needs-entry"));
     expect(queueStudioLink).toHaveAttribute("href", expect.stringContaining("/packs/studio?"));
 
@@ -655,13 +655,13 @@ describe("PacksPageOptimized", () => {
 
     render(<PacksPageOptimized />);
 
-    expect(await screen.findByText("补肉优先队列")).toBeInTheDocument();
-    const queue = screen.getByText("补肉优先队列").closest("#readiness-queue");
+    expect(await screen.findByText("打磨与验收队列")).toBeInTheDocument();
+    const queue = screen.getByText("打磨与验收队列").closest("#readiness-queue");
     expect(queue).not.toBeNull();
-    expect(screen.getByText("按体检缺口和交付状态自动挑出最需要小羽补用途、入口、示例、真实结果或能力边界的能力包。当前第 1 / 2 批，展示 6 个，共 8 个待打磨。")).toBeInTheDocument();
+    expect(screen.getByText("按体检缺口和交付状态挑出需要继续解释、验收或补入口的能力包；P0 才是阻塞项，P1/P2 多数是可用但需要讲清楚边界和结果。当前第 1 / 2 批，展示 6 个，共 8 个待打磨。")).toBeInTheDocument();
     expect(screen.getByText("P0 6 · P1 0 · P2 0；先处理缺入口 6 个，再补说明 0 个。")).toBeInTheDocument();
     expect(screen.getByText("0 个有入口可打开复验；其余从 Chat、任务、记忆或知识流程观察结果。")).toBeInTheDocument();
-    expect(screen.getByText("补肉队列 · 第 1 / 2 页 · 共 8 个")).toBeInTheDocument();
+    expect(screen.getByText("打磨队列 · 第 1 / 2 页 · 共 8 个")).toBeInTheDocument();
     expect(within(queue as HTMLElement).getByText("Needs Entry Pack 1")).toBeInTheDocument();
     expect(within(queue as HTMLElement).getByText("Needs Entry Pack 6")).toBeInTheDocument();
     expect(within(queue as HTMLElement).queryByText("Needs Entry Pack 7")).not.toBeInTheDocument();
@@ -678,7 +678,7 @@ describe("PacksPageOptimized", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "下一页" }));
 
-    expect(screen.getByText("按体检缺口和交付状态自动挑出最需要小羽补用途、入口、示例、真实结果或能力边界的能力包。当前第 2 / 2 批，展示 2 个，共 8 个待打磨。")).toBeInTheDocument();
+    expect(screen.getByText("按体检缺口和交付状态挑出需要继续解释、验收或补入口的能力包；P0 才是阻塞项，P1/P2 多数是可用但需要讲清楚边界和结果。当前第 2 / 2 批，展示 2 个，共 8 个待打磨。")).toBeInTheDocument();
     expect(screen.getByText("P0 2 · P1 0 · P2 0；先处理缺入口 2 个，再补说明 0 个。")).toBeInTheDocument();
     expect(within(queue as HTMLElement).getByText("Needs Entry Pack 7")).toBeInTheDocument();
     expect(within(queue as HTMLElement).getByText("Needs Entry Pack 8")).toBeInTheDocument();
@@ -705,7 +705,7 @@ describe("PacksPageOptimized", () => {
     render(<PacksPageOptimized />);
 
     expect((await screen.findAllByText("Plan Only Pack")).length).toBeGreaterThan(0);
-    expect(screen.getByText("补肉优先队列")).toBeInTheDocument();
+    expect(screen.getByText("打磨与验收队列")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /优先打磨1/ })).toBeInTheDocument();
     expect(screen.getByText("交付状态：实验/计划。先保留限制说明；如果要变成主路径，下一轮补真实执行、结果查看和回滚证据。")).toBeInTheDocument();
     expect(screen.getByText("P0 0 · P1 1 · P2 0；先处理缺入口 0 个，再补说明 0 个。")).toBeInTheDocument();

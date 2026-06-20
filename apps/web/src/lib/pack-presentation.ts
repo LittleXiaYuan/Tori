@@ -269,8 +269,8 @@ export function packDeliveryProfile(manifest: PackManifest): PackDeliveryProfile
   if (readiness.missing.length > 0) {
     return {
       level: "needs_meat",
-      label: "待补肉",
-      description: "资料还没把用途、入口或后端能力讲完整，用户装上后容易不知道怎么验证。",
+      label: "需打磨",
+      description: "能力可能已经存在，但用途、入口或后端声明还没讲完整，用户装上后不容易验证价值。",
       nextStep: `交给小羽先补 ${readiness.missing.join("、")}，再预览差异、审计并重新打包。`,
       tone: "danger",
     };
