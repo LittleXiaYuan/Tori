@@ -367,6 +367,9 @@ describe("ChatMessageList file preview", () => {
     expect(onCopy.mock.calls[0][1]).toContain("小羽批量打磨任务: 2 个能力包");
     expect(onCopy.mock.calls[0][1]).toContain("队列批次：第 2 / 4 批；总计 20 个待补肉");
     expect(onCopy.mock.calls[0][1]).toContain("Needs Entry Pack");
+    expect(onCopy.mock.calls[0][1]).toContain("验收：中心 /packs?q=yunque.pack.needs-entry&from=studio");
+    expect(onCopy.mock.calls[0][1]).toContain("入口 /packs/needs-entry");
+    expect(onCopy.mock.calls[0][1]).toContain("入口 无独立入口");
     expect(onCopy.mock.calls[0][1]).toContain("请逐包生成改包草稿请求");
     expect(onCopy.mock.calls[0][1]).not.toContain("yunque.pack_studio.batch_draft_request.v1");
   });

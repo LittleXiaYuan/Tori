@@ -118,7 +118,10 @@ function packStudioToolSummary(content: string): string | null {
   if (batchRequest) {
     const packLines = batchRequest.packs.slice(0, 5).map((pack, index) => {
       const missing = pack.missing.length ? `缺口：${pack.missing.join(" / ")}` : "缺口：未标注";
-      return `${index + 1}. ${pack.name || pack.id} ${pack.version || ""} · ${pack.readiness || "待评估"} · ${missing}`.trim();
+      return [
+        `${index + 1}. ${pack.name || pack.id} ${pack.version || ""} · ${pack.readiness || "待评估"} · ${missing}`.trim(),
+        packHandoffSummary(pack),
+      ].filter(Boolean).join("\n   ");
     });
     return [
       batchRequest.displayText,
@@ -190,6 +193,14 @@ function packDetailHref(pack: { id?: string }): string | null {
 
 function packCenterHref(pack: { id?: string }): string {
   return pack.id ? `/packs?q=${encodeURIComponent(pack.id)}` : "/packs";
+}
+
+function packHandoffSummary(pack: PackStudioBatchDraftRequest["packs"][number]): string {
+  const links = pack.handoffLinks;
+  const center = links?.center || packCenterHref(pack);
+  const detail = links?.detail || packDetailHref(pack) || "未标注";
+  const open = links?.open || "无独立入口";
+  return `验收：中心 ${center} · 详情 ${detail} · 入口 ${open}`;
 }
 
 function renderPackHandoffLinks(pack: PackStudioBatchDraftRequest["packs"][number]) {
