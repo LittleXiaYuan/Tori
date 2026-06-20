@@ -253,6 +253,8 @@ describe("PacksPageOptimized", () => {
     expect(screen.getAllByText("交付状态：后台支撑").length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText("它不一定单独打开，而是在 Chat、任务、记忆、知识或设置流程里被云雀调用。").length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText("下一步：从它声明的用户感知位置验证：能否在主路径里看到效果、结果或状态变化。").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText("建议从卡片里的入口或 Chat 主路径触发一次，确认结果、产物或状态变化可见。")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /去 Chat 验证/ })).toHaveAttribute("href", "/chat");
     expect(screen.getByText("权限：读取、写入、沙箱；启用前建议确认")).toBeInTheDocument();
     expect(screen.getByText("权限：读取；低风险")).toBeInTheDocument();
     expect(screen.getByText("主入口：开始生成文档 · 帮我生成一份可下载的文档")).toBeInTheDocument();

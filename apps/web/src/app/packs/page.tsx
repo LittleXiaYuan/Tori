@@ -92,6 +92,12 @@ type CenterActionNotice = {
   actionLabel?: string;
   packId?: string;
 };
+type CurrentViewAction = {
+  label: string;
+  kind: "anchor" | "filter" | "link";
+  href?: string;
+  onPress?: () => void;
+};
 
 const KIND_FILTER_LABELS: Record<KindFilter, string> = {
   all: "全部类型",
@@ -727,6 +733,61 @@ export default function PacksPageOptimized() {
     if (filteredReleaseEntries.length + filteredPrivateCatalogEntries.length > 0) return "建议先打开详情或工坊只读检查，再安装、启用并回到中心验证入口。";
     if (filteredInstalledPacks.some((pack) => pack.status !== "enabled")) return "建议先查看详情确认权限，再启用；启用后按入口提示验证结果。";
     return "建议从卡片里的入口或 Chat 主路径触发一次，确认结果、产物或状态变化可见。";
+  }, [filteredInstalledPacks, filteredPrivateCatalogEntries.length, filteredReleaseEntries.length, totalMatches, visibleDeliveryStats]);
+  const currentViewAction = useMemo<CurrentViewAction>(() => {
+    if (totalMatches === 0) {
+      return {
+        label: "清空筛选",
+        kind: "filter",
+        onPress: () => {
+          setQuery("");
+          setKindFilter("all");
+          setInstallFilter("all");
+          setRiskFilter("all");
+          setSourceFilter("all");
+          setStabilityFilter("all");
+          setReadinessFilter("all");
+          setSortMode("name");
+        },
+      };
+    }
+    if (visibleDeliveryStats.needs_meat > 0) {
+      return { label: "去打磨队列", kind: "anchor", href: "#readiness-queue" };
+    }
+    if (visibleDeliveryStats.plan_only > 0) {
+      return {
+        label: "只看实验能力",
+        kind: "filter",
+        onPress: () => {
+          setKindFilter("experimental");
+          setStabilityFilter("alpha");
+          setSortMode("kind");
+        },
+      };
+    }
+    if (filteredReleaseEntries.length + filteredPrivateCatalogEntries.length > 0) {
+      return {
+        label: "只看可安装",
+        kind: "filter",
+        onPress: () => {
+          setInstallFilter("available");
+          setSourceFilter("all");
+          setSortMode("status");
+        },
+      };
+    }
+    if (filteredInstalledPacks.some((pack) => pack.status !== "enabled")) {
+      return {
+        label: "只看未启用",
+        kind: "filter",
+        onPress: () => {
+          setInstallFilter("disabled");
+          setSourceFilter("installed");
+          setSortMode("status");
+        },
+      };
+    }
+    return { label: "去 Chat 验证", kind: "link", href: "/chat" };
   }, [filteredInstalledPacks, filteredPrivateCatalogEntries.length, filteredReleaseEntries.length, totalMatches, visibleDeliveryStats]);
   const installedPageCount = pageCountFor(filteredInstalledPacks.length);
   const currentInstalledPage = Math.min(installedPage, installedPageCount);
@@ -1472,10 +1533,29 @@ export default function PacksPageOptimized() {
                 完整 {visibleReadinessStats.complete} · 补说明 {visibleReadinessStats.needs_context} · 补入口 {visibleReadinessStats.needs_entry}
               </div>
             </div>
-            <div className="rounded-md border p-3" style={{ borderColor: "rgba(59,130,246,0.18)", background: "rgba(59,130,246,0.06)" }}>
+            <div className="rounded-md border p-3 md:col-span-4" style={{ borderColor: "rgba(59,130,246,0.18)", background: "rgba(59,130,246,0.06)" }}>
               <div className="text-[11px] font-medium" style={{ color: "var(--yunque-primary)" }}>建议下一步</div>
-              <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
-                {currentViewAdvice}
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+                <div className="min-w-0 flex-1 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
+                  {currentViewAdvice}
+                </div>
+                {currentViewAction.kind === "link" ? (
+                  <Link href={currentViewAction.href || "/chat"}>
+                    <Button size="sm" variant="outline">
+                      {currentViewAction.label} <ArrowRight size={14} />
+                    </Button>
+                  </Link>
+                ) : currentViewAction.kind === "anchor" ? (
+                  <a href={currentViewAction.href || "#readiness-queue"}>
+                    <Button size="sm" variant="outline">
+                      {currentViewAction.label} <ArrowRight size={14} />
+                    </Button>
+                  </a>
+                ) : (
+                  <Button size="sm" variant="outline" onPress={currentViewAction.onPress}>
+                    {currentViewAction.label} <ArrowRight size={14} />
+                  </Button>
+                )}
               </div>
             </div>
           </div>
