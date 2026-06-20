@@ -635,6 +635,7 @@ describe("PackStudioPage", () => {
 
     expect(screen.getByText("当前能力包：Documents")).toBeInTheDocument();
     expect(screen.getByText("当前处理：Documents")).toBeInTheDocument();
+    expect(screen.getByText("已记录：只读已检查")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /上一包/ })).toBeEnabled();
     expect(screen.getByRole("button", { name: /下一包/ })).toBeDisabled();
     expect(screen.getByRole("button", { name: /跳到下一个 P0/ })).toBeEnabled();

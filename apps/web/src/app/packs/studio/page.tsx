@@ -129,6 +129,30 @@ function priorityColor(level?: string): "danger" | "warning" | "default" {
 }
 
 type BatchPack = PackStudioBatchDraftRequest["packs"][number];
+type BatchPackProgress = {
+  stage: string;
+  rank: number;
+};
+
+function batchStageRank(stage: string): number {
+  const order = [
+    "未载入",
+    "本页已载入",
+    "只读已检查",
+    "工作区已准备",
+    "草稿已载入",
+    "已预览差异",
+    "已应用差异",
+    "审计阻断",
+    "审计通过",
+    "已重打包",
+    "已复检",
+    "已安装",
+    "已启用",
+  ];
+  const index = order.indexOf(stage);
+  return index >= 0 ? index : 0;
+}
 
 function buildDeliverySummary(params: {
   manifest?: PackManifest;
@@ -788,6 +812,7 @@ export default function PackStudioPage() {
   const [patchFile, setPatchFile] = useState("");
   const [patchContent, setPatchContent] = useState("");
   const [importedBatchText, setImportedBatchText] = useState(() => searchParams.get("batch") || "");
+  const [batchProgress, setBatchProgress] = useState<Record<string, BatchPackProgress>>({});
   const [importedPatchPlanText, setImportedPatchPlanText] = useState("");
   const [importedPatchDraftText, setImportedPatchDraftText] = useState("");
   const [patching, setPatching] = useState(false);
@@ -967,6 +992,9 @@ export default function PackStudioPage() {
     [importedBatchText],
   );
   useEffect(() => {
+    setBatchProgress({});
+  }, [importedBatchText]);
+  useEffect(() => {
     if (selectedId || !importedBatchRequest?.packs.length || candidates.length === 0) return;
     const firstPack = importedBatchRequest.packs.find((pack) => candidates.some((candidate) => candidate.manifest.id === pack.id));
     if (!firstPack) return;
@@ -1140,8 +1168,25 @@ export default function PackStudioPage() {
     if (inspectReport) return "只读已检查";
     return "本页已载入";
   }, [auditReport, batchActivePack, inspectReport, installedRepack, patchContent, patchReport, reinspectReport, repackReport, workspaceReport]);
+  useEffect(() => {
+    if (!batchActivePack) return;
+    const rank = batchStageRank(batchActiveStage);
+    setBatchProgress((current) => {
+      const existing = current[batchActivePack.id];
+      if (existing && existing.rank >= rank) return current;
+      return {
+        ...current,
+        [batchActivePack.id]: { stage: batchActiveStage, rank },
+      };
+    });
+  }, [batchActivePack, batchActiveStage]);
   const batchPackStage = (pack: BatchPack, candidate?: PackCandidate) => {
-    if (pack.id === batchActivePack?.id) return batchActiveStage;
+    const recorded = batchProgress[pack.id];
+    if (pack.id === batchActivePack?.id) {
+      if (recorded && recorded.rank > batchStageRank(batchActiveStage)) return `队列记录：${recorded.stage}`;
+      return batchActiveStage;
+    }
+    if (recorded && recorded.rank > batchStageRank("本页已载入")) return `已记录：${recorded.stage}`;
     if (candidate?.enabled) return "已启用";
     if (candidate?.installed) return "已安装";
     if (candidate) return "候选可载入";
@@ -1154,10 +1199,12 @@ export default function PackStudioPage() {
       if (pack.id === batchActivePack?.id) {
         return !["未载入", "本页已载入", "需检查 yqpack"].includes(batchActiveStage);
       }
+      const recorded = batchProgress[pack.id];
+      if (recorded && recorded.rank > batchStageRank("本页已载入")) return true;
       const candidate = candidates.find((item) => item.manifest.id === pack.id);
       return Boolean(candidate?.installed || candidate?.enabled);
     }).length;
-  }, [batchActivePack?.id, batchActiveStage, candidates, importedBatchRequest]);
+  }, [batchActivePack?.id, batchActiveStage, batchProgress, candidates, importedBatchRequest]);
   const batchSummary = useMemo(() => {
     const packs = importedBatchRequest?.packs || [];
     return {
