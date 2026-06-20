@@ -302,13 +302,19 @@ describe("PacksPageOptimized", () => {
   });
 
   it("focuses a pack from the URL query when returning from Studio", async () => {
-    navigationMock.query = "q=yunque.pack.files";
+    navigationMock.query = "q=yunque.pack.files&from=studio";
 
     render(<PacksPageOptimized />);
 
     expect(await screen.findByText("Files (产物文件)")).toBeInTheDocument();
     expect((screen.getByLabelText("搜索能力包") as HTMLInputElement).value).toBe("yunque.pack.files");
     expect(screen.queryByText("Documents (文档生成)")).not.toBeInTheDocument();
+    expect(screen.getByText("工坊返回验收")).toBeInTheDocument();
+    expect(screen.getByText("已聚焦 Files (产物文件)。先确认来源、权限和交付状态，再打开入口验证；如果结果不符合预期，可以继续回工坊补肉或禁用/回滚。")).toBeInTheDocument();
+    expect(screen.getByText("搜索已聚焦")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /验收权限与来源/ })).toHaveAttribute("href", "/packs/detail?id=yunque.pack.files");
+    expect(screen.getByRole("link", { name: /打开入口复验/ })).toHaveAttribute("href", "/chat?q=%E5%88%97%E5%87%BA%E6%88%91%E6%9C%80%E8%BF%91%E7%94%9F%E6%88%90%E7%9A%84%E6%96%87%E4%BB%B6");
+    expect(screen.getByRole("link", { name: /继续让小羽改/ })).toHaveAttribute("href", expect.stringContaining("/packs/studio?packId=yunque.pack.files"));
   });
 
   it("filters source and install state without hiding official release cards", async () => {

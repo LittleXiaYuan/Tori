@@ -530,6 +530,7 @@ export default function PacksPageOptimized() {
   const [privatePage, setPrivatePage] = useState(1);
   const [readinessQueuePage, setReadinessQueuePage] = useState(1);
   const searchFocus = searchParams.get("q")?.trim() || searchParams.get("packId")?.trim() || "";
+  const returnedFromStudio = searchParams.get("from") === "studio" && searchFocus.length > 0;
 
   const packs = data?.packs || [];
   const catalogEntries = catalog?.entries || [];
@@ -850,6 +851,12 @@ export default function PacksPageOptimized() {
     packs.find((pack) => pack.manifest.id === id)?.manifest
     || releaseEntries.find((entry) => entry.manifest.id === id)?.manifest
     || privateCatalogEntries.find((entry) => entry.manifest.id === id)?.manifest;
+  const studioReturnManifest = returnedFromStudio ? manifestById(searchFocus) : undefined;
+  const studioReturnOpenPath = studioReturnManifest
+    ? packUsability(studioReturnManifest).primaryActionPath || studioReturnManifest.frontend?.menus?.[0]?.path || studioReturnManifest.frontend?.routes?.[0]?.path
+    : undefined;
+  const studioReturnDelivery = studioReturnManifest ? packDeliveryProfile(studioReturnManifest) : undefined;
+  const studioReturnRisk = studioReturnManifest ? riskProfileForPack(studioReturnManifest) : undefined;
   const enable = (id: string) => {
     const manifest = manifestById(id);
     return run(`enable:${id}`, () => packsClient.enable(id), "已启用，可在命令菜单、扩展分组或本页入口打开", manifest ? noticeForEnabled(manifest) : undefined);
@@ -981,6 +988,58 @@ export default function PacksPageOptimized() {
                   <Link href={packStudioHref(manifestById(actionNotice.packId) || { id: actionNotice.packId, name: actionNotice.packId, version: "", status: "beta" } as PackManifest)}>
                     <Button size="sm" variant="ghost">
                       <Wrench size={14} /> 交给小羽补齐
+                    </Button>
+                  </Link>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {returnedFromStudio && (
+          <div className="mt-4 rounded-lg border p-4" style={{ borderColor: "rgba(59,130,246,0.22)", background: "rgba(59,130,246,0.07)" }}>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
+                  <Wrench size={16} style={{ color: "var(--yunque-primary)" }} />
+                  工坊返回验收
+                </div>
+                <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
+                  {studioReturnManifest
+                    ? `已聚焦 ${studioReturnManifest.name}。先确认来源、权限和交付状态，再打开入口验证；如果结果不符合预期，可以继续回工坊补肉或禁用/回滚。`
+                    : `已按 ${searchFocus} 聚焦搜索。没有找到本机或源里的同名能力包时，先刷新官方源/私有源，或回工坊复检 yqpack 的包 ID。`}
+                </div>
+                {studioReturnManifest && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Chip size="sm" color={studioReturnDelivery?.level === "ready" ? "success" : studioReturnDelivery?.level === "needs_meat" ? "danger" : "warning"}>
+                      {studioReturnDelivery?.label}
+                    </Chip>
+                    <Chip size="sm" color={studioReturnRisk?.level === "high" ? "danger" : studioReturnRisk?.level === "medium" ? "warning" : "success"}>
+                      {studioReturnRisk?.label}
+                    </Chip>
+                    <Chip size="sm" variant="soft">搜索已聚焦</Chip>
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {studioReturnManifest && (
+                  <Link href={`/packs/detail?id=${encodeURIComponent(studioReturnManifest.id)}`}>
+                    <Button size="sm" variant="outline">
+                      <ShieldCheck size={14} /> 验收权限与来源
+                    </Button>
+                  </Link>
+                )}
+                {studioReturnOpenPath && (
+                  <Link href={studioReturnOpenPath}>
+                    <Button size="sm" className="btn-accent">
+                      <ExternalLink size={14} /> 打开入口复验
+                    </Button>
+                  </Link>
+                )}
+                {studioReturnManifest && (
+                  <Link href={packStudioHref(studioReturnManifest)}>
+                    <Button size="sm" variant="ghost">
+                      <Wrench size={14} /> 继续让小羽改
                     </Button>
                   </Link>
                 )}

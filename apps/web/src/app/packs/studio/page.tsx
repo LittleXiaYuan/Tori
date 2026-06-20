@@ -249,7 +249,7 @@ function packPrimaryPath(manifest: PackManifest): string | undefined {
 }
 
 function packCenterFocusHref(packId?: string): string {
-  return packId ? `/packs?q=${encodeURIComponent(packId)}` : "/packs";
+  return packId ? `/packs?q=${encodeURIComponent(packId)}&from=studio` : "/packs?from=studio";
 }
 
 function postInstallNextStep(pack: InstalledPack): { title: string; detail: string } {
