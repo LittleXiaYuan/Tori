@@ -32,6 +32,13 @@ export type PackInstallChecklistItem = {
   tone: "safe" | "warning" | "danger";
 };
 
+export type PackInstallTroubleshootingItem = {
+  key: "download" | "sha" | "signature" | "manifest" | "platform";
+  label: string;
+  detail: string;
+  tone: "safe" | "warning" | "danger";
+};
+
 export type PackFeatureFlags = {
   hasFrontend: boolean;
   hasBackend: boolean;
@@ -680,4 +687,39 @@ export function formatPackInstallError(error: unknown, fallback = "安装失败"
   if (/platform|os|arch|unsupported/.test(text)) return "安装失败：当前平台不支持这个能力包。";
   if (/download|fetch|network|timeout|connection|404|403|500/.test(text)) return "安装失败：下载失败，请检查网络、源地址或权限。";
   return raw ? `${fallback}：${raw}` : fallback;
+}
+
+export function packInstallTroubleshooting(): PackInstallTroubleshootingItem[] {
+  return [
+    {
+      key: "download",
+      label: "下载失败",
+      detail: "先检查网络、源地址和访问权限；私有 OSS 源还要确认签名链接或鉴权是否过期。",
+      tone: "warning",
+    },
+    {
+      key: "sha",
+      label: "SHA 不匹配",
+      detail: "不要继续安装；换源、重新下载，或先让小羽只读检查 yqpack 与发布记录是否一致。",
+      tone: "danger",
+    },
+    {
+      key: "signature",
+      label: "签名失败",
+      detail: "确认发布者和签名配置；无法确认来源时保持未启用，避免安装未知能力包。",
+      tone: "danger",
+    },
+    {
+      key: "manifest",
+      label: "声明不合法",
+      detail: "能力声明或包结构不完整；先进工坊只读检查，再决定是修 manifest 还是退回发布者。",
+      tone: "warning",
+    },
+    {
+      key: "platform",
+      label: "平台不支持",
+      detail: "确认这个能力包是否声明了当前系统、架构或桌面/服务端运行方式。",
+      tone: "safe",
+    },
+  ];
 }

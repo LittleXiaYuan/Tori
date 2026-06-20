@@ -45,6 +45,7 @@ import {
   groupPackPermissions,
   packDeliveryProfile,
   packInstallChecklist,
+  packInstallTroubleshooting,
   packExamples,
   packFeatureFlags,
   packPermissionSummary,
@@ -147,6 +148,8 @@ const SORT_MODE_LABELS: Record<SortMode, string> = {
   status: "按阶段",
 };
 
+const INSTALL_TROUBLESHOOTING = packInstallTroubleshooting();
+
 function deliveryToneStyle(tone: ReturnType<typeof packDeliveryProfile>["tone"]): { background: string; borderColor: string; color: string } {
   if (tone === "danger") {
     return { background: "rgba(239,68,68,0.08)", borderColor: "rgba(239,68,68,0.20)", color: "var(--yunque-danger)" };
@@ -246,11 +249,11 @@ function packStudioHref(manifest: PackManifest, options?: { packageUrl?: string;
   const readiness = packReadiness(manifest);
   const delivery = packDeliveryProfile(manifest);
   const gap = readiness.missing.length > 0
-    ? `重点补齐：${readiness.missing.join("、")}。`
+    ? `重点打磨：${readiness.missing.join("、")}。`
     : delivery.level === "plan_only"
-      ? "重点把实验/计划边界讲清楚：不要伪装成稳定执行能力，补齐真实结果、限制、验证和回滚说明。"
+      ? "重点把实验/计划边界讲清楚：不要伪装成稳定执行能力，补全真实结果、限制、验证和回滚说明。"
     : "继续打磨更具体的用户场景和入口反馈。";
-  const goal = `让 ${manifest.name} 更像一个用户能直接理解和使用的能力包，${gap}补齐用途、入口、权限说明和可回滚改造建议。`;
+  const goal = `让 ${manifest.name} 更像一个用户能直接理解和使用的能力包，${gap}打磨用途、入口、权限说明和可回滚改造建议。`;
   const params = new URLSearchParams({
     packId: manifest.id,
     goal,
@@ -417,7 +420,7 @@ function buildBatchReadinessPrompt(
   };
   return [
     "请以“小羽改包”的方式批量处理下面这些能力包。",
-    "目标是先补齐用户可感知的用途、入口、示例、权限边界和回滚说明，而不是直接扩大能力或绕过能力包工坊。",
+    "目标是先打磨用户可感知的用途、入口、示例、权限边界和回滚说明，而不是直接扩大能力或绕过能力包工坊。",
     "请按优先级逐包输出计划；需要具体改单文件时，只输出 yunque.pack_studio.patch_draft_request.v1 或 patch_draft.v1，并要求用户回到能力包工坊预览差异 / 审计 / 重打包。",
     "每个包完成后必须按 handoff_links 回能力包中心、详情页和入口复验；没有 open 链接的包要说明应从 Chat、任务、记忆或知识流程验收。",
     "",
@@ -1731,7 +1734,7 @@ export default function PacksPageOptimized() {
             <div className="rounded-md border p-3" style={{ borderColor: "var(--yunque-border)", background: "rgba(255,255,255,0.03)" }}>
               <div className="text-[11px] font-medium" style={{ color: "var(--yunque-text-muted)" }}>交付构成</div>
               <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
-                可交付 {visibleDeliveryStats.ready} · 后台 {visibleDeliveryStats.support} · 实验 {visibleDeliveryStats.plan_only} · 待补 {visibleDeliveryStats.needs_meat}
+                可交付 {visibleDeliveryStats.ready} · 后台 {visibleDeliveryStats.support} · 实验 {visibleDeliveryStats.plan_only} · 待打磨 {visibleDeliveryStats.needs_meat}
               </div>
             </div>
             <div className="rounded-md border p-3" style={{ borderColor: "var(--yunque-border)", background: "rgba(255,255,255,0.03)" }}>
@@ -1800,6 +1803,21 @@ export default function PacksPageOptimized() {
                 </div>
               </div>
             ))}
+          </div>
+
+          <div className="mb-4 rounded-md border p-3" style={{ borderColor: "rgba(59,130,246,0.18)", background: "rgba(59,130,246,0.06)" }}>
+            <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>安装失败怎么处理</div>
+            <div className="mt-2 grid grid-cols-1 md:grid-cols-3 gap-2">
+              {INSTALL_TROUBLESHOOTING.slice(0, 3).map((item) => {
+                const style = checklistToneStyle(item.tone);
+                return (
+                  <div key={item.key} className="rounded-md border p-2" style={{ borderColor: style.borderColor, background: style.background }}>
+                    <div className="text-[11px] font-medium" style={{ color: style.color }}>{item.label}</div>
+                    <div className="mt-1 text-[11px] leading-4" style={{ color: "var(--yunque-text-muted)" }}>{item.detail}</div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           {releaseLoading ? (
@@ -1876,6 +1894,21 @@ export default function PacksPageOptimized() {
               ))}
             </div>
           )}
+
+          <div className="mb-4 rounded-md border p-3" style={{ borderColor: "rgba(245,158,11,0.18)", background: "rgba(245,158,11,0.06)" }}>
+            <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>私有源安装前确认</div>
+            <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
+              {INSTALL_TROUBLESHOOTING.slice(1).map((item) => {
+                const style = checklistToneStyle(item.tone);
+                return (
+                  <div key={item.key} className="rounded-md border p-2" style={{ borderColor: style.borderColor, background: style.background }}>
+                    <div className="text-[11px] font-medium" style={{ color: style.color }}>{item.label}</div>
+                    <div className="mt-1 text-[11px] leading-4" style={{ color: "var(--yunque-text-muted)" }}>{item.detail}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
 
           {catalogLoading ? (
             <div className="flex items-center gap-2 text-xs py-6" style={{ color: "var(--yunque-text-muted)" }}>
@@ -2131,6 +2164,12 @@ export default function PacksPageOptimized() {
             {options.sourceDetail && (
               <div className="mt-1 break-all font-mono text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>{options.sourceDetail}</div>
             )}
+            {options.sha256 && (
+              <div className="mt-1 break-all font-mono text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>SHA256 {options.sha256}</div>
+            )}
+            <div className="mt-2 text-[11px] leading-4" style={{ color: "var(--yunque-text-muted)" }}>
+              安装前可先进工坊只读检查；若 SHA、签名或声明异常，保持未启用并换源或让小羽打磨后重新打包。
+            </div>
           </div>
         )}
 

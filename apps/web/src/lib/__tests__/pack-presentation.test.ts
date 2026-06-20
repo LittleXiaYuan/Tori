@@ -10,6 +10,7 @@ import {
   packPermissionSummary,
   packDeliveryProfile,
   packInstallChecklist,
+  packInstallTroubleshooting,
   packFeatureFlags,
   packReadiness,
   packUsageExplanation,
@@ -197,6 +198,15 @@ describe("pack-presentation", () => {
     expect(formatPackInstallError(new Error("manifest schema invalid"))).toContain("能力声明不合法");
     expect(formatPackInstallError(new Error("unsupported platform"))).toContain("当前平台不支持");
     expect(formatPackInstallError(new Error("download timeout"))).toContain("下载失败");
+  });
+
+  it("explains install troubleshooting without raw backend errors", () => {
+    const items = packInstallTroubleshooting();
+    expect(items.map((item) => item.key)).toEqual(["download", "sha", "signature", "manifest", "platform"]);
+    expect(items.find((item) => item.key === "download")?.detail).toContain("网络、源地址和访问权限");
+    expect(items.find((item) => item.key === "sha")?.detail).toContain("不要继续安装");
+    expect(items.find((item) => item.key === "signature")?.tone).toBe("danger");
+    expect(items.find((item) => item.key === "manifest")?.detail).toContain("工坊只读检查");
   });
 
   it("summarizes pack usability from metadata and frontend entries", () => {

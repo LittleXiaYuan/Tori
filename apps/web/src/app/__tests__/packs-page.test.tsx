@@ -289,7 +289,7 @@ describe("PacksPageOptimized", () => {
     expect(screen.getByText("来源构成")).toBeInTheDocument();
     expect(screen.getByText("已安装 1 · 官方 0 · 私有 0")).toBeInTheDocument();
     expect(screen.getByText("交付构成")).toBeInTheDocument();
-    expect(screen.getByText("可交付 0 · 后台 1 · 实验 0 · 待补 0")).toBeInTheDocument();
+    expect(screen.getByText("可交付 0 · 后台 1 · 实验 0 · 待打磨 0")).toBeInTheDocument();
     expect(screen.getByText("体检构成")).toBeInTheDocument();
     expect(screen.getByText("完整 1 · 补说明 0 · 补入口 0")).toBeInTheDocument();
     expect(screen.getByText("建议下一步")).toBeInTheDocument();
@@ -365,11 +365,17 @@ describe("PacksPageOptimized", () => {
     expect(screen.queryByText("Documents (文档生成)")).not.toBeInTheDocument();
     expect(screen.getByText(/官方源 1/)).toBeInTheDocument();
     expect(screen.getByText("状态：可安装")).toBeInTheDocument();
+    expect(screen.getByText("安装失败怎么处理")).toBeInTheDocument();
+    expect(screen.getByText("下载失败")).toBeInTheDocument();
+    expect(screen.getAllByText("SHA 不匹配").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("签名失败").length).toBeGreaterThan(0);
     expect(screen.getByText("来源：官方源")).toBeInTheDocument();
     expect(screen.getByText("已安装 0 · 官方 1 · 私有 0")).toBeInTheDocument();
     expect(screen.getByText("建议先打开详情或工坊只读检查，再安装、启用并回到中心验证入口。")).toBeInTheDocument();
     expect(screen.getByText("来源：官方源 · example.com")).toBeInTheDocument();
     expect(screen.getByText("https://example.com/docs.yqpack")).toBeInTheDocument();
+    expect(screen.getByText("SHA256 abc")).toBeInTheDocument();
+    expect(screen.getByText("安装前可先进工坊只读检查；若 SHA、签名或声明异常，保持未启用并换源或让小羽打磨后重新打包。")).toBeInTheDocument();
     expect(screen.getByText("安装前看这几点")).toBeInTheDocument();
     expect(screen.getByText("确认来源")).toBeInTheDocument();
     expect(screen.getByText("理解权限")).toBeInTheDocument();
@@ -491,8 +497,12 @@ describe("PacksPageOptimized", () => {
 
     expect(await screen.findByText("Private Files Pack")).toBeInTheDocument();
     expect(screen.getByText("源可用")).toBeInTheDocument();
+    expect(screen.getByText("私有源安装前确认")).toBeInTheDocument();
+    expect(screen.getByText("声明不合法")).toBeInTheDocument();
+    expect(screen.getByText("平台不支持")).toBeInTheDocument();
     expect(screen.getByText("来源：私有源 · oss.example.com")).toBeInTheDocument();
     expect(screen.getByText("https://oss.example.com/yunque/private/private-pack.yqpack")).toBeInTheDocument();
+    expect(screen.getByText("SHA256 def")).toBeInTheDocument();
     expect(screen.getByText("安装前看这几点")).toBeInTheDocument();
     expect(screen.getByText("来源：私有源 · oss.example.com。安装前可先在工坊只读检查包内容、SHA 与能力声明。")).toBeInTheDocument();
     expect(screen.getByText("回滚：声明支持版本回滚；也可以随时禁用能力包。")).toBeInTheDocument();
@@ -519,7 +529,7 @@ describe("PacksPageOptimized", () => {
     expect(screen.getByText((_, node) => node?.textContent === "已体检 3 个能力包，按用途说明、用户能感知的位置、入口和后端能力声明判断是否需要继续打磨；只有 P0 才代表会阻塞用户验证。")).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: /复制体检报告 JSON/ }).length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: /优先打磨2/ })).toBeInTheDocument();
-    expect(screen.getByText("可交付 0 · 后台 1 · 实验 0 · 待补 2")).toBeInTheDocument();
+    expect(screen.getByText("可交付 0 · 后台 1 · 实验 0 · 待打磨 2")).toBeInTheDocument();
     expect(screen.getByText("完整 1 · 补说明 1 · 补入口 1")).toBeInTheDocument();
     expect(screen.getByText("建议先进入打磨队列：P0 修可用路径，P1/P2 补说明、边界和主路径验收。")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /说明完整1/ })).toBeInTheDocument();
