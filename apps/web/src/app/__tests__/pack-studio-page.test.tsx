@@ -577,6 +577,10 @@ describe("PackStudioPage", () => {
     expect(screen.getByText("yqpack：https://oss.example.com/wasm-plugin.yqpack")).toBeInTheDocument();
     expect(screen.getByText(`SHA：${"9".repeat(64)}`)).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: /打开 Studio/ })[0]).toHaveAttribute("href", expect.stringContaining("packId=yunque.pack.wasm-plugin"));
+    expect(screen.getAllByRole("link", { name: /查看详情/ }).some((link) => link.getAttribute("href") === "/packs/detail?id=yunque.pack.wasm-plugin")).toBe(true);
+    expect(screen.getAllByRole("link", { name: /回中心/ }).some((link) => link.getAttribute("href") === "/packs?q=yunque.pack.wasm-plugin")).toBe(true);
+    expect(screen.getAllByRole("link", { name: /查看详情/ }).some((link) => link.getAttribute("href") === "/packs/detail?id=yunque.pack.documents")).toBe(true);
+    expect(screen.getAllByRole("link", { name: /回中心/ }).some((link) => link.getAttribute("href") === "/packs?q=yunque.pack.documents")).toBe(true);
 
     fireEvent.click(screen.getAllByRole("button", { name: "载入本页" })[0]);
 
@@ -606,7 +610,7 @@ describe("PackStudioPage", () => {
     expect((screen.getByLabelText("SHA256") as HTMLInputElement).value).toBe("");
     expect(screen.queryByText("已同步检查结果")).not.toBeInTheDocument();
     expect(screen.getAllByText((_, element) => /本页状态：\s*本页已载入/.test(element?.textContent || "")).length).toBeGreaterThan(0);
-    expect(screen.getByRole("link", { name: /查看详情/ })).toHaveAttribute("href", "/packs/detail?id=yunque.pack.documents");
+    expect(screen.getAllByRole("link", { name: /查看详情/ }).some((link) => link.getAttribute("href") === "/packs/detail?id=yunque.pack.documents")).toBe(true);
   });
 
   it("keeps Studio candidate selection searchable and paginated", async () => {

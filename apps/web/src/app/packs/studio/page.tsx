@@ -1783,6 +1783,16 @@ export default function PackStudioPage() {
                             打开 Studio <ArrowRight size={13} />
                           </Button>
                         </Link>
+                        <Link href={`/packs/detail?id=${encodeURIComponent(pack.id)}`}>
+                          <Button size="sm" variant="ghost">
+                            查看详情 <FileSearch size={13} />
+                          </Button>
+                        </Link>
+                        <Link href={packCenterFocusHref(pack.id)}>
+                          <Button size="sm" variant="ghost">
+                            回中心 <ArrowRight size={13} />
+                          </Button>
+                        </Link>
                       </div>
                       {!candidate && (
                         <div className="mt-2 text-[11px]" style={{ color: "var(--yunque-warning)" }}>
