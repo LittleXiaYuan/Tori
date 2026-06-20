@@ -7,7 +7,9 @@ import type { ChatDispatch } from "@/lib/chat-state";
 import { CHAT_AGENT_SCENES, CHAT_EMPTY_SCENARIOS, PRODUCT_SCENARIOS, type ProductScenario } from "@/lib/product-scenarios";
 
 interface StarterChip {
+  id: string;
   label: string;
+  description: string;
   prompt: string;
 }
 
@@ -65,7 +67,9 @@ export function ChatEmptyState({ setupNeeded, chatD, inputRef, composer }: ChatE
       .map((id) => SCENARIO_BY_ID.get(id))
       .filter((s): s is ProductScenario => Boolean(s))
       .map((s) => ({
+        id: s.id,
         label: t(`scenario.${s.id}.label`),
+        description: s.description,
         prompt: t(`scenario.${s.id}.prompt`),
       }));
   }, [activeScene, t]);
@@ -94,9 +98,7 @@ export function ChatEmptyState({ setupNeeded, chatD, inputRef, composer }: ChatE
           </span>
           <h1 className="chat-empty__greeting" suppressHydrationWarning>{t("chat.empty.greetTpl").replace("{g}", greeting)}</h1>
         </div>
-        <p style={{ marginTop: 8, fontSize: 13, lineHeight: 1.5, color: "var(--yunque-text-muted)", textAlign: "center", maxWidth: 460 }}>
-          {t("chat.empty.subtitle")}
-        </p>
+        <p className="chat-empty__sub">{t("chat.empty.subtitle")}</p>
       </div>
 
       <div className="chat-empty__composer">{composer}</div>
@@ -130,14 +132,17 @@ export function ChatEmptyState({ setupNeeded, chatD, inputRef, composer }: ChatE
 
         <ul className="chat-empty__chips" aria-label={t("chat.empty.suggestions")}>
           {chips.map((chip) => (
-            <li key={chip.label}>
+            <li key={chip.id}>
               <button
                 type="button"
                 className="chat-empty__chip"
+                aria-labelledby={`chat-empty-chip-title-${chip.id}`}
+                aria-describedby={`chat-empty-chip-desc-${chip.id}`}
                 onClick={() => pickChip(chip.prompt)}
                 title={chip.prompt}
               >
-                {chip.label}
+                <span id={`chat-empty-chip-title-${chip.id}`} className="chat-empty__chip-title">{chip.label}</span>
+                <span id={`chat-empty-chip-desc-${chip.id}`} className="chat-empty__chip-desc">{chip.description}</span>
               </button>
             </li>
           ))}

@@ -73,6 +73,17 @@ import { providerModelLabel } from "@/lib/provider-ui";
 
 const browserIntentClient = createBrowserIntentPackClient();
 
+function conversationTitle(c: ConversationInfo | undefined, fallback: string): string {
+  const name = (c?.name || "").trim();
+  if (name && name !== c?.id && !name.startsWith("new-")) return name;
+  const summary = (c?.summary || "").trim();
+  if (summary) {
+    const runes = [...summary];
+    return runes.length > 30 ? runes.slice(0, 30).join("") + "…" : summary;
+  }
+  return fallback;
+}
+
 export default function ChatPage() {
   const { t } = useI18n();
   const router = useRouter();
@@ -744,6 +755,12 @@ export default function ChatPage() {
     });
   }, [conv.list, conv.searchQuery]);
 
+  const activeConversation = useMemo(
+    () => conv.list.find((c) => c.id === conv.activeId),
+    [conv.list, conv.activeId],
+  );
+  const activeConversationTitle = conversationTitle(activeConversation, t("chat.workspaceTitle"));
+
 
   const shortcutHandlers = useMemo(() => ({
     new_chat: () => newConversation(),
@@ -931,25 +948,38 @@ export default function ChatPage() {
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Bar */}
         <header
-          className="flex items-center justify-between shrink-0 px-4 py-2.5 xl:px-5"
+          className="chat-topbar flex items-center justify-between shrink-0 px-4 py-2.5 xl:px-5"
           style={{
-            borderBottom: chat.messages.length > 0 ? "1px solid var(--glass-edge, var(--yunque-border))" : "none",
-            background: chat.messages.length > 0 ? "var(--glass-sidebar, var(--yunque-sidebar))" : "transparent",
-            backdropFilter: chat.messages.length > 0 ? "blur(var(--yunque-glass-blur)) saturate(var(--yunque-glass-saturate))" : "none",
-            WebkitBackdropFilter: chat.messages.length > 0 ? "blur(var(--yunque-glass-blur)) saturate(var(--yunque-glass-saturate))" : "none",
+            borderBottom: "1px solid transparent",
+            background: "transparent",
           }}
         >
-          <div className="flex items-center gap-3">
+          <div className="chat-topbar__left flex items-center gap-3 min-w-0">
             <button
               onClick={() => setShowSidebar(!showSidebar)}
-              className="p-1.5 rounded-lg transition-colors"
+              className="chat-topbar__icon-btn p-1.5 rounded-lg transition-colors"
               style={{ color: "var(--yunque-text-muted)" }}
               aria-label={showSidebar ? t("convo.hideList") : t("convo.showList")}
             >
               <MessageCircle size={16} />
             </button>
-
-            
+            <div className="chat-topbar__title-wrap">
+              <div className="chat-topbar__title-row">
+                <span className="chat-topbar__title">{activeConversationTitle}</span>
+                <ChevronDown size={13} aria-hidden className="chat-topbar__chevron" />
+                <Button
+                  isIconOnly
+                  variant="ghost"
+                  size="sm"
+                  className="chat-topbar__new h-7 w-7 rounded-full"
+                  aria-label={t("convo.new")}
+                  onPress={newConversation}
+                >
+                  <Plus size={14} />
+                </Button>
+              </div>
+              <div className="chat-topbar__subtitle">{t("chat.desktopWorkspace")}</div>
+            </div>
           </div>
 
           <div className="flex items-center gap-1.5">
@@ -988,6 +1018,7 @@ export default function ChatPage() {
                 <Button
                   isIconOnly variant="ghost" size="sm" className="chat-tool-btn h-8 w-8 rounded-full"
                   onPress={() => setShowComputer(!showComputer)}
+                  aria-label={showComputer ? t("chat.computer.hide") : t("chat.computer.show")}
                   style={{ color: showComputer ? "var(--yunque-accent)" : "var(--yunque-text-muted)" }}
                 >
                   <Monitor size={15} />
@@ -1000,6 +1031,7 @@ export default function ChatPage() {
               <Button
                 isIconOnly variant="ghost" size="sm" className="chat-tool-btn h-8 w-8 rounded-full"
                 onPress={() => router.push("/missions")}
+                aria-label={t("chat.toTasks")}
                 style={{ color: "var(--yunque-text-muted)" }}
               >
                 <Zap size={15} />
@@ -1011,6 +1043,7 @@ export default function ChatPage() {
               <Button
                 isIconOnly variant="ghost" size="sm" className="chat-tool-btn h-8 w-8 rounded-full"
                 onPress={() => shortcutHandlers.zen_mode()}
+                aria-label={t("chat.zen")}
                 style={{ color: "var(--yunque-text-muted)" }}
               >
                 <Maximize2 size={14} />

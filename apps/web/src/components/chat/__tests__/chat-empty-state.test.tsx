@@ -51,6 +51,8 @@ describe("ChatEmptyState", () => {
     expect(screen.getByRole("button", { name: "记忆沉淀" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "能力扩展" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "电脑使用计划" })).toBeInTheDocument();
+    expect(screen.getByText("用通俗的话解释一个概念并举例。")).toBeInTheDocument();
+    expect(screen.getByText("把资料沉淀成可复用知识条目。")).toBeInTheDocument();
 
     const text = document.body.textContent || "";
     expect(text).not.toMatch(/\bPack\b|Cogni|微内核|WASM|DLC/);
@@ -66,6 +68,9 @@ describe("ChatEmptyState", () => {
       type: "SET_INPUT",
       value: expect.stringContaining("可验收的改进清单"),
     });
+
+    fireEvent.click(screen.getByRole("button", { name: "记忆沉淀" }));
+    expect(screen.getByText("把你的习惯写进长期记忆。")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "电脑使用计划" }));
     expect(screen.getByText("先规划浏览器或桌面动作，当前不会直接控制本机。")).toBeInTheDocument();
