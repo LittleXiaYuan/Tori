@@ -208,6 +208,22 @@ function packCenterFocusHref(packId?: string): string {
   return packId ? `/packs?q=${encodeURIComponent(packId)}` : "/packs";
 }
 
+function postInstallNextStep(pack: InstalledPack): { title: string; detail: string } {
+  const openPath = packPrimaryPath(pack.manifest);
+  if (pack.status === "enabled") {
+    return {
+      title: "下一步：打开入口验证，或回详情确认权限",
+      detail: openPath
+        ? "新包已经启用。建议先打开入口跑一遍主路径；如果结果不符合预期，可以回到这里禁用或回滚。"
+        : "新包已经启用，但没有独立入口。建议回详情确认它会在哪些 Chat、任务、记忆或知识流程里被云雀调用。",
+    };
+  }
+  return {
+    title: "下一步：确认权限后再启用",
+    detail: "新包已经安装但未启用。先确认权限、来源和风险；确认后启用，或回中心继续管理这个包。",
+  };
+}
+
 function buildManifestDraftContent(manifest: PackManifest, goal: string, readinessGaps: string[] = []): string {
   const draft = JSON.parse(JSON.stringify(manifest)) as PackManifest;
   const safeGoal = goal.trim() || "让这个能力包更像一个用户能直接理解和使用的功能，而不是只看到存在。";
@@ -2545,6 +2561,7 @@ export default function PackStudioPage() {
                         {installedRepack && (() => {
                           const installedRisk = riskProfileForPack(installedRepack.manifest);
                           const installedPermissionSummary = packPermissionSummary(installedRepack.manifest);
+                          const nextStep = postInstallNextStep(installedRepack);
                           return (
                             <div className="mt-3 rounded-md border p-3" style={{ borderColor: "var(--yunque-border)" }}>
                               <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -2562,6 +2579,10 @@ export default function PackStudioPage() {
                               </div>
                               <div className="mt-2 text-xs font-medium" style={{ color: installedRisk.requiresAuthorization ? "var(--yunque-warning)" : "var(--yunque-text-muted)" }}>
                                 {installedPermissionSummary}
+                              </div>
+                              <div className="mt-3 rounded px-3 py-2 text-xs leading-5" style={{ background: "var(--yunque-bg-hover)", color: "var(--yunque-text-secondary)" }}>
+                                <div className="font-medium" style={{ color: "var(--yunque-text)" }}>{nextStep.title}</div>
+                                <div className="mt-1">{nextStep.detail}</div>
                               </div>
                               <div className="mt-3 flex flex-wrap gap-2">
                                 {packPrimaryPath(installedRepack.manifest) && (

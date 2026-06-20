@@ -1027,6 +1027,8 @@ describe("PackStudioPage", () => {
     expect(screen.getByRole("link", { name: /打开入口/ })).toHaveAttribute("href", "/packs/wasm-plugin");
     expect(screen.getByRole("link", { name: /查看权限与来源/ })).toHaveAttribute("href", "/packs/detail?id=yunque.pack.wasm-plugin");
     expect(screen.getByRole("link", { name: /回中心管理/ })).toHaveAttribute("href", "/packs?q=yunque.pack.wasm-plugin");
+    expect(screen.getByText("下一步：确认权限后再启用")).toBeInTheDocument();
+    expect(screen.getByText("新包已经安装但未启用。先确认权限、来源和风险；确认后启用，或回中心继续管理这个包。")).toBeInTheDocument();
     expect(screen.getAllByText("下一步：确认权限后启用或回滚").length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole("button", { name: "启用" }));
@@ -1037,6 +1039,8 @@ describe("PackStudioPage", () => {
       expect(screen.getByRole("button", { name: "启用" })).toBeDisabled();
     });
     expect(screen.getAllByText("已启用").length).toBeGreaterThan(0);
+    expect(screen.getByText("下一步：打开入口验证，或回详情确认权限")).toBeInTheDocument();
+    expect(screen.getByText("新包已经启用。建议先打开入口跑一遍主路径；如果结果不符合预期，可以回到这里禁用或回滚。")).toBeInTheDocument();
     expect(screen.getAllByText("下一步：打开入口或查看详情").length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole("button", { name: "复制交付摘要" }));
