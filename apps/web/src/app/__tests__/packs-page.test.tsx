@@ -227,7 +227,7 @@ describe("PacksPageOptimized", () => {
     expect(await screen.findByText("Documents (文档生成)")).toBeInTheDocument();
     expect(screen.getByText("Files (产物文件)")).toBeInTheDocument();
     expect(screen.getByText("能力包不是都要单独打开")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Pack Studio/ })).toHaveAttribute("href", "/packs/studio");
+    expect(screen.getByRole("link", { name: /能力包工坊/ })).toHaveAttribute("href", "/packs/studio");
     expect(screen.getByText("可直接使用")).toBeInTheDocument();
     expect(screen.getByText("基础能力")).toBeInTheDocument();
     expect(screen.getByText("实验中")).toBeInTheDocument();
@@ -345,8 +345,8 @@ describe("PacksPageOptimized", () => {
     expect(screen.getByText("能力边界")).toBeInTheDocument();
     expect(screen.getByText("回滚路径")).toBeInTheDocument();
     expect(screen.getByText("权限：读取、写入、沙箱；启用前建议确认")).toBeInTheDocument();
-    expect(screen.getByText("来源：官方源 · example.com。安装前可先在 Studio 只读检查包内容、SHA 与 manifest。")).toBeInTheDocument();
-    expect(screen.getByText("边界：不会自动泄露 API Key，不会绕过权限声明，也不能调用未声明 route。")).toBeInTheDocument();
+    expect(screen.getByText("来源：官方源 · example.com。安装前可先在 Studio 只读检查包内容、SHA 与能力声明。")).toBeInTheDocument();
+    expect(screen.getByText("边界：不会自动泄露 API Key，不会绕过权限声明，也不能调用未声明的后端路由。")).toBeInTheDocument();
     const remoteStudioLink = screen.getAllByRole("link", { name: /小羽优化/ })
       .find((link) => link.getAttribute("href")?.includes("yunque.pack.remote-docs"));
     expect(remoteStudioLink).toHaveAttribute("href", expect.stringContaining("packageUrl=https%3A%2F%2Fexample.com%2Fdocs.yqpack"));
@@ -432,7 +432,7 @@ describe("PacksPageOptimized", () => {
     expect(screen.getByText("来源：私有源 · oss.example.com")).toBeInTheDocument();
     expect(screen.getByText("https://oss.example.com/yunque/private/private-pack.yqpack")).toBeInTheDocument();
     expect(screen.getByText("安装前看这几点")).toBeInTheDocument();
-    expect(screen.getByText("来源：私有源 · oss.example.com。安装前可先在 Studio 只读检查包内容、SHA 与 manifest。")).toBeInTheDocument();
+    expect(screen.getByText("来源：私有源 · oss.example.com。安装前可先在 Studio 只读检查包内容、SHA 与能力声明。")).toBeInTheDocument();
     expect(screen.getByText("回滚：声明支持版本回滚；也可以随时禁用能力包。")).toBeInTheDocument();
   });
 
@@ -465,7 +465,7 @@ describe("PacksPageOptimized", () => {
     expect(screen.getAllByText("为什么进队列：").length).toBeGreaterThan(0);
     expect(screen.getByText("体检缺口：使用示例、用户感知位置、打开/使用入口、后端能力声明。")).toBeInTheDocument();
     expect(screen.getAllByText("优先修改：").length).toBeGreaterThan(0);
-    expect(screen.getByText("先确认是否真有后端能力：有则补 routeSpecs、permissions 和测试；没有就明确标为前端/说明型能力，不能伪造执行能力。")).toBeInTheDocument();
+    expect(screen.getByText("先确认是否真有后端能力：有则补后端路由、权限和测试；没有就明确标为界面/说明型能力，不能伪造执行能力。")).toBeInTheDocument();
     expect(screen.getAllByText("验收路径：").length).toBeGreaterThan(0);
     expect(screen.getByText("改完回到能力包详情与 Chat/任务主路径验证：用户是否知道怎么触发、结果在哪里、出问题怎么禁用或回滚。")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "复制批量打磨任务" })).toBeInTheDocument();

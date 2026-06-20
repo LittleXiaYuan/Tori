@@ -253,16 +253,16 @@ function packPolishGuidance(manifest: PackManifest): PackPolishGuidance {
   const reason = missing.length > 0
     ? `体检缺口：${missing.join("、")}。`
     : `交付状态：${delivery.label}。${delivery.description}`;
-  let firstEdit = "先补 manifest metadata：用途、入口、示例、限制和回滚说明。";
+  let firstEdit = "先补能力声明里的用途、入口、示例、限制和回滚说明。";
 
   if (missing.includes("后端能力声明")) {
-    firstEdit = "先确认是否真有后端能力：有则补 routeSpecs、permissions 和测试；没有就明确标为前端/说明型能力，不能伪造执行能力。";
+    firstEdit = "先确认是否真有后端能力：有则补后端路由、权限和测试；没有就明确标为界面/说明型能力，不能伪造执行能力。";
   } else if (missing.includes("打开/使用入口")) {
-    firstEdit = "先补 metadata.primaryActionPath 或 frontend menu/route，让用户知道启用后从哪里进入。";
+    firstEdit = "先补主要入口或界面菜单，让用户知道启用后从哪里进入。";
   } else if (missing.includes("用户感知位置")) {
-    firstEdit = "先补 metadata.usageSurface，说明它会在 Chat、任务、记忆、知识或设置中的哪个位置被看见。";
+    firstEdit = "先补用户感知位置，说明它会在 Chat、任务、记忆、知识或设置中的哪个位置被看见。";
   } else if (missing.includes("使用示例")) {
-    firstEdit = "先补 metadata.example1-3，用真实用户动作描述它能产出什么结果。";
+    firstEdit = "先补真实使用示例，用用户动作描述它能产出什么结果。";
   } else if (delivery.level === "plan_only") {
     firstEdit = "先保留实验边界，补真实结果位置、当前限制、验证步骤和转稳定的最小待办。";
   } else if (delivery.level === "needs_meat") {
@@ -1051,7 +1051,7 @@ export default function PacksPageOptimized() {
           <div className="mt-4 mb-3">
             <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>交付状态分布</div>
             <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
-              这层不是看 manifest 是否完整，而是看用户安装后能否直接验证价值。
+              这层不是只看能力声明是否完整，而是看用户安装后能否直接验证价值。
             </div>
           </div>
           <div className="grid gap-3 md:grid-cols-4">
@@ -1159,7 +1159,7 @@ export default function PacksPageOptimized() {
         <div className="flex items-center gap-3 mt-4">
           <Link href="/packs/studio">
             <Button size="sm" variant="outline">
-              <Wrench size={14} /> Pack Studio
+              <Wrench size={14} /> 能力包工坊
             </Button>
           </Link>
           <Button size="sm" variant="ghost" onPress={() => setShowAdvanced(!showAdvanced)}>
@@ -1362,7 +1362,7 @@ export default function PacksPageOptimized() {
                   </div>
                   <div className="text-[11px] font-mono break-all mt-1" style={{ color: "var(--yunque-text-muted)" }}>{report.source}</div>
                   <div className="text-xs mt-2" style={{ color: "var(--yunque-text-muted)" }}>
-                    manifest {report.manifest_count} 个，匹配 {report.matched_entries} 个
+                    声明 {report.manifest_count} 个，匹配 {report.matched_entries} 个
                   </div>
                   {(report.errors?.length ?? 0) > 0 && (
                     <div className="text-xs mt-2" style={{ color: "var(--yunque-warning)" }}>
