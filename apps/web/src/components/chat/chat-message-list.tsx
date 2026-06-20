@@ -192,6 +192,36 @@ function packCenterHref(pack: { id?: string }): string {
   return pack.id ? `/packs?q=${encodeURIComponent(pack.id)}` : "/packs";
 }
 
+function renderPackHandoffLinks(pack: PackStudioBatchDraftRequest["packs"][number]) {
+  const links = pack.handoffLinks;
+  if (!links) return renderPackGovernanceLinks(pack, "详情", "中心");
+  const detailHref = links.detail || packDetailHref(pack);
+  const centerHref = links.center || packCenterHref(pack);
+  const openHref = links.open;
+  return (
+    <div className="mt-2">
+      <div className="mb-1 text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
+        验收出口：回中心确认状态，进详情复查权限{openHref ? "，再打开入口复验。" : "；没有独立入口时，从 Chat、任务、记忆或知识流程复验。"}
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {detailHref && (
+          <a href={detailHref} className="inline-flex items-center gap-1 text-[11px] font-medium" style={{ color: "var(--yunque-accent)" }}>
+            详情 <ArrowRight size={10} />
+          </a>
+        )}
+        <a href={centerHref} className="inline-flex items-center gap-1 text-[11px] font-medium" style={{ color: "var(--yunque-text-muted)" }}>
+          中心 <ArrowRight size={10} />
+        </a>
+        {openHref && (
+          <a href={openHref} className="inline-flex items-center gap-1 text-[11px] font-medium" style={{ color: "var(--yunque-success)" }}>
+            打开入口 <ArrowRight size={10} />
+          </a>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function renderPackGovernanceLinks(pack: { id?: string }, detailLabel = "查看详情", centerLabel = "回中心") {
   const detailHref = packDetailHref(pack);
   return (
@@ -229,6 +259,12 @@ function packStudioBatchHandoffHref(request: PackStudioBatchDraftRequest): strin
       source: pack.source,
       missing: pack.missing,
       readiness: pack.readiness,
+      handoff_links: pack.handoffLinks ? {
+        center: pack.handoffLinks.center,
+        detail: pack.handoffLinks.detail,
+        open: pack.handoffLinks.open || null,
+        studio: pack.handoffLinks.studio,
+      } : undefined,
       studio_url: pack.studioUrl,
       package_url: pack.packageUrl,
       sha256: pack.sha256,
@@ -393,9 +429,9 @@ function renderPackStudioBatchDraftRequest(request: PackStudioBatchDraftRequest)
                   {pack.id} · {pack.version || "unknown"} · {pack.source || "来源未标注"}
                 </div>
               </div>
-              {pack.studioUrl && (
+              {(pack.handoffLinks?.studio || pack.studioUrl) && (
                 <a
-                  href={pack.studioUrl}
+                  href={pack.handoffLinks?.studio || pack.studioUrl}
                   className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium"
                   style={{ background: "var(--yunque-accent-muted)", color: "var(--yunque-accent)" }}
                 >
@@ -403,7 +439,7 @@ function renderPackStudioBatchDraftRequest(request: PackStudioBatchDraftRequest)
                 </a>
               )}
             </div>
-            {renderPackGovernanceLinks(pack, "详情", "中心")}
+            {renderPackHandoffLinks(pack)}
             <div className="mt-1.5 flex flex-wrap gap-1.5">
               {pack.readiness && <Chip size="sm" variant="soft">{pack.readiness}</Chip>}
               {pack.status && <Chip size="sm" variant="soft">稳定性：{pack.status}</Chip>}

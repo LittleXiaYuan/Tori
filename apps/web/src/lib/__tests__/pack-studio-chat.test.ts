@@ -201,6 +201,12 @@ describe("parsePackStudioBatchDraftRequestPrompt", () => {
               description: "用户装上后容易不知道怎么验证。",
               next_step: "交给小羽先补入口。",
             },
+            handoff_links: {
+              center: "/packs?q=yunque.pack.needs-entry&from=studio",
+              detail: "/packs/detail?id=yunque.pack.needs-entry",
+              open: null,
+              studio: "/packs/studio?pack=yunque.pack.needs-entry&from=batch",
+            },
             studio_url: "/packs/studio?pack=yunque.pack.needs-entry",
             package_url: "https://example.com/yunque.pack.needs-entry.yqpack",
             sha256: "a".repeat(64),
@@ -224,6 +230,12 @@ describe("parsePackStudioBatchDraftRequestPrompt", () => {
       },
       studioUrl: "/packs/studio?pack=yunque.pack.needs-entry",
       packageUrl: "https://example.com/yunque.pack.needs-entry.yqpack",
+      handoffLinks: {
+        center: "/packs?q=yunque.pack.needs-entry&from=studio",
+        detail: "/packs/detail?id=yunque.pack.needs-entry",
+        open: "",
+        studio: "/packs/studio?pack=yunque.pack.needs-entry&from=batch",
+      },
       delivery: {
         level: "needs_meat",
         label: "待补肉",

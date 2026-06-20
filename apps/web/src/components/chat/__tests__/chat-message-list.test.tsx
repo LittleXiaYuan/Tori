@@ -298,6 +298,12 @@ describe("ChatMessageList file preview", () => {
             source: "已安装",
             missing: ["使用示例", "用户感知位置", "打开/使用入口", "后端能力声明"],
             readiness: "需补入口",
+            handoff_links: {
+              center: "/packs?q=yunque.pack.needs-entry&from=studio",
+              detail: "/packs/detail?id=yunque.pack.needs-entry",
+              open: "/packs/needs-entry",
+              studio: "/packs/studio?pack=yunque.pack.needs-entry&from=batch",
+            },
             studio_url: "/packs/studio?pack=yunque.pack.needs-entry",
             package_url: "https://example.com/yunque.pack.needs-entry.yqpack",
             sha256: "a".repeat(64),
@@ -310,6 +316,12 @@ describe("ChatMessageList file preview", () => {
             source: "官方源",
             missing: ["使用示例"],
             readiness: "需补说明",
+            handoff_links: {
+              center: "/packs?q=yunque.pack.experimental&from=studio",
+              detail: "/packs/detail?id=yunque.pack.experimental",
+              open: null,
+              studio: "/packs/studio?pack=yunque.pack.experimental&from=batch",
+            },
             studio_url: "/packs/studio?pack=yunque.pack.experimental",
           },
         ],
@@ -328,12 +340,15 @@ describe("ChatMessageList file preview", () => {
     expect(screen.getByText("Experimental Pack")).toBeInTheDocument();
     expect(screen.getByText("需补入口")).toBeInTheDocument();
     expect(screen.getByText("打开/使用入口")).toBeInTheDocument();
+    expect(screen.getAllByText(/验收出口：回中心确认状态/).length).toBeGreaterThan(1);
+    expect(screen.getByText(/没有独立入口时，从 Chat、任务、记忆或知识流程复验/)).toBeInTheDocument();
     expect(screen.getByText(/预览差异、运行审计、重新打包并复检 SHA/)).toBeInTheDocument();
-    expect(screen.getAllByRole("link", { name: /打开工坊/ })[0]).toHaveAttribute("href", "/packs/studio?pack=yunque.pack.needs-entry");
+    expect(screen.getAllByRole("link", { name: /打开工坊/ })[0]).toHaveAttribute("href", "/packs/studio?pack=yunque.pack.needs-entry&from=batch");
     expect(screen.getAllByRole("link", { name: /^详情/ })[0]).toHaveAttribute("href", "/packs/detail?id=yunque.pack.needs-entry");
-    expect(screen.getAllByRole("link", { name: /^中心/ })[0]).toHaveAttribute("href", "/packs?q=yunque.pack.needs-entry");
+    expect(screen.getAllByRole("link", { name: /^中心/ })[0]).toHaveAttribute("href", "/packs?q=yunque.pack.needs-entry&from=studio");
+    expect(screen.getByRole("link", { name: /打开入口/ })).toHaveAttribute("href", "/packs/needs-entry");
     expect(screen.getAllByRole("link", { name: /^详情/ })[1]).toHaveAttribute("href", "/packs/detail?id=yunque.pack.experimental");
-    expect(screen.getAllByRole("link", { name: /^中心/ })[1]).toHaveAttribute("href", "/packs?q=yunque.pack.experimental");
+    expect(screen.getAllByRole("link", { name: /^中心/ })[1]).toHaveAttribute("href", "/packs?q=yunque.pack.experimental&from=studio");
     const batchStudioLink = screen.getByRole("link", { name: /导入工坊逐包处理/ });
     expect(batchStudioLink).toHaveAttribute("href", expect.stringContaining("/packs/studio?batch="));
     const batchParam = new URL(batchStudioLink.getAttribute("href")!, "http://localhost").searchParams.get("batch") || "";
@@ -341,6 +356,8 @@ describe("ChatMessageList file preview", () => {
     expect(batchParam).toContain("yunque.pack.needs-entry");
     expect(batchParam).toContain("\"page_count\": 4");
     expect(batchParam).toContain("studio_url");
+    expect(batchParam).toContain("handoff_links");
+    expect(batchParam).toContain("/packs/needs-entry");
     expect(screen.getByRole("link", { name: /返回能力包中心队列/ })).toHaveAttribute("href", "/packs#readiness-queue");
     expect(screen.getByText("请批量补肉这批能力包。")).toBeInTheDocument();
     expect(screen.queryByText(/yunque.pack_studio.batch_draft_request.v1/)).not.toBeInTheDocument();
