@@ -1,11 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Button, Card, Chip, Input, Spinner, TextArea, TextField } from "@heroui/react";
-import { Activity, AlertTriangle, CalendarClock, Download, GitCompareArrows, RefreshCw, ShieldCheck, Sparkles, Workflow } from "lucide-react";
+import { Activity, AlertTriangle, CalendarClock, ClipboardList, Download, GitCompareArrows, RefreshCw, Send, ShieldCheck, Sparkles, Workflow } from "lucide-react";
 import PageHeader from "@/components/page-header";
 import { showToast } from "@/components/toast-provider";
 import { formatErrorMessage } from "@/lib/error-utils";
+import { chatPromptHref } from "@/lib/pack-action-links";
 import { createCognitiveCanaryPackClient, type CognitiveCanaryReport, type CognitiveCanaryReportSummary, type CognitiveCanaryResponseCollectorPipelinePlan, type CognitiveCanaryResponseCollectorWritebackReport, type CognitiveCanaryScenario, type CognitiveCanaryShadowPlan, type CognitiveCanaryStatus } from "@/lib/cognitive-canary-pack-client";
 
 const cognitiveCanaryPack = createCognitiveCanaryPackClient();
@@ -75,6 +77,25 @@ const boundaryItems = [
   "不会 mirror 真实流量或采集用户回答。",
   "不会调用 LLM-as-Judge batch。",
   "不会发布指标或执行自动回滚。",
+];
+
+const workflowLoopItems = [
+  {
+    title: "1. 维护题集",
+    body: "把关键问答、安全决策和延迟期望放进回归题集，形成模型变更前的检查清单。",
+  },
+  {
+    title: "2. 带回 Chat",
+    body: "让云雀解释 block/warn 原因，生成修提示词、修 Cogni 策略或回滚候选的任务。",
+  },
+  {
+    title: "3. 看上线依据",
+    body: "报告、shadow 计划和 collector store 是上线评审材料，不会自动放量。",
+  },
+  {
+    title: "4. 继续补能力",
+    body: "如果评估维度不够，把失败样例交给小羽补新的场景、指标或判断规则。",
+  },
 ];
 
 export default function CognitiveCanaryPackPage() {
@@ -295,6 +316,41 @@ export default function CognitiveCanaryPackPage() {
             </div>
           </div>
           <Button size="sm" variant="ghost" onPress={load}><RefreshCw size={14} />刷新</Button>
+        </div>
+      </Card>
+
+      <Card className="section-card p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>从回归结果到上线决策</div>
+            <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
+              Cognitive Canary 用来把“模型或策略变好了吗”变成可复查证据：先跑回归，再让云雀解释差异，最后由你决定是否继续推进。
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link href={chatPromptHref("请根据 Cognitive Canary 的最新报告，解释候选版本是否值得继续推进，并把需要修复的场景拆成任务。")}>
+              <Button size="sm" className="btn-accent">
+                <Send size={13} /> 带回 Chat
+              </Button>
+            </Link>
+            <Link href="/missions">
+              <Button size="sm" variant="outline">
+                <ClipboardList size={13} /> 看任务
+              </Button>
+            </Link>
+          </div>
+        </div>
+        <div className="mt-3 grid gap-2 md:grid-cols-4">
+          {workflowLoopItems.map((item) => (
+            <div key={item.title} className="rounded-md border p-3" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-surface)" }}>
+              <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>{item.title}</div>
+              <div className="mt-2 text-[11px] leading-5" style={{ color: "var(--yunque-text-muted)" }}>{item.body}</div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2 text-xs">
+          <Link href="/trace"><Button size="sm" variant="ghost">核对执行轨迹</Button></Link>
+          <Link href="/packs/studio?packId=yunque.pack.cognitive-canary"><Button size="sm" variant="ghost">让小羽继续改</Button></Link>
         </div>
       </Card>
 

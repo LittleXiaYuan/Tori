@@ -19,6 +19,12 @@ vi.mock("@/components/toast-provider", () => ({
   showToast: vi.fn(),
 }));
 
+vi.mock("next/link", () => ({
+  default: ({ href, children, ...props }: { href: string; children: React.ReactNode }) => (
+    <a href={href} {...props}>{children}</a>
+  ),
+}));
+
 describe("RPAReplayPackPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -59,5 +65,12 @@ describe("RPAReplayPackPage", () => {
     expect(screen.getByText("不会消费 Browser Intent 会话或写浏览器状态。")).toBeInTheDocument();
     expect(screen.getByText("不会把 plan-only 轨迹当成已完成的自动化任务。")).toBeInTheDocument();
     expect(screen.getByText("技术状态")).toBeInTheDocument();
+    expect(screen.getByText("从回放计划到可验证自动化")).toBeInTheDocument();
+    expect(screen.getByText("2. 带回 Chat")).toBeInTheDocument();
+    expect(screen.getByText("3. 看证据位置")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /带回 Chat/ })).toHaveAttribute("href", expect.stringContaining("/chat?q="));
+    expect(screen.getByRole("link", { name: /看任务/ })).toHaveAttribute("href", "/missions");
+    expect(screen.getByRole("link", { name: "核对执行轨迹" })).toHaveAttribute("href", "/trace");
+    expect(screen.getByRole("link", { name: "让小羽继续改" })).toHaveAttribute("href", "/packs/studio?packId=yunque.pack.rpa-replay");
   });
 });

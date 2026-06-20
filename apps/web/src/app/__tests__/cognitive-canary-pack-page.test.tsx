@@ -23,6 +23,12 @@ vi.mock("@/components/toast-provider", () => ({
   showToast: vi.fn(),
 }));
 
+vi.mock("next/link", () => ({
+  default: ({ href, children, ...props }: { href: string; children: React.ReactNode }) => (
+    <a href={href} {...props}>{children}</a>
+  ),
+}));
+
 describe("CognitiveCanaryPackPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -56,5 +62,12 @@ describe("CognitiveCanaryPackPage", () => {
     expect(screen.getByText("不会 mirror 真实流量或采集用户回答。")).toBeInTheDocument();
     expect(screen.getByText("不会发布指标或执行自动回滚。")).toBeInTheDocument();
     expect(screen.getByText("技术状态")).toBeInTheDocument();
+    expect(screen.getByText("从回归结果到上线决策")).toBeInTheDocument();
+    expect(screen.getByText("2. 带回 Chat")).toBeInTheDocument();
+    expect(screen.getByText("3. 看上线依据")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /带回 Chat/ })).toHaveAttribute("href", expect.stringContaining("/chat?q="));
+    expect(screen.getByRole("link", { name: /看任务/ })).toHaveAttribute("href", "/missions");
+    expect(screen.getByRole("link", { name: "核对执行轨迹" })).toHaveAttribute("href", "/trace");
+    expect(screen.getByRole("link", { name: "让小羽继续改" })).toHaveAttribute("href", "/packs/studio?packId=yunque.pack.cognitive-canary");
   });
 });

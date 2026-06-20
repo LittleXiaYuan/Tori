@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   Button,
   Card,
@@ -14,15 +15,18 @@ import {
   Activity,
   AlertTriangle,
   CalendarClock,
+  ClipboardList,
   Download,
   Play,
   RefreshCw,
+  Send,
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
 import PageHeader from "@/components/page-header";
 import { showToast } from "@/components/toast-provider";
 import { formatErrorMessage } from "@/lib/error-utils";
+import { chatPromptHref } from "@/lib/pack-action-links";
 import {
   createChaosProbePackClient,
   type ChaosProbeDefinition,
@@ -104,6 +108,25 @@ const boundaryItems = [
   "不会创建后台定时任务。",
   "不会发送告警或发布 Prometheus 指标。",
   "不会写入真实 runtime degrade-state engine。",
+];
+
+const workflowLoopItems = [
+  {
+    title: "1. 准备探针",
+    body: "把 health、guardrail 和关键链路检查写成安全探针，先限定影响范围。",
+  },
+  {
+    title: "2. 带回 Chat",
+    body: "让云雀解释失败原因、降级等级和修复顺序，再拆成可以执行的任务。",
+  },
+  {
+    title: "3. 看证据位置",
+    body: "报告、调度计划和本地降级状态是演练证据，不会直接改线上状态。",
+  },
+  {
+    title: "4. 继续补能力",
+    body: "如果探针太少或误报，把真实报告交给小羽补检查项和判断规则。",
+  },
 ];
 
 export default function ChaosProbePackPage() {
@@ -400,6 +423,41 @@ export default function ChaosProbePackPage() {
             <RefreshCw size={14} />
             刷新
           </Button>
+        </div>
+      </Card>
+
+      <Card className="section-card p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>从安全探针到修复任务</div>
+            <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
+              Chaos Probe 的目标不是制造事故，而是用可控探针提前发现薄弱点，把报告变成任务、证据和后续能力补强。
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link href={chatPromptHref("请根据 Chaos Probe 的最新健康报告，解释风险等级、优先修复项和需要观察的指标，并拆成任务。")}>
+              <Button size="sm" className="btn-accent">
+                <Send size={13} /> 带回 Chat
+              </Button>
+            </Link>
+            <Link href="/missions">
+              <Button size="sm" variant="outline">
+                <ClipboardList size={13} /> 看任务
+              </Button>
+            </Link>
+          </div>
+        </div>
+        <div className="mt-3 grid gap-2 md:grid-cols-4">
+          {workflowLoopItems.map((item) => (
+            <div key={item.title} className="rounded-md border p-3" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-surface)" }}>
+              <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>{item.title}</div>
+              <div className="mt-2 text-[11px] leading-5" style={{ color: "var(--yunque-text-muted)" }}>{item.body}</div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2 text-xs">
+          <Link href="/trace"><Button size="sm" variant="ghost">核对执行轨迹</Button></Link>
+          <Link href="/packs/studio?packId=yunque.pack.chaos-probe"><Button size="sm" variant="ghost">让小羽继续改</Button></Link>
         </div>
       </Card>
 

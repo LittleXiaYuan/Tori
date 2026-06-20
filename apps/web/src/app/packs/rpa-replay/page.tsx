@@ -1,11 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Button, Card, Chip, Input, Spinner, TextArea, TextField } from "@heroui/react";
-import { AlertTriangle, ClipboardList, Download, Play, Plus, Radio, RefreshCw, Route, ShieldCheck, Workflow } from "lucide-react";
+import { AlertTriangle, ClipboardList, Download, Play, Plus, Radio, RefreshCw, Route, Send, ShieldCheck, Workflow } from "lucide-react";
 import PageHeader from "@/components/page-header";
 import { showToast } from "@/components/toast-provider";
 import { formatErrorMessage } from "@/lib/error-utils";
+import { chatPromptHref } from "@/lib/pack-action-links";
 import { createRPAReplayPackClient, type RPAReplayExecutorPlan, type RPAReplayResult, type RPAReplayStatus, type RPAReplayTraceSummary } from "@/lib/rpa-replay-pack-client";
 
 const rpaReplayPack = createRPAReplayPackClient();
@@ -36,6 +38,25 @@ const boundaryItems = [
   "不会消费 Browser Intent 会话或写浏览器状态。",
   "不会访问外部目标站点或执行真实网络动作。",
   "不会把 plan-only 轨迹当成已完成的自动化任务。",
+];
+
+const workflowLoopItems = [
+  {
+    title: "1. 保存轨迹",
+    body: "把网页流程、参数和断言保存成可复用记录，先形成可检查的自动化意图。",
+  },
+  {
+    title: "2. 带回 Chat",
+    body: "让云雀解释回放计划、补齐缺失步骤，或拆成需要人工确认的任务。",
+  },
+  {
+    title: "3. 看证据位置",
+    body: "dry-run 结果和 executor handoff 是验证材料，不等于已经执行成功。",
+  },
+  {
+    title: "4. 继续补能力",
+    body: "如果还缺点击、截图或站点适配，把真实问题交给小羽继续改包。",
+  },
 ];
 
 function sampleTrace(slug: string) {
@@ -224,6 +245,41 @@ export default function RPAReplayPackPage() {
             </div>
           </div>
           <Button size="sm" variant="ghost" onPress={load}><RefreshCw size={14} />刷新</Button>
+        </div>
+      </Card>
+
+      <Card className="section-card p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>从回放计划到可验证自动化</div>
+            <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
+              RPA Replay 的价值不是假装已经接管浏览器，而是把重复流程沉淀成可审计计划，再交给 Chat、任务中心和小羽逐步补成真能力。
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link href={chatPromptHref("请检查 RPA Replay 当前轨迹和 dry-run 计划，指出哪些步骤可以安全执行、哪些还需要人工确认，并把下一步拆成任务。")}>
+              <Button size="sm" className="btn-accent">
+                <Send size={13} /> 带回 Chat
+              </Button>
+            </Link>
+            <Link href="/missions">
+              <Button size="sm" variant="outline">
+                <ClipboardList size={13} /> 看任务
+              </Button>
+            </Link>
+          </div>
+        </div>
+        <div className="mt-3 grid gap-2 md:grid-cols-4">
+          {workflowLoopItems.map((item) => (
+            <div key={item.title} className="rounded-md border p-3" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-surface)" }}>
+              <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>{item.title}</div>
+              <div className="mt-2 text-[11px] leading-5" style={{ color: "var(--yunque-text-muted)" }}>{item.body}</div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2 text-xs">
+          <Link href="/trace"><Button size="sm" variant="ghost">核对执行轨迹</Button></Link>
+          <Link href="/packs/studio?packId=yunque.pack.rpa-replay"><Button size="sm" variant="ghost">让小羽继续改</Button></Link>
         </div>
       </Card>
 
