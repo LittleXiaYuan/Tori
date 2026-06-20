@@ -86,13 +86,13 @@ describe("PackRuntimeRouteClientPage DLC route", () => {
     expect(decodeURIComponent(studioLink.getAttribute("href") || "")).toContain("优先补齐 使用示例、用户感知位置");
     expect(await screen.findByText("这个能力界面来自能力包本身")).toBeInTheDocument();
     expect(screen.getAllByText("独立界面包").length).toBeGreaterThan(0);
-    expect(screen.getByText("iframe 沙箱")).toBeInTheDocument();
+    expect(screen.getByText("沙箱隔离")).toBeInTheDocument();
     expect(screen.getByText("按声明路由调用")).toBeInTheDocument();
-    expect(screen.getByText(/随能力包一起下载的 DLC\/iframe 前端/)).toBeInTheDocument();
+    expect(screen.getByText(/随能力包一起下载的独立界面/)).toBeInTheDocument();
     expect(screen.getByText("沙箱边界")).toBeInTheDocument();
-    expect(screen.getByText("iframe 没有宿主 token，不能读取云雀本地登录态。")).toBeInTheDocument();
-    expect(screen.getByText("backend.call 只能访问该能力包 manifest 声明的后端路由。")).toBeInTheDocument();
-    expect(screen.getByText("越权 bridge 调用会被拒绝并写入审计线索。")).toBeInTheDocument();
+    expect(screen.getByText("独立界面拿不到云雀本地登录态或宿主 token。")).toBeInTheDocument();
+    expect(screen.getByText("它只能调用自己声明过的后端路由。")).toBeInTheDocument();
+    expect(screen.getByText("越权调用会被拒绝并留下审计线索。")).toBeInTheDocument();
     expect(screen.getByText("这是 DLC/iframe/WASM 的参考包，用于验证热插拔界面和 bridge 权限，不是业务功能。")).toBeInTheDocument();
     expect(screen.getByTestId("pack-dlc-host")).toBeInTheDocument();
     expect(screen.getByText("入口同步详情")).toBeInTheDocument();

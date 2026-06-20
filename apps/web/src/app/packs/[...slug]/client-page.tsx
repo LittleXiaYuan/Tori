@@ -15,11 +15,11 @@ import { chatPromptHref } from "@/lib/pack-action-links";
 import { packDeliveryProfile, packExamples, packFeatureFlags, packReadiness, packUsability, riskProfileForPack } from "@/lib/pack-presentation";
 
 const dlcBoundaryItems = [
-  "iframe 没有宿主 token，不能读取云雀本地登录态。",
+  "独立界面拿不到云雀本地登录态或宿主 token。",
   "沙箱只允许脚本运行，不开放同源、弹窗或本机桌面能力。",
-  "backend.call 只能访问该能力包 manifest 声明的后端路由。",
+  "它只能调用自己声明过的后端路由。",
   "nav.push 只能跳转到该能力包声明的前端路径。",
-  "越权 bridge 调用会被拒绝并写入审计线索。",
+  "越权调用会被拒绝并留下审计线索。",
 ];
 
 function packCenterFocusHref(packId?: string): string {
@@ -50,7 +50,7 @@ export default function PackRuntimeRouteClientPage() {
       })
       .catch((err) => {
         if (cancelled) return;
-        setError(formatErrorMessage(err, "加载已启用 Pack 失败"));
+        setError(formatErrorMessage(err, "加载已启用能力包失败"));
         setPacks([]);
       })
       .finally(() => {
@@ -209,15 +209,15 @@ export default function PackRuntimeRouteClientPage() {
                 <Chip size="sm" style={{ background: "rgba(56,189,248,0.12)", color: "#38bdf8" }}>
                   独立界面包
                 </Chip>
-                <Chip size="sm" variant="soft">iframe 沙箱</Chip>
+                <Chip size="sm" variant="soft">沙箱隔离</Chip>
                 <Chip size="sm" variant="soft">按声明路由调用</Chip>
               </div>
               <div className="mt-3 text-base font-semibold" style={{ color: "var(--yunque-text)" }}>
                 这个能力界面来自能力包本身
               </div>
               <div className="mt-2 max-w-3xl text-sm leading-6" style={{ color: "var(--yunque-text-secondary)" }}>
-                它不是写死在云雀主前端里的页面，而是随能力包一起下载的 DLC/iframe 前端。
-                启用后，云雀只负责加载沙箱、注入主题和转发白名单内的 bridge 调用；界面内容、交互和升级都由该能力包提供。
+                它不是写死在云雀主前端里的页面，而是随能力包一起下载的独立界面。
+                启用后，云雀只负责加载沙箱、注入主题和转发白名单内的调用；界面内容、交互和升级都由该能力包提供。
               </div>
               {manifest.metadata?.limitation && (
                 <div className="mt-3 rounded-lg p-3 text-xs leading-5" style={{ background: "rgba(245,158,11,0.10)", color: "var(--yunque-warning)" }}>
@@ -310,7 +310,7 @@ export default function PackRuntimeRouteClientPage() {
             ))}
           </div>
         ) : (
-          <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>该 pack 尚未声明 SDK 入口。</div>
+          <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>该能力包尚未声明开发者 SDK 入口。</div>
         )}
       </Card>
 
