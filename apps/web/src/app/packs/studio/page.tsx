@@ -898,6 +898,10 @@ export default function PackStudioPage() {
 
   const clearPackWorkState = () => {
     setInspectReport(null);
+    clearWorkflowStateAfterInspect();
+  };
+
+  const clearWorkflowStateAfterInspect = () => {
     setWorkspaceReport(null);
     setPatchFile("");
     setPatchContent("");
@@ -1381,7 +1385,7 @@ export default function PackStudioPage() {
         goal,
       });
       setInspectReport(report);
-      setWorkspaceReport(null);
+      clearWorkflowStateAfterInspect();
       showToast("已完成 yqpack 只读检查", "success");
     } catch (error) {
       showToast(error instanceof Error ? error.message : "yqpack 检查失败", "error");

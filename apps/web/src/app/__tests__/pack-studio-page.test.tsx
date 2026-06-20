@@ -1149,5 +1149,19 @@ describe("PackStudioPage", () => {
     await waitFor(() => {
       expect(toastMock).toHaveBeenCalledWith("已复制小羽改包任务", "success");
     });
+
+    fireEvent.click(screen.getByRole("button", { name: "只读检查" }));
+    await waitFor(() => {
+      expect(packsClientMock.studioInspect).toHaveBeenCalledWith({
+        packagePath: "C:\\packs\\wasm-plugin.yqpack",
+        packageUrl: undefined,
+        sha256: "a".repeat(64),
+        goal: "增加一个可查看运行结果的界面",
+      });
+    });
+    expect(await screen.findByText("当前阶段：准备工作区 · 下一步：SHA 匹配后准备工作区。小羽只生成计划和草稿，不会自动应用改动。")).toBeInTheDocument();
+    expect(screen.queryByText("新包已经安装但未启用。先确认权限、来源和风险；确认后启用，或回中心继续管理这个包。")).not.toBeInTheDocument();
+    expect(screen.queryByText("安装后怎么验收")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "启用" })).not.toBeInTheDocument();
   }, 30000);
 });
