@@ -1208,7 +1208,7 @@ export default function PacksPageOptimized() {
                 {actionNotice.packId && (
                   <Link href={packStudioHref(manifestById(actionNotice.packId) || { id: actionNotice.packId, name: actionNotice.packId, version: "", status: "beta" } as PackManifest)}>
                     <Button size="sm" variant="ghost">
-                      <Wrench size={14} /> 交给小羽补齐
+                      <Wrench size={14} /> 交给小羽打磨
                     </Button>
                   </Link>
                 )}
@@ -2121,7 +2121,7 @@ export default function PacksPageOptimized() {
 
         {readiness.missing.length > 0 && (
           <div className="mb-3 rounded-md p-3 text-xs" style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.18)", color: "var(--yunque-text-secondary)" }}>
-            可用性体检：还缺 {readiness.missing.join("、")}。可以交给小羽优化补齐用途、入口或使用说明。
+            可用性体检：还缺 {readiness.missing.join("、")}。可以交给小羽打磨用途、入口或使用说明。
           </div>
         )}
 
@@ -2322,14 +2322,14 @@ export default function PacksPageOptimized() {
               </div>
               <div className="flex items-start gap-2 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
                 <span style={{ color: "var(--yunque-primary)" }}>•</span>
-                <span>想继续补肉：进详情确认权限，或交给小羽补用途、入口和示例。</span>
+                <span>想继续打磨：进详情确认权限，或交给小羽优化用途、入口和示例。</span>
               </div>
             </div>
           </div>
 
           {readiness.missing.length > 0 && (
             <div className="mb-3 rounded-md p-3 text-xs" style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.18)", color: "var(--yunque-text-secondary)" }}>
-              可用性体检：还缺 {readiness.missing.join("、")}。可以交给小羽优化补齐用途、入口或使用说明。
+              可用性体检：还缺 {readiness.missing.join("、")}。可以交给小羽打磨用途、入口或使用说明。
             </div>
           )}
 

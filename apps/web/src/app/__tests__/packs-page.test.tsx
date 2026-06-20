@@ -124,7 +124,7 @@ const makeNeedsEntryPack = (index: number) => ({
     ...filesManifest,
     id: `yunque.pack.needs-entry-${index}`,
     name: `Needs Entry Pack ${index}`,
-    description: `补肉队列分页测试能力包 ${index}`,
+    description: `打磨队列分页测试能力包 ${index}`,
     backend: {
       capabilities: [],
       permissions: [],
@@ -264,11 +264,12 @@ describe("PacksPageOptimized", () => {
     expect(screen.getByText("主入口：开始生成文档 · 帮我生成一份可下载的文档")).toBeInTheDocument();
     expect(screen.getByText("主入口：查看最近产物 · 列出我最近生成的文件")).toBeInTheDocument();
     expect(screen.getAllByText("固定方式：没有独立侧栏入口，通常在 Chat、任务或其他能力里自动生效。").length).toBeGreaterThanOrEqual(2);
-    expect(screen.getAllByText("想继续补肉：进详情确认权限，或交给小羽补用途、入口和示例。").length).toBeGreaterThanOrEqual(2);
-    const studioLinks = screen.getAllByRole("link", { name: /小羽优化/ });
-    expect(studioLinks[0]).toHaveAttribute("href", expect.stringContaining("/packs/studio?packId=yunque.pack.documents"));
-    expect(decodeURIComponent(studioLinks[0].getAttribute("href") || "").replace(/\+/g, " ")).toContain("让 Documents (文档生成) 更像一个用户能直接理解和使用的能力包");
-    expect(decodeURIComponent(studioLinks[0].getAttribute("href") || "").replace(/\+/g, " ")).toContain("继续打磨更具体的用户场景和入口反馈");
+    expect(screen.getAllByText("想继续打磨：进详情确认权限，或交给小羽优化用途、入口和示例。").length).toBeGreaterThanOrEqual(2);
+    const studioLink = screen.getAllByRole("link", { name: /小羽优化/ })
+      .find((link) => link.getAttribute("href")?.includes("/packs/studio?packId=yunque.pack.documents"));
+    expect(studioLink).toBeTruthy();
+    expect(decodeURIComponent(studioLink?.getAttribute("href") || "").replace(/\+/g, " ")).toContain("让 Documents (文档生成) 更像一个用户能直接理解和使用的能力包");
+    expect(decodeURIComponent(studioLink?.getAttribute("href") || "").replace(/\+/g, " ")).toContain("继续打磨更具体的用户场景和入口反馈");
   });
 
   it("filters installed packs by search and resets the store filters", async () => {
@@ -447,7 +448,7 @@ describe("PacksPageOptimized", () => {
     expect(screen.getByText("下一步先查看详情确认权限和入口，再启用；也可以继续筛选、固定或交给小羽打磨。")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /立即启用/ })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /查看详情并启用/ })).toHaveAttribute("href", "/packs/detail?id=yunque.pack.remote-docs");
-    expect(screen.getByRole("link", { name: /交给小羽补齐/ })).toHaveAttribute("href", expect.stringContaining("/packs/studio?packId=yunque.pack.remote-docs"));
+    expect(screen.getByRole("link", { name: /交给小羽打磨/ })).toHaveAttribute("href", expect.stringContaining("/packs/studio?packId=yunque.pack.remote-docs"));
     fireEvent.click(screen.getByRole("button", { name: /立即启用/ }));
     await waitFor(() => {
       expect(packsClientMock.enable).toHaveBeenCalledWith("yunque.pack.remote-docs");
@@ -639,7 +640,7 @@ describe("PacksPageOptimized", () => {
     expect(screen.getAllByText("Needs Context Pack").length).toBeGreaterThan(0);
     expect(screen.queryByText("Documents (文档生成)")).not.toBeInTheDocument();
     expect(screen.getByText("体检：需补说明")).toBeInTheDocument();
-    expect(screen.getByText("可用性体检：还缺 用户感知位置。可以交给小羽优化补齐用途、入口或使用说明。")).toBeInTheDocument();
+    expect(screen.getByText("可用性体检：还缺 用户感知位置。可以交给小羽打磨用途、入口或使用说明。")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "清除体检" }));
 

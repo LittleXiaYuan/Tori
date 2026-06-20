@@ -33,6 +33,12 @@ function deliveryColor(tone: ReturnType<typeof packDeliveryProfile>["tone"]): "s
   return "default";
 }
 
+function displayDeliveryLabel(label?: string, level?: string): string {
+  const value = label || level || "";
+  if (value === "待补肉" || value === "needs_meat") return "需打磨";
+  return value || "未知";
+}
+
 export default function PackRuntimeRouteClientPage() {
   const pathname = usePathname() || "/packs";
   const [packs, setPacks] = useState<InstalledPack[]>([]);
@@ -98,6 +104,7 @@ export default function PackRuntimeRouteClientPage() {
   const usability = packUsability(manifest);
   const readiness = packReadiness(manifest);
   const delivery = packDeliveryProfile(manifest);
+  const deliveryLabel = displayDeliveryLabel(delivery.label, delivery.level);
   const risk = riskProfileForPack(manifest);
   const flags = packFeatureFlags(manifest);
   const examples = packExamples(manifest, 3);
@@ -107,7 +114,7 @@ export default function PackRuntimeRouteClientPage() {
     `请告诉我它现在能帮我做什么、适合放在哪个工作流里、我可以怎么下第一条指令。`,
     `能力包说明：${manifest.description || "暂无说明"}`,
     `可用性：${usability.label}；${usability.description}`,
-    `交付状态：${delivery.label}；${delivery.description}`,
+    `交付状态：${deliveryLabel}；${delivery.description}`,
     `建议下一步：${delivery.nextStep}`,
     readiness.missing.length > 0 ? `当前还缺：${readiness.missing.join("、")}` : "当前体检：说明基本完整",
     usability.limitation ? `当前限制：${usability.limitation}` : "",
@@ -143,7 +150,7 @@ export default function PackRuntimeRouteClientPage() {
                 {readiness.label}
               </Chip>
               <Chip size="sm" color={deliveryColor(delivery.tone)}>
-                {delivery.label}
+                {deliveryLabel}
               </Chip>
               <Chip size="sm" color={risk.level === "high" ? "danger" : risk.level === "medium" ? "warning" : "success"}>
                 {risk.label}
@@ -160,10 +167,10 @@ export default function PackRuntimeRouteClientPage() {
               {usability.limitation ? ` 当前限制：${usability.limitation}` : ""}
             </div>
             <div className="mt-3 rounded-lg px-3 py-2 text-xs leading-5" style={{ background: "var(--yunque-bg-hover)", color: "var(--yunque-text-secondary)" }}>
-              交付状态：{delivery.label}。{delivery.description} 下一步：{delivery.nextStep}
+              交付状态：{deliveryLabel}。{delivery.description} 下一步：{delivery.nextStep}
             </div>
             <div className="mt-3 grid gap-2 md:grid-cols-3">
-              {(examples.length > 0 ? examples : ["还没有写清使用示例，可以交给小羽补齐。"]).map((example) => (
+              {(examples.length > 0 ? examples : ["还没有写清使用示例，可以交给小羽打磨。"]).map((example) => (
                 <div key={example} className="rounded-lg px-3 py-2 text-xs leading-5" style={{ background: "var(--yunque-bg-hover)", color: "var(--yunque-text-secondary)" }}>
                   {example}
                 </div>
@@ -195,7 +202,7 @@ export default function PackRuntimeRouteClientPage() {
             </Link>
             <Link href={studioHref}>
               <Button size="sm" variant="ghost">
-                <Wrench size={13} /> 交给小羽补齐
+                <Wrench size={13} /> 交给小羽打磨
               </Button>
             </Link>
           </div>
@@ -210,7 +217,7 @@ export default function PackRuntimeRouteClientPage() {
               从当前入口继续改包
             </div>
             <div className="text-sm leading-6" style={{ color: "var(--yunque-text-secondary)" }}>
-              你现在打开的是 <code>{pathname}</code>。如果这个能力看起来像空壳、说明不清或入口不顺，可以先看权限与来源，再交给小羽只读检查 yqpack、补齐用途和验收路径。
+              你现在打开的是 <code>{pathname}</code>。如果这个能力看起来像空壳、说明不清或入口不顺，可以先看权限与来源，再交给小羽只读检查 yqpack、打磨用途和验收路径。
             </div>
             <div className="mt-3 grid gap-2 md:grid-cols-3">
               {verificationSteps.map((step, idx) => (

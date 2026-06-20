@@ -77,11 +77,11 @@ describe("PackRuntimeRouteClientPage DLC route", () => {
     expect(screen.getByText("这个能力包提供独立界面，已在沙箱中动态加载。")).toBeInTheDocument();
     expect(screen.getByText("可直接使用")).toBeInTheDocument();
     expect(screen.getByText("需补说明")).toBeInTheDocument();
-    expect(screen.getByText("还没有写清使用示例，可以交给小羽补齐。")).toBeInTheDocument();
+    expect(screen.getByText("还没有写清使用示例，可以交给小羽打磨。")).toBeInTheDocument();
     expect(screen.getByText(/还缺：使用示例、用户感知位置/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /问云雀怎么用/ })).toHaveAttribute("href", expect.stringContaining("/chat?q="));
     expect(screen.getByRole("link", { name: /权限与详情/ })).toHaveAttribute("href", "/packs/detail?id=yunque.pack.dlc-demo");
-    const studioLink = screen.getByRole("link", { name: /交给小羽补齐/ });
+    const studioLink = screen.getByRole("link", { name: /交给小羽打磨/ });
     expect(studioLink).toHaveAttribute("href", expect.stringContaining("/packs/studio?packId=yunque.pack.dlc-demo"));
     expect(decodeURIComponent(studioLink.getAttribute("href") || "")).toContain("优先补齐 使用示例、用户感知位置");
     expect(screen.getByText("从当前入口继续改包")).toBeInTheDocument();
