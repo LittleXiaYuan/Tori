@@ -323,13 +323,17 @@ export default function RPAReplayPackPage() {
           <Card className="section-card p-4">
             <div className="mb-3 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2 text-sm font-semibold"><Plus size={16} />创建 / 导入轨迹</div>
-              <TextField className="w-56" value={slug} onChange={setSlug}>
+              <TextField aria-label="RPA trace slug" className="w-56" value={slug} onChange={setSlug}>
                 <Input placeholder="trace slug" />
               </TextField>
             </div>
-            <TextField value={traceJSON} onChange={setTraceJSON}>
+            <div className="mb-2 text-xs font-medium" style={{ color: "var(--yunque-text)" }}>轨迹定义 JSON</div>
+            <TextField aria-label="RPA trace JSON" value={traceJSON} onChange={setTraceJSON}>
               <TextArea rows={10} aria-label="Trace JSON" className="font-mono text-xs" />
             </TextField>
+            <div className="mt-2 text-[11px] leading-5" style={{ color: "var(--yunque-text-muted)" }}>
+              这里保存的是可审计轨迹，不会自动打开网页或执行点击；后续回放仍是 dry-run 计划。
+            </div>
             <div className="mt-3 flex justify-end">
               <Button className="btn-accent" isPending={busy === "create"} onPress={createTrace}><Plus size={14} />保存轨迹</Button>
             </div>
@@ -347,9 +351,13 @@ export default function RPAReplayPackPage() {
                 <Button className="btn-accent" isPending={busy === "replay"} onPress={replay} isDisabled={!slug}><Play size={14} />生成回放计划</Button>
               </div>
             </div>
-            <TextField value={paramsJSON} onChange={setParamsJSON}>
+            <div className="mb-2 text-xs font-medium" style={{ color: "var(--yunque-text)" }}>回放参数 JSON</div>
+            <TextField aria-label="RPA replay params JSON" value={paramsJSON} onChange={setParamsJSON}>
               <TextArea rows={4} aria-label="Replay params JSON" className="font-mono text-xs" />
             </TextField>
+            <div className="mt-2 text-[11px] leading-5" style={{ color: "var(--yunque-text-muted)" }}>
+              参数只用于生成计划和证据包；当前不会消费 Browser Intent、写浏览器状态或访问目标站点。
+            </div>
             {result && (
               <Card className="mt-3 p-3" style={{ background: "rgba(255,255,255,0.03)" }}>
                 <div className="mb-2 flex items-center gap-2 text-sm font-medium"><Radio size={15} />{result.output || "回放计划"}</div>

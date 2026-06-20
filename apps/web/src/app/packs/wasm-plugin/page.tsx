@@ -1248,11 +1248,11 @@ export default function WASMPluginPackPage() {
                 <ShieldCheck size={16} />
                 注册 / 校验插件元数据
               </div>
-              <TextField className="w-56" value={slug} onChange={setSlug}>
+              <TextField aria-label="WASM plugin slug" className="w-56" value={slug} onChange={setSlug}>
                 <Input placeholder="plugin slug" />
               </TextField>
             </div>
-            <TextField value={manifestJSON} onChange={setManifestJSON}>
+            <TextField aria-label="WASM plugin manifest JSON" value={manifestJSON} onChange={setManifestJSON}>
               <TextArea
                 rows={12}
                 aria-label="WASM plugin manifest JSON"
@@ -1299,6 +1299,7 @@ export default function WASMPluginPackPage() {
               </Button>
             </div>
             <TextField
+              aria-label="WASM remote install package inspect writeback JSON"
               value={remotePackageInspectJSON}
               onChange={setRemotePackageInspectJSON}
             >
@@ -1365,6 +1366,7 @@ export default function WASMPluginPackPage() {
             </div>
             {remotePackageInspect && (
               <TextField
+                aria-label="WASM package inspect writeback result"
                 className="mt-3"
                 value={JSON.stringify(remotePackageInspect, null, 2)}
                 onChange={() => undefined}
@@ -1409,6 +1411,7 @@ export default function WASMPluginPackPage() {
               </Button>
             </div>
             <TextField
+              aria-label="WASM remote install installer registration plan JSON"
               value={remoteInstallerRegistrationJSON}
               onChange={setRemoteInstallerRegistrationJSON}
             >
@@ -1498,6 +1501,7 @@ export default function WASMPluginPackPage() {
             </div>
             {remoteInstallerRegistration && (
               <TextField
+                aria-label="WASM installer registration handoff plan result"
                 className="mt-3"
                 value={JSON.stringify(remoteInstallerRegistration, null, 2)}
                 onChange={() => undefined}
@@ -1540,6 +1544,7 @@ export default function WASMPluginPackPage() {
               </Button>
             </div>
             <TextField
+              aria-label="WASM remote install installer continuation plan JSON"
               value={remoteInstallerJSON}
               onChange={setRemoteInstallerJSON}
             >
@@ -1630,6 +1635,7 @@ export default function WASMPluginPackPage() {
             </div>
             {remoteInstallerPlan && (
               <TextField
+                aria-label="WASM installer continuation plan result"
                 className="mt-3"
                 value={JSON.stringify(remoteInstallerPlan, null, 2)}
                 onChange={() => undefined}
@@ -1672,6 +1678,7 @@ export default function WASMPluginPackPage() {
               </Button>
             </div>
             <TextField
+              aria-label="WASM remote install installer download writeback JSON"
               value={remoteInstallerDownloadJSON}
               onChange={setRemoteInstallerDownloadJSON}
             >
@@ -1743,6 +1750,7 @@ export default function WASMPluginPackPage() {
             </div>
             {remoteInstallerDownload && (
               <TextField
+                aria-label="WASM installer download writeback result"
                 className="mt-3"
                 value={JSON.stringify(remoteInstallerDownload, null, 2)}
                 onChange={() => undefined}
@@ -1785,6 +1793,7 @@ export default function WASMPluginPackPage() {
               </Button>
             </div>
             <TextField
+              aria-label="WASM remote install signature verification writeback JSON"
               value={remoteSignatureVerificationJSON}
               onChange={setRemoteSignatureVerificationJSON}
             >
@@ -1864,6 +1873,7 @@ export default function WASMPluginPackPage() {
             </div>
             {remoteSignatureVerification && (
               <TextField
+                aria-label="WASM signature verification writeback result"
                 className="mt-3"
                 value={JSON.stringify(remoteSignatureVerification, null, 2)}
                 onChange={() => undefined}
@@ -1904,6 +1914,7 @@ export default function WASMPluginPackPage() {
               </Button>
             </div>
             <TextField
+              aria-label="WASM remote install approval queue writeback JSON"
               value={remoteQueueWritebackJSON}
               onChange={setRemoteQueueWritebackJSON}
             >
@@ -2007,6 +2018,7 @@ export default function WASMPluginPackPage() {
             </div>
             {remoteQueueWriteback && (
               <TextField
+                aria-label="WASM remote install approval queue writeback result"
                 className="mt-3"
                 value={JSON.stringify(remoteQueueWriteback, null, 2)}
                 onChange={() => undefined}
@@ -2046,6 +2058,7 @@ export default function WASMPluginPackPage() {
               </Button>
             </div>
             <TextField
+              aria-label="WASM remote install approval decision plan JSON"
               value={remoteDecisionJSON}
               onChange={setRemoteDecisionJSON}
             >
@@ -2118,6 +2131,7 @@ export default function WASMPluginPackPage() {
             </div>
             {remoteDecisionPlan && (
               <TextField
+                aria-label="WASM remote install approval decision plan result"
                 className="mt-3"
                 value={JSON.stringify(remoteDecisionPlan, null, 2)}
                 onChange={() => undefined}
@@ -2159,6 +2173,7 @@ export default function WASMPluginPackPage() {
               </Button>
             </div>
             <TextField
+              aria-label="WASM remote install approval writeback plan JSON"
               value={remoteWritebackJSON}
               onChange={setRemoteWritebackJSON}
             >
@@ -2235,6 +2250,7 @@ export default function WASMPluginPackPage() {
             </div>
             {remoteWritebackPlan && (
               <TextField
+                aria-label="WASM remote install approval writeback plan result"
                 className="mt-3"
                 value={JSON.stringify(remoteWritebackPlan, null, 2)}
                 onChange={() => undefined}
@@ -2275,6 +2291,7 @@ export default function WASMPluginPackPage() {
               </Button>
             </div>
             <TextField
+              aria-label="WASM remote install approval gate plan JSON"
               value={remoteApprovalJSON}
               onChange={setRemoteApprovalJSON}
             >
@@ -2348,6 +2365,7 @@ export default function WASMPluginPackPage() {
             </div>
             {remoteApprovalPlan && (
               <TextField
+                aria-label="WASM remote install approval gate plan result"
                 className="mt-3"
                 value={JSON.stringify(remoteApprovalPlan, null, 2)}
                 onChange={() => undefined}
@@ -2388,6 +2406,7 @@ export default function WASMPluginPackPage() {
               </Button>
             </div>
             <TextField
+              aria-label="WASM remote signed package install plan JSON"
               value={remoteInstallJSON}
               onChange={setRemoteInstallJSON}
             >
@@ -2475,6 +2494,7 @@ export default function WASMPluginPackPage() {
             </div>
             {remoteInstallPlan && (
               <TextField
+                aria-label="WASM remote install plan result"
                 className="mt-3"
                 value={JSON.stringify(remoteInstallPlan, null, 2)}
                 onChange={() => undefined}
@@ -2538,7 +2558,7 @@ export default function WASMPluginPackPage() {
                 </Button>
               </div>
             </div>
-            <TextField value={inputJSON} onChange={setInputJSON}>
+            <TextField aria-label="WASM plugin input JSON" value={inputJSON} onChange={setInputJSON}>
               <TextArea
                 rows={4}
                 aria-label="WASM plugin input JSON"
@@ -2607,6 +2627,7 @@ export default function WASMPluginPackPage() {
                   </Chip>
                 </div>
                 <TextField
+                  aria-label="WASM Plugin execution result"
                   value={JSON.stringify(result, null, 2)}
                   onChange={() => undefined}
                 >

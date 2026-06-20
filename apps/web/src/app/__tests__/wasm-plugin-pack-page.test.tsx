@@ -101,6 +101,10 @@ describe("WASMPluginPackPage", () => {
     expect(screen.getByText("不会把未验签包解包到 plugin_dir。")).toBeInTheDocument();
     expect(screen.getByText("技术状态")).toBeInTheDocument();
     expect(screen.getByText("查看技术链路详情")).toBeInTheDocument();
+    expect(screen.getByLabelText("WASM plugin slug")).toBeInTheDocument();
+    expect(screen.getByLabelText("WASM plugin manifest JSON")).toBeInTheDocument();
+    expect(screen.getByLabelText("WASM remote install package inspect writeback JSON")).toBeInTheDocument();
+    expect(screen.getByLabelText("WASM plugin input JSON")).toBeInTheDocument();
   });
 
   it("connects WASM validation back to Chat, tasks, trace and Pack Studio", async () => {

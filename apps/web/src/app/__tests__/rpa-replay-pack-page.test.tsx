@@ -68,6 +68,13 @@ describe("RPAReplayPackPage", () => {
     expect(screen.getByText("从回放计划到可验证自动化")).toBeInTheDocument();
     expect(screen.getByText("2. 带回 Chat")).toBeInTheDocument();
     expect(screen.getByText("3. 看证据位置")).toBeInTheDocument();
+    expect(screen.getByText("轨迹定义 JSON")).toBeInTheDocument();
+    expect(screen.getByText("这里保存的是可审计轨迹，不会自动打开网页或执行点击；后续回放仍是 dry-run 计划。")).toBeInTheDocument();
+    expect(screen.getByText("回放参数 JSON")).toBeInTheDocument();
+    expect(screen.getByText("参数只用于生成计划和证据包；当前不会消费 Browser Intent、写浏览器状态或访问目标站点。")).toBeInTheDocument();
+    expect(screen.getByLabelText("RPA trace slug")).toBeInTheDocument();
+    expect(screen.getByLabelText("Trace JSON")).toBeInTheDocument();
+    expect(screen.getByLabelText("Replay params JSON")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /带回 Chat/ })).toHaveAttribute("href", expect.stringContaining("/chat?q="));
     expect(screen.getByRole("link", { name: /看任务/ })).toHaveAttribute("href", "/missions");
     expect(screen.getByRole("link", { name: "核对执行轨迹" })).toHaveAttribute("href", "/trace");
