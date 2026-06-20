@@ -409,18 +409,18 @@ export function packInstallChecklist(
   const risk = riskProfileForPack(manifest);
   const flags = packFeatureFlags(manifest);
   const sourceDetail = options.sourceLabel
-    ? `来源：${options.sourceLabel}。安装前可先在 Studio 只读检查包内容、SHA 与 manifest。`
+    ? `来源：${options.sourceLabel}。安装前可先在 Studio 只读检查包内容、SHA 与能力声明。`
     : options.installed
       ? "来源：本机已安装记录。可从详情页查看版本、入口和权限声明。"
-      : "来源：未标注安装源。建议先确认发布者、SHA 和 manifest 后再安装。";
+      : "来源：未标注安装源。建议先确认发布者、SHA 和能力声明后再安装。";
   const permissionDetail = groups.length > 0
-    ? `会声明 ${groups.map((group) => group.label).join("、")} 等能力；具体动作仍受云雀 route、权限和用户确认约束。`
-    : "未声明额外权限；启用后主要按 manifest 暴露入口或说明，不会默认获得额外写入能力。";
+    ? `会声明 ${groups.map((group) => group.label).join("、")} 等能力；具体动作仍受云雀后端路由、权限和用户确认约束。`
+    : "未声明额外权限；启用后主要按能力声明暴露入口或说明，不会默认获得额外写入能力。";
   const boundaryDetail = manifest.id === "yunque.pack.computer-use"
     ? "边界：当前只让 Planner 生成电脑使用计划，不执行本机桌面控制。"
     : risk.requiresAuthorization
       ? "边界：需要授权的高风险能力不会自动越权执行；启用前应确认来源可信，启用后按具体动作授权。"
-      : "边界：不会自动泄露 API Key，不会绕过权限声明，也不能调用未声明 route。";
+      : "边界：不会自动泄露 API Key，不会绕过权限声明，也不能调用未声明的后端路由。";
   const rollbackDetail = flags.canRollback
     ? "回滚：声明支持版本回滚；也可以随时禁用能力包。"
     : options.enabled
@@ -558,7 +558,7 @@ export function formatPackInstallError(error: unknown, fallback = "安装失败"
   const text = raw.toLowerCase();
   if (/sha|checksum|digest|hash/.test(text)) return "安装失败：SHA256 校验不一致，请确认包来源或重新下载。";
   if (/signature|sign/.test(text)) return "安装失败：签名验证未通过，请确认发布者和签名配置。";
-  if (/manifest|schema|invalid json|parse/.test(text)) return "安装失败：manifest 不合法或能力包结构不完整。";
+  if (/manifest|schema|invalid json|parse/.test(text)) return "安装失败：能力声明不合法或能力包结构不完整。";
   if (/platform|os|arch|unsupported/.test(text)) return "安装失败：当前平台不支持这个能力包。";
   if (/download|fetch|network|timeout|connection|404|403|500/.test(text)) return "安装失败：下载失败，请检查网络、源地址或权限。";
   return raw ? `${fallback}：${raw}` : fallback;

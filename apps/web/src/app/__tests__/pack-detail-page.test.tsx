@@ -179,14 +179,14 @@ describe("PackDetailClientPage", () => {
     expect(screen.getAllByText("安装能力包").length).toBeGreaterThan(0);
     expect(screen.getAllByText("安装后启用和管理").length).toBeGreaterThan(0);
     expect(screen.getByText(/可以留在详情页启用，也可以回能力包中心并自动聚焦这个包/)).toBeInTheDocument();
-    expect(screen.getByText(/检查 yqpack 来源、SHA、manifest、权限和入口/)).toBeInTheDocument();
+    expect(screen.getByText(/检查 yqpack 来源、SHA、能力声明、权限和入口/)).toBeInTheDocument();
     expect(screen.getByText("来源与安装包")).toBeInTheDocument();
     expect(screen.getByText("官方发布源 · example.com")).toBeInTheDocument();
     expect(screen.getByText("https://example.com/needs-context.yqpack")).toBeInTheDocument();
     expect(screen.getByText("SHA256 abc123")).toBeInTheDocument();
     expect(screen.getByText("4 KB")).toBeInTheDocument();
     expect(screen.getByText(/来源：官方发布源 · example.com/)).toBeInTheDocument();
-    expect(screen.getByText(/安装前可先在 Studio 只读检查包内容、SHA 与 manifest/)).toBeInTheDocument();
+    expect(screen.getByText(/安装前可先在 Studio 只读检查包内容、SHA 与能力声明/)).toBeInTheDocument();
     expect(screen.getByText("权限：记忆/知识；启用前建议确认")).toBeInTheDocument();
 
     const sourceStudioLink = screen.getByRole("link", { name: /先在 Studio 只读检查/ });

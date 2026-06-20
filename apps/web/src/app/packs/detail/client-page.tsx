@@ -373,15 +373,15 @@ export default function PackDetailClientPage() {
           key: "inspect",
           label: "先做只读检查",
           detail: installSource
-            ? "在 Studio 里检查 yqpack 来源、SHA、manifest、权限和入口，不会安装或改写本机能力。"
-            : "先确认这个能力包的 manifest、权限和入口是否完整；没有可用安装源时不要直接安装。",
+            ? "在 Studio 里检查 yqpack 来源、SHA、能力声明、权限和入口，不会安装或改写本机能力。"
+            : "先确认这个能力包的能力声明、权限和入口是否完整；没有可用安装源时不要直接安装。",
           href: studioHref,
         },
         {
           key: "install",
           label: "安装能力包",
           detail: installSource
-            ? "确认来源可信后再安装；失败时会提示下载失败、SHA 不匹配、签名失败、manifest 不合法或平台不支持。"
+            ? "确认来源可信后再安装；失败时会提示下载失败、SHA 不匹配、签名失败、能力声明不合法或平台不支持。"
             : "当前没有可用安装源，请回能力包中心换官方源、私有源或本地高级安装。",
           actionLabel: "安装能力包",
           action: installSource ? installFromCatalog : undefined,
@@ -748,7 +748,7 @@ export default function PackDetailClientPage() {
               </div>
               <div className="text-xs mt-2" style={{ color: "var(--yunque-text-muted)" }}>{risk.description}</div>
               <div className="text-xs mt-2" style={{ color: "var(--yunque-text-muted)" }}>
-                不会做什么：启用能力包不会自动泄露 API Key，不会绕过云雀的权限声明，也不会获得未声明 route 的调用能力。
+                不会做什么：启用能力包不会自动泄露 API Key，不会绕过云雀的权限声明，也不会获得未声明后端路由的调用能力。
               </div>
               <div className="text-xs mt-2" style={{ color: "var(--yunque-text-muted)" }}>
                 {update?.rollback ? "支持回滚到上一版本；也可以随时禁用。" : "可以随时禁用；此包未声明版本回滚。"}
@@ -838,7 +838,7 @@ export default function PackDetailClientPage() {
             </div>
             {featureFlags.isIframeBundle && (
               <div className="mt-3 rounded-md p-3 text-xs" style={{ background: "rgba(59,130,246,0.08)", color: "var(--yunque-text-secondary)" }}>
-                独立界面包运行在 iframe 沙箱中：不直接获得云雀 token，默认隔离页面能力，只能通过自身声明的 route 与云雀通信，越权 bridge call 会被拒绝并记录。
+                独立界面包运行在沙箱隔离环境中：不直接获得云雀 token，默认隔离页面能力，只能通过自身声明的后端路由与云雀通信，越权调用会被拒绝并记录。
               </div>
             )}
           </Card>

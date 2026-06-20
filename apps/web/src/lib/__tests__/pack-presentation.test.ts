@@ -192,7 +192,7 @@ describe("pack-presentation", () => {
   it("turns install failures into clear user-facing reasons", () => {
     expect(formatPackInstallError(new Error("sha256 checksum mismatch"))).toContain("SHA256 校验不一致");
     expect(formatPackInstallError(new Error("signature verification failed"))).toContain("签名验证未通过");
-    expect(formatPackInstallError(new Error("manifest schema invalid"))).toContain("manifest 不合法");
+    expect(formatPackInstallError(new Error("manifest schema invalid"))).toContain("能力声明不合法");
     expect(formatPackInstallError(new Error("unsupported platform"))).toContain("当前平台不支持");
     expect(formatPackInstallError(new Error("download timeout"))).toContain("下载失败");
   });
