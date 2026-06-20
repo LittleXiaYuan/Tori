@@ -84,6 +84,16 @@ describe("PackRuntimeRouteClientPage DLC route", () => {
     const studioLink = screen.getByRole("link", { name: /交给小羽补齐/ });
     expect(studioLink).toHaveAttribute("href", expect.stringContaining("/packs/studio?packId=yunque.pack.dlc-demo"));
     expect(decodeURIComponent(studioLink.getAttribute("href") || "")).toContain("优先补齐 使用示例、用户感知位置");
+    expect(screen.getByText("从当前入口继续改包")).toBeInTheDocument();
+    expect(screen.getByText(/你现在打开的是/)).toBeInTheDocument();
+    expect(screen.getAllByText("/packs/dlc-demo").length).toBeGreaterThan(0);
+    expect(screen.getByText("先触发一次")).toBeInTheDocument();
+    expect(screen.getByText("看结果在哪")).toBeInTheDocument();
+    expect(screen.getByText("决定留下还是改")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /看权限与来源/ })).toHaveAttribute("href", "/packs/detail?id=yunque.pack.dlc-demo");
+    const handoffLink = screen.getByRole("link", { name: /让小羽改这个包/ });
+    expect(handoffLink).toHaveAttribute("href", expect.stringContaining("/packs/studio?packId=yunque.pack.dlc-demo"));
+    expect(screen.getByRole("link", { name: /回中心筛选/ })).toHaveAttribute("href", "/packs?q=yunque.pack.dlc-demo");
     expect(await screen.findByText("这个能力界面来自能力包本身")).toBeInTheDocument();
     expect(screen.getAllByText("独立界面包").length).toBeGreaterThan(0);
     expect(screen.getByText("沙箱隔离")).toBeInTheDocument();

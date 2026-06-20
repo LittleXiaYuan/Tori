@@ -12,7 +12,7 @@ import { buildPackSdkEntrypoints, fetchEnabledPacks, findPackRouteBinding, forma
 import { PackDlcHost } from "@/lib/pack-dlc-host";
 import { eventPathsFromPermissions } from "@/lib/pack-bridge";
 import { chatPromptHref } from "@/lib/pack-action-links";
-import { packDeliveryProfile, packExamples, packFeatureFlags, packReadiness, packUsability, riskProfileForPack } from "@/lib/pack-presentation";
+import { packDeliveryProfile, packExamples, packFeatureFlags, packReadiness, packUsability, packVerificationSteps, riskProfileForPack } from "@/lib/pack-presentation";
 
 const dlcBoundaryItems = [
   "独立界面拿不到云雀本地登录态或宿主 token。",
@@ -101,6 +101,7 @@ export default function PackRuntimeRouteClientPage() {
   const risk = riskProfileForPack(manifest);
   const flags = packFeatureFlags(manifest);
   const examples = packExamples(manifest, 3);
+  const verificationSteps = packVerificationSteps(manifest);
   const usagePrompt = [
     `我正在使用云雀能力包：${manifest.name} (${manifest.id})。`,
     `请告诉我它现在能帮我做什么、适合放在哪个工作流里、我可以怎么下第一条指令。`,
@@ -195,6 +196,57 @@ export default function PackRuntimeRouteClientPage() {
             <Link href={studioHref}>
               <Button size="sm" variant="ghost">
                 <Wrench size={13} /> 交给小羽补齐
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </Card>
+
+      <Card className="section-card p-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0 max-w-3xl">
+            <div className="mb-2 flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
+              <Wrench size={15} style={{ color: "var(--yunque-accent)" }} />
+              从当前入口继续改包
+            </div>
+            <div className="text-sm leading-6" style={{ color: "var(--yunque-text-secondary)" }}>
+              你现在打开的是 <code>{pathname}</code>。如果这个能力看起来像空壳、说明不清或入口不顺，可以先看权限与来源，再交给小羽只读检查 yqpack、补齐用途和验收路径。
+            </div>
+            <div className="mt-3 grid gap-2 md:grid-cols-3">
+              {verificationSteps.map((step, idx) => (
+                <div
+                  key={step.key}
+                  className="rounded-lg border px-3 py-2 text-xs leading-5"
+                  style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-bg-hover)", color: "var(--yunque-text-secondary)" }}
+                >
+                  <div className="mb-1 flex items-center gap-2 font-semibold" style={{ color: "var(--yunque-text)" }}>
+                    <span
+                      className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px]"
+                      style={{ background: "rgba(59,130,246,0.12)", color: "var(--yunque-primary)" }}
+                    >
+                      {idx + 1}
+                    </span>
+                    {step.label}
+                  </div>
+                  {step.detail}
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="flex w-full flex-wrap gap-2 lg:w-auto lg:max-w-xs">
+            <Link href={`/packs/detail?id=${encodeURIComponent(manifest.id)}`}>
+              <Button size="sm" variant="outline">
+                <ShieldCheck size={13} /> 看权限与来源
+              </Button>
+            </Link>
+            <Link href={studioHref}>
+              <Button size="sm" className="btn-accent">
+                <Wrench size={13} /> 让小羽改这个包
+              </Button>
+            </Link>
+            <Link href={packCenterFocusHref(manifest.id)}>
+              <Button size="sm" variant="ghost">
+                <PackageOpen size={13} /> 回中心筛选
               </Button>
             </Link>
           </div>
