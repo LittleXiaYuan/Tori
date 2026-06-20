@@ -318,6 +318,7 @@ describe("PackStudioPage", () => {
     expect((screen.getByLabelText("SHA256") as HTMLInputElement).value).toBe("9".repeat(64));
     expect(screen.getByText("当前能力包：WASM 能力包")).toBeInTheDocument();
     expect(screen.getByText("已带 yqpack 来源")).toBeInTheDocument();
+    expect(screen.getByText(/候选来源：已启用；本机状态：已启用；尚未对当前 yqpack 做只读检查/)).toBeInTheDocument();
     expect(screen.getByText("先在这里做只读检查、工作区、差异预览、审计和重新打包；完成后回详情确认权限，或回能力包中心刷新入口与状态。")).toBeInTheDocument();
     expect(screen.getByText("当前阶段：只读检查 · 下一步：填写路径/URL 后点击只读检查。小羽只生成计划和草稿，不会自动应用改动。")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /查看详情/ })).toHaveAttribute("href", "/packs/detail?id=yunque.pack.wasm-plugin");
@@ -398,6 +399,7 @@ describe("PackStudioPage", () => {
     expect(screen.getByText("已从能力包中心接入这个 yqpack")).toBeInTheDocument();
     expect(screen.getByText("当前能力包：WASM 能力包")).toBeInTheDocument();
     expect(screen.getByText("已带 yqpack 来源")).toBeInTheDocument();
+    expect(screen.getByText(/候选来源：官方源；本机状态：未安装；尚未对当前 yqpack 做只读检查/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /查看详情/ })).toHaveAttribute("href", "/packs/detail?id=yunque.pack.wasm-plugin");
     await waitFor(() => {
       expect(packsClientMock.studioPlan).toHaveBeenCalledWith({
@@ -440,6 +442,7 @@ describe("PackStudioPage", () => {
     });
     expect(screen.getByText("当前能力包：WASM 能力包")).toBeInTheDocument();
     expect(screen.getByText("已同步检查结果")).toBeInTheDocument();
+    expect(screen.getByText(/候选来源：已启用；本机状态：已启用；只读检查已匹配当前能力包，SHA 匹配，3 个文件/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /查看详情/ })).toHaveAttribute("href", "/packs/detail?id=yunque.pack.wasm-plugin");
     expect(screen.getByRole("link", { name: /打开能力入口/ })).toHaveAttribute("href", "/packs/wasm-plugin");
   });

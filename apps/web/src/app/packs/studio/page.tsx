@@ -908,6 +908,19 @@ export default function PackStudioPage() {
     if (inspectReport && !matchesKnownCandidate) return "只读检查结果";
     return sourceLabel(contextCandidate);
   }, [candidates, contextCandidate, inspectReport]);
+  const contextStatusDetail = useMemo(() => {
+    if (!contextCandidate) return "先从候选、批量任务或 yqpack 来源中选择一个能力包。";
+    const known = Boolean(candidates.some((item) => item.manifest.id === contextCandidate.manifest.id));
+    const source = contextSourceLabel;
+    const status = contextCandidate.enabled ? "已启用" : contextCandidate.installed ? "已安装未启用" : "未安装";
+    const inspection = inspectReport
+      ? inspectReport.manifest.id === contextCandidate.manifest.id
+        ? `只读检查已匹配当前能力包，SHA ${inspectReport.sha256_match ? "匹配" : "不匹配"}，${inspectReport.entry_count} 个文件。`
+        : `只读检查结果来自 ${inspectReport.manifest.name}，与当前候选不一致。`
+      : "尚未对当前 yqpack 做只读检查。";
+    const origin = known ? `候选来源：${source}` : `来源：${source}，不在当前候选列表中`;
+    return `${origin}；本机状态：${status}；${inspection}`;
+  }, [candidates, contextCandidate, contextSourceLabel, inspectReport]);
   const readiness = manifest ? packReadiness(manifest) : null;
   const delivery = manifest ? packDeliveryProfile(manifest) : null;
   const { data: studioPlan, refresh: refreshStudioPlan } = useApiData(async () => {
@@ -1480,6 +1493,9 @@ export default function PackStudioPage() {
                 <div className="mt-2 rounded-md border px-3 py-2 text-xs" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-bg-hover)", color: "var(--yunque-text-secondary)" }}>
                   当前阶段：{currentWorkflowStep?.title || "等待开始"} · 下一步：{currentWorkflowStep?.action || "先选择能力包"}。小羽只生成计划和草稿，不会自动应用改动。
                 </div>
+                <div className="mt-2 rounded-md border px-3 py-2 text-xs leading-5" style={{ borderColor: "rgba(59,130,246,0.16)", background: "rgba(59,130,246,0.06)", color: "var(--yunque-text-secondary)" }}>
+                  {contextStatusDetail}
+                </div>
                 <div className="mt-2 text-[11px] font-mono break-all" style={{ color: "var(--yunque-text-muted)" }}>
                   {manifest.id}
                 </div>
@@ -1705,6 +1721,9 @@ export default function PackStudioPage() {
                 <div className="mt-2 grid gap-2 md:grid-cols-2">
                   <div className="rounded px-2 py-2 text-[11px]" style={{ background: "var(--yunque-surface)", color: "var(--yunque-text-secondary)" }}>
                     当前处理：{batchActivePack?.name || batchActivePack?.id || "尚未载入队列中的能力包"}
+                    {batchActivePack && (
+                      <div className="mt-1 leading-5">{contextStatusDetail}</div>
+                    )}
                   </div>
                   <div className="rounded px-2 py-2 text-[11px]" style={{ background: "var(--yunque-surface)", color: "var(--yunque-text-secondary)" }}>
                     <div>下一步：{currentWorkflowStep?.action || "先载入一个能力包"}</div>
