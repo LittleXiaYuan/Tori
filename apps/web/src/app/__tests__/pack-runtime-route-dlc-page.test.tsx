@@ -7,9 +7,12 @@ const packsClientMock = vi.hoisted(() => ({
 }));
 
 const dlcHostMock = vi.hoisted(() => vi.fn());
+const pathnameMock = vi.hoisted(() => ({
+  value: "/packs/dlc-demo",
+}));
 
 vi.mock("next/navigation", () => ({
-  usePathname: () => "/packs/dlc-demo",
+  usePathname: () => pathnameMock.value,
 }));
 
 vi.mock("@/lib/sdk-client", () => ({
@@ -62,13 +65,16 @@ const dlcDemoPack = {
 describe("PackRuntimeRouteClientPage DLC route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    pathnameMock.value = "/packs/dlc-demo";
     packsClientMock.enabled.mockResolvedValue({ packs: [dlcDemoPack] });
   });
 
   it("explains iframe-bundle DLC boundaries before rendering the sandbox host", async () => {
     render(<PackRuntimeRouteClientPage />);
 
+    expect(await screen.findByRole("link", { name: /回中心定位/ })).toHaveAttribute("href", "/packs?q=yunque.pack.dlc-demo");
     expect(await screen.findByText("这个能力包能帮你做什么")).toBeInTheDocument();
+    expect(screen.getByText("这个能力包提供独立界面，已在沙箱中动态加载。")).toBeInTheDocument();
     expect(screen.getByText("可直接使用")).toBeInTheDocument();
     expect(screen.getByText("需补说明")).toBeInTheDocument();
     expect(screen.getByText("还没有写清使用示例，可以交给小羽补齐。")).toBeInTheDocument();
@@ -89,6 +95,12 @@ describe("PackRuntimeRouteClientPage DLC route", () => {
     expect(screen.getByText("越权 bridge 调用会被拒绝并写入审计线索。")).toBeInTheDocument();
     expect(screen.getByText("这是 DLC/iframe/WASM 的参考包，用于验证热插拔界面和 bridge 权限，不是业务功能。")).toBeInTheDocument();
     expect(screen.getByTestId("pack-dlc-host")).toBeInTheDocument();
+    expect(screen.getByText("入口同步详情")).toBeInTheDocument();
+    expect(screen.getByText("界面资源与安装包")).toBeInTheDocument();
+    expect(screen.getByText("开发者 SDK 能力")).toBeInTheDocument();
+    expect(screen.getByText(/技术说明：这个页面只读取已启用能力包返回的 manifest/)).toBeInTheDocument();
+    expect(screen.queryByText("Pack 路由同步")).not.toBeInTheDocument();
+    expect(screen.queryByText("Pack 路由未启用")).not.toBeInTheDocument();
 
     await waitFor(() => expect(dlcHostMock).toHaveBeenCalled());
     expect(dlcHostMock.mock.calls[0]?.[0]).toMatchObject({
@@ -98,5 +110,20 @@ describe("PackRuntimeRouteClientPage DLC route", () => {
       allowedNavPaths: ["/packs/dlc-demo"],
       allowedEventPaths: ["/v1/events/stream"],
     });
+  });
+
+  it("guides users back to the pack center when a dynamic route is not enabled", async () => {
+    pathnameMock.value = "/packs/not-enabled";
+    packsClientMock.enabled.mockResolvedValueOnce({ packs: [dlcDemoPack] });
+
+    render(<PackRuntimeRouteClientPage />);
+
+    expect(await screen.findByText("能力包入口未启用")).toBeInTheDocument();
+    expect(screen.getByText("这个入口还没有在已启用能力包中声明，请先安装并启用对应能力。")).toBeInTheDocument();
+    expect(screen.getByText("未找到可打开的能力包页面")).toBeInTheDocument();
+    expect(screen.getByText(/需要先安装并启用对应能力包/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /返回能力包中心/ })).toHaveAttribute("href", "/packs");
+    expect(screen.queryByText("Pack 路由未启用")).not.toBeInTheDocument();
+    expect(dlcHostMock).not.toHaveBeenCalled();
   });
 });

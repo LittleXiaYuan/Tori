@@ -22,6 +22,10 @@ const dlcBoundaryItems = [
   "越权 bridge 调用会被拒绝并写入审计线索。",
 ];
 
+function packCenterFocusHref(packId?: string): string {
+  return packId ? `/packs?q=${encodeURIComponent(packId)}` : "/packs";
+}
+
 function deliveryColor(tone: ReturnType<typeof packDeliveryProfile>["tone"]): "success" | "default" | "warning" | "danger" {
   if (tone === "success") return "success";
   if (tone === "warning") return "warning";
@@ -64,7 +68,7 @@ export default function PackRuntimeRouteClientPage() {
   if (error) {
     return (
       <div className="page-root space-y-5 animate-fade-in-up">
-        <PageHeader icon={<Boxes size={20} />} title="Pack 路由同步" description="从后端 enabled pack registry 加载前端入口失败。" />
+        <PageHeader icon={<Boxes size={20} />} title="能力包入口同步失败" description="无法从已启用能力包列表加载入口，请回能力包中心刷新状态。" />
         <Card className="section-card p-5 text-sm" style={{ color: "var(--yunque-danger)" }}>{error}</Card>
       </div>
     );
@@ -73,13 +77,13 @@ export default function PackRuntimeRouteClientPage() {
   if (!match) {
     return (
       <div className="page-root space-y-5 animate-fade-in-up">
-        <PageHeader icon={<PackageOpen size={20} />} title="Pack 路由未启用" description="该前端入口未在后端 enabled packs 的 frontend.routes 中声明。" />
+        <PageHeader icon={<PackageOpen size={20} />} title="能力包入口未启用" description="这个入口还没有在已启用能力包中声明，请先安装并启用对应能力。" />
         <Card className="section-card p-6 space-y-3">
-          <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>未找到可同步的 Pack 页面</div>
+          <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>未找到可打开的能力包页面</div>
           <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>
-            当前路径 <code>{pathname}</code> 需要先安装并启用对应 pack。前端不会为未启用包暴露页面入口，避免继续把可选能力写死进主系统。
+            当前路径 <code>{pathname}</code> 需要先安装并启用对应能力包。云雀不会为未启用能力暴露页面入口，避免把可选能力写死进主系统。
           </div>
-          <Link href="/packs" className="btn-accent inline-flex w-fit items-center rounded-xl px-4 py-2 text-sm">返回能力包运行时</Link>
+          <Link href="/packs" className="btn-accent inline-flex w-fit items-center rounded-xl px-4 py-2 text-sm">返回能力包中心</Link>
         </Card>
       </div>
     );
@@ -122,9 +126,9 @@ export default function PackRuntimeRouteClientPage() {
         icon={<Boxes size={20} />}
         title={match.title || manifest.name}
         description={isIframeBundle
-          ? "该 Pack 提供独立前端包，已在沙箱 iframe 中动态加载（DLC）。"
-          : "这是由后端 enabled pack registry 同步出来的通用 Pack 页面。专属页面尚未随前端包加载时，先展示 manifest、资源入口和 SDK 调用面。"}
-        actions={<Link href="/packs" className="inline-flex items-center rounded-xl px-4 py-2 text-sm" style={{ border: "1px solid var(--yunque-border)", color: "var(--yunque-text)" }}>管理能力包</Link>}
+          ? "这个能力包提供独立界面，已在沙箱中动态加载。"
+          : "这是能力包声明同步出来的通用入口；没有专属页面时，先展示用途、入口、权限和可继续打磨的路径。"}
+        actions={<Link href={packCenterFocusHref(manifest.id)} className="inline-flex items-center rounded-xl px-4 py-2 text-sm" style={{ border: "1px solid var(--yunque-border)", color: "var(--yunque-text)" }}>回中心定位</Link>}
       />
 
       <Card className="section-card p-5">
@@ -250,7 +254,7 @@ export default function PackRuntimeRouteClientPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <Card className="section-card p-4">
-          <div className="kpi-label">Pack</div>
+          <div className="kpi-label">能力包</div>
           <div className="text-sm font-mono mt-1" style={{ color: "var(--yunque-text)" }}>{manifest.id}</div>
           <Chip size="sm" className="mt-3" style={{ background: "rgba(34,197,94,0.10)", color: "var(--yunque-success)" }}>{pack.status}</Chip>
         </Card>
@@ -269,7 +273,7 @@ export default function PackRuntimeRouteClientPage() {
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         <Card className="section-card p-5 space-y-3">
           <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
-            <Route size={15} /> Registry 同步入口
+            <Route size={15} /> 入口同步详情
           </div>
           <div className="text-xs space-y-2" style={{ color: "var(--yunque-text-muted)" }}>
             <div>当前路径：<code>{pathname}</code></div>
@@ -281,7 +285,7 @@ export default function PackRuntimeRouteClientPage() {
 
         <Card className="section-card p-5 space-y-3">
           <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
-            <ExternalLink size={15} /> UI 资源与能力包
+            <ExternalLink size={15} /> 界面资源与安装包
           </div>
           <div className="text-xs space-y-2" style={{ color: "var(--yunque-text-muted)" }}>
             <div>资源类型：<code>{assets?.type || "builtin"}</code></div>
@@ -295,7 +299,7 @@ export default function PackRuntimeRouteClientPage() {
 
       <Card className="section-card p-5 space-y-3">
         <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
-          <TerminalSquare size={15} /> SDK 调用能力
+          <TerminalSquare size={15} /> 开发者 SDK 能力
         </div>
         {entries.length > 0 ? (
           <div className="flex flex-wrap gap-2">
@@ -313,7 +317,7 @@ export default function PackRuntimeRouteClientPage() {
       <Card className="section-card p-5 flex items-start gap-3">
         <ShieldCheck size={16} className="mt-0.5 shrink-0" style={{ color: "var(--yunque-success)" }} />
         <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>
-          这个页面只消费 <code>/v1/packs/enabled</code> 返回的 manifest，不把新功能硬编码进主导航。后续某个 pack 提供独立前端包或专属页面时，可以覆盖同一路径；未覆盖前，仍可通过此通用入口完成菜单、路由、UI 资源和 SDK 能力同步展示。
+          技术说明：这个页面只读取已启用能力包返回的 manifest，不把新功能硬编码进主导航。后续某个能力包提供独立前端包或专属页面时，可以覆盖同一路径；未覆盖前，仍可通过这个通用入口查看菜单、路由、界面资源和 SDK 能力。
         </div>
       </Card>
     </div>
