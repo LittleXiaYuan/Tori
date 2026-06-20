@@ -329,6 +329,30 @@ export default function PackDetailClientPage() {
       ? `让 ${manifest.name} 更像一个用户能直接理解和使用的能力包，优先补齐 ${readiness.missing.join("、") || "用途、入口、示例、权限边界和回滚说明"}。`
       : `让 ${manifest.name} 更像一个用户能直接理解和使用的能力包，补齐用途、入口、示例、权限边界和回滚说明。`;
   const studioHref = studioHrefForPack({ manifest, goal: studioGoal, catalogEntry, releaseEntry });
+  const studioHandoffItems = [
+    {
+      label: "补强目标",
+      detail: studioGoal,
+    },
+    {
+      label: "体检缺口",
+      detail: readiness.missing.length > 0
+        ? readiness.missing.join("、")
+        : "说明、入口、示例与能力边界已基本完整，可继续打磨更具体的用户路径。",
+    },
+    {
+      label: "来源与包",
+      detail: installSource
+        ? `${installSource.label}${installSource.sha256 ? ` · SHA ${installSource.sha256}` : ""}`
+        : installed
+          ? "本机已安装记录；可在工坊先做只读检查，再准备工作区。"
+          : "暂未找到可安装来源；先回能力包中心选择官方源、私有源或本地高级安装。",
+    },
+    {
+      label: "验收路径",
+      detail: verificationSteps.map((step) => step.label).join(" -> "),
+    },
+  ];
 
   const installFromCatalog = () => {
     const installEntry = catalogEntry || (releaseEntry ? { ...releaseEntry, source: releaseEntry.release_url } : undefined);
@@ -621,6 +645,38 @@ export default function PackDetailClientPage() {
             <Link href={studioHref}>
               <Button size="sm" variant="ghost">
                 <Sparkles size={14} /> 交给小羽补齐
+              </Button>
+            </Link>
+          </div>
+        </Card>
+
+        <Card className="section-card p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Sparkles size={16} style={{ color: "var(--yunque-accent)" }} />
+            <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
+              交接给小羽改包
+            </div>
+          </div>
+          <div className="text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
+            从详情进入工坊时，会带上当前能力包、来源、体检缺口和验收路径；小羽只生成计划和草稿，真正安装、启用、回滚都需要你确认。
+          </div>
+          <div className="mt-3 grid gap-2 md:grid-cols-2">
+            {studioHandoffItems.map((item) => (
+              <div key={item.label} className="rounded-md border p-3" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-bg-hover)" }}>
+                <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>{item.label}</div>
+                <div className="mt-1 text-[11px] leading-5 break-words" style={{ color: "var(--yunque-text-secondary)" }}>{item.detail}</div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link href={studioHref}>
+              <Button size="sm" className="btn-accent">
+                <Sparkles size={14} /> 带上下文进入工坊
+              </Button>
+            </Link>
+            <Link href={packCenterFocusHref(manifest.id)}>
+              <Button size="sm" variant="ghost">
+                回中心看队列 <ArrowRight size={14} />
               </Button>
             </Link>
           </div>

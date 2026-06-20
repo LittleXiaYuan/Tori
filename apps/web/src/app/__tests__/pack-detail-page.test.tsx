@@ -97,6 +97,16 @@ describe("PackDetailClientPage", () => {
     expect(screen.getByText(/交付状态：待补肉/)).toBeInTheDocument();
     expect(screen.getByText("能力包体检")).toBeInTheDocument();
     expect(screen.getByText(/还缺：使用示例/)).toBeInTheDocument();
+    expect(screen.getByText("交接给小羽改包")).toBeInTheDocument();
+    expect(screen.getByText("从详情进入工坊时，会带上当前能力包、来源、体检缺口和验收路径；小羽只生成计划和草稿，真正安装、启用、回滚都需要你确认。")).toBeInTheDocument();
+    expect(screen.getByText("补强目标")).toBeInTheDocument();
+    expect(screen.getByText(/让 Needs Context Pack 更像一个用户能直接理解和使用的能力包/)).toBeInTheDocument();
+    expect(screen.getByText("体检缺口")).toBeInTheDocument();
+    expect(screen.getByText("使用示例")).toBeInTheDocument();
+    expect(screen.getByText("来源与包")).toBeInTheDocument();
+    expect(screen.getByText("本机已安装记录；可在工坊先做只读检查，再准备工作区。")).toBeInTheDocument();
+    expect(screen.getByText("验收路径")).toBeInTheDocument();
+    expect(screen.getByText("先触发一次 -> 看结果在哪 -> 决定留下还是改")).toBeInTheDocument();
     expect(screen.getByText("确认来源")).toBeInTheDocument();
     expect(screen.getByText(/来源：本机已安装记录/)).toBeInTheDocument();
     expect(screen.getByText("能力边界")).toBeInTheDocument();
@@ -115,6 +125,9 @@ describe("PackDetailClientPage", () => {
     expect(studioLinks[0]).toHaveAttribute("href", expect.stringContaining("/packs/studio?packId=yunque.pack.needs-context"));
     expect(studioLinks[0]).toHaveAttribute("href", expect.stringContaining("goal="));
     expect(decodeURIComponent(studioLinks[0].getAttribute("href") || "")).toContain("优先补齐+使用示例");
+    const handoffStudioLink = screen.getByRole("link", { name: /带上下文进入工坊/ });
+    expect(handoffStudioLink).toHaveAttribute("href", expect.stringContaining("/packs/studio?packId=yunque.pack.needs-context"));
+    expect(decodeURIComponent(handoffStudioLink.getAttribute("href") || "")).toContain("优先补齐+使用示例");
     expect(screen.getByRole("link", { name: /打开能力入口/ })).toHaveAttribute("href", "/packs/needs-context");
   });
 
@@ -186,6 +199,7 @@ describe("PackDetailClientPage", () => {
     expect(screen.getByText("SHA256 abc123")).toBeInTheDocument();
     expect(screen.getByText("4 KB")).toBeInTheDocument();
     expect(screen.getByText(/来源：官方发布源 · example.com/)).toBeInTheDocument();
+    expect(screen.getAllByText(/官方发布源 · example.com · SHA abc123/).length).toBeGreaterThan(0);
     expect(screen.getByText(/安装前可先在工坊只读检查包内容、SHA 与能力声明/)).toBeInTheDocument();
     expect(screen.getByText("权限：记忆/知识；启用前建议确认")).toBeInTheDocument();
 
@@ -199,6 +213,9 @@ describe("PackDetailClientPage", () => {
     const studioLinks = screen.getAllByRole("link", { name: /交给小羽补齐/ });
     expect(studioLinks[0]).toHaveAttribute("href", expect.stringContaining("packageUrl=https%3A%2F%2Fexample.com%2Fneeds-context.yqpack"));
     expect(studioLinks[0]).toHaveAttribute("href", expect.stringContaining("sha256=abc123"));
+    const handoffStudioLink = screen.getByRole("link", { name: /带上下文进入工坊/ });
+    expect(handoffStudioLink).toHaveAttribute("href", expect.stringContaining("packageUrl=https%3A%2F%2Fexample.com%2Fneeds-context.yqpack"));
+    expect(handoffStudioLink).toHaveAttribute("href", expect.stringContaining("sha256=abc123"));
 
     fireEvent.click(screen.getByRole("button", { name: "安装" }));
 
