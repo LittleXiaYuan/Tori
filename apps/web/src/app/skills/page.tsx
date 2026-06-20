@@ -8,7 +8,6 @@ import {
 } from "lucide-react";
 import { showToast } from "@/components/toast-provider";
 import EmptyState from "@/components/empty-state";
-import PackSurfaceGuide from "@/components/pack-surface-guide";
 
 type TabKey = "installed" | "market" | "dynamic";
 type HubSource = "" | "clawhub" | "torihub";
@@ -137,7 +136,6 @@ export default function SkillsPage() {
         </div>
       </div>
 
-      <PackSurfaceGuide surface="skills" />
 
       <Tabs selectedKey={tab} onSelectionChange={(k) => setTab(k as TabKey)}>
         <Tabs.ListContainer>

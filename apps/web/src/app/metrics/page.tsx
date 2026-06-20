@@ -6,7 +6,6 @@ import { api, type MetricsSnapshot } from "@/lib/api";
 import { BarChart3, RefreshCw, Activity, Clock, Zap, TrendingUp } from "lucide-react";
 import { usePolling } from "@/lib/use-polling";
 import PageHeader from "@/components/page-header";
-import PackSurfaceGuide from "@/components/pack-surface-guide";
 import { formatErrorMessage } from "@/lib/error-utils";
 
 export default function MetricsPage() {
@@ -35,7 +34,6 @@ export default function MetricsPage() {
     <div className="page-root space-y-6 animate-fade-in-up">
       <PageHeader icon={<BarChart3 size={20} />} title="性能指标" onRefresh={() => { setLoading(true); load(); }} />
 
-      <PackSurfaceGuide surface="metrics" />
 
       {!metrics ? (
         <Card className="section-card p-12 text-center">

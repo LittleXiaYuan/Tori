@@ -39,10 +39,6 @@ describe("TrustPage", () => {
     expect(screen.getByText("观察健康")).toBeInTheDocument();
     expect(screen.getByText("管理模型")).toBeInTheDocument();
     expect(screen.getByText("查看工具执行")).toBeInTheDocument();
-    expect(screen.getByText("这里承接的能力包")).toBeInTheDocument();
-    expect(screen.getByText("控制面")).toBeInTheDocument();
-    expect(screen.getByText("权限")).toBeInTheDocument();
-    expect(screen.getByText(/控制工具、联网、写入、远程包和模型配置的授权边界/)).toBeInTheDocument();
     expect(await screen.findByText("browser-intent")).toBeInTheDocument();
   });
 });

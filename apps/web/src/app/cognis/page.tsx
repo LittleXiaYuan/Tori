@@ -41,7 +41,6 @@ import {
   Workflow,
 } from "lucide-react";
 import PageHeader from "@/components/page-header";
-import PackSurfaceGuide from "@/components/pack-surface-guide";
 import { showToast } from "@/components/toast-provider";
 import { formatErrorMessage } from "@/lib/error-utils";
 import { createCognisClient } from "yunque-client/cognis";
@@ -391,7 +390,6 @@ export default function CognisPage() {
         }
       />
 
-      <PackSurfaceGuide surface="cognis" />
 
       <Card className="section-card p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">

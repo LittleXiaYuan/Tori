@@ -11,7 +11,6 @@ import {
 } from "lucide-react";
 import { showToast } from "@/components/toast-provider";
 import EmptyState from "@/components/empty-state";
-import PackSurfaceGuide from "@/components/pack-surface-guide";
 
 type ConfigTab = "cursor" | "claude_code" | "windsurf";
 
@@ -142,7 +141,6 @@ export default function WorkersPage() {
         </div>
       </div>
 
-      <PackSurfaceGuide surface="workers" />
 
       <Card className="mb-6 p-4" style={{ background: "var(--yunque-card)", border: "1px solid var(--yunque-border)" }}>
         <div className="grid gap-3 md:grid-cols-3">

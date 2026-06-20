@@ -7,7 +7,6 @@ import { api, getAuthHeaders } from "@/lib/api";
 import type { SetupEnvironment, SetupTemplate } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import { formatErrorMessage } from "@/lib/error-utils";
-import PackSurfaceGuide from "@/components/pack-surface-guide";
 import {
   Bot,
   CheckCircle2,
@@ -333,7 +332,6 @@ export default function SetupPage() {
         })}
       </div>
 
-      <PackSurfaceGuide surface="setup" />
 
       {step === STEP_CHOOSE && (
         <Card className="p-6">

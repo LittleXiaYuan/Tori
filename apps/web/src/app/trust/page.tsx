@@ -7,7 +7,6 @@ import { Card, Button, Spinner, Tooltip, Chip, ProgressBar } from "@heroui/react
 import { Activity, ClipboardCheck, FileSearch, ShieldCheck, SlidersHorizontal, TerminalSquare, Zap, RotateCcw, RefreshCw } from "lucide-react";
 import { useApiData } from "@/lib/use-api-data";
 import { formatErrorMessage } from "@/lib/error-utils";
-import PackSurfaceGuide from "@/components/pack-surface-guide";
 
 const LEVEL_COLORS: Record<string, string> = {
   shell: "#ef4444", network: "#f59e0b", write: "#3b82f6", "read-only": "#6b7280",
@@ -115,7 +114,6 @@ export default function TrustPage() {
         </div>
       </Card>
 
-      <PackSurfaceGuide surface="trust" />
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
         {governanceLinks.map((item) => (
