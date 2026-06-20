@@ -26,6 +26,7 @@ import { showToast } from "@/components/toast-provider";
 import { createYunqueSDKClientOptions } from "@/lib/sdk-client";
 import { useApiData } from "@/lib/use-api-data";
 import {
+  packBoundarySummary,
   capabilitySurfaceLabels,
   groupPackPermissions,
   packDeliveryProfile,
@@ -221,7 +222,7 @@ function buildDeliverySummary(params: {
     "## 产品验收入口",
     `- 能力包中心：${centerHref}（聚焦这个包，确认来源、版本、安装/启用状态和侧栏入口）`,
     detailHref
-      ? `- 权限与来源详情：${detailHref}（复查权限、风险、入口、回滚和小羽补齐建议）`
+      ? `- 权限与来源详情：${detailHref}（复查权限、风险、入口、回滚和小羽打磨建议）`
       : "- 权限与来源详情：尚未选择能力包，无法生成详情链接。",
     openPath
       ? `- 打开入口复验：${openPath}（按用户主路径触发一次，确认结果、产物或状态变化可见）`
@@ -1005,6 +1006,7 @@ export default function PackStudioPage() {
   }, [candidates, inspectReport]);
   const readiness = manifest ? packReadiness(manifest) : null;
   const delivery = manifest ? packDeliveryProfile(manifest) : null;
+  const boundarySummary = manifest ? packBoundarySummary(manifest) : [];
   const { data: studioPlan, refresh: refreshStudioPlan } = useApiData(async () => {
     if (!manifest) return null;
     try {
@@ -1856,7 +1858,7 @@ export default function PackStudioPage() {
             <div className="mt-3 space-y-3">
               <div className="grid gap-2 text-[11px] lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]" style={{ color: "var(--yunque-text-muted)" }}>
                 <div className="rounded px-2 py-2" style={{ background: "var(--yunque-bg-hover)" }}>
-                  目标：{importedBatchRequest.goal || "逐包补齐用途、入口、示例、权限边界和回滚说明。"}
+                  目标：{importedBatchRequest.goal || "逐包打磨用途、入口、示例、权限边界和回滚说明。"}
                 </div>
                 <div className="rounded px-2 py-2" style={{ background: "var(--yunque-bg-hover)" }}>
                   规则：{importedBatchRequest.rules.slice(0, 2).join("；") || "不要自动应用改动，先回到能力包工坊预览差异 / 审计 / 重新打包。"}
@@ -2272,6 +2274,19 @@ export default function PackStudioPage() {
                   {readiness.missing.length > 0
                     ? `小羽会优先补齐：${readiness.missing.join("、")}。`
                     : "说明、入口、示例与能力边界已基本完整，可继续打磨更具体的用户路径。"}
+                </div>
+              )}
+              {boundarySummary.length > 0 && (
+                <div className="mt-3 rounded-md border p-3 text-xs" style={{ borderColor: "rgba(59,130,246,0.18)", background: "rgba(59,130,246,0.06)" }}>
+                  <div className="mb-2 text-xs font-medium" style={{ color: "var(--yunque-text)" }}>启用前边界</div>
+                  <div className="grid gap-2 md:grid-cols-2">
+                    {boundarySummary.map((item) => (
+                      <div key={item.key} className="rounded px-2 py-2" style={{ background: "var(--yunque-surface)", color: "var(--yunque-text-secondary)" }}>
+                        <div className="mb-1 font-medium" style={{ color: item.tone === "danger" ? "var(--yunque-danger)" : item.tone === "warning" ? "var(--yunque-warning)" : "var(--yunque-text)" }}>{item.label}</div>
+                        <div className="leading-5">{item.detail}</div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
               <div className="mt-3 grid gap-3 md:grid-cols-2">

@@ -728,6 +728,12 @@ describe("PackStudioPage", () => {
 
     expect(screen.getByText("可以让小羽优先优化")).toBeInTheDocument();
     expect(screen.getByText("需要守住的边界")).toBeInTheDocument();
+    expect(screen.getByText("启用前边界")).toBeInTheDocument();
+    expect(screen.getByText("它会获得")).toBeInTheDocument();
+    expect(screen.getByText("它不会做")).toBeInTheDocument();
+    expect(screen.getByText(/远程安装、签名校验、包检查、注册和 host 执行都受门禁约束/)).toBeInTheDocument();
+    expect(screen.getByText("怎么验收")).toBeInTheDocument();
+    expect(screen.getByText("不合适时")).toBeInTheDocument();
     expect(screen.getByText("能力包体检")).toBeInTheDocument();
     expect(screen.getByText("交付状态")).toBeInTheDocument();
     expect(screen.getAllByText("需打磨").length).toBeGreaterThan(0);
@@ -1096,8 +1102,8 @@ describe("PackStudioPage", () => {
     expect(screen.getByText("下一步：确认权限后再启用")).toBeInTheDocument();
     expect(screen.getByText("新包已经安装但未启用。先确认权限、来源和风险；确认后启用，或回中心继续管理这个包。")).toBeInTheDocument();
     expect(screen.getByText("安装后怎么验收")).toBeInTheDocument();
-    expect(screen.getByText(/先触发一次：从「检查 WASM 能力」进入/)).toBeInTheDocument();
-    expect(screen.getByText(/看结果在哪：回到 \/packs\/wasm-plugin 查看页面状态、结果或下一步动作/)).toBeInTheDocument();
+    expect(screen.getAllByText(/先触发一次：从「检查 WASM 能力」进入/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/看结果在哪：回到 \/packs\/wasm-plugin 查看页面状态、结果或下一步动作/).length).toBeGreaterThan(0);
     expect(screen.getByText("复验失败怎么退")).toBeInTheDocument();
     expect(screen.getByText("1. 先禁用新包，停止它继续影响入口、Chat 或任务流程。")).toBeInTheDocument();
     expect(screen.getByText("2. 再执行回滚，恢复上一版本或原始 yqpack 的安装记录。")).toBeInTheDocument();
@@ -1132,7 +1138,7 @@ describe("PackStudioPage", () => {
     expect(deliverySummary).toContain("- 安装状态：installed；安装包：WASM 能力包 (yunque.pack.wasm-plugin)");
     expect(deliverySummary).toContain("## 产品验收入口");
     expect(deliverySummary).toContain("- 能力包中心：/packs?q=yunque.pack.wasm-plugin&from=studio（聚焦这个包，确认来源、版本、安装/启用状态和侧栏入口）");
-    expect(deliverySummary).toContain("- 权限与来源详情：/packs/detail?id=yunque.pack.wasm-plugin（复查权限、风险、入口、回滚和小羽补齐建议）");
+    expect(deliverySummary).toContain("- 权限与来源详情：/packs/detail?id=yunque.pack.wasm-plugin（复查权限、风险、入口、回滚和小羽打磨建议）");
     expect(deliverySummary).toContain("- 打开入口复验：/packs/wasm-plugin（按用户主路径触发一次，确认结果、产物或状态变化可见）");
     expect(deliverySummary).toContain("- 当前安装状态：已安装未启用，先确认权限后启用；不符合预期则禁用或回滚。");
     expect(deliverySummary).toContain("## 验证路径");
