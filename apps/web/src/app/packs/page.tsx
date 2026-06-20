@@ -90,6 +90,8 @@ type CenterActionNotice = {
   detail: string;
   href?: string;
   actionLabel?: string;
+  inlineActionLabel?: string;
+  inlineAction?: () => void;
   packId?: string;
 };
 type CurrentViewAction = {
@@ -839,6 +841,8 @@ export default function PacksPageOptimized() {
     detail: "下一步先查看详情确认权限和入口，再启用；也可以继续筛选、固定或交给小羽补肉。",
     href: `/packs/detail?id=${encodeURIComponent(manifest.id)}`,
     actionLabel: "查看详情并启用",
+    inlineActionLabel: "立即启用",
+    inlineAction: () => enable(manifest.id),
     packId: manifest.id,
   });
   const noticeForEnabled = (manifest: PackManifest): CenterActionNotice => {
@@ -1040,6 +1044,11 @@ export default function PacksPageOptimized() {
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
+                {actionNotice.inlineAction && (
+                  <Button size="sm" className="btn-accent" onPress={actionNotice.inlineAction} isDisabled={busy === `enable:${actionNotice.packId}`}>
+                    <Power size={14} /> {actionNotice.inlineActionLabel || "继续"}
+                  </Button>
+                )}
                 {actionNotice.href && (
                   <Link href={actionNotice.href}>
                     <Button size="sm" variant="outline">

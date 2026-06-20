@@ -403,6 +403,31 @@ describe("PacksPageOptimized", () => {
       count: 0,
       entries: [],
     });
+    packsClientMock.installed.mockResolvedValueOnce({
+      packs: [
+        { manifest: documentsManifest, status: "enabled", updatedAt: "2026-06-19T00:00:00Z" },
+        { manifest: filesManifest, status: "enabled", updatedAt: "2026-06-19T00:00:00Z" },
+        { manifest: remoteDocsManifest, status: "enabled", updatedAt: "2026-06-19T00:02:00Z" },
+      ],
+      count: 3,
+    });
+    packsClientMock.catalog.mockResolvedValueOnce({
+      generated_at: "2026-06-19T00:02:00Z",
+      sources: [],
+      source_reports: [],
+      count: 0,
+      installed: 3,
+      enabled: 3,
+      downloadable: 0,
+      capabilities: 0,
+      entries: [],
+    });
+    packsClientMock.releaseCatalog.mockResolvedValueOnce({
+      generated_at: "2026-06-19T00:02:00Z",
+      releases: ["https://example.com/releases/tag/pack%2Fdocs%2Fv0.1.0"],
+      count: 0,
+      entries: [],
+    });
 
     fireEvent.click(screen.getByRole("button", { name: "安装" }));
 
@@ -416,8 +441,14 @@ describe("PacksPageOptimized", () => {
     });
     expect(await screen.findByText("能力包已安装")).toBeInTheDocument();
     expect(screen.getByText("下一步先查看详情确认权限和入口，再启用；也可以继续筛选、固定或交给小羽补肉。")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /立即启用/ })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /查看详情并启用/ })).toHaveAttribute("href", "/packs/detail?id=yunque.pack.remote-docs");
     expect(screen.getByRole("link", { name: /交给小羽补齐/ })).toHaveAttribute("href", expect.stringContaining("/packs/studio?packId=yunque.pack.remote-docs"));
+    fireEvent.click(screen.getByRole("button", { name: /立即启用/ }));
+    await waitFor(() => {
+      expect(packsClientMock.enable).toHaveBeenCalledWith("yunque.pack.remote-docs");
+    });
+    expect(await screen.findByText("能力包已启用")).toBeInTheDocument();
   });
 
   it("shows private catalog source origin on installable cards", async () => {
