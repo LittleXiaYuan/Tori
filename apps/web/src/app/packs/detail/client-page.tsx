@@ -178,6 +178,8 @@ type ActionNotice = {
   detail: string;
   href?: string;
   actionLabel?: string;
+  secondaryHref?: string;
+  secondaryActionLabel?: string;
   inlineActionLabel?: string;
   inlineAction?: () => void;
 };
@@ -384,6 +386,8 @@ export default function PackDetailClientPage() {
     detail: openPath ? "现在可以打开能力入口验证结果；也可以回能力包中心固定侧栏或继续查看权限来源。" : "这个包没有独立入口，启用后会在 Chat、任务、记忆或知识流程中被云雀感知；可回中心确认状态。",
     href: openPath || packCenterFocusHref(manifest.id),
     actionLabel: openPath ? (usability.primaryActionLabel || "打开能力入口") : "回中心管理",
+    secondaryHref: openPath ? packCenterFocusHref(manifest.id) : undefined,
+    secondaryActionLabel: "回中心管理",
   });
   const disable = () => run("disable", () => packsClient.disable(manifest.id), {
     title: "能力包已禁用",
@@ -396,6 +400,8 @@ export default function PackDetailClientPage() {
     detail: openPath ? "建议重新打开入口验证结果、权限和产物是否回到预期；如果仍有问题，回中心继续禁用或交给小羽检查。" : "建议回中心确认版本与状态；如果仍有问题，继续禁用或交给小羽检查。",
     href: openPath || packCenterFocusHref(manifest.id),
     actionLabel: openPath ? "打开入口复验" : "回中心确认",
+    secondaryHref: openPath ? packCenterFocusHref(manifest.id) : undefined,
+    secondaryActionLabel: "回中心排查",
   });
   const nextSteps: NextStep[] = !installed
     ? [
@@ -559,6 +565,14 @@ export default function PackDetailClientPage() {
                     <Button size="sm" variant="outline">
                       {actionNotice.href.startsWith("/packs/") && actionNotice.href !== packCenterFocusHref(manifest.id) ? <ExternalLink size={14} /> : <ArrowRight size={14} />}
                       {actionNotice.actionLabel || "继续"}
+                    </Button>
+                  </Link>
+                )}
+                {actionNotice.secondaryHref && (
+                  <Link href={actionNotice.secondaryHref}>
+                    <Button size="sm" variant="ghost">
+                      <ArrowRight size={14} />
+                      {actionNotice.secondaryActionLabel || "回中心"}
                     </Button>
                   </Link>
                 )}

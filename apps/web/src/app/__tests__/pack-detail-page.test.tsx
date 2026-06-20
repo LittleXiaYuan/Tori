@@ -289,5 +289,6 @@ describe("PackDetailClientPage", () => {
     expect(await screen.findByText("能力包已启用")).toBeInTheDocument();
     expect(screen.getByText("现在可以打开能力入口验证结果；也可以回能力包中心固定侧栏或继续查看权限来源。")).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: /打开能力入口/ }).some((link) => link.getAttribute("href") === "/packs/needs-context")).toBe(true);
+    expect(screen.getByRole("link", { name: /回中心管理/ })).toHaveAttribute("href", "/packs?q=yunque.pack.needs-context");
   });
 });
