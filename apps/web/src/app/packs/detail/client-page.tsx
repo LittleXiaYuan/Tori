@@ -172,6 +172,13 @@ type NextStep = {
   disabled?: boolean;
 };
 
+type ActionNotice = {
+  title: string;
+  detail: string;
+  href?: string;
+  actionLabel?: string;
+};
+
 export default function PackDetailClientPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -181,6 +188,7 @@ export default function PackDetailClientPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [actionNotice, setActionNotice] = useState<ActionNotice | null>(null);
 
   const reload = async () => {
     if (!id) {
@@ -221,15 +229,17 @@ export default function PackDetailClientPage() {
   };
 
   useEffect(() => {
+    setActionNotice(null);
     void reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  const run = async (label: string, op: () => Promise<unknown>) => {
+  const run = async (label: string, op: () => Promise<unknown>, notice?: ActionNotice) => {
     setBusy(label);
     try {
       await op();
-      showToast("操作成功", "success");
+      if (notice) setActionNotice(notice);
+      showToast(notice?.title || "操作成功", "success");
       await reload();
     } catch (e) {
       showToast(label === "install" ? formatPackInstallError(e) : formatErrorMessage(e, "操作失败"), "error");
@@ -330,13 +340,33 @@ export default function PackDetailClientPage() {
       return;
     }
     return run("install", () =>
-      packsClient.install(request),
+      packsClient.install(request), {
+        title: "能力包已安装",
+        detail: "下一步先确认权限并启用；也可以回能力包中心聚焦这个包，查看入口、固定侧栏或继续交给小羽补肉。",
+        href: packCenterFocusHref(manifest.id),
+        actionLabel: "回中心管理",
+      },
     );
   };
 
-  const enable = () => run("enable", () => packsClient.enable(manifest.id));
-  const disable = () => run("disable", () => packsClient.disable(manifest.id));
-  const rollback = () => run("rollback", () => packsClient.rollback(manifest.id));
+  const enable = () => run("enable", () => packsClient.enable(manifest.id), {
+    title: "能力包已启用",
+    detail: openPath ? "现在可以打开能力入口验证结果；也可以回能力包中心固定侧栏或继续查看权限来源。" : "这个包没有独立入口，启用后会在 Chat、任务、记忆或知识流程中被云雀感知；可回中心确认状态。",
+    href: openPath || packCenterFocusHref(manifest.id),
+    actionLabel: openPath ? (usability.primaryActionLabel || "打开能力入口") : "回中心管理",
+  });
+  const disable = () => run("disable", () => packsClient.disable(manifest.id), {
+    title: "能力包已禁用",
+    detail: "云雀不会再把它纳入可用能力；你可以回中心确认状态，或稍后重新启用。",
+    href: packCenterFocusHref(manifest.id),
+    actionLabel: "回中心确认",
+  });
+  const rollback = () => run("rollback", () => packsClient.rollback(manifest.id), {
+    title: "能力包已回滚",
+    detail: openPath ? "建议重新打开入口验证结果、权限和产物是否回到预期；如果仍有问题，回中心继续禁用或交给小羽检查。" : "建议回中心确认版本与状态；如果仍有问题，继续禁用或交给小羽检查。",
+    href: openPath || packCenterFocusHref(manifest.id),
+    actionLabel: openPath ? "打开入口复验" : "回中心确认",
+  });
   const nextSteps: NextStep[] = !installed
     ? [
         {
@@ -476,6 +506,30 @@ export default function PackDetailClientPage() {
 
       {/* 可滚动内容 */}
       <div className="flex-1 overflow-y-auto p-5 space-y-4">
+        {actionNotice && (
+          <Card className="section-card p-4" style={{ borderColor: "rgba(34,197,94,0.22)", background: "rgba(34,197,94,0.07)" }}>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
+                  <PackageCheck size={16} style={{ color: "var(--yunque-success)" }} />
+                  {actionNotice.title}
+                </div>
+                <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
+                  {actionNotice.detail}
+                </div>
+              </div>
+              {actionNotice.href && (
+                <Link href={actionNotice.href}>
+                  <Button size="sm" variant="outline">
+                    {actionNotice.href.startsWith("/packs/") && actionNotice.href !== packCenterFocusHref(manifest.id) ? <ExternalLink size={14} /> : <ArrowRight size={14} />}
+                    {actionNotice.actionLabel || "继续"}
+                  </Button>
+                </Link>
+              )}
+            </div>
+          </Card>
+        )}
+
         <Card className="section-card p-4">
           <div className="flex items-center gap-2 mb-3">
             <ArrowRight size={16} style={{ color: "var(--yunque-accent)" }} />

@@ -13,6 +13,7 @@ const packsClientMock = vi.hoisted(() => ({
 }));
 
 const routerPushMock = vi.hoisted(() => vi.fn());
+const showToastMock = vi.hoisted(() => vi.fn());
 
 vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams("id=yunque.pack.needs-context"),
@@ -28,6 +29,10 @@ vi.mock("@/lib/sdk-client", () => ({
 
 vi.mock("yunque-client/packs", () => ({
   createPacksClient: () => packsClientMock,
+}));
+
+vi.mock("@/components/toast-provider", () => ({
+  showToast: showToastMock,
 }));
 
 const manifest = {
@@ -74,6 +79,9 @@ describe("PackDetailClientPage", () => {
       entries: [],
     });
     packsClientMock.install.mockResolvedValue({ ok: true });
+    packsClientMock.enable.mockResolvedValue({ ok: true });
+    packsClientMock.disable.mockResolvedValue({ ok: true });
+    packsClientMock.rollback.mockResolvedValue({ ok: true });
   });
 
   it("links unclear packs directly to Chat guidance and Xiaoyu Studio improvement", async () => {
@@ -143,6 +151,25 @@ describe("PackDetailClientPage", () => {
         manifest,
       }],
     });
+    packsClientMock.installed.mockResolvedValueOnce({
+      packs: [{ manifest, status: "disabled", installedAt: "2026-06-19T00:00:00Z", updatedAt: "2026-06-19T00:01:00Z" }],
+      count: 1,
+    });
+    packsClientMock.catalog.mockResolvedValueOnce({
+      entries: [],
+      count: 0,
+      installed: 1,
+      enabled: 0,
+      downloadable: 0,
+      capabilities: 1,
+      generated_at: "2026-06-19T00:01:00Z",
+    });
+    packsClientMock.releaseCatalog.mockResolvedValueOnce({
+      generated_at: "2026-06-19T00:01:00Z",
+      releases: ["https://example.com/releases/tag/pack%2Fneeds-context%2Fv0.1.0"],
+      count: 1,
+      entries: [],
+    });
 
     render(<PackDetailClientPage />);
 
@@ -183,5 +210,38 @@ describe("PackDetailClientPage", () => {
         download: true,
       });
     });
+    await waitFor(() => {
+      expect(showToastMock).toHaveBeenCalledWith("能力包已安装", "success");
+    });
+    expect(await screen.findByText("能力包已安装")).toBeInTheDocument();
+    expect(screen.getByText("下一步先确认权限并启用；也可以回能力包中心聚焦这个包，查看入口、固定侧栏或继续交给小羽补肉。")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /回中心管理/ })).toHaveAttribute("href", "/packs?q=yunque.pack.needs-context");
+    expect(screen.getByRole("button", { name: "启用" })).toBeInTheDocument();
+  });
+
+  it("keeps the next action visible after enabling an installed pack", async () => {
+    packsClientMock.installed.mockResolvedValueOnce({
+      packs: [{ manifest, status: "disabled", installedAt: "2026-06-19T00:00:00Z", updatedAt: "2026-06-19T00:00:00Z" }],
+      count: 1,
+    });
+    packsClientMock.installed.mockResolvedValueOnce({
+      packs: [{ manifest, status: "enabled", installedAt: "2026-06-19T00:00:00Z", updatedAt: "2026-06-19T00:02:00Z" }],
+      count: 1,
+    });
+
+    render(<PackDetailClientPage />);
+
+    expect(await screen.findByText("Needs Context Pack")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "启用" }));
+
+    await waitFor(() => {
+      expect(packsClientMock.enable).toHaveBeenCalledWith("yunque.pack.needs-context");
+    });
+    await waitFor(() => {
+      expect(showToastMock).toHaveBeenCalledWith("能力包已启用", "success");
+    });
+    expect(await screen.findByText("能力包已启用")).toBeInTheDocument();
+    expect(screen.getByText("现在可以打开能力入口验证结果；也可以回能力包中心固定侧栏或继续查看权限来源。")).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: /打开能力入口/ }).some((link) => link.getAttribute("href") === "/packs/needs-context")).toBe(true);
   });
 });
