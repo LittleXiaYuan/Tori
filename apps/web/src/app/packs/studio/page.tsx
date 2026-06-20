@@ -7,6 +7,8 @@ import { Button, Card, Chip, Input, Label, Spinner, TextArea, TextField } from "
 import {
   ArrowRight,
   Boxes,
+  ChevronLeft,
+  ChevronRight,
   ClipboardCheck,
   Copy,
   ExternalLink,
@@ -15,6 +17,7 @@ import {
   RefreshCw,
   RotateCcw,
   ShieldCheck,
+  SkipForward,
   Sparkles,
   Wrench,
 } from "lucide-react";
@@ -35,6 +38,7 @@ import {
 } from "@/lib/pack-presentation";
 import {
   packStudioWorkspaceMatches,
+  type PackStudioBatchDraftRequest,
   parsePackStudioBatchDraftRequestPrompt,
   parsePackStudioPatchDraftRequestPrompt,
   parsePackStudioPatchDraftPrompt,
@@ -123,6 +127,8 @@ function priorityColor(level?: string): "danger" | "warning" | "default" {
   if (level === "P1") return "warning";
   return "default";
 }
+
+type BatchPack = PackStudioBatchDraftRequest["packs"][number];
 
 function buildDeliverySummary(params: {
   manifest?: PackManifest;
@@ -872,7 +878,7 @@ export default function PackStudioPage() {
     clearPackWorkState();
   };
 
-  const selectBatchPack = (pack: { id: string; name: string; studioUrl: string; packageUrl: string; sha256: string }) => {
+  const selectBatchPack = (pack: BatchPack) => {
     const candidate = candidates.find((item) => item.manifest.id === pack.id);
     if (candidate) selectCandidate(candidate);
     else clearPackWorkState();
@@ -985,6 +991,16 @@ export default function PackStudioPage() {
     [importedBatchRequest, manifest?.id],
   );
   const batchActivePack = batchActiveIndex >= 0 ? importedBatchRequest?.packs[batchActiveIndex] : undefined;
+  const batchPreviousPack = batchActiveIndex > 0 ? importedBatchRequest?.packs[batchActiveIndex - 1] : undefined;
+  const batchNextPack = importedBatchRequest && batchActiveIndex >= 0 && batchActiveIndex < importedBatchRequest.packs.length - 1
+    ? importedBatchRequest.packs[batchActiveIndex + 1]
+    : undefined;
+  const batchNextP0Pack = useMemo(() => {
+    if (!importedBatchRequest?.packs.length) return undefined;
+    const startIndex = batchActiveIndex >= 0 ? batchActiveIndex + 1 : 0;
+    return importedBatchRequest.packs.find((pack, index) => index >= startIndex && pack.priority?.level === "P0")
+      || importedBatchRequest.packs.find((pack, index) => index < startIndex && pack.priority?.level === "P0");
+  }, [batchActiveIndex, importedBatchRequest]);
   const importedPatchPlan = useMemo(
     () => parsePackStudioPatchPlanPrompt(importedPatchPlanText),
     [importedPatchPlanText],
@@ -1124,6 +1140,24 @@ export default function PackStudioPage() {
     if (inspectReport) return "只读已检查";
     return "本页已载入";
   }, [auditReport, batchActivePack, inspectReport, installedRepack, patchContent, patchReport, reinspectReport, repackReport, workspaceReport]);
+  const batchPackStage = (pack: BatchPack, candidate?: PackCandidate) => {
+    if (pack.id === batchActivePack?.id) return batchActiveStage;
+    if (candidate?.enabled) return "已启用";
+    if (candidate?.installed) return "已安装";
+    if (candidate) return "候选可载入";
+    if (pack.packageUrl || pack.sha256) return "需检查 yqpack";
+    return "需补来源";
+  };
+  const batchHandledCount = useMemo(() => {
+    if (!importedBatchRequest?.packs.length) return 0;
+    return importedBatchRequest.packs.filter((pack) => {
+      if (pack.id === batchActivePack?.id) {
+        return !["未载入", "本页已载入", "需检查 yqpack"].includes(batchActiveStage);
+      }
+      const candidate = candidates.find((item) => item.manifest.id === pack.id);
+      return Boolean(candidate?.installed || candidate?.enabled);
+    }).length;
+  }, [batchActivePack?.id, batchActiveStage, candidates, importedBatchRequest]);
   const batchSummary = useMemo(() => {
     const packs = importedBatchRequest?.packs || [];
     return {
@@ -1753,20 +1787,34 @@ export default function PackStudioPage() {
                     <Chip size="sm" color={batchActiveIndex >= 0 ? "success" : "warning"}>
                       批量进度：{batchActiveIndex >= 0 ? batchActiveIndex + 1 : 0} / {importedBatchRequest.packs.length}
                     </Chip>
-                  <Chip size="sm" variant="soft">
-                    本页状态：{batchActiveStage}
-                  </Chip>
-                  {batchActivePack?.delivery && (
+                    <Chip size="sm" color={batchHandledCount > 0 ? "success" : "default"}>
+                      已推进：{batchHandledCount} / {importedBatchRequest.packs.length}
+                    </Chip>
                     <Chip size="sm" variant="soft">
-                      交付：{batchActivePack.delivery.label || batchActivePack.delivery.level}
+                      本页状态：{batchActiveStage}
                     </Chip>
-                  )}
-                  {batchActivePack?.priority && (
-                    <Chip size="sm" color={priorityColor(batchActivePack.priority.level)}>
-                      {batchActivePack.priority.label || batchActivePack.priority.level}
-                    </Chip>
-                  )}
+                    {batchActivePack?.delivery && (
+                      <Chip size="sm" variant="soft">
+                        交付：{batchActivePack.delivery.label || batchActivePack.delivery.level}
+                      </Chip>
+                    )}
+                    {batchActivePack?.priority && (
+                      <Chip size="sm" color={priorityColor(batchActivePack.priority.level)}>
+                        {batchActivePack.priority.label || batchActivePack.priority.level}
+                      </Chip>
+                    )}
+                  </div>
                 </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button size="sm" variant="outline" onPress={() => batchPreviousPack && selectBatchPack(batchPreviousPack)} isDisabled={!batchPreviousPack}>
+                    <ChevronLeft size={13} /> 上一包
+                  </Button>
+                  <Button size="sm" variant="outline" onPress={() => batchNextPack && selectBatchPack(batchNextPack)} isDisabled={!batchNextPack}>
+                    下一包 <ChevronRight size={13} />
+                  </Button>
+                  <Button size="sm" variant="ghost" onPress={() => batchNextP0Pack && selectBatchPack(batchNextP0Pack)} isDisabled={!batchNextP0Pack || batchNextP0Pack.id === batchActivePack?.id}>
+                    <SkipForward size={13} /> 跳到下一个 P0
+                  </Button>
                 </div>
                 <div className="mt-2 grid gap-2 md:grid-cols-2">
                   <div className="rounded px-2 py-2 text-[11px]" style={{ background: "var(--yunque-surface)", color: "var(--yunque-text-secondary)" }}>
@@ -1790,6 +1838,7 @@ export default function PackStudioPage() {
                   const candidate = candidates.find((item) => item.manifest.id === pack.id);
                   const href = pack.studioUrl || `/packs/studio?packId=${encodeURIComponent(pack.id)}`;
                   const active = pack.id === manifest?.id;
+                  const stage = batchPackStage(pack, candidate);
                   return (
                     <div
                       key={`${pack.id}:${pack.studioUrl}`}
@@ -1805,7 +1854,7 @@ export default function PackStudioPage() {
                           <div className="mt-1 truncate font-mono text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>{pack.id}</div>
                         </div>
                         <div className="flex flex-wrap gap-1">
-                          <Chip size="sm" color={active ? "success" : "default"}>{active ? batchActiveStage : "待载入"}</Chip>
+                          <Chip size="sm" color={active ? "success" : stage.includes("需") ? "warning" : "default"}>{stage}</Chip>
                           {pack.priority && (
                             <Chip size="sm" color={priorityColor(pack.priority.level)}>
                               {pack.priority.level || pack.priority.label}

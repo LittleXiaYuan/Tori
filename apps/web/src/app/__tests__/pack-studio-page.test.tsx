@@ -578,6 +578,10 @@ describe("PackStudioPage", () => {
     await waitFor(() => {
       expect(screen.getAllByText((_, element) => /批量进度：\s*1\s*\/\s*2/.test(element?.textContent || "")).length).toBeGreaterThan(0);
     });
+    expect(screen.getByText("已推进：1 / 2")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /上一包/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /下一包/ })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /跳到下一个 P0/ })).toBeDisabled();
     expect(screen.getByText("当前处理：WASM 能力包")).toBeInTheDocument();
     expect(screen.getAllByText("P0 先补授权边界").length).toBeGreaterThan(0);
     expect(screen.getByText("优先级：P0 先补授权边界。涉及高风险授权，但交付路径还不够清楚。")).toBeInTheDocument();
@@ -597,7 +601,8 @@ describe("PackStudioPage", () => {
     expect(screen.getByText("先补 metadata.example1-3，用真实用户动作描述它能产出什么结果。")).toBeInTheDocument();
     expect(screen.getByText("验收路径：")).toBeInTheDocument();
     expect(screen.getByText("改完回到 /packs/wasm-plugin 验证入口、提示、结果位置和回滚路径是否可见。")).toBeInTheDocument();
-    expect(screen.getAllByText("待载入").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("本页已载入").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("已安装").length).toBeGreaterThan(0);
     expect(screen.getByText("yqpack：https://oss.example.com/wasm-plugin.yqpack")).toBeInTheDocument();
     expect(screen.getByText(`SHA：${"9".repeat(64)}`)).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: /打开工坊/ })[0]).toHaveAttribute("href", expect.stringContaining("packId=yunque.pack.wasm-plugin"));
@@ -624,11 +629,15 @@ describe("PackStudioPage", () => {
     });
     expect(screen.getAllByText((_, element) => /本页状态：\s*只读已检查/.test(element?.textContent || "")).length).toBeGreaterThan(0);
     expect(screen.getAllByText("只读已检查").length).toBeGreaterThan(0);
+    expect(screen.getByText("已推进：2 / 2")).toBeInTheDocument();
 
-    fireEvent.click(screen.getAllByRole("button", { name: "载入本页" })[1]);
+    fireEvent.click(screen.getByRole("button", { name: /下一包/ }));
 
     expect(screen.getByText("当前能力包：Documents")).toBeInTheDocument();
     expect(screen.getByText("当前处理：Documents")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /上一包/ })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /下一包/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /跳到下一个 P0/ })).toBeEnabled();
     expect((screen.getByLabelText("这次想补强什么") as HTMLInputElement).value).toBe("批量把这些能力包补齐用途和入口。");
     expect((screen.getByLabelText("OSS / Release URL") as HTMLInputElement).value).toBe("");
     expect((screen.getByLabelText("SHA256") as HTMLInputElement).value).toBe("");
