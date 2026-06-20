@@ -19,6 +19,7 @@ const packsClientMock = vi.hoisted(() => ({
   disable: vi.fn(),
   rollback: vi.fn(),
 }));
+const toastMock = vi.hoisted(() => vi.fn());
 
 vi.mock("next/link", () => ({
   default: ({ href, children, ...props }: { href: string; children: React.ReactNode }) => (
@@ -38,7 +39,7 @@ vi.mock("@/lib/sdk-client", () => ({
 }));
 
 vi.mock("@/components/toast-provider", () => ({
-  showToast: vi.fn(),
+  showToast: toastMock,
 }));
 
 vi.mock("@/hooks/use-user-preferences", () => ({
@@ -195,6 +196,9 @@ describe("PacksPageOptimized", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     navigationMock.query = "";
+    Object.assign(navigator, {
+      clipboard: { writeText: vi.fn().mockResolvedValue(undefined) },
+    });
     packsClientMock.installed.mockResolvedValue({
       packs: [
         { manifest: documentsManifest, status: "enabled", updatedAt: "2026-06-19T00:00:00Z" },
@@ -512,6 +516,7 @@ describe("PacksPageOptimized", () => {
     expect(screen.getByText("补肉优先队列").closest("#readiness-queue")).not.toBeNull();
     expect(screen.getByText("能力包体检总览")).toBeInTheDocument();
     expect(screen.getByText("已体检 3 个能力包，按用途说明、用户能感知的位置、入口和后端能力声明判断是否需要补肉。")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /复制体检报告 JSON/ }).length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: /优先打磨2/ })).toBeInTheDocument();
     expect(screen.getByText("可交付 0 · 后台 1 · 实验 0 · 待补 2")).toBeInTheDocument();
     expect(screen.getByText("完整 1 · 补说明 1 · 补入口 1")).toBeInTheDocument();
@@ -582,6 +587,25 @@ describe("PacksPageOptimized", () => {
     expect(batchStudioPrompt).toContain("permission_summary");
     expect(batchStudioPrompt).toContain("polish_guidance");
     expect(batchStudioPrompt).toContain("\"priority\"");
+    fireEvent.click(screen.getAllByRole("button", { name: /复制体检报告 JSON/ })[0]);
+    await waitFor(() => {
+      expect(navigator.clipboard.writeText).toHaveBeenCalled();
+    });
+    const reportText = vi.mocked(navigator.clipboard.writeText).mock.calls.at(-1)?.[0] || "";
+    const report = JSON.parse(String(reportText));
+    expect(report.kind).toBe("yunque.pack_usability_report.v1");
+    expect(report.source).toBe("pack-center");
+    expect(report.summary.total).toBe(3);
+    expect(report.summary.queue.total).toBe(2);
+    expect(report.queue.map((item: { id: string }) => item.id)).toContain("yunque.pack.needs-entry");
+    expect(report.queue[0].handoff_links).toEqual(expect.objectContaining({
+      center: "/packs?q=yunque.pack.needs-entry&from=studio",
+      detail: "/packs/detail?id=yunque.pack.needs-entry",
+      open: null,
+    }));
+    expect(report.queue[0].handoff_links.studio).toContain("/packs/studio?");
+    expect(report.queue[0].next_step).toContain("后端能力");
+    expect(toastMock).toHaveBeenCalledWith("已复制能力包体检报告", "success");
     const queueStudioLink = screen.getAllByRole("link", { name: /交给小羽补齐/ })
       .find((link) => link.getAttribute("href")?.includes("yunque.pack.needs-entry"));
     expect(queueStudioLink).toHaveAttribute("href", expect.stringContaining("/packs/studio?"));

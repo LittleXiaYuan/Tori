@@ -9,6 +9,7 @@ import {
   Boxes,
   ChevronDown,
   ChevronUp,
+  Copy,
   Download,
   ExternalLink,
   FolderInput,
@@ -426,6 +427,96 @@ function buildBatchReadinessPrompt(
   ].join("\n");
 }
 
+function buildPackCenterUsabilityReport(
+  items: ReadinessQueueItem[],
+  queueItems: ReadinessQueueItem[],
+  batch: { page: number; pageCount: number; total: number; pageSize: number },
+) {
+  const groups = { actionable: 0, infrastructure: 0, experimental: 0, documented: 0 };
+  const readiness = { complete: 0, needs_context: 0, needs_entry: 0 };
+  const delivery = { ready: 0, support: 0, plan_only: 0, needs_meat: 0 };
+  for (const item of items) {
+    groups[packUsability(item.manifest).kind] += 1;
+    readiness[packReadiness(item.manifest).level] += 1;
+    delivery[packDeliveryProfile(item.manifest).level] += 1;
+  }
+  const queue = queueItems.map((item) => packCenterReportItem(item));
+  return {
+    kind: "yunque.pack_usability_report.v1",
+    source: "pack-center",
+    generated_at: new Date().toISOString(),
+    summary: {
+      total: items.length,
+      groups,
+      readiness,
+      delivery,
+      queue: {
+        total: batch.total,
+        page: batch.page,
+        page_count: batch.pageCount,
+        page_size: batch.pageSize,
+        p0: queue.filter((item) => item.priority.level === "P0").length,
+        p1: queue.filter((item) => item.priority.level === "P1").length,
+        p2: queue.filter((item) => item.priority.level === "P2").length,
+      },
+    },
+    queue,
+    packs: items.map((item) => packCenterReportItem(item)),
+  };
+}
+
+function packCenterReportItem(item: ReadinessQueueItem) {
+  const manifest = item.manifest;
+  const usability = packUsability(manifest);
+  const readiness = packReadiness(manifest);
+  const delivery = packDeliveryProfile(manifest);
+  const priority = packPolishPriority(manifest);
+  const risk = riskProfileForPack(manifest);
+  const guidance = packPolishGuidance(manifest);
+  const open = usability.primaryActionPath || manifest.frontend?.menus?.[0]?.path || manifest.frontend?.routes?.[0]?.path || "";
+  return {
+    id: manifest.id,
+    name: manifest.name,
+    version: manifest.version,
+    status: manifest.status || "",
+    source: item.sourceLabel,
+    package_url: item.packageUrl || "",
+    sha256: item.sha256 || "",
+    usability: {
+      kind: usability.kind,
+      label: usability.label,
+      description: usability.description,
+      limitation: usability.limitation || "",
+    },
+    readiness: {
+      level: readiness.level,
+      label: readiness.label,
+      missing: readiness.missing,
+    },
+    delivery: {
+      level: delivery.level,
+      label: delivery.label,
+      description: delivery.description,
+      next_step: delivery.nextStep,
+    },
+    priority,
+    risk: {
+      level: risk.level,
+      label: risk.label,
+      requires_authorization: risk.requiresAuthorization,
+    },
+    permission_summary: packPermissionSummary(manifest),
+    next_step: guidance.firstEdit,
+    verify: guidance.verify,
+    handoff_links: {
+      center: packCenterFocusHref(manifest.id),
+      detail: `/packs/detail?id=${encodeURIComponent(manifest.id)}`,
+      open: open || null,
+      studio: packStudioHref(manifest, { packageUrl: item.packageUrl, sha256: item.sha256 }),
+    },
+  };
+}
+
 function packSearchText(manifest: PackManifest): string {
   return [
     manifest.id,
@@ -561,7 +652,7 @@ export default function PacksPageOptimized() {
     installed: packs.length,
     enabled: packs.filter((p) => p.status === "enabled").length,
   }), [packs, privateCatalogEntries.length, releaseEntries]);
-  const readinessItems = useMemo<ReadinessQueueItem[]>(() => {
+  const centerReportItems = useMemo<ReadinessQueueItem[]>(() => {
     const seen = new Map<string, ReadinessQueueItem>();
     for (const pack of packs) {
       seen.set(pack.manifest.id, { manifest: pack.manifest, sourceLabel: pack.status === "enabled" ? "已安装 · 已启用" : "已安装" });
@@ -586,9 +677,12 @@ export default function PacksPageOptimized() {
         });
       }
     }
+    return [...seen.values()];
+  }, [packs, releaseEntries, privateCatalogEntries]);
+  const readinessItems = useMemo<ReadinessQueueItem[]>(() => {
     const readinessOrder = { needs_entry: 0, needs_context: 1, complete: 2 } as const;
     const deliveryOrder = { needs_meat: 0, plan_only: 1, support: 2, ready: 3 } as const;
-    return [...seen.values()]
+    return centerReportItems
       .filter((item) => {
         const readiness = packReadiness(item.manifest);
         const delivery = packDeliveryProfile(item.manifest);
@@ -607,7 +701,7 @@ export default function PacksPageOptimized() {
           || rb.missing.length - ra.missing.length
           || a.manifest.name.localeCompare(b.manifest.name);
       });
-  }, [packs, releaseEntries, privateCatalogEntries]);
+  }, [centerReportItems]);
   const readinessQueueTotal = readinessItems.length;
   const readinessQueuePageCount = pageCountFor(readinessQueueTotal, READINESS_QUEUE_PAGE_SIZE);
   const currentReadinessQueuePage = Math.min(readinessQueuePage, readinessQueuePageCount);
@@ -851,6 +945,15 @@ export default function PacksPageOptimized() {
   );
   const batchReadinessChatHref = readinessQueue.length > 0 ? `/chat?q=${encodeURIComponent(batchReadinessPrompt)}` : "";
   const batchReadinessStudioHref = readinessQueue.length > 0 ? `/packs/studio?batch=${encodeURIComponent(batchReadinessPrompt)}` : "";
+  const packUsabilityReport = useMemo(
+    () => buildPackCenterUsabilityReport(centerReportItems, readinessQueue, {
+      page: currentReadinessQueuePage,
+      pageCount: readinessQueuePageCount,
+      total: readinessQueueTotal,
+      pageSize: READINESS_QUEUE_PAGE_SIZE,
+    }),
+    [centerReportItems, currentReadinessQueuePage, readinessQueue, readinessQueuePageCount, readinessQueueTotal],
+  );
 
   useEffect(() => {
     if (searchFocus) setQuery(searchFocus);
@@ -874,6 +977,11 @@ export default function PacksPageOptimized() {
     if (readinessQueue.length === 0) return;
     await navigator.clipboard?.writeText(batchReadinessPrompt);
     showToast("已复制批量打磨任务", "success");
+  };
+
+  const copyPackUsabilityReport = async () => {
+    await navigator.clipboard?.writeText(JSON.stringify(packUsabilityReport, null, 2));
+    showToast("已复制能力包体检报告", "success");
   };
 
   const noticeForInstalled = (manifest: PackManifest): CenterActionNotice => ({
@@ -1300,6 +1408,9 @@ export default function PacksPageOptimized() {
                 查看打磨队列 <ArrowRight size={14} />
               </Button>
             </a>
+            <Button size="sm" variant="ghost" onPress={copyPackUsabilityReport}>
+              <Copy size={14} /> 复制体检报告 JSON
+            </Button>
           </div>
           <div className="grid gap-3 md:grid-cols-3">
             <button
@@ -1389,6 +1500,9 @@ export default function PacksPageOptimized() {
               </Button>
               <Button size="sm" variant="outline" onPress={copyBatchReadinessPrompt}>
                 复制批量打磨任务
+              </Button>
+              <Button size="sm" variant="ghost" onPress={copyPackUsabilityReport}>
+                复制体检报告 JSON <Copy size={14} />
               </Button>
               <Link href={batchReadinessStudioHref}>
                 <Button size="sm" variant="outline">
