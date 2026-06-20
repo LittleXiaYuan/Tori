@@ -1359,6 +1359,8 @@ export default function PacksPageOptimized() {
                 const deliveryStyle = deliveryToneStyle(delivery.tone);
                 const guidance = packPolishGuidance(item.manifest);
                 const priority = packPolishPriority(item.manifest);
+                const risk = riskProfileForPack(item.manifest);
+                const permissionSummary = packPermissionSummary(item.manifest);
                 const queueReason = readiness.missing.length > 0
                   ? `还缺：${readiness.missing.join("、")}`
                   : `交付状态：${delivery.label}。${delivery.nextStep}`;
@@ -1373,10 +1375,23 @@ export default function PacksPageOptimized() {
                         <Chip size="sm" color={priority.level === "P0" ? "danger" : priority.level === "P1" ? "warning" : "default"}>{priority.level}</Chip>
                         <Chip size="sm" color={readiness.level === "needs_entry" ? "danger" : readiness.level === "needs_context" ? "warning" : "success"}>{readiness.label}</Chip>
                         <Chip size="sm" style={{ background: deliveryStyle.background, color: deliveryStyle.color }}>{delivery.label}</Chip>
+                        <Chip size="sm" color={risk.level === "high" ? "danger" : risk.level === "medium" ? "warning" : "success"}>{risk.label}</Chip>
                       </div>
                     </div>
                     <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
                       {queueReason}
+                    </div>
+                    <div
+                      className="mt-2 rounded-md border p-2 text-[11px] leading-5"
+                      style={{
+                        borderColor: risk.requiresAuthorization ? "rgba(239,68,68,0.22)" : "rgba(59,130,246,0.16)",
+                        background: risk.requiresAuthorization ? "rgba(239,68,68,0.07)" : "rgba(59,130,246,0.06)",
+                        color: "var(--yunque-text-secondary)",
+                      }}
+                    >
+                      <div><span className="font-medium" style={{ color: "var(--yunque-text)" }}>来源：</span>{item.sourceLabel}{item.packageUrl ? ` · ${item.packageUrl}` : ""}</div>
+                      <div><span className="font-medium" style={{ color: "var(--yunque-text)" }}>权限：</span>{permissionSummary}</div>
+                      <div><span className="font-medium" style={{ color: "var(--yunque-text)" }}>先做：</span>{risk.requiresAuthorization ? "先验收权限、来源和回滚，再进入工坊补肉。" : "可直接进工坊补说明；启用前仍要回详情确认权限。"}</div>
                     </div>
                     <div className="mt-2 rounded-md border p-2 text-[11px] leading-5" style={{ borderColor: "rgba(245,158,11,0.18)", background: "rgba(245,158,11,0.06)", color: "var(--yunque-text-secondary)" }}>
                       <div><span className="font-medium" style={{ color: "var(--yunque-text)" }}>{priority.label}：</span>{priority.reason}</div>
@@ -1384,7 +1399,10 @@ export default function PacksPageOptimized() {
                       <div><span className="font-medium" style={{ color: "var(--yunque-text)" }}>优先修改：</span>{guidance.firstEdit}</div>
                       <div><span className="font-medium" style={{ color: "var(--yunque-text)" }}>验收路径：</span>{guidance.verify}</div>
                     </div>
-                    <div className="mt-2">
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <Link href={`/packs/detail?id=${encodeURIComponent(item.manifest.id)}`}>
+                        <Button size="sm" variant={risk.requiresAuthorization ? "outline" : "ghost"}>先看权限与来源 <ShieldCheck size={14} /></Button>
+                      </Link>
                       <Link href={packStudioHref(item.manifest, { packageUrl: item.packageUrl, sha256: item.sha256 })}>
                         <Button size="sm" variant="ghost">交给小羽补齐 <Wrench size={14} /></Button>
                       </Link>

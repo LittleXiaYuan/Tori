@@ -501,6 +501,12 @@ describe("PacksPageOptimized", () => {
     expect(screen.getByText("先确认是否真有后端能力：有则补后端路由、权限和测试；没有就明确标为界面/说明型能力，不能伪造执行能力。")).toBeInTheDocument();
     expect(screen.getAllByText("验收路径：").length).toBeGreaterThan(0);
     expect(screen.getByText("改完回到能力包详情与 Chat/任务主路径验证：用户是否知道怎么触发、结果在哪里、出问题怎么禁用或回滚。")).toBeInTheDocument();
+    expect(screen.getAllByText((_, node) => node?.textContent === "来源：已安装").length).toBeGreaterThan(0);
+    expect(screen.getAllByText((_, node) => node?.textContent === "权限：权限：未声明额外权限；低风险").length).toBeGreaterThan(0);
+    expect(screen.getAllByText((_, node) => node?.textContent === "先做：可直接进工坊补说明；启用前仍要回详情确认权限。").length).toBeGreaterThan(0);
+    const queueDetailLink = screen.getAllByRole("link", { name: /先看权限与来源/ })
+      .find((link) => link.getAttribute("href") === "/packs/detail?id=yunque.pack.needs-entry");
+    expect(queueDetailLink).toBeTruthy();
     expect(screen.getByRole("button", { name: "复制批量打磨任务" })).toBeInTheDocument();
     const batchChatLink = screen.getByRole("link", { name: /交给 Chat 批量打磨/ });
     expect(batchChatLink).toHaveAttribute("href", expect.stringContaining("/chat?q="));
