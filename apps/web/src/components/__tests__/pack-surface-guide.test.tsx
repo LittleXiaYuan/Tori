@@ -15,6 +15,8 @@ describe("PackSurfaceGuide", () => {
     expect(screen.getByText("搜索一条记忆")).toBeInTheDocument();
     expect(screen.getByText("查看情感历史")).toBeInTheDocument();
     expect(screen.getByText("把经验带回下一次任务")).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: /查看详情/ })[0]).toHaveAttribute("href", "/packs/detail?id=yunque.pack.memory");
+    expect(screen.getAllByRole("link", { name: /回中心/ })[0]).toHaveAttribute("href", "/packs?q=yunque.pack.memory");
   });
 
   it("covers the shared surfaces that otherwise look like generic pages", () => {
@@ -92,5 +94,7 @@ describe("PackSurfaceGuide", () => {
     expect(screen.getByText("产物文件")).toBeInTheDocument();
     expect(screen.getByText("语音")).toBeInTheDocument();
     expect(screen.getByText(/没有必要单独占一个页面/)).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: /详情/ })[0]).toHaveAttribute("href", "/packs/detail?id=yunque.pack.documents");
+    expect(screen.getAllByRole("link", { name: /中心/ })[0]).toHaveAttribute("href", "/packs?q=yunque.pack.documents");
   });
 });

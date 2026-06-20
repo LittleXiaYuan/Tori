@@ -1,6 +1,8 @@
 "use client";
 
-import { Card, Chip } from "@heroui/react";
+import Link from "next/link";
+import { ArrowRight, Search } from "lucide-react";
+import { Button, Card, Chip } from "@heroui/react";
 import type { PackSurfaceKey } from "@/lib/pack-surface-guidance";
 import { packSurfaceGuide } from "@/lib/pack-surface-guidance";
 
@@ -34,6 +36,18 @@ export default function PackSurfaceGuide({ surface, compact = false }: { surface
                   <Chip size="sm" style={{ background: tone.bg, color: tone.fg, fontSize: "var(--text-2xs)" }}>{item.kind}</Chip>
                 </div>
                 <div className="mt-1 text-[11px] leading-4" style={{ color: "var(--yunque-text-muted)" }}>{item.summary}</div>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  <Link href={`/packs/detail?id=${encodeURIComponent(item.id)}`}>
+                    <Button size="sm" variant="ghost">
+                      详情 <ArrowRight size={12} />
+                    </Button>
+                  </Link>
+                  <Link href={`/packs?q=${encodeURIComponent(item.id)}`}>
+                    <Button size="sm" variant="ghost">
+                      中心 <Search size={12} />
+                    </Button>
+                  </Link>
+                </div>
               </div>
             );
           })}
@@ -73,6 +87,18 @@ export default function PackSurfaceGuide({ surface, compact = false }: { surface
                       {action}
                     </span>
                   ))}
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Link href={`/packs/detail?id=${encodeURIComponent(item.id)}`}>
+                    <Button size="sm" variant="outline">
+                      查看详情 <ArrowRight size={13} />
+                    </Button>
+                  </Link>
+                  <Link href={`/packs?q=${encodeURIComponent(item.id)}`}>
+                    <Button size="sm" variant="ghost">
+                      回中心 <Search size={13} />
+                    </Button>
+                  </Link>
                 </div>
               </div>
             );
