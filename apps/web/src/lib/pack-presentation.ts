@@ -74,6 +74,13 @@ export type PackDeliveryProfile = {
   tone: "success" | "primary" | "warning" | "danger";
 };
 
+export type PackVerificationStep = {
+  key: "trigger" | "observe" | "decide";
+  label: string;
+  detail: string;
+  href?: string;
+};
+
 type EntryLike = {
   manifest: PackManifest;
   package_url?: string;
@@ -501,6 +508,56 @@ export function packUsageExplanation(manifest: PackManifest): string[] {
   }
 
   return explanation;
+}
+
+export function packVerificationSteps(manifest: PackManifest): PackVerificationStep[] {
+  const usability = packUsability(manifest);
+  const delivery = packDeliveryProfile(manifest);
+  const metadata = manifest.metadata || {};
+  const primaryPath = usability.primaryActionPath || manifest.frontend?.menus?.[0]?.path || manifest.frontend?.routes?.[0]?.path;
+  const primaryLabel = usability.primaryActionLabel || "打开入口";
+  const surface = typeof metadata.usageSurface === "string" && metadata.usageSurface.trim().length > 0
+    ? metadata.usageSurface.trim()
+    : "";
+  const firstExample = packExamples(manifest, 1)[0];
+  const triggerDetail = primaryPath
+    ? `从「${primaryLabel}」进入；也可以在 Chat 里用一句话描述目标，让云雀按需调用。`
+    : usability.kind === "infrastructure"
+      ? `它通常不需要单独打开；从 ${surface || "Chat、任务、记忆或知识主路径"} 触发相关流程即可。`
+      : `先在能力包详情确认权限和边界，再从 Chat 或任务里尝试触发。`;
+  const observeDetail = surface
+    ? `到 ${surface} 查看状态、结果、产物或提示是否出现。`
+    : primaryPath
+      ? `回到 ${primaryPath} 查看页面状态、结果或下一步动作。`
+      : "回到 Chat、任务中心或能力包详情查看是否出现状态变化、结果说明或错误提示。";
+  const planOnlySuffix = delivery.level === "plan_only"
+    ? " 它仍属于实验/计划能力，重点验证计划、报告或预演结果，不要期待自动执行真实动作。"
+    : "";
+  const decideDetail = delivery.level === "needs_meat"
+    ? "如果仍看不出用途，交给小羽补用途、入口、示例、权限边界和回滚说明，再重新打包验证。"
+    : usability.limitation
+      ? `对照当前限制判断是否符合预期：${usability.limitation} 不够清楚时交给小羽补验证步骤和结果位置。`
+      : "结果符合预期就启用或固定入口；不符合预期就禁用、回滚，或交给小羽继续改包。";
+
+  return [
+    {
+      key: "trigger",
+      label: "先触发一次",
+      detail: firstExample ? `${triggerDetail} 试法：${firstExample}` : triggerDetail,
+      href: primaryPath,
+    },
+    {
+      key: "observe",
+      label: "看结果在哪",
+      detail: `${observeDetail}${planOnlySuffix}`,
+      href: primaryPath,
+    },
+    {
+      key: "decide",
+      label: "决定留下还是改",
+      detail: decideDetail,
+    },
+  ];
 }
 
 export function capabilitySurfaceLabels(manifest: PackManifest): string[] {

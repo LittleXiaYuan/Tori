@@ -47,6 +47,7 @@ import {
   packReadiness,
   packUsageExplanation,
   packUsability,
+  packVerificationSteps,
   riskProfileForPack,
 } from "@/lib/pack-presentation";
 import { chatPromptHref } from "@/lib/pack-action-links";
@@ -298,6 +299,7 @@ export default function PackDetailClientPage() {
   const featureFlags = packFeatureFlags(manifest);
   const surfaceLabels = capabilitySurfaceLabels(manifest);
   const usageExplanation = packUsageExplanation(manifest);
+  const verificationSteps = packVerificationSteps(manifest);
   const usability = packUsability(manifest);
   const readiness = packReadiness(manifest);
   const delivery = packDeliveryProfile(manifest);
@@ -621,6 +623,40 @@ export default function PackDetailClientPage() {
                 <Sparkles size={14} /> 交给小羽补齐
               </Button>
             </Link>
+          </div>
+        </Card>
+
+        <Card className="section-card p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Workflow size={16} style={{ color: "var(--yunque-primary)" }} />
+            <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
+              怎么验证它有用
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {verificationSteps.map((step, idx) => (
+              <div
+                key={step.key}
+                className="rounded-md border p-3"
+                style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-bg-hover)" }}
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <span
+                    className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-semibold"
+                    style={{ background: "rgba(59,130,246,0.12)", color: "var(--yunque-primary)" }}
+                  >
+                    {idx + 1}
+                  </span>
+                  <div className="text-xs font-semibold" style={{ color: "var(--yunque-text)" }}>{step.label}</div>
+                </div>
+                <div className="text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>{step.detail}</div>
+                {step.href && (
+                  <Link href={step.href} className="mt-2 inline-flex items-center gap-1 text-xs font-medium" style={{ color: "var(--yunque-accent)" }}>
+                    打开验证 <ArrowRight size={12} />
+                  </Link>
+                )}
+              </div>
+            ))}
           </div>
         </Card>
 

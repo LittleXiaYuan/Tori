@@ -13,6 +13,7 @@ import {
   packReadiness,
   packUsageExplanation,
   packUsability,
+  packVerificationSteps,
   riskProfileForPack,
 } from "../pack-presentation";
 
@@ -342,5 +343,55 @@ describe("pack-presentation", () => {
       level: "needs_entry",
       missing: ["打开/使用入口", "后端能力声明"],
     });
+  });
+
+  it("builds user-facing verification steps for actionable, support and plan-only packs", () => {
+    const actionable: PackManifest = {
+      id: "yunque.pack.memory",
+      name: "Memory",
+      version: "0.1.0",
+      metadata: {
+        usability: "actionable",
+        primaryActionLabel: "查看和整理记忆",
+        primaryActionPath: "/memory",
+        usageSurface: "记忆页和 Chat 个性化上下文",
+        example1: "查看并整理长期偏好。",
+      },
+      backend: { capabilities: ["memory.recall"] },
+    };
+    const support: PackManifest = {
+      id: "yunque.pack.state",
+      name: "State",
+      version: "0.1.0",
+      metadata: {
+        usability: "infrastructure",
+        usageSurface: "任务中心与 Chat 任务进度",
+        example1: "发起一个任务并观察状态变化。",
+      },
+      backend: { capabilities: ["state.read"] },
+    };
+    const planOnly: PackManifest = {
+      id: "yunque.pack.computer-use",
+      name: "Computer Use",
+      version: "0.1.0",
+      status: "alpha",
+      metadata: {
+        primaryActionPath: "/packs/computer-use",
+        usageSurface: "电脑使用页和 Chat 电脑使用计划",
+        example1: "把目标转成需审批的电脑使用计划。",
+        limitation: "当前只生成电脑使用计划，不执行本机桌面控制。",
+      },
+      backend: { capabilities: ["computer.use.plan"] },
+    };
+
+    expect(packVerificationSteps(actionable)[0]).toMatchObject({
+      label: "先触发一次",
+      href: "/memory",
+    });
+    expect(packVerificationSteps(actionable)[1].detail).toContain("记忆页和 Chat 个性化上下文");
+    expect(packVerificationSteps(support)[0].detail).toContain("通常不需要单独打开");
+    expect(packVerificationSteps(support)[1].detail).toContain("任务中心与 Chat 任务进度");
+    expect(packVerificationSteps(planOnly)[1].detail).toContain("实验/计划能力");
+    expect(packVerificationSteps(planOnly)[2].detail).toContain("当前只生成电脑使用计划");
   });
 });

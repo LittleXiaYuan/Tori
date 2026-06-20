@@ -50,6 +50,7 @@ import {
   packReadiness,
   packUsageExplanation,
   packUsability,
+  packVerificationSteps,
   riskProfileForPack,
 } from "@/lib/pack-presentation";
 
@@ -1504,6 +1505,7 @@ export default function PacksPageOptimized() {
     const permissionSummary = packPermissionSummary(manifest);
     const deliveryStyle = deliveryToneStyle(delivery.tone);
     const usageLines = packUsageExplanation(manifest).slice(0, 3);
+    const verificationSteps = packVerificationSteps(manifest).slice(0, 2);
     const installChecklist = packInstallChecklist(manifest, {
       sourceLabel: options.sourceLabel || options.source,
       installed: options.action.kind === "enable" || options.action.kind === "use",
@@ -1603,6 +1605,18 @@ export default function PacksPageOptimized() {
           </div>
         )}
 
+        <div className="mb-3 rounded-md p-3" style={{ background: "rgba(34,197,94,0.05)", border: "1px solid rgba(34,197,94,0.14)" }}>
+          <div className="mb-2 text-xs font-medium" style={{ color: "var(--yunque-text)" }}>怎么判断有用</div>
+          <div className="space-y-1">
+            {verificationSteps.map((step) => (
+              <div key={step.key} className="flex items-start gap-2 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
+                <span style={{ color: "var(--yunque-success)" }}>•</span>
+                <span>{step.label}：{step.detail}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {readiness.missing.length > 0 && (
           <div className="mb-3 rounded-md p-3 text-xs" style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.18)", color: "var(--yunque-text-secondary)" }}>
             可用性体检：还缺 {readiness.missing.join("、")}。可以交给小羽优化补齐用途、入口或使用说明。
@@ -1687,6 +1701,7 @@ export default function PacksPageOptimized() {
     const permissionSummary = packPermissionSummary(manifest);
     const deliveryStyle = deliveryToneStyle(delivery.tone);
     const usageLines = packUsageExplanation(manifest).slice(0, 3);
+    const verificationSteps = packVerificationSteps(manifest).slice(0, 2);
     const navItems = navItemsForPack(pack);
     const openPath = usability.primaryActionPath || manifest.frontend?.menus?.[0]?.path || manifest.frontend?.routes?.[0]?.path;
     const entryHint = describePackEntry(usability.primaryActionLabel, openPath);
@@ -1779,6 +1794,18 @@ export default function PacksPageOptimized() {
               </div>
             </div>
           )}
+
+          <div className="mb-3 rounded-md p-3" style={{ background: "rgba(34,197,94,0.05)", border: "1px solid rgba(34,197,94,0.14)" }}>
+            <div className="mb-2 text-xs font-medium" style={{ color: "var(--yunque-text)" }}>怎么判断有用</div>
+            <div className="space-y-1">
+              {verificationSteps.map((step) => (
+                <div key={step.key} className="flex items-start gap-2 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
+                  <span style={{ color: "var(--yunque-success)" }}>•</span>
+                  <span>{step.label}：{step.detail}</span>
+                </div>
+              ))}
+            </div>
+          </div>
 
           <div className="mb-3 rounded-md p-3" style={{ background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.14)" }}>
             <div className="mb-2 text-xs font-medium" style={{ color: "var(--yunque-text)" }}>启用后去哪用</div>
