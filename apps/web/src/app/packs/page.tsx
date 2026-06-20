@@ -79,6 +79,12 @@ type PackPolishGuidance = {
   verify: string;
   handoff: string;
 };
+type PackPolishPriority = {
+  level: "P0" | "P1" | "P2";
+  label: string;
+  reason: string;
+  order: number;
+};
 type CenterActionNotice = {
   title: string;
   detail: string;
@@ -280,6 +286,52 @@ function packPolishGuidance(manifest: PackManifest): PackPolishGuidance {
   };
 }
 
+function packPolishPriority(manifest: PackManifest): PackPolishPriority {
+  const readiness = packReadiness(manifest);
+  const delivery = packDeliveryProfile(manifest);
+  const risk = riskProfileForPack(manifest);
+  const missing = readiness.missing;
+
+  if (missing.includes("后端能力声明") || missing.includes("打开/使用入口")) {
+    return {
+      level: "P0",
+      label: "P0 先补可用路径",
+      reason: "缺后端能力声明或打开入口，用户很难确认这个能力是否真的可用。",
+      order: 0,
+    };
+  }
+  if (risk.requiresAuthorization && delivery.level !== "ready") {
+    return {
+      level: "P0",
+      label: "P0 先补授权边界",
+      reason: "涉及高风险授权，但交付路径还不够清楚，启用前必须先讲明边界和回滚。",
+      order: 0,
+    };
+  }
+  if (delivery.level === "plan_only") {
+    return {
+      level: "P1",
+      label: "P1 实验转可验证",
+      reason: "当前仍是实验/计划能力，需要补真实结果位置、限制和转稳定待办。",
+      order: 1,
+    };
+  }
+  if (missing.includes("用户感知位置") || missing.includes("使用示例") || delivery.level === "needs_meat") {
+    return {
+      level: "P1",
+      label: "P1 补用户理解",
+      reason: "能力本体存在，但用户还缺少场景、示例或结果位置来判断价值。",
+      order: 1,
+    };
+  }
+  return {
+    level: "P2",
+    label: "P2 继续打磨",
+    reason: "核心声明已基本完整，适合补更具体的文案、验收和发布说明。",
+    order: 2,
+  };
+}
+
 function buildBatchReadinessPrompt(
   items: ReadinessQueueItem[],
   batch: { page: number; pageCount: number; total: number; pageSize: number },
@@ -305,12 +357,18 @@ function buildBatchReadinessPrompt(
       const delivery = packDeliveryProfile(item.manifest);
       const risk = riskProfileForPack(item.manifest);
       const guidance = packPolishGuidance(item.manifest);
+      const priority = packPolishPriority(item.manifest);
       return {
         id: item.manifest.id,
         name: item.manifest.name,
         version: item.manifest.version,
         status: item.manifest.status,
         source: item.sourceLabel,
+        priority: {
+          level: priority.level,
+          label: priority.label,
+          reason: priority.reason,
+        },
         missing: readiness.missing,
         readiness: readiness.label,
         risk: {
@@ -520,7 +578,10 @@ export default function PacksPageOptimized() {
         const rb = packReadiness(b.manifest);
         const da = packDeliveryProfile(a.manifest);
         const db = packDeliveryProfile(b.manifest);
-        return deliveryOrder[da.level] - deliveryOrder[db.level]
+        const pa = packPolishPriority(a.manifest);
+        const pb = packPolishPriority(b.manifest);
+        return pa.order - pb.order
+          || deliveryOrder[da.level] - deliveryOrder[db.level]
           || readinessOrder[ra.level] - readinessOrder[rb.level]
           || rb.missing.length - ra.missing.length
           || a.manifest.name.localeCompare(b.manifest.name);
@@ -1139,6 +1200,7 @@ export default function PacksPageOptimized() {
                 const delivery = packDeliveryProfile(item.manifest);
                 const deliveryStyle = deliveryToneStyle(delivery.tone);
                 const guidance = packPolishGuidance(item.manifest);
+                const priority = packPolishPriority(item.manifest);
                 const queueReason = readiness.missing.length > 0
                   ? `还缺：${readiness.missing.join("、")}`
                   : `交付状态：${delivery.label}。${delivery.nextStep}`;
@@ -1150,6 +1212,7 @@ export default function PacksPageOptimized() {
                         <div className="mt-1 truncate text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>{item.sourceLabel}</div>
                       </div>
                       <div className="flex shrink-0 flex-wrap justify-end gap-1">
+                        <Chip size="sm" color={priority.level === "P0" ? "danger" : priority.level === "P1" ? "warning" : "default"}>{priority.level}</Chip>
                         <Chip size="sm" color={readiness.level === "needs_entry" ? "danger" : readiness.level === "needs_context" ? "warning" : "success"}>{readiness.label}</Chip>
                         <Chip size="sm" style={{ background: deliveryStyle.background, color: deliveryStyle.color }}>{delivery.label}</Chip>
                       </div>
@@ -1158,6 +1221,7 @@ export default function PacksPageOptimized() {
                       {queueReason}
                     </div>
                     <div className="mt-2 rounded-md border p-2 text-[11px] leading-5" style={{ borderColor: "rgba(245,158,11,0.18)", background: "rgba(245,158,11,0.06)", color: "var(--yunque-text-secondary)" }}>
+                      <div><span className="font-medium" style={{ color: "var(--yunque-text)" }}>{priority.label}：</span>{priority.reason}</div>
                       <div><span className="font-medium" style={{ color: "var(--yunque-text)" }}>为什么进队列：</span>{guidance.reason}</div>
                       <div><span className="font-medium" style={{ color: "var(--yunque-text)" }}>优先修改：</span>{guidance.firstEdit}</div>
                       <div><span className="font-medium" style={{ color: "var(--yunque-text)" }}>验收路径：</span>{guidance.verify}</div>

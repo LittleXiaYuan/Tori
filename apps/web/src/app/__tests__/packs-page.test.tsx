@@ -475,6 +475,10 @@ describe("PacksPageOptimized", () => {
     expect(screen.getByRole("button", { name: /查看打磨队列/ })).toBeInTheDocument();
     expect(screen.getByText("按体检缺口和交付状态自动挑出最需要小羽补用途、入口、示例、真实结果或能力边界的能力包。当前第 1 / 1 批，展示 2 个，共 2 个待打磨。")).toBeInTheDocument();
     expect(screen.getByText("还缺：使用示例、用户感知位置、打开/使用入口、后端能力声明")).toBeInTheDocument();
+    expect(screen.getByText("P0 先补可用路径：")).toBeInTheDocument();
+    expect(screen.getByText("缺后端能力声明或打开入口，用户很难确认这个能力是否真的可用。")).toBeInTheDocument();
+    expect(screen.getByText("P1 补用户理解：")).toBeInTheDocument();
+    expect(screen.getByText("能力本体存在，但用户还缺少场景、示例或结果位置来判断价值。")).toBeInTheDocument();
     expect(screen.getAllByText("为什么进队列：").length).toBeGreaterThan(0);
     expect(screen.getByText("体检缺口：使用示例、用户感知位置、打开/使用入口、后端能力声明。")).toBeInTheDocument();
     expect(screen.getAllByText("优先修改：").length).toBeGreaterThan(0);
@@ -495,6 +499,9 @@ describe("PacksPageOptimized", () => {
     expect(batchPrompt).toContain("\"permission_summary\"");
     expect(batchPrompt).toContain("\"risk\"");
     expect(batchPrompt).toContain("\"polish_guidance\"");
+    expect(batchPrompt).toContain("\"priority\"");
+    expect(batchPrompt).toContain("\"level\": \"P0\"");
+    expect(batchPrompt).toContain("\"label\": \"P0 先补可用路径\"");
     expect(batchPrompt).toContain("\"first_edit\"");
     expect(batchPrompt).toContain("不能伪造执行能力");
     expect(batchPrompt).toContain("改完回到能力包详情与 Chat/任务主路径验证");
@@ -506,6 +513,7 @@ describe("PacksPageOptimized", () => {
     expect(batchStudioPrompt).toContain("studio_url");
     expect(batchStudioPrompt).toContain("permission_summary");
     expect(batchStudioPrompt).toContain("polish_guidance");
+    expect(batchStudioPrompt).toContain("\"priority\"");
     const queueStudioLink = screen.getAllByRole("link", { name: /交给小羽补齐/ })
       .find((link) => link.getAttribute("href")?.includes("yunque.pack.needs-entry"));
     expect(queueStudioLink).toHaveAttribute("href", expect.stringContaining("/packs/studio?"));
