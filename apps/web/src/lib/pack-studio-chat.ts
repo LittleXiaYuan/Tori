@@ -367,10 +367,35 @@ export function parsePackStudioPatchDraftRequestPrompt(text?: string): PackStudi
 }
 
 export function parsePackStudioBatchDraftRequestPrompt(text?: string): PackStudioBatchDraftRequest | null {
-  if (!text?.includes("yunque.pack_studio.batch_draft_request.v1")) return null;
+  if (!text?.includes("yunque.pack_studio.batch_draft_request.v1") && !text?.includes("yunque.pack_usability_report.v1")) return null;
   for (const parsed of parseJsonBlocks(text)) {
     const root = asRecord(parsed);
-    if (!root || root.kind !== "yunque.pack_studio.batch_draft_request.v1") continue;
+    if (!root) continue;
+    if (root.kind === "yunque.pack_usability_report.v1") {
+      const queue = Array.isArray(root.queue) ? root.queue : null;
+      if (!queue) continue;
+      const summary = asRecord(root.summary);
+      const queueSummary = asRecord(summary?.queue);
+      return {
+        goal: "按能力包体检报告逐包补齐用途、入口、示例、权限边界和回滚说明。",
+        rules: [
+          "不要自动应用改动。",
+          "优先处理报告 queue 中的 P0/P1 项；每个包仍需只读检查、差异预览、审计、重新打包和复检。",
+          "实验/计划型能力不能包装成稳定承诺，高风险权限必须保留授权和回滚说明。",
+        ],
+        ...(queueSummary ? {
+          batch: {
+            page: numberValue(queueSummary.page) || 1,
+            pageCount: numberValue(queueSummary.page_count) || 1,
+            total: numberValue(queueSummary.total) || queue.length,
+            pageSize: numberValue(queueSummary.page_size) || queue.length,
+          },
+        } : {}),
+        packs: queue.map(packFromUsabilityReportItem).filter((pack) => pack.id || pack.name),
+        displayText: displayTextWithoutJsonBlocks(text),
+      };
+    }
+    if (root.kind !== "yunque.pack_studio.batch_draft_request.v1") continue;
     const packs = Array.isArray(root.packs) ? root.packs : null;
     if (!packs) continue;
     const batch = asRecord(root.batch);
@@ -415,4 +440,36 @@ export function parsePackStudioBatchDraftRequestPrompt(text?: string): PackStudi
     };
   }
   return null;
+}
+
+function packFromUsabilityReportItem(item: unknown): PackStudioBatchDraftRequest["packs"][number] {
+  const pack = asRecord(item) || {};
+  const readiness = asRecord(pack.readiness);
+  const delivery = deliverySummary(pack.delivery);
+  const risk = riskSummary(pack.risk);
+  const priority = prioritySummary(pack.priority);
+  const links = handoffLinks(pack.handoff_links) || handoffLinks(pack.handoffLinks);
+  return {
+    id: stringValue(pack.id),
+    name: stringValue(pack.name),
+    version: stringValue(pack.version),
+    status: stringValue(pack.status),
+    source: stringValue(pack.source),
+    missing: stringList(readiness?.missing),
+    readiness: stringValue(readiness?.label) || stringValue(readiness?.level),
+    ...(priority ? { priority } : {}),
+    ...(risk ? { risk } : {}),
+    permissionSummary: stringValue(pack.permission_summary) || stringValue(pack.permissionSummary),
+    ...(delivery ? { delivery } : {}),
+    polishGuidance: {
+      reason: stringValue(pack.next_step),
+      firstEdit: stringValue(pack.next_step),
+      verify: stringValue(pack.verify),
+      handoff: "只读检查 -> 准备工作区 -> 预览差异 -> 审计 -> 重新打包 -> 复检 -> 安装/启用/回滚。",
+    },
+    ...(links ? { handoffLinks: links } : {}),
+    studioUrl: stringValue(links?.studio),
+    packageUrl: stringValue(pack.package_url),
+    sha256: stringValue(pack.sha256),
+  };
 }

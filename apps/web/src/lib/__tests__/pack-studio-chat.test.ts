@@ -248,6 +248,97 @@ describe("parsePackStudioBatchDraftRequestPrompt", () => {
     expect(parsed?.displayText).not.toContain("yunque.pack_studio.batch_draft_request.v1");
   });
 
+  it("imports a pack center usability report as a batch handoff", () => {
+    const parsed = parsePackStudioBatchDraftRequestPrompt([
+      "从能力包中心复制的体检报告：",
+      "",
+      "```json",
+      JSON.stringify({
+        kind: "yunque.pack_usability_report.v1",
+        source: "pack-center",
+        summary: {
+          total: 3,
+          queue: { total: 2, page: 1, page_count: 1, page_size: 6, p0: 0, p1: 1, p2: 1 },
+        },
+        queue: [
+          {
+            id: "yunque.pack.computer-use",
+            name: "Computer Use",
+            version: "0.1.0",
+            status: "alpha",
+            source: "官方源",
+            package_url: "https://oss.example.com/computer-use.yqpack",
+            sha256: "b".repeat(64),
+            readiness: { level: "complete", label: "说明完整", missing: [] },
+            delivery: {
+              level: "plan_only",
+              label: "实验/计划",
+              description: "当前只生成计划。",
+              next_step: "补真实结果位置和限制。",
+            },
+            priority: {
+              level: "P1",
+              label: "P1 实验能力补边界",
+              reason: "不能包装成稳定执行。",
+            },
+            risk: {
+              level: "high",
+              label: "需要授权",
+              requires_authorization: true,
+            },
+            permission_summary: "权限：浏览器、电脑使用；需要授权后使用",
+            next_step: "保留计划边界，补真实结果位置。",
+            verify: "回到 /packs/computer-use 复验入口和限制说明。",
+            handoff_links: {
+              center: "/packs?q=yunque.pack.computer-use&from=studio",
+              detail: "/packs/detail?id=yunque.pack.computer-use",
+              open: "/packs/computer-use",
+              studio: "/packs/studio?packId=yunque.pack.computer-use",
+            },
+          },
+        ],
+      }, null, 2),
+      "```",
+    ].join("\n"));
+
+    expect(parsed?.goal).toContain("体检报告");
+    expect(parsed?.batch).toEqual({ page: 1, pageCount: 1, total: 2, pageSize: 6 });
+    expect(parsed?.rules[0]).toBe("不要自动应用改动。");
+    expect(parsed?.packs[0]).toMatchObject({
+      id: "yunque.pack.computer-use",
+      name: "Computer Use",
+      readiness: "说明完整",
+      priority: {
+        level: "P1",
+        label: "P1 实验能力补边界",
+        reason: "不能包装成稳定执行。",
+      },
+      risk: {
+        level: "high",
+        label: "需要授权",
+        requiresAuthorization: true,
+      },
+      permissionSummary: "权限：浏览器、电脑使用；需要授权后使用",
+      delivery: {
+        level: "plan_only",
+        label: "实验/计划",
+        description: "当前只生成计划。",
+        nextStep: "补真实结果位置和限制。",
+      },
+      handoffLinks: {
+        center: "/packs?q=yunque.pack.computer-use&from=studio",
+        detail: "/packs/detail?id=yunque.pack.computer-use",
+        open: "/packs/computer-use",
+        studio: "/packs/studio?packId=yunque.pack.computer-use",
+      },
+      studioUrl: "/packs/studio?packId=yunque.pack.computer-use",
+      packageUrl: "https://oss.example.com/computer-use.yqpack",
+      sha256: "b".repeat(64),
+    });
+    expect(parsed?.packs[0].polishGuidance?.verify).toBe("回到 /packs/computer-use 复验入口和限制说明。");
+    expect(parsed?.displayText).toBe("从能力包中心复制的体检报告：");
+  });
+
   it("requires the batch request kind and a packs array", () => {
     expect(parsePackStudioBatchDraftRequestPrompt("```json\n{\"kind\":\"other\",\"packs\":[]}\n```")).toBeNull();
     expect(parsePackStudioBatchDraftRequestPrompt("```json\n{\"kind\":\"yunque.pack_studio.batch_draft_request.v1\"}\n```")).toBeNull();
