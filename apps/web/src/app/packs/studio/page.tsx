@@ -958,6 +958,26 @@ export default function PackStudioPage() {
     const origin = known ? `候选来源：${source}` : `来源：${source}，不在当前候选列表中`;
     return `${origin}；本机状态：${status}；${inspection}`;
   }, [candidates, contextCandidate, contextSourceLabel, inspectReport]);
+  const inspectionSyncState = useMemo(() => {
+    if (!inspectReport) return null;
+    const matched = candidates.find((item) => item.manifest.id === inspectReport.manifest.id);
+    if (matched) {
+      return {
+        tone: "success" as const,
+        title: "只读检查已对齐候选",
+        detail: `检查结果已同步到 ${inspectReport.manifest.name}，来源是 ${sourceLabel(matched)}。候选列表会高亮这个能力包，下一步可以准备工作区、载入草稿或重新选择其他候选再检查。`,
+        actionLabel: "跳到工作区准备",
+        href: "#yqpack-check",
+      };
+    }
+    return {
+      tone: "warning" as const,
+      title: "外部 yqpack 未在候选中",
+      detail: `检查结果来自 ${inspectReport.manifest.name}，但它不在当前已安装、官方源或私有源候选里。可以继续按外部包只读改造；如果你想改已有能力包，请回候选列表重新选择后再检查。`,
+      actionLabel: "回候选列表",
+      href: "#studio-candidates",
+    };
+  }, [candidates, inspectReport]);
   const readiness = manifest ? packReadiness(manifest) : null;
   const delivery = manifest ? packDeliveryProfile(manifest) : null;
   const { data: studioPlan, refresh: refreshStudioPlan } = useApiData(async () => {
@@ -1596,6 +1616,28 @@ export default function PackStudioPage() {
                 <div className="mt-2 rounded-md border px-3 py-2 text-xs leading-5" style={{ borderColor: "rgba(59,130,246,0.16)", background: "rgba(59,130,246,0.06)", color: "var(--yunque-text-secondary)" }}>
                   {contextStatusDetail}
                 </div>
+                {inspectionSyncState && (
+                  <div
+                    className="mt-2 rounded-md border px-3 py-2 text-xs leading-5"
+                    style={{
+                      borderColor: inspectionSyncState.tone === "success" ? "rgba(34,197,94,0.22)" : "rgba(245,158,11,0.24)",
+                      background: inspectionSyncState.tone === "success" ? "rgba(34,197,94,0.08)" : "rgba(245,158,11,0.08)",
+                      color: "var(--yunque-text-secondary)",
+                    }}
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <span className="font-medium" style={{ color: "var(--yunque-text)" }}>{inspectionSyncState.title}：</span>
+                        {inspectionSyncState.detail}
+                      </div>
+                      <a href={inspectionSyncState.href}>
+                        <Button size="sm" variant="outline">
+                          {inspectionSyncState.actionLabel} <ArrowRight size={13} />
+                        </Button>
+                      </a>
+                    </div>
+                  </div>
+                )}
                 <div className="mt-2 text-[11px] font-mono break-all" style={{ color: "var(--yunque-text-muted)" }}>
                   {manifest.id}
                 </div>
@@ -1623,7 +1665,7 @@ export default function PackStudioPage() {
           </Card>
         )}
 
-        <Card className="section-card p-4">
+        <Card id="studio-candidates" className="section-card scroll-mt-24 p-4">
           <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
             <div className="flex items-center gap-2">
               <FileSearch size={16} style={{ color: "var(--yunque-accent)" }} />

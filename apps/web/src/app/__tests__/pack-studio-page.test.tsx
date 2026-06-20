@@ -443,6 +443,9 @@ describe("PackStudioPage", () => {
     expect(screen.getByText("当前能力包：WASM 能力包")).toBeInTheDocument();
     expect(screen.getByText("已同步检查结果")).toBeInTheDocument();
     expect(screen.getByText(/候选来源：已启用；本机状态：已启用；只读检查已匹配当前能力包，SHA 匹配，3 个文件/)).toBeInTheDocument();
+    expect(screen.getByText(/只读检查已对齐候选/)).toBeInTheDocument();
+    expect(screen.getByText(/检查结果已同步到 WASM 能力包，来源是 已启用/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /跳到工作区准备/ })).toHaveAttribute("href", "#yqpack-check");
     expect(screen.getByRole("link", { name: /查看详情/ })).toHaveAttribute("href", "/packs/detail?id=yunque.pack.wasm-plugin");
     expect(screen.getByRole("link", { name: /打开能力入口/ })).toHaveAttribute("href", "/packs/wasm-plugin");
   });
