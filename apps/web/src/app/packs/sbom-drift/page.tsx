@@ -1,11 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Button, Card, Chip, Input, Spinner, TextArea, TextField } from "@heroui/react";
-import { AlertTriangle, Download, FileJson, GitCompare, PackageSearch, RefreshCw, ShieldCheck } from "lucide-react";
+import { AlertTriangle, ClipboardList, Download, FileJson, GitCompare, PackageSearch, RefreshCw, Send, ShieldCheck } from "lucide-react";
 import PageHeader from "@/components/page-header";
 import { showToast } from "@/components/toast-provider";
 import { formatErrorMessage } from "@/lib/error-utils";
+import { chatPromptHref } from "@/lib/pack-action-links";
 import { createSBOMDriftClient as createSBOMDriftPackClient, type SBOMDriftBaselineArtifactSourcePlan, type SBOMDriftCIBaselineWriteback, type SBOMDriftCIGatePlan, type SBOMDriftCIWorkflowWritebackPlan, type SBOMDriftCycloneDXDocument, type SBOMDriftDiff, type SBOMDriftSnapshotSummary, type SBOMDriftStatusResponse as SBOMDriftStatus } from "yunque-client/sbom-drift";
 import { createYunqueSDKClientOptions } from "@/lib/sdk-client";
 
@@ -45,6 +47,25 @@ const boundaryItems = [
   "不会联网拉取漏洞库或执行 govulncheck。",
   "不会把计划结果写成真实发布阻断。",
   "不会替代正式供应链安全扫描。",
+];
+
+const workflowLoopItems = [
+  {
+    title: "1. 保留基线",
+    body: "把发版前依赖状态保存成快照，后续变化才有比较对象。",
+  },
+  {
+    title: "2. 带回 Chat",
+    body: "让云雀解释新增依赖、版本漂移和风险等级，再拆出处理任务。",
+  },
+  {
+    title: "3. 看发布依据",
+    body: "CycloneDX、证据包和 CI gate 计划是评审材料，不会直接阻断发布。",
+  },
+  {
+    title: "4. 继续补能力",
+    body: "如果需要更多语言或漏洞源，把真实漂移报告交给小羽继续扩展。",
+  },
 ];
 
 export default function SBOMDriftPackPage() {
@@ -303,6 +324,41 @@ export default function SBOMDriftPackPage() {
             </div>
           </div>
           <Button size="sm" variant="ghost" onPress={load}><RefreshCw size={14} />刷新</Button>
+        </div>
+      </Card>
+
+      <Card className="section-card p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>从依赖漂移到发布判断</div>
+            <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
+              SBOM Drift 不是只列依赖清单，而是把发版前的变化变成可解释风险、可下载证据和可交给任务中心处理的清单。
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link href={chatPromptHref("请根据 SBOM Drift 最新漂移报告，解释新增依赖和版本变化的风险，并把需要处理的项拆成任务。")}>
+              <Button size="sm" className="btn-accent">
+                <Send size={13} /> 带回 Chat
+              </Button>
+            </Link>
+            <Link href="/missions">
+              <Button size="sm" variant="outline">
+                <ClipboardList size={13} /> 看任务
+              </Button>
+            </Link>
+          </div>
+        </div>
+        <div className="mt-3 grid gap-2 md:grid-cols-4">
+          {workflowLoopItems.map((item) => (
+            <div key={item.title} className="rounded-md border p-3" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-surface)" }}>
+              <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>{item.title}</div>
+              <div className="mt-2 text-[11px] leading-5" style={{ color: "var(--yunque-text-muted)" }}>{item.body}</div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2 text-xs">
+          <Link href="/trace"><Button size="sm" variant="ghost">核对执行轨迹</Button></Link>
+          <Link href="/packs/studio?packId=yunque.pack.sbom-drift"><Button size="sm" variant="ghost">让小羽继续改</Button></Link>
         </div>
       </Card>
 

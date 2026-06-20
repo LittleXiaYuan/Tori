@@ -1,11 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Button, Card, Chip, Input, Spinner, TextArea, TextField } from "@heroui/react";
-import { Activity, AlertTriangle, ClipboardCheck, Download, Radar, RefreshCw, ShieldAlert } from "lucide-react";
+import { Activity, AlertTriangle, ClipboardCheck, ClipboardList, Download, Radar, RefreshCw, Send, ShieldAlert } from "lucide-react";
 import PageHeader from "@/components/page-header";
 import { showToast } from "@/components/toast-provider";
 import { formatErrorMessage } from "@/lib/error-utils";
+import { chatPromptHref } from "@/lib/pack-action-links";
 import { createSkillAnomalyPackClient, type SkillAnomalyApprovalManagerBridgePlan, type SkillAnomalyApprovalQueueWriteback, type SkillAnomalyAuditHookPlan, type SkillAnomalyProfileSummary, type SkillAnomalyResult, type SkillAnomalyStatus } from "@/lib/skill-anomaly-pack-client";
 
 const skillAnomalyPack = createSkillAnomalyPackClient();
@@ -56,6 +58,25 @@ const boundaryItems = [
   "不会自动批准或释放 runtime action。",
   "不会追加 Merkle Chain 审计记录。",
   "不会调用全局 Approval Manager。",
+];
+
+const workflowLoopItems = [
+  {
+    title: "1. 观察正常行为",
+    body: "先积累 Skill 的正常调用、耗时和成功率，避免把未知误判成异常。",
+  },
+  {
+    title: "2. 带回 Chat",
+    body: "让云雀解释异常原因，拆成确认参数、收紧权限或补审批规则的任务。",
+  },
+  {
+    title: "3. 看审批依据",
+    body: "本地队列和桥接计划是治理证据，不会自动扣分或释放动作。",
+  },
+  {
+    title: "4. 继续补能力",
+    body: "如果误报或漏报明显，把真实样本交给小羽改检测规则和画像逻辑。",
+  },
 ];
 
 export default function SkillAnomalyPackPage() {
@@ -278,6 +299,41 @@ export default function SkillAnomalyPackPage() {
             </div>
           </div>
           <Button size="sm" variant="ghost" onPress={load}><RefreshCw size={14} />刷新</Button>
+        </div>
+      </Card>
+
+      <Card className="section-card p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>从异常检测到人工审批</div>
+            <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
+              Skill Anomaly 把可疑调用整理成可审查证据：先解释为什么异常，再由你决定是否进入审批、收紧权限或继续训练画像。
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link href={chatPromptHref("请根据 Skill Anomaly 最新检测结果，解释可疑调用为什么需要审批，并把确认权限、收紧规则和补样本拆成任务。")}>
+              <Button size="sm" className="btn-accent">
+                <Send size={13} /> 带回 Chat
+              </Button>
+            </Link>
+            <Link href="/missions">
+              <Button size="sm" variant="outline">
+                <ClipboardList size={13} /> 看任务
+              </Button>
+            </Link>
+          </div>
+        </div>
+        <div className="mt-3 grid gap-2 md:grid-cols-4">
+          {workflowLoopItems.map((item) => (
+            <div key={item.title} className="rounded-md border p-3" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-surface)" }}>
+              <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>{item.title}</div>
+              <div className="mt-2 text-[11px] leading-5" style={{ color: "var(--yunque-text-muted)" }}>{item.body}</div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2 text-xs">
+          <Link href="/trace"><Button size="sm" variant="ghost">核对执行轨迹</Button></Link>
+          <Link href="/packs/studio?packId=yunque.pack.skill-anomaly"><Button size="sm" variant="ghost">让小羽继续改</Button></Link>
         </div>
       </Card>
 

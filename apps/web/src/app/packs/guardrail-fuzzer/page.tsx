@@ -1,11 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Button, Card, Chip, Input, Spinner, TextArea, TextField } from "@heroui/react";
-import { AlertTriangle, CalendarClock, Download, FileCode2, Play, RefreshCw, ShieldAlert, Sparkles } from "lucide-react";
+import { AlertTriangle, CalendarClock, ClipboardList, Download, FileCode2, Play, RefreshCw, Send, ShieldAlert, Sparkles } from "lucide-react";
 import PageHeader from "@/components/page-header";
 import { showToast } from "@/components/toast-provider";
 import { formatErrorMessage } from "@/lib/error-utils";
+import { chatPromptHref } from "@/lib/pack-action-links";
 import { createGuardrailFuzzerPackClient, type GuardrailFuzzerCIGatePlan, type GuardrailFuzzerNativeCorpusPlan, type GuardrailFuzzerReport, type GuardrailFuzzerReportSummary, type GuardrailFuzzerStatus } from "@/lib/guardrail-fuzzer-pack-client";
 
 const guardrailFuzzerPack = createGuardrailFuzzerPackClient();
@@ -63,6 +65,25 @@ const boundaryItems = [
   "不会创建 CI 定时任务或阻断发布。",
   "不会发送告警、开 issue 或上传 artifacts。",
   "不会把 fuzz 样本写入 Go testdata。",
+];
+
+const workflowLoopItems = [
+  {
+    title: "1. 保留绕过样本",
+    body: "把失败样本、误杀样本和变体报告留作护栏回归证据。",
+  },
+  {
+    title: "2. 带回 Chat",
+    body: "让云雀解释绕过原因，拆出规则修复、语料补充和人工复核任务。",
+  },
+  {
+    title: "3. 看修复依据",
+    body: "CI gate、规则候选和 native corpus 只是评审材料，不会自动改策略。",
+  },
+  {
+    title: "4. 继续补能力",
+    body: "如果覆盖面不够，把真实绕过报告交给小羽继续扩展 fuzz 规则。",
+  },
 ];
 
 export default function GuardrailFuzzerPackPage() {
@@ -253,6 +274,41 @@ export default function GuardrailFuzzerPackPage() {
             </div>
           </div>
           <Button size="sm" variant="ghost" onPress={load}><RefreshCw size={14} />刷新</Button>
+        </div>
+      </Card>
+
+      <Card className="section-card p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>从绕过报告到护栏修复</div>
+            <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
+              Guardrail Fuzzer 的结果要回到行动：先确认样本，再让云雀拆修复任务，最后由你审查规则和 CI 计划。
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link href={chatPromptHref("请根据 Guardrail Fuzzer 最新报告，解释绕过样本和误杀样本的原因，并把护栏修复拆成任务。")}>
+              <Button size="sm" className="btn-accent">
+                <Send size={13} /> 带回 Chat
+              </Button>
+            </Link>
+            <Link href="/missions">
+              <Button size="sm" variant="outline">
+                <ClipboardList size={13} /> 看任务
+              </Button>
+            </Link>
+          </div>
+        </div>
+        <div className="mt-3 grid gap-2 md:grid-cols-4">
+          {workflowLoopItems.map((item) => (
+            <div key={item.title} className="rounded-md border p-3" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-surface)" }}>
+              <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>{item.title}</div>
+              <div className="mt-2 text-[11px] leading-5" style={{ color: "var(--yunque-text-muted)" }}>{item.body}</div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2 text-xs">
+          <Link href="/trace"><Button size="sm" variant="ghost">核对执行轨迹</Button></Link>
+          <Link href="/packs/studio?packId=yunque.pack.guardrail-fuzzer"><Button size="sm" variant="ghost">让小羽继续改</Button></Link>
         </div>
       </Card>
 
