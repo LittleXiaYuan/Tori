@@ -178,6 +178,8 @@ type ActionNotice = {
   detail: string;
   href?: string;
   actionLabel?: string;
+  inlineActionLabel?: string;
+  inlineAction?: () => void;
 };
 
 export default function PackDetailClientPage() {
@@ -371,6 +373,8 @@ export default function PackDetailClientPage() {
         detail: "下一步先确认权限并启用；也可以回能力包中心聚焦这个包，查看入口、固定侧栏或继续交给小羽补肉。",
         href: packCenterFocusHref(manifest.id),
         actionLabel: "回中心管理",
+        inlineActionLabel: "立即启用",
+        inlineAction: () => enable(),
       },
     );
   };
@@ -544,14 +548,21 @@ export default function PackDetailClientPage() {
                   {actionNotice.detail}
                 </div>
               </div>
-              {actionNotice.href && (
-                <Link href={actionNotice.href}>
-                  <Button size="sm" variant="outline">
-                    {actionNotice.href.startsWith("/packs/") && actionNotice.href !== packCenterFocusHref(manifest.id) ? <ExternalLink size={14} /> : <ArrowRight size={14} />}
-                    {actionNotice.actionLabel || "继续"}
+              <div className="flex flex-wrap gap-2">
+                {actionNotice.inlineAction && (
+                  <Button size="sm" className="btn-accent" onPress={actionNotice.inlineAction} isDisabled={busy === "enable"}>
+                    <Power size={14} /> {actionNotice.inlineActionLabel || "继续"}
                   </Button>
-                </Link>
-              )}
+                )}
+                {actionNotice.href && (
+                  <Link href={actionNotice.href}>
+                    <Button size="sm" variant="outline">
+                      {actionNotice.href.startsWith("/packs/") && actionNotice.href !== packCenterFocusHref(manifest.id) ? <ExternalLink size={14} /> : <ArrowRight size={14} />}
+                      {actionNotice.actionLabel || "继续"}
+                    </Button>
+                  </Link>
+                )}
+              </div>
             </div>
           </Card>
         )}
