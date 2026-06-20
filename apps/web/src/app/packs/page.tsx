@@ -623,6 +623,20 @@ export default function PacksPageOptimized() {
     [privateCatalogEntries, normalizedQuery, kindFilter, installFilter, riskFilter, sourceFilter, stabilityFilter, readinessFilter, sortMode],
   );
   const totalMatches = filteredInstalledPacks.length + filteredReleaseEntries.length + filteredPrivateCatalogEntries.length;
+  const visibleKindStats = useMemo(() => {
+    const manifests = [
+      ...filteredInstalledPacks.map((pack) => pack.manifest),
+      ...filteredReleaseEntries.map((entry) => entry.manifest),
+      ...filteredPrivateCatalogEntries.map((entry) => entry.manifest),
+    ];
+    const counts = { actionable: 0, infrastructure: 0, experimental: 0 };
+    for (const manifest of manifests) {
+      const kind = packUsability(manifest).kind;
+      if (kind === "actionable" || kind === "experimental") counts[kind] += 1;
+      else counts.infrastructure += 1;
+    }
+    return counts;
+  }, [filteredInstalledPacks, filteredReleaseEntries, filteredPrivateCatalogEntries]);
   const installedPageCount = pageCountFor(filteredInstalledPacks.length);
   const currentInstalledPage = Math.min(installedPage, installedPageCount);
   const pagedInstalledPacks = paginate(filteredInstalledPacks, currentInstalledPage);
@@ -1242,6 +1256,12 @@ export default function PacksPageOptimized() {
                 <X size={13} />
               </Button>
             ))}
+          </div>
+          <div className="mt-3 rounded-md border px-3 py-2 text-xs leading-5" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-bg-hover)", color: "var(--yunque-text-secondary)" }}>
+            <span className="font-medium" style={{ color: "var(--yunque-text)" }}>当前视图：</span>
+            {totalMatches === 0
+              ? "没有匹配的能力包。可以清空搜索或放宽类型、风险、稳定性筛选。"
+              : `共 ${totalMatches} 个，${visibleKindStats.actionable} 个可直接使用、${visibleKindStats.infrastructure} 个作为 Chat/任务/记忆/知识的底座能力、${visibleKindStats.experimental} 个仍建议先看边界再启用。`}
           </div>
         </Card>
       </div>

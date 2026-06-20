@@ -277,6 +277,8 @@ describe("PacksPageOptimized", () => {
     expect(screen.getByText("Documents (文档生成)")).toBeInTheDocument();
     expect(screen.queryByText("Files (产物文件)")).not.toBeInTheDocument();
     expect(screen.getByText(/匹配 1 个/)).toBeInTheDocument();
+    expect(screen.getByText("当前视图：")).toBeInTheDocument();
+    expect(screen.getByText("共 1 个，0 个可直接使用、1 个作为 Chat/任务/记忆/知识的底座能力、0 个仍建议先看边界再启用。")).toBeInTheDocument();
     expect(screen.getByText("搜索：文档")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "清除搜索" }));
