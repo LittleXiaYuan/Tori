@@ -99,6 +99,12 @@ function deliveryChipColor(tone: ReturnType<typeof packDeliveryProfile>["tone"])
   return "default";
 }
 
+function displayDeliveryLabel(label?: string, level?: string): string {
+  const value = label || level || "";
+  if (value === "待补肉" || value === "needs_meat") return "需打磨";
+  return value || "未知";
+}
+
 type StudioWorkflowStep = {
   key: string;
   title: string;
@@ -518,7 +524,7 @@ function buildPatchDraftRequestPrompt(prompt: string, workspace: PackStudioWorks
       : "这次没有强制体检缺口；请继续打磨真实可用路径和用户反馈。",
     delivery.level === "plan_only"
       ? "本包交付状态仍是实验/计划：不要把计划、演示或 dry-run 包装成稳定执行能力；必须写清结果位置、限制、验证和回滚。"
-      : `本包交付状态：${delivery.label}。请让草稿服务于下一步：${delivery.nextStep}`,
+      : `本包交付状态：${displayDeliveryLabel(delivery.label, delivery.level)}。请让草稿服务于下一步：${delivery.nextStep}`,
     "输出必须只包含一段 fenced JSON，kind 必须是 yunque.pack_studio.patch_draft.v1。",
     "content 必须是完整的新文件内容，不要输出差异补丁、片段或解释文本。",
     "不要声称已经应用改动；用户回到能力包工坊导入后仍要预览差异、运行内置审计、重新打包和复检 SHA。",
@@ -634,7 +640,7 @@ function buildStudioAnalysis(manifest: PackManifest, goal = ""): StudioAnalysis 
 
   const warnings = [];
   if (delivery.level === "plan_only") warnings.push("交付状态仍是实验/计划：不要伪装成稳定执行能力，必须补真实结果位置、限制、验证证据和回滚说明。");
-  if (delivery.level === "needs_meat") warnings.push(`交付状态仍是待补肉：${delivery.nextStep}`);
+  if (delivery.level === "needs_meat") warnings.push(`交付状态仍需打磨：${delivery.nextStep}`);
   if (usability.kind === "infrastructure") warnings.push("这个包主要是基础能力，改造目标应落到 Chat/任务/知识等实际使用面。");
   if (usability.kind === "experimental") warnings.push("这个包仍是实验能力，改造时不要把它包装成稳定承诺。");
   if (readiness.missing.length > 0) warnings.push(`能力包体检：${readiness.label}，还缺 ${readiness.missing.join("、")}。`);
@@ -1724,7 +1730,7 @@ export default function PackStudioPage() {
             <span className="mx-1 h-5 w-px" style={{ background: "var(--yunque-border)" }} />
             {([
               ["all", "全部交付"],
-              ["needs_meat", "待补肉"],
+              ["needs_meat", "需打磨"],
               ["plan_only", "实验/计划"],
               ["support", "后台支撑"],
               ["ready", "可直接交付"],
@@ -1779,7 +1785,7 @@ export default function PackStudioPage() {
                       <div className="mt-1 truncate text-xs" style={{ color: "var(--yunque-text-muted)" }}>{candidate.manifest.id}</div>
                       <div className="mt-2 flex flex-wrap gap-1">
                         <Chip size="sm" style={{ background: "rgba(59,130,246,0.08)", color: "var(--yunque-primary)" }}>{usability.label}</Chip>
-                        <Chip size="sm" color={deliveryChipColor(delivery.tone)}>{delivery.label}</Chip>
+                        <Chip size="sm" color={deliveryChipColor(delivery.tone)}>{displayDeliveryLabel(delivery.label, delivery.level)}</Chip>
                         {readiness.missing.length > 0 && <Chip size="sm" variant="soft">缺 {readiness.missing.length} 项</Chip>}
                         <Chip size="sm" variant="soft">v{candidate.manifest.version}</Chip>
                       </div>
@@ -1815,9 +1821,9 @@ export default function PackStudioPage() {
             <div className="flex items-start gap-2">
               <ClipboardCheck size={16} style={{ color: "var(--yunque-accent)" }} />
               <div>
-                <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>导入批量补肉任务</div>
+                <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>导入批量打磨任务</div>
                 <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
-                  从能力包中心或 Chat 粘贴批量补肉任务；工坊会拆成逐包处理入口，不会批量自动改包。
+                  从能力包中心或 Chat 粘贴批量打磨/验收任务；工坊会拆成逐包处理入口，不会批量自动改包。
                 </div>
               </div>
             </div>
@@ -1834,7 +1840,7 @@ export default function PackStudioPage() {
             )}
           </div>
           <TextArea
-            aria-label="导入批量补肉任务 JSON"
+            aria-label="导入批量打磨任务 JSON"
             value={importedBatchText}
             onChange={(event) => setImportedBatchText(event.target.value)}
             rows={4}
@@ -1843,7 +1849,7 @@ export default function PackStudioPage() {
           </TextArea>
           {importedBatchText.trim() && !importedBatchRequest && (
             <div className="mt-2 rounded px-2 py-1 text-[11px]" style={{ background: "rgba(248,113,113,0.08)", color: "var(--yunque-danger)" }}>
-              未识别到完整批量补肉任务。请粘贴能力包中心生成的完整 JSON fenced block 或原始 Chat 消息。
+              未识别到完整批量打磨任务。请粘贴能力包中心生成的完整 JSON fenced block 或原始 Chat 消息。
             </div>
           )}
           {importedBatchRequest && (
@@ -1858,7 +1864,7 @@ export default function PackStudioPage() {
               </div>
               {importedBatchRequest.batch?.total ? (
                 <div className="rounded px-2 py-2 text-[11px]" style={{ background: "var(--yunque-bg-hover)", color: "var(--yunque-text-secondary)" }}>
-                  来自补肉队列第 {importedBatchRequest.batch.page || 1} / {importedBatchRequest.batch.pageCount || 1} 批：本批 {importedBatchRequest.packs.length} 个，队列总计 {importedBatchRequest.batch.total} 个，每批最多 {importedBatchRequest.batch.pageSize || importedBatchRequest.packs.length} 个。
+                  来自打磨与验收队列第 {importedBatchRequest.batch.page || 1} / {importedBatchRequest.batch.pageCount || 1} 批：本批 {importedBatchRequest.packs.length} 个，队列总计 {importedBatchRequest.batch.total} 个，每批最多 {importedBatchRequest.batch.pageSize || importedBatchRequest.packs.length} 个。
                 </div>
               ) : null}
               <div className="grid gap-2 text-[11px] md:grid-cols-4 lg:grid-cols-8">
@@ -1878,7 +1884,7 @@ export default function PackStudioPage() {
                   实验/计划：{batchSummary.planOnly}
                 </div>
                 <div className="rounded px-2 py-2" style={{ background: "rgba(245,158,11,0.08)", color: "var(--yunque-text-secondary)" }}>
-                  待补肉：{batchSummary.needsMeat}
+                  需打磨：{batchSummary.needsMeat}
                 </div>
                 <div className="rounded px-2 py-2" style={{ background: "var(--yunque-bg-hover)", color: "var(--yunque-text-secondary)" }}>
                   缺说明/示例：{batchSummary.missingContext}
@@ -1907,7 +1913,7 @@ export default function PackStudioPage() {
                     </Chip>
                     {batchActivePack?.delivery && (
                       <Chip size="sm" variant="soft">
-                        交付：{batchActivePack.delivery.label || batchActivePack.delivery.level}
+                        交付：{displayDeliveryLabel(batchActivePack.delivery.label, batchActivePack.delivery.level)}
                       </Chip>
                     )}
                     {batchActivePack?.priority && (
@@ -1978,7 +1984,7 @@ export default function PackStudioPage() {
                           {pack.readiness && <Chip size="sm" color={pack.readiness.includes("入口") ? "danger" : "warning"}>{pack.readiness}</Chip>}
                           {pack.delivery && (
                             <Chip size="sm" variant="soft">
-                              {pack.delivery.label || pack.delivery.level}
+                              {displayDeliveryLabel(pack.delivery.label, pack.delivery.level)}
                             </Chip>
                           )}
                           {pack.risk && (
@@ -2002,7 +2008,7 @@ export default function PackStudioPage() {
                       )}
                       {pack.delivery && (
                         <div className="mt-2 rounded px-2 py-2 text-[11px] leading-5" style={{ background: "var(--yunque-bg-hover)", color: "var(--yunque-text-secondary)" }}>
-                          交付状态：{pack.delivery.description || pack.delivery.label || pack.delivery.level}
+                          交付状态：{pack.delivery.description || displayDeliveryLabel(pack.delivery.label, pack.delivery.level)}
                           {pack.delivery.nextStep ? ` 下一步：${pack.delivery.nextStep}` : ""}
                         </div>
                       )}

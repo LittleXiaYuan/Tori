@@ -577,20 +577,20 @@ describe("PackStudioPage", () => {
 
     render(<PackStudioPage />);
 
-    expect(await screen.findByText("导入批量补肉任务")).toBeInTheDocument();
-    expect((screen.getByLabelText("导入批量补肉任务 JSON") as HTMLTextAreaElement).value).toContain("yunque.pack_studio.batch_draft_request.v1");
+    expect(await screen.findByText("导入批量打磨任务")).toBeInTheDocument();
+    expect((screen.getByLabelText("导入批量打磨任务 JSON") as HTMLTextAreaElement).value).toContain("yunque.pack_studio.batch_draft_request.v1");
     expect(screen.getByText("2 个包")).toBeInTheDocument();
     expect(screen.getByText("第 2 / 5 批")).toBeInTheDocument();
     expect(screen.getByText("逐包处理")).toBeInTheDocument();
     expect(screen.getByText("目标：批量把这些能力包补齐用途和入口。")).toBeInTheDocument();
     expect(screen.getByText("规则：不要自动应用改动。；回到能力包工坊预览差异 / 审计 / 重新打包。")).toBeInTheDocument();
-    expect(screen.getByText("来自补肉队列第 2 / 5 批：本批 2 个，队列总计 26 个，每批最多 6 个。")).toBeInTheDocument();
+    expect(screen.getByText("来自打磨与验收队列第 2 / 5 批：本批 2 个，队列总计 26 个，每批最多 6 个。")).toBeInTheDocument();
     expect(screen.getByText("高风险/需授权：1")).toBeInTheDocument();
     expect(screen.getByText("P0：1")).toBeInTheDocument();
     expect(screen.getByText("P1：1")).toBeInTheDocument();
     expect(screen.getByText("P2：0")).toBeInTheDocument();
     expect(screen.getByText("实验/计划：1")).toBeInTheDocument();
-    expect(screen.getByText("待补肉：2")).toBeInTheDocument();
+    expect(screen.getByText("需打磨：2")).toBeInTheDocument();
     expect(screen.getByText("缺说明/示例：2")).toBeInTheDocument();
     expect(screen.getByText("缺入口/后端：0")).toBeInTheDocument();
     expect(screen.getByText("批量处理进度")).toBeInTheDocument();
@@ -690,7 +690,7 @@ describe("PackStudioPage", () => {
 
     expect(await screen.findByText("匹配 14 个 · 第 1 / 2 页")).toBeInTheDocument();
     expect(screen.getByText("工坊候选 · 每页 12 个")).toBeInTheDocument();
-    expect(screen.getAllByText("待补肉").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("需打磨").length).toBeGreaterThan(0);
     expect(screen.getAllByText(/交给小羽先补/).length).toBeGreaterThan(0);
     expect(screen.getAllByText("Bulk Pack 1").length).toBeGreaterThan(0);
     expect(screen.queryByText("Bulk Pack 9")).not.toBeInTheDocument();
@@ -699,7 +699,7 @@ describe("PackStudioPage", () => {
     expect(screen.getByText("匹配 0 个 · 第 1 / 1 页")).toBeInTheDocument();
     expect(screen.getByText("没有匹配的能力包。可以清除搜索，或切换来源筛选。")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "待补肉" }));
+    fireEvent.click(screen.getByRole("button", { name: "需打磨" }));
     expect(screen.getByText("匹配 14 个 · 第 1 / 2 页")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "下一页" }));
@@ -730,10 +730,10 @@ describe("PackStudioPage", () => {
     expect(screen.getByText("需要守住的边界")).toBeInTheDocument();
     expect(screen.getByText("能力包体检")).toBeInTheDocument();
     expect(screen.getByText("交付状态")).toBeInTheDocument();
-    expect(screen.getAllByText("待补肉").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("需打磨").length).toBeGreaterThan(0);
     expect(screen.getByText("小羽会优先补齐：使用示例、用户感知位置。")).toBeInTheDocument();
     expect(screen.getByText("能力包体检缺口：使用示例、用户感知位置，优先补齐这些用户可感知信息。")).toBeInTheDocument();
-    expect(screen.getByText(/交付状态仍是待补肉/)).toBeInTheDocument();
+    expect(screen.getByText(/交付状态仍需打磨/)).toBeInTheDocument();
     expect(screen.getByText("不要反编译后硬改 WASM；需要源码、ABI 说明和 wasm-plugin 回归测试。")).toBeInTheDocument();
     expect(screen.getByText(/这个包仍是实验能力，改造时不要把它包装成稳定承诺。/)).toBeInTheDocument();
 
@@ -749,7 +749,7 @@ describe("PackStudioPage", () => {
     const task = screen.getByLabelText("小羽改包任务") as HTMLTextAreaElement;
     expect(task.value).toContain("用户目标：增加一个可查看运行结果的界面");
     expect(task.value).toContain("能力包体检：需补说明；还缺 使用示例、用户感知位置");
-    expect(task.value).toContain("交付状态：待补肉");
+    expect(task.value).toContain("交付状态：需打磨");
     expect(task.value).toContain("验证交付状态是否改善");
     expect(task.value).toContain("POST /v1/wasm-plugin/run");
     expect(task.value).toContain("可改文件候选：");
@@ -875,7 +875,7 @@ describe("PackStudioPage", () => {
     expect(draftRequestPrompt).toContain("yunque.pack_studio.patch_draft.v1");
     expect(draftRequestPrompt).toContain("这次必须优先补齐体检缺口：使用示例、用户感知位置");
     expect(draftRequestPrompt).toContain("\"delivery\"");
-    expect(draftRequestPrompt).toContain("本包交付状态：待补肉");
+    expect(draftRequestPrompt).toContain("本包交付状态：需打磨");
     expect(draftRequestPrompt).toContain("readiness_gaps");
     expect(draftRequestPrompt).toContain("content 必须是完整的新文件内容，不要输出差异补丁、片段或解释文本");
     expect(draftRequestPrompt).toContain("starter_content");
