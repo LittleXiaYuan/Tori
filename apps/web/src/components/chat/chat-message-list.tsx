@@ -122,49 +122,49 @@ function packStudioToolSummary(content: string): string | null {
     });
     return [
       batchRequest.displayText,
-      `Pack Studio 批量补肉任务: ${batchRequest.packs.length} 个能力包`,
+      `小羽批量补肉任务: ${batchRequest.packs.length} 个能力包`,
       batchRequest.batch?.total ? `队列批次：第 ${batchRequest.batch.page || 1} / ${batchRequest.batch.pageCount || 1} 批；总计 ${batchRequest.batch.total} 个待补肉` : "",
       batchRequest.goal ? `目标：${batchRequest.goal}` : "",
       batchRequest.rules.length ? `规则：${batchRequest.rules.join(" / ")}` : "",
       ...packLines,
       batchRequest.packs.length > packLines.length ? `还有 ${batchRequest.packs.length - packLines.length} 个能力包未展开。` : "",
-      "请逐包生成 Draft Request；不要跳过 Studio 的 diff / audit / repack。",
+      "请逐包生成改包草稿请求；不要跳过能力包工坊的差异预览、审计和重新打包。",
     ].filter(Boolean).join("\n");
   }
   const request = parsePackStudioPatchDraftRequestPrompt(content);
   if (request) {
     return [
       request.displayText,
-      `Pack Studio Draft Request: ${request.pack.name || request.pack.id} ${request.pack.version || ""}`.trim(),
+      `小羽改包草稿请求: ${request.pack.name || request.pack.id} ${request.pack.version || ""}`.trim(),
       `目标文件：${request.target.filePath}`,
       `风险：${request.target.riskLevel || "未标注"}`,
       `starter 内容长度：${request.starterContentLength.toLocaleString()} chars`,
       request.target.gates.length ? `门禁：${request.target.gates.join(" / ")}` : "",
       request.target.reason ? `原因：${request.target.reason}` : "",
-      "请让小羽只返回 yunque.pack_studio.patch_draft.v1 JSON；不要跳过 Studio 的 diff / audit / repack。",
+      "请让小羽只返回改包草稿 JSON；不要跳过能力包工坊的差异预览、审计和重新打包。",
     ].filter(Boolean).join("\n");
   }
   const draft = parsePackStudioPatchDraftPrompt(content);
   if (draft) {
     return [
       draft.displayText,
-      `Pack Studio Patch Draft: ${draft.pack.name || draft.pack.id} ${draft.pack.version || ""}`.trim(),
+      `小羽改包草稿: ${draft.pack.name || draft.pack.id} ${draft.pack.version || ""}`.trim(),
       `文件：${draft.filePath}`,
       `风险：${draft.riskLevel || "未标注"}`,
       `内容长度：${draft.content.length.toLocaleString()} chars`,
       draft.gates.length ? `门禁：${draft.gates.join(" / ")}` : "",
       draft.reason ? `原因：${draft.reason}` : "",
-      "完整文件内容已隐藏；请回到 /packs/studio 导入后预览 diff、运行审计、重新打包。",
+      "完整文件内容已隐藏；请回到能力包工坊导入后预览差异、运行审计、重新打包。",
     ].filter(Boolean).join("\n");
   }
   const plan = parsePackStudioPatchPlanPrompt(content);
   if (plan) {
     return [
       plan.displayText,
-      `Pack Studio Patch Plan: ${plan.pack.name || plan.pack.id} ${plan.pack.version || ""}`.trim(),
+      `小羽改包计划: ${plan.pack.name || plan.pack.id} ${plan.pack.version || ""}`.trim(),
       `工作区：${plan.workspace.id || plan.workspace.path}`,
       `候选改动：${plan.candidates.length}`,
-      "完整文件内容未包含在计划里；请回到 /packs/studio 载入候选并走 diff / audit / repack。",
+      "完整文件内容未包含在计划里；请回到能力包工坊载入候选，并完成差异预览、审计和重新打包。",
     ].filter(Boolean).join("\n");
   }
   return null;
@@ -258,7 +258,7 @@ function renderPackStudioPlan(plan: PackStudioPatchPlanSummary) {
         <div className="min-w-0">
           <div className="flex items-center gap-2 font-semibold">
             <Sparkles size={14} style={{ color: "var(--yunque-accent)" }} />
-            <span>Pack Studio 改包任务</span>
+            <span>小羽改包任务</span>
           </div>
           <div className="mt-1 truncate" style={{ color: "var(--yunque-text-muted)" }}>
             {plan.pack.name || plan.pack.id} · {plan.pack.version || "unknown"} · {plan.candidates.length} 个候选改动
@@ -290,7 +290,7 @@ function renderPackStudioPlan(plan: PackStudioPatchPlanSummary) {
         ))}
       </div>
       <div className="mt-2 leading-5" style={{ color: "var(--yunque-text-muted)" }}>
-        这张卡只展示结构化计划，不包含完整文件内容。请在 Studio 导入 Plan、载入草稿、预览 diff、运行审计、重新打包并复检 SHA 后再安装或回滚。
+        这张卡只展示结构化计划，不包含完整文件内容。请在能力包工坊导入计划、载入草稿、预览差异、运行审计、重新打包并复检 SHA 后再安装或回滚。
       </div>
       {renderPackGovernanceLinks(plan.pack, "查看能力包详情", "回中心定位")}
     </div>
@@ -311,7 +311,7 @@ function renderPackStudioDraft(draft: PackStudioPatchDraft) {
         <div className="min-w-0">
           <div className="flex items-center gap-2 font-semibold">
             <Wand2 size={14} style={{ color: "var(--yunque-success)" }} />
-            <span>Pack Studio Patch Draft</span>
+            <span>小羽改包草稿</span>
           </div>
           <div className="mt-1 truncate" style={{ color: "var(--yunque-text-muted)" }}>
             {draft.pack.name || draft.pack.id} · {draft.pack.version || "unknown"} · 单文件草稿
@@ -341,7 +341,7 @@ function renderPackStudioDraft(draft: PackStudioPatchDraft) {
         </div>
       )}
       <div className="mt-2 leading-5" style={{ color: "var(--yunque-text-muted)" }}>
-        完整文件内容已隐藏。请把这条消息粘贴到 Studio 的 Patch Draft 导入区，确认工作区匹配后预览 diff、运行审计，再应用和重新打包。
+        完整文件内容已隐藏。请把这条消息导入能力包工坊的草稿区，确认工作区匹配后预览差异、运行审计，再应用和重新打包。
       </div>
       {renderPackGovernanceLinks(draft.pack, "查看能力包详情", "回中心定位")}
     </div>
@@ -362,7 +362,7 @@ function renderPackStudioBatchDraftRequest(request: PackStudioBatchDraftRequest)
         <div className="min-w-0">
           <div className="flex items-center gap-2 font-semibold">
             <Sparkles size={14} style={{ color: "var(--yunque-accent)" }} />
-            <span>Pack Studio 批量补肉任务</span>
+            <span>小羽批量补肉任务</span>
           </div>
           <div className="mt-1 truncate" style={{ color: "var(--yunque-text-muted)" }}>
             {request.batch?.total
@@ -375,7 +375,7 @@ function renderPackStudioBatchDraftRequest(request: PackStudioBatchDraftRequest)
           className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1.5 text-[11px] font-medium"
           style={{ background: "var(--yunque-accent-muted)", color: "var(--yunque-accent)" }}
         >
-          导入 Studio 逐包处理 <ArrowRight size={11} />
+          导入工坊逐包处理 <ArrowRight size={11} />
         </a>
       </div>
       {request.goal && (
@@ -399,7 +399,7 @@ function renderPackStudioBatchDraftRequest(request: PackStudioBatchDraftRequest)
                   className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium"
                   style={{ background: "var(--yunque-accent-muted)", color: "var(--yunque-accent)" }}
                 >
-                  打开 Studio <ArrowRight size={10} />
+                  打开工坊 <ArrowRight size={10} />
                 </a>
               )}
             </div>
@@ -426,7 +426,7 @@ function renderPackStudioBatchDraftRequest(request: PackStudioBatchDraftRequest)
         </div>
       )}
       <div className="mt-2 leading-5" style={{ color: "var(--yunque-text-muted)" }}>
-        这只是批量生成请求，不会自动应用改动。每个包都要回到 Studio 预览 diff、运行 audit、重新打包并复检 SHA 后再安装或回滚。
+        这只是批量生成请求，不会自动应用改动。每个包都要回到能力包工坊预览差异、运行审计、重新打包并复检 SHA 后再安装或回滚。
       </div>
       <div className="mt-2">
         <a href="/packs#readiness-queue" className="inline-flex items-center gap-1 text-[11px] font-medium" style={{ color: "var(--yunque-accent)" }}>
@@ -451,7 +451,7 @@ function renderPackStudioDraftRequest(request: PackStudioPatchDraftRequest) {
         <div className="min-w-0">
           <div className="flex items-center gap-2 font-semibold">
             <Sparkles size={14} style={{ color: "var(--yunque-accent)" }} />
-            <span>Pack Studio Draft 请求</span>
+            <span>小羽改包请求</span>
           </div>
           <div className="mt-1 truncate" style={{ color: "var(--yunque-text-muted)" }}>
             {request.pack.name || request.pack.id} · {request.pack.version || "unknown"} · 让小羽生成单文件 Draft
@@ -482,7 +482,7 @@ function renderPackStudioDraftRequest(request: PackStudioPatchDraftRequest) {
         </div>
       )}
       <div className="mt-2 leading-5" style={{ color: "var(--yunque-text-muted)" }}>
-        这是一条生成请求，不是已应用改动。小羽应只返回 {request.expectedKind || "yunque.pack_studio.patch_draft.v1"}，用户再回到 Studio 导入、预览 diff、审计、重新打包。
+        这是一条生成请求，不是已应用改动。小羽应只返回改包草稿，用户再回到能力包工坊导入、预览差异、审计、重新打包。
       </div>
       {renderPackGovernanceLinks(request.pack, "查看能力包详情", "回中心定位")}
     </div>
