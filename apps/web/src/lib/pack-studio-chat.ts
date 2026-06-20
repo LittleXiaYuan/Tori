@@ -88,6 +88,11 @@ export type PackStudioBatchDraftRequest = {
     source: string;
     missing: string[];
     readiness: string;
+    priority?: {
+      level: string;
+      label: string;
+      reason: string;
+    };
     risk?: {
       level: string;
       label: string;
@@ -161,6 +166,16 @@ function riskSummary(value: unknown): PackStudioBatchDraftRequest["packs"][numbe
   const requiresAuthorization = record.requires_authorization === true || record.requiresAuthorization === true;
   if (!level && !label && !requiresAuthorization) return undefined;
   return { level, label, requiresAuthorization };
+}
+
+function prioritySummary(value: unknown): PackStudioBatchDraftRequest["packs"][number]["priority"] | undefined {
+  const record = asRecord(value);
+  if (!record) return undefined;
+  const level = stringValue(record.level);
+  const label = stringValue(record.label);
+  const reason = stringValue(record.reason);
+  if (!level && !label && !reason) return undefined;
+  return { level, label, reason };
 }
 
 function polishGuidance(value: unknown): PackStudioBatchDraftRequest["packs"][number]["polishGuidance"] | undefined {
@@ -357,6 +372,7 @@ export function parsePackStudioBatchDraftRequestPrompt(text?: string): PackStudi
         const pack = asRecord(item) || {};
         const delivery = deliverySummary(pack.delivery);
         const risk = riskSummary(pack.risk);
+        const priority = prioritySummary(pack.priority);
         const guidance = polishGuidance(pack.polish_guidance) || polishGuidance(pack.polishGuidance);
         return {
           id: stringValue(pack.id),
@@ -366,6 +382,7 @@ export function parsePackStudioBatchDraftRequestPrompt(text?: string): PackStudi
           source: stringValue(pack.source),
           missing: stringList(pack.missing),
           readiness: stringValue(pack.readiness),
+          ...(priority ? { priority } : {}),
           ...(risk ? { risk } : {}),
           permissionSummary: stringValue(pack.permission_summary) || stringValue(pack.permissionSummary),
           ...(delivery ? { delivery } : {}),

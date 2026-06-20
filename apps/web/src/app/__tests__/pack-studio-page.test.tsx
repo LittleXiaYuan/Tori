@@ -505,6 +505,11 @@ describe("PackStudioPage", () => {
           version: "0.1.0",
           status: "alpha",
           source: "官方源",
+          priority: {
+            level: "P0",
+            label: "P0 先补授权边界",
+            reason: "涉及高风险授权，但交付路径还不够清楚。",
+          },
           missing: ["使用示例", "用户感知位置"],
           readiness: "需补说明",
           risk: {
@@ -535,6 +540,11 @@ describe("PackStudioPage", () => {
           version: "0.1.0",
           status: "beta",
           source: "已安装",
+          priority: {
+            level: "P1",
+            label: "P1 补用户理解",
+            reason: "用户还缺少场景、示例或结果位置来判断价值。",
+          },
           missing: ["用户感知位置"],
           readiness: "需补说明",
           studio_url: "/packs/studio?packId=yunque.pack.documents",
@@ -556,6 +566,9 @@ describe("PackStudioPage", () => {
     expect(screen.getByText("规则：不要自动应用改动。；回到能力包工坊预览差异 / 审计 / 重新打包。")).toBeInTheDocument();
     expect(screen.getByText("来自补肉队列第 2 / 5 批：本批 2 个，队列总计 26 个，每批最多 6 个。")).toBeInTheDocument();
     expect(screen.getByText("高风险/需授权：1")).toBeInTheDocument();
+    expect(screen.getByText("P0：1")).toBeInTheDocument();
+    expect(screen.getByText("P1：1")).toBeInTheDocument();
+    expect(screen.getByText("P2：0")).toBeInTheDocument();
     expect(screen.getByText("实验/计划：1")).toBeInTheDocument();
     expect(screen.getByText("待补肉：2")).toBeInTheDocument();
     expect(screen.getByText("缺说明/示例：2")).toBeInTheDocument();
@@ -566,6 +579,9 @@ describe("PackStudioPage", () => {
       expect(screen.getAllByText((_, element) => /批量进度：\s*1\s*\/\s*2/.test(element?.textContent || "")).length).toBeGreaterThan(0);
     });
     expect(screen.getByText("当前处理：WASM 能力包")).toBeInTheDocument();
+    expect(screen.getAllByText("P0 先补授权边界").length).toBeGreaterThan(0);
+    expect(screen.getByText("优先级：P0 先补授权边界。涉及高风险授权，但交付路径还不够清楚。")).toBeInTheDocument();
+    expect(screen.getByText("优先级：P1 补用户理解。用户还缺少场景、示例或结果位置来判断价值。")).toBeInTheDocument();
     expect(screen.getAllByText((_, element) => /本页状态：\s*本页已载入/.test(element?.textContent || "")).length).toBeGreaterThan(0);
     expect(screen.getByRole("link", { name: /跳到下一步/ })).toHaveAttribute("href", "#yqpack-check");
     expect(screen.getByText("补：使用示例")).toBeInTheDocument();

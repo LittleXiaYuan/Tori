@@ -118,6 +118,12 @@ function workflowStateColor(state: StudioWorkflowStep["state"]): "success" | "wa
   return "default";
 }
 
+function priorityColor(level?: string): "danger" | "warning" | "default" {
+  if (level === "P0") return "danger";
+  if (level === "P1") return "warning";
+  return "default";
+}
+
 function buildDeliverySummary(params: {
   manifest?: PackManifest;
   goal: string;
@@ -1121,6 +1127,9 @@ export default function PackStudioPage() {
   const batchSummary = useMemo(() => {
     const packs = importedBatchRequest?.packs || [];
     return {
+      p0: packs.filter((pack) => pack.priority?.level === "P0").length,
+      p1: packs.filter((pack) => pack.priority?.level === "P1").length,
+      p2: packs.filter((pack) => pack.priority?.level === "P2").length,
       highRisk: packs.filter((pack) => pack.risk?.level === "high" || pack.risk?.requiresAuthorization).length,
       planOnly: packs.filter((pack) => pack.delivery?.level === "plan_only").length,
       needsMeat: packs.filter((pack) => pack.delivery?.level === "needs_meat" || pack.missing.length > 0).length,
@@ -1706,7 +1715,16 @@ export default function PackStudioPage() {
                   来自补肉队列第 {importedBatchRequest.batch.page || 1} / {importedBatchRequest.batch.pageCount || 1} 批：本批 {importedBatchRequest.packs.length} 个，队列总计 {importedBatchRequest.batch.total} 个，每批最多 {importedBatchRequest.batch.pageSize || importedBatchRequest.packs.length} 个。
                 </div>
               ) : null}
-              <div className="grid gap-2 text-[11px] md:grid-cols-5">
+              <div className="grid gap-2 text-[11px] md:grid-cols-4 lg:grid-cols-8">
+                <div className="rounded px-2 py-2" style={{ background: "rgba(239,68,68,0.08)", color: batchSummary.p0 > 0 ? "var(--yunque-danger)" : "var(--yunque-text-muted)" }}>
+                  P0：{batchSummary.p0}
+                </div>
+                <div className="rounded px-2 py-2" style={{ background: "rgba(245,158,11,0.08)", color: batchSummary.p1 > 0 ? "var(--yunque-warning)" : "var(--yunque-text-muted)" }}>
+                  P1：{batchSummary.p1}
+                </div>
+                <div className="rounded px-2 py-2" style={{ background: "var(--yunque-bg-hover)", color: "var(--yunque-text-secondary)" }}>
+                  P2：{batchSummary.p2}
+                </div>
                 <div className="rounded px-2 py-2" style={{ background: "rgba(239,68,68,0.08)", color: batchSummary.highRisk > 0 ? "var(--yunque-warning)" : "var(--yunque-text-muted)" }}>
                   高风险/需授权：{batchSummary.highRisk}
                 </div>
@@ -1741,6 +1759,11 @@ export default function PackStudioPage() {
                   {batchActivePack?.delivery && (
                     <Chip size="sm" variant="soft">
                       交付：{batchActivePack.delivery.label || batchActivePack.delivery.level}
+                    </Chip>
+                  )}
+                  {batchActivePack?.priority && (
+                    <Chip size="sm" color={priorityColor(batchActivePack.priority.level)}>
+                      {batchActivePack.priority.label || batchActivePack.priority.level}
                     </Chip>
                   )}
                 </div>
@@ -1783,6 +1806,11 @@ export default function PackStudioPage() {
                         </div>
                         <div className="flex flex-wrap gap-1">
                           <Chip size="sm" color={active ? "success" : "default"}>{active ? batchActiveStage : "待载入"}</Chip>
+                          {pack.priority && (
+                            <Chip size="sm" color={priorityColor(pack.priority.level)}>
+                              {pack.priority.level || pack.priority.label}
+                            </Chip>
+                          )}
                           {pack.readiness && <Chip size="sm" color={pack.readiness.includes("入口") ? "danger" : "warning"}>{pack.readiness}</Chip>}
                           {pack.delivery && (
                             <Chip size="sm" variant="soft">
@@ -1800,6 +1828,12 @@ export default function PackStudioPage() {
                       {pack.permissionSummary && (
                         <div className="mt-2 rounded px-2 py-2 text-[11px] font-medium" style={{ background: "var(--yunque-bg-hover)", color: pack.risk?.requiresAuthorization ? "var(--yunque-warning)" : "var(--yunque-text-muted)" }}>
                           {pack.permissionSummary}
+                        </div>
+                      )}
+                      {pack.priority && (
+                        <div className="mt-2 rounded px-2 py-2 text-[11px] leading-5" style={{ background: "var(--yunque-bg-hover)", color: "var(--yunque-text-secondary)" }}>
+                          优先级：{pack.priority.label || pack.priority.level}
+                          {pack.priority.reason ? `。${pack.priority.reason}` : ""}
                         </div>
                       )}
                       {pack.delivery && (

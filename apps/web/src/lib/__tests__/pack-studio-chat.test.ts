@@ -188,6 +188,11 @@ describe("parsePackStudioBatchDraftRequestPrompt", () => {
             version: "0.1.0",
             status: "beta",
             source: "已安装",
+            priority: {
+              level: "P0",
+              label: "P0 先补可用路径",
+              reason: "缺后端能力声明或打开入口。",
+            },
             missing: ["使用示例", "打开/使用入口"],
             readiness: "需补入口",
             delivery: {
@@ -212,6 +217,11 @@ describe("parsePackStudioBatchDraftRequestPrompt", () => {
       id: "yunque.pack.needs-entry",
       name: "Needs Entry Pack",
       readiness: "需补入口",
+      priority: {
+        level: "P0",
+        label: "P0 先补可用路径",
+        reason: "缺后端能力声明或打开入口。",
+      },
       studioUrl: "/packs/studio?pack=yunque.pack.needs-entry",
       packageUrl: "https://example.com/yunque.pack.needs-entry.yqpack",
       delivery: {
