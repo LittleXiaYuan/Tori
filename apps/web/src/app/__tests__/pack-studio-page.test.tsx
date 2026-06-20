@@ -555,6 +555,11 @@ describe("PackStudioPage", () => {
     expect(screen.getByText("目标：批量把这些能力包补齐用途和入口。")).toBeInTheDocument();
     expect(screen.getByText("规则：不要自动应用改动。；回到能力包工坊预览差异 / 审计 / 重新打包。")).toBeInTheDocument();
     expect(screen.getByText("来自补肉队列第 2 / 5 批：本批 2 个，队列总计 26 个，每批最多 6 个。")).toBeInTheDocument();
+    expect(screen.getByText("高风险/需授权：1")).toBeInTheDocument();
+    expect(screen.getByText("实验/计划：1")).toBeInTheDocument();
+    expect(screen.getByText("待补肉：2")).toBeInTheDocument();
+    expect(screen.getByText("缺说明/示例：2")).toBeInTheDocument();
+    expect(screen.getByText("缺入口/后端：0")).toBeInTheDocument();
     expect(screen.getByText("批量处理进度")).toBeInTheDocument();
     expect(screen.getByText("逐包载入、逐包检查、逐包重打包；能力包工坊不会把批量任务自动应用到多个能力包。")).toBeInTheDocument();
     await waitFor(() => {

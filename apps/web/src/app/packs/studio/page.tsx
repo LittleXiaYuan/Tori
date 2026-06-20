@@ -1118,6 +1118,16 @@ export default function PackStudioPage() {
     if (inspectReport) return "只读已检查";
     return "本页已载入";
   }, [auditReport, batchActivePack, inspectReport, installedRepack, patchContent, patchReport, reinspectReport, repackReport, workspaceReport]);
+  const batchSummary = useMemo(() => {
+    const packs = importedBatchRequest?.packs || [];
+    return {
+      highRisk: packs.filter((pack) => pack.risk?.level === "high" || pack.risk?.requiresAuthorization).length,
+      planOnly: packs.filter((pack) => pack.delivery?.level === "plan_only").length,
+      needsMeat: packs.filter((pack) => pack.delivery?.level === "needs_meat" || pack.missing.length > 0).length,
+      missingContext: packs.filter((pack) => pack.missing.some((gap) => /说明|示例|感知|用途|context/i.test(gap))).length,
+      missingEntry: packs.filter((pack) => pack.missing.some((gap) => /入口|后端|route|backend/i.test(gap))).length,
+    };
+  }, [importedBatchRequest]);
   const releaseChecklist = useMemo(() => [
     {
       label: "原包已只读检查",
@@ -1696,6 +1706,23 @@ export default function PackStudioPage() {
                   来自补肉队列第 {importedBatchRequest.batch.page || 1} / {importedBatchRequest.batch.pageCount || 1} 批：本批 {importedBatchRequest.packs.length} 个，队列总计 {importedBatchRequest.batch.total} 个，每批最多 {importedBatchRequest.batch.pageSize || importedBatchRequest.packs.length} 个。
                 </div>
               ) : null}
+              <div className="grid gap-2 text-[11px] md:grid-cols-5">
+                <div className="rounded px-2 py-2" style={{ background: "rgba(239,68,68,0.08)", color: batchSummary.highRisk > 0 ? "var(--yunque-warning)" : "var(--yunque-text-muted)" }}>
+                  高风险/需授权：{batchSummary.highRisk}
+                </div>
+                <div className="rounded px-2 py-2" style={{ background: "rgba(245,158,11,0.08)", color: "var(--yunque-text-secondary)" }}>
+                  实验/计划：{batchSummary.planOnly}
+                </div>
+                <div className="rounded px-2 py-2" style={{ background: "rgba(245,158,11,0.08)", color: "var(--yunque-text-secondary)" }}>
+                  待补肉：{batchSummary.needsMeat}
+                </div>
+                <div className="rounded px-2 py-2" style={{ background: "var(--yunque-bg-hover)", color: "var(--yunque-text-secondary)" }}>
+                  缺说明/示例：{batchSummary.missingContext}
+                </div>
+                <div className="rounded px-2 py-2" style={{ background: "var(--yunque-bg-hover)", color: "var(--yunque-text-secondary)" }}>
+                  缺入口/后端：{batchSummary.missingEntry}
+                </div>
+              </div>
               <div className="rounded-md border p-3" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-bg-hover)" }}>
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
