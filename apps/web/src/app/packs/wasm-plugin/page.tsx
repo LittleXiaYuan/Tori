@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   Button,
   Card,
@@ -13,6 +14,7 @@ import {
 import {
   AlertTriangle,
   CheckCircle2,
+  ClipboardList,
   Cpu,
   Download,
   FileCode2,
@@ -21,11 +23,13 @@ import {
   Play,
   Power,
   RefreshCw,
+  Send,
   ShieldCheck,
 } from "lucide-react";
 import PageHeader from "@/components/page-header";
 import { showToast } from "@/components/toast-provider";
 import { formatErrorMessage } from "@/lib/error-utils";
+import { chatPromptHref } from "@/lib/pack-action-links";
 import {
   createWASMPluginClient as createWASMPluginPackClient,
   type WASMPluginExecuteResult,
@@ -79,6 +83,25 @@ const boundaryItems = [
   "不会把未验签包解包到 plugin_dir。",
   "不会在 Host ABI 强执行未就绪时放开特权函数。",
   "不会把实验链路包装成稳定第三方插件市场。",
+];
+
+const workflowLoopItems = [
+  {
+    title: "1. 检查接入条件",
+    body: "先用清单、签名、SHA-256、审批和 Host ABI gate 判断这个能力能不能安全进入云雀。",
+  },
+  {
+    title: "2. 带回 Chat",
+    body: "把检查结果交给云雀解释，拆出需要修的权限、签名、入口或 WASM 模块问题。",
+  },
+  {
+    title: "3. 看证据位置",
+    body: "远程安装计划、写回记录和证据包是验收材料，不等于已经安装或执行。",
+  },
+  {
+    title: "4. 继续交给小羽改",
+    body: "如果能力不完整，把缺口带进工坊，让小羽改 yqpack 后再验收、打包和回滚。",
+  },
 ];
 
 function sampleManifest(slug: string) {
@@ -807,6 +830,78 @@ export default function WASMPluginPackPage() {
               ))}
             </div>
           </div>
+        </div>
+      </Card>
+
+      <Card className="section-card p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div
+              className="text-sm font-semibold"
+              style={{ color: "var(--yunque-text)" }}
+            >
+              从 WASM 验收到可用能力
+            </div>
+            <div
+              className="mt-1 text-xs leading-5"
+              style={{ color: "var(--yunque-text-muted)" }}
+            >
+              WASM 能力包的价值不是让用户读一堆技术 gate，而是把第三方能力先验收、留证据，再交给 Chat、任务中心和小羽逐步补成可用能力。
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href={chatPromptHref(
+                "请检查 WASM 能力包当前的清单、签名、权限、Host ABI 和 dry-run 结果，指出能安全接入的部分、仍被阻断的原因，并把下一步拆成任务。",
+              )}
+            >
+              <Button size="sm" className="btn-accent">
+                <Send size={13} /> 带回 Chat
+              </Button>
+            </Link>
+            <Link href="/missions">
+              <Button size="sm" variant="outline">
+                <ClipboardList size={13} /> 看任务
+              </Button>
+            </Link>
+          </div>
+        </div>
+        <div className="mt-3 grid gap-2 md:grid-cols-4">
+          {workflowLoopItems.map((item) => (
+            <div
+              key={item.title}
+              className="rounded-md border p-3"
+              style={{
+                borderColor: "var(--yunque-border)",
+                background: "var(--yunque-surface)",
+              }}
+            >
+              <div
+                className="text-xs font-medium"
+                style={{ color: "var(--yunque-text)" }}
+              >
+                {item.title}
+              </div>
+              <div
+                className="mt-2 text-[11px] leading-5"
+                style={{ color: "var(--yunque-text-muted)" }}
+              >
+                {item.body}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2 text-xs">
+          <Link href="/trace">
+            <Button size="sm" variant="ghost">
+              核对执行轨迹
+            </Button>
+          </Link>
+          <Link href="/packs/studio?packId=yunque.pack.wasm-plugin">
+            <Button size="sm" variant="ghost">
+              让小羽继续改
+            </Button>
+          </Link>
         </div>
       </Card>
 

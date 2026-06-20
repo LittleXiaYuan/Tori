@@ -2,6 +2,21 @@ import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import WASMPluginPackPage from "../packs/wasm-plugin/page";
 
+vi.mock("next/link", () => ({
+  default: ({
+    href,
+    children,
+    ...props
+  }: {
+    href: string;
+    children: React.ReactNode;
+  }) => (
+    <a href={href} {...props}>
+      {children}
+    </a>
+  ),
+}));
+
 const wasmClientMock = vi.hoisted(() => ({
   status: vi.fn(),
   plugins: vi.fn(),
@@ -86,5 +101,29 @@ describe("WASMPluginPackPage", () => {
     expect(screen.getByText("不会把未验签包解包到 plugin_dir。")).toBeInTheDocument();
     expect(screen.getByText("技术状态")).toBeInTheDocument();
     expect(screen.getByText("查看技术链路详情")).toBeInTheDocument();
+  });
+
+  it("connects WASM validation back to Chat, tasks, trace and Pack Studio", async () => {
+    render(<WASMPluginPackPage />);
+
+    expect(await screen.findByText("从 WASM 验收到可用能力")).toBeInTheDocument();
+    expect(screen.getByText("2. 带回 Chat")).toBeInTheDocument();
+    expect(screen.getByText("4. 继续交给小羽改")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /带回 Chat/ })).toHaveAttribute(
+      "href",
+      expect.stringContaining("/chat?q="),
+    );
+    expect(screen.getByRole("link", { name: /看任务/ })).toHaveAttribute(
+      "href",
+      "/missions",
+    );
+    expect(screen.getByRole("link", { name: "核对执行轨迹" })).toHaveAttribute(
+      "href",
+      "/trace",
+    );
+    expect(screen.getByRole("link", { name: "让小羽继续改" })).toHaveAttribute(
+      "href",
+      "/packs/studio?packId=yunque.pack.wasm-plugin",
+    );
   });
 });

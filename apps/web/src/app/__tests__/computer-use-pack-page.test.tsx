@@ -2,6 +2,21 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ComputerUsePackPage from "../packs/computer-use/page";
 
+vi.mock("next/link", () => ({
+  default: ({
+    href,
+    children,
+    ...props
+  }: {
+    href: string;
+    children: React.ReactNode;
+  }) => (
+    <a href={href} {...props}>
+      {children}
+    </a>
+  ),
+}));
+
 const fetchMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/sdk-client", () => ({
@@ -94,6 +109,30 @@ describe("ComputerUsePackPage", () => {
     expect(screen.getByText("Beta 关闭")).toBeInTheDocument();
   });
 
+  it("connects computer use plans back to Chat, tasks, trace and Pack Studio", async () => {
+    render(<ComputerUsePackPage />);
+
+    expect(await screen.findByText("从电脑使用计划到可验证任务")).toBeInTheDocument();
+    expect(screen.getByText("2. 带回 Chat")).toBeInTheDocument();
+    expect(screen.getByText("4. 继续交给小羽改")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /带回 Chat/ })).toHaveAttribute(
+      "href",
+      expect.stringContaining("/chat?q="),
+    );
+    expect(screen.getByRole("link", { name: /看任务/ })).toHaveAttribute(
+      "href",
+      "/missions",
+    );
+    expect(screen.getByRole("link", { name: "核对执行轨迹" })).toHaveAttribute(
+      "href",
+      "/trace",
+    );
+    expect(screen.getByRole("link", { name: "让小羽继续改" })).toHaveAttribute(
+      "href",
+      "/packs/studio?packId=yunque.pack.computer-use",
+    );
+  });
+
   it("captures browser screenshot as read-only evidence", async () => {
     render(<ComputerUsePackPage />);
     await screen.findByText("浏览器截图证据");
@@ -105,7 +144,7 @@ describe("ComputerUsePackPage", () => {
       expect.any(Object),
     ));
     expect(await screen.findByAltText("浏览器截图证据")).toBeInTheDocument();
-    expect(screen.getByText(/只读证据/)).toBeInTheDocument();
+    expect(screen.getByText(/2026-06-19T00:00:00Z · 只读证据/)).toBeInTheDocument();
   });
 
   it("renders generated plans as non-executing review output", async () => {

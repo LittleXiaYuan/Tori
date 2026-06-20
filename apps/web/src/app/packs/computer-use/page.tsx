@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Button, Card, Chip, Input, Label, Spinner, TextArea, TextField } from "@heroui/react";
-import { Camera, MonitorCog, Play, RotateCcw, ShieldAlert, ShieldCheck } from "lucide-react";
+import { Camera, ClipboardList, MonitorCog, Play, RotateCcw, Send, ShieldAlert, ShieldCheck } from "lucide-react";
 import PageHeader from "@/components/page-header";
 import { showToast } from "@/components/toast-provider";
 import { createYunqueSDKClientOptions } from "@/lib/sdk-client";
 import { formatErrorMessage } from "@/lib/error-utils";
+import { chatPromptHref } from "@/lib/pack-action-links";
 
 const sdkOptions = createYunqueSDKClientOptions();
 
@@ -72,6 +74,25 @@ const surfaceCards: Array<{
     desc: "本机鼠标、键盘、命令和文件写入仍关闭，后续必须经过授权和审批。",
     readyLabel: "已开放",
     unavailableLabel: "Beta 关闭",
+  },
+];
+
+const workflowLoopItems = [
+  {
+    title: "1. 生成计划",
+    body: "把目标拆成界面、只读证据、权限和阻塞原因，先让用户看懂它准备怎么做。",
+  },
+  {
+    title: "2. 带回 Chat",
+    body: "让云雀解释计划、补充缺失信息，或把可执行部分拆成需要人工确认的任务。",
+  },
+  {
+    title: "3. 核对证据",
+    body: "浏览器截图和计划结果只作为证据，不代表云雀已经控制了电脑。",
+  },
+  {
+    title: "4. 继续交给小羽改",
+    body: "如果用户需要云桌面、审批或站点适配，把缺口带进工坊继续补能力。",
   },
 ];
 
@@ -193,6 +214,43 @@ export default function ComputerUsePackPage() {
               <div>原因：执行器、权限策略和人工审批运行时还没有开放。</div>
             </div>
           </div>
+        </div>
+      </Card>
+
+      <Card className="section-card p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
+              从电脑使用计划到可验证任务
+            </div>
+            <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
+              Computer Use 现在先帮你把“让云雀操作电脑”的目标变成可审阅计划和只读证据，再交给 Chat、任务中心和小羽决定下一步，而不是直接接管本机。
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link href={chatPromptHref("请检查 Computer Use 当前生成的计划和浏览器截图证据，指出哪些步骤可以安全推进、哪些需要人工确认，并把下一步拆成任务。")}>
+              <Button size="sm" className="btn-accent">
+                <Send size={13} /> 带回 Chat
+              </Button>
+            </Link>
+            <Link href="/missions">
+              <Button size="sm" variant="outline">
+                <ClipboardList size={13} /> 看任务
+              </Button>
+            </Link>
+          </div>
+        </div>
+        <div className="mt-3 grid gap-2 md:grid-cols-4">
+          {workflowLoopItems.map((item) => (
+            <div key={item.title} className="rounded-md border p-3" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-surface)" }}>
+              <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>{item.title}</div>
+              <div className="mt-2 text-[11px] leading-5" style={{ color: "var(--yunque-text-muted)" }}>{item.body}</div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2 text-xs">
+          <Link href="/trace"><Button size="sm" variant="ghost">核对执行轨迹</Button></Link>
+          <Link href="/packs/studio?packId=yunque.pack.computer-use"><Button size="sm" variant="ghost">让小羽继续改</Button></Link>
         </div>
       </Card>
 
