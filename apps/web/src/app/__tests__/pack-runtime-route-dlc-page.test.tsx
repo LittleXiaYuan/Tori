@@ -85,6 +85,12 @@ describe("PackRuntimeRouteClientPage DLC route", () => {
     expect(studioLink).toHaveAttribute("href", expect.stringContaining("/packs/studio?packId=yunque.pack.dlc-demo"));
     expect(decodeURIComponent(studioLink.getAttribute("href") || "")).toContain("优先补齐 使用示例、用户感知位置");
     expect(screen.getByText("从当前入口继续改包")).toBeInTheDocument();
+    expect(screen.getByText("启用前边界")).toBeInTheDocument();
+    expect(screen.getByText("它会获得")).toBeInTheDocument();
+    expect(screen.getByText("它不会做")).toBeInTheDocument();
+    expect(screen.getByText(/独立界面拿不到云雀 token/)).toBeInTheDocument();
+    expect(screen.getByText("怎么验收")).toBeInTheDocument();
+    expect(screen.getByText("不合适时")).toBeInTheDocument();
     expect(screen.getByText(/你现在打开的是/)).toBeInTheDocument();
     expect(screen.getAllByText("/packs/dlc-demo").length).toBeGreaterThan(0);
     expect(screen.getByText("先触发一次")).toBeInTheDocument();

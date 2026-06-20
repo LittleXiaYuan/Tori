@@ -36,6 +36,7 @@ import {
 import { createYunqueSDKClientOptions } from "@/lib/sdk-client";
 import { formatErrorMessage } from "@/lib/error-utils";
 import {
+  packBoundarySummary,
   capabilitySurfaceLabels,
   entryInstallRequest,
   formatPackInstallError,
@@ -310,6 +311,7 @@ export default function PackDetailClientPage() {
   const surfaceLabels = capabilitySurfaceLabels(manifest);
   const usageExplanation = packUsageExplanation(manifest);
   const verificationSteps = packVerificationSteps(manifest);
+  const boundarySummary = packBoundarySummary(manifest);
   const usability = packUsability(manifest);
   const readiness = packReadiness(manifest);
   const delivery = packDeliveryProfile(manifest);
@@ -711,6 +713,34 @@ export default function PackDetailClientPage() {
                 回中心看队列 <ArrowRight size={14} />
               </Button>
             </Link>
+          </div>
+        </Card>
+
+        <Card className="section-card p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <ShieldCheck size={16} style={{ color: "var(--yunque-primary)" }} />
+            <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
+              启用前边界
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {boundarySummary.map((item) => (
+              <div
+                key={item.key}
+                className="rounded-md border p-3"
+                style={{
+                  borderColor: item.tone === "danger" ? "rgba(239,68,68,0.24)" : item.tone === "warning" ? "rgba(245,158,11,0.24)" : "var(--yunque-border)",
+                  background: item.tone === "danger" ? "rgba(239,68,68,0.07)" : item.tone === "warning" ? "rgba(245,158,11,0.08)" : "var(--yunque-bg-hover)",
+                }}
+              >
+                <div className="text-xs font-semibold" style={{ color: item.tone === "danger" ? "var(--yunque-danger)" : item.tone === "warning" ? "var(--yunque-warning)" : "var(--yunque-text)" }}>
+                  {item.label}
+                </div>
+                <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
+                  {item.detail}
+                </div>
+              </div>
+            ))}
           </div>
         </Card>
 

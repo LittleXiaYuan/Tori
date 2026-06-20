@@ -12,7 +12,7 @@ import { buildPackSdkEntrypoints, fetchEnabledPacks, findPackRouteBinding, forma
 import { PackDlcHost } from "@/lib/pack-dlc-host";
 import { eventPathsFromPermissions } from "@/lib/pack-bridge";
 import { chatPromptHref } from "@/lib/pack-action-links";
-import { packDeliveryProfile, packExamples, packFeatureFlags, packReadiness, packUsability, packVerificationSteps, riskProfileForPack } from "@/lib/pack-presentation";
+import { packBoundarySummary, packDeliveryProfile, packExamples, packFeatureFlags, packReadiness, packUsability, packVerificationSteps, riskProfileForPack } from "@/lib/pack-presentation";
 
 const dlcBoundaryItems = [
   "独立界面拿不到云雀本地登录态或宿主 token。",
@@ -109,6 +109,7 @@ export default function PackRuntimeRouteClientPage() {
   const flags = packFeatureFlags(manifest);
   const examples = packExamples(manifest, 3);
   const verificationSteps = packVerificationSteps(manifest);
+  const boundarySummary = packBoundarySummary(manifest);
   const usagePrompt = [
     `我正在使用云雀能力包：${manifest.name} (${manifest.id})。`,
     `请告诉我它现在能帮我做什么、适合放在哪个工作流里、我可以怎么下第一条指令。`,
@@ -206,6 +207,31 @@ export default function PackRuntimeRouteClientPage() {
               </Button>
             </Link>
           </div>
+        </div>
+      </Card>
+
+      <Card className="section-card p-5">
+        <div className="mb-3 flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
+          <ShieldCheck size={15} style={{ color: "var(--yunque-primary)" }} />
+          启用前边界
+        </div>
+        <div className="grid gap-3 md:grid-cols-2">
+          {boundarySummary.map((item) => (
+            <div
+              key={item.key}
+              className="rounded-lg border px-3 py-2 text-xs leading-5"
+              style={{
+                borderColor: item.tone === "danger" ? "rgba(239,68,68,0.24)" : item.tone === "warning" ? "rgba(245,158,11,0.24)" : "var(--yunque-border)",
+                background: item.tone === "danger" ? "rgba(239,68,68,0.07)" : item.tone === "warning" ? "rgba(245,158,11,0.08)" : "var(--yunque-bg-hover)",
+                color: "var(--yunque-text-secondary)",
+              }}
+            >
+              <div className="mb-1 font-semibold" style={{ color: item.tone === "danger" ? "var(--yunque-danger)" : item.tone === "warning" ? "var(--yunque-warning)" : "var(--yunque-text)" }}>
+                {item.label}
+              </div>
+              {item.detail}
+            </div>
+          ))}
         </div>
       </Card>
 

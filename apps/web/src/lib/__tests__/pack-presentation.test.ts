@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { PackManifest } from "yunque-client/packs";
 import {
+  packBoundarySummary,
   capabilitySurfaceLabels,
   catalogActionForEntry,
   entryInstallRequest,
@@ -393,5 +394,62 @@ describe("pack-presentation", () => {
     expect(packVerificationSteps(support)[1].detail).toContain("任务中心与 Chat 任务进度");
     expect(packVerificationSteps(planOnly)[1].detail).toContain("实验/计划能力");
     expect(packVerificationSteps(planOnly)[2].detail).toContain("当前只生成电脑使用计划");
+  });
+
+  it("builds explicit boundary summaries for high-risk and sandboxed packs", () => {
+    const computerUse: PackManifest = {
+      id: "yunque.pack.computer-use",
+      name: "Computer Use",
+      version: "0.1.0",
+      status: "alpha",
+      metadata: {
+        primaryActionPath: "/packs/computer-use",
+        usageSurface: "电脑使用页和 Chat 电脑使用计划",
+        example1: "把目标转成需审批的电脑使用计划。",
+        limitation: "当前只生成电脑使用计划，不执行本机桌面控制。",
+      },
+      backend: {
+        permissions: ["computer:control", "browser:read", "sandbox:desktop"],
+        capabilities: ["computer.intent.plan"],
+      },
+      update: { rollback: true },
+    };
+    const wasm: PackManifest = {
+      id: "yunque.pack.wasm-plugin",
+      name: "WASM Plugin",
+      version: "0.1.0",
+      status: "alpha",
+      metadata: {
+        primaryActionPath: "/packs/wasm-plugin",
+        usageSurface: "WASM 插件页、远程安装审批与证据导出",
+        example1: "生成远程安装审批计划。",
+        limitation: "当前远程安装和真实运行时 host 仍受严格门禁。",
+      },
+      backend: {
+        permissions: ["wasm:execute", "wasm:write"],
+        capabilities: ["wasm.remote_install.plan"],
+      },
+    };
+    const dlc: PackManifest = {
+      id: "yunque.pack.dlc-demo",
+      name: "DLC Demo",
+      version: "0.1.0",
+      status: "alpha",
+      metadata: {
+        primaryActionPath: "/packs/dlc-demo",
+        usageSurface: "DLC 演示页和 iframe 沙箱界面",
+        example1: "通过 postMessage 桥调用白名单路由。",
+      },
+      frontend: {
+        routes: [{ path: "/packs/dlc-demo", component: "PackDlcHost" }],
+        assets: { type: "iframe-bundle", entry: "index.html" },
+      },
+      backend: { permissions: ["dlc:demo"], capabilities: ["dlc.demo.ping"] },
+    };
+
+    expect(packBoundarySummary(computerUse).find((item) => item.key === "doesNot")?.detail).toContain("不会执行本机桌面控制");
+    expect(packBoundarySummary(computerUse).find((item) => item.key === "rollback")?.detail).toContain("回滚");
+    expect(packBoundarySummary(wasm).find((item) => item.key === "doesNot")?.detail).toContain("不会跳过审批直接写入或运行未知模块");
+    expect(packBoundarySummary(dlc).find((item) => item.key === "doesNot")?.detail).toContain("拿不到云雀 token");
   });
 });

@@ -81,6 +81,13 @@ export type PackVerificationStep = {
   href?: string;
 };
 
+export type PackBoundarySummaryItem = {
+  key: "gets" | "doesNot" | "verify" | "rollback";
+  label: string;
+  detail: string;
+  tone: "safe" | "warning" | "danger";
+};
+
 type EntryLike = {
   manifest: PackManifest;
   package_url?: string;
@@ -556,6 +563,60 @@ export function packVerificationSteps(manifest: PackManifest): PackVerificationS
       key: "decide",
       label: "决定留下还是改",
       detail: decideDetail,
+    },
+  ];
+}
+
+export function packBoundarySummary(manifest: PackManifest): PackBoundarySummaryItem[] {
+  const risk = riskProfileForPack(manifest);
+  const flags = packFeatureFlags(manifest);
+  const usability = packUsability(manifest);
+  const groups = groupPackPermissions(manifest.backend?.permissions || []);
+  const verification = packVerificationSteps(manifest);
+  const permissionLabels = groups.length > 0
+    ? groups.map((group) => group.label).join("、")
+    : "已声明入口和说明，不额外申请高风险权限";
+  const limitation = usability.limitation || manifest.metadata?.limitation;
+
+  let doesNot = "不会绕过权限声明，不会自动泄露 API Key，也不能调用未声明的后端路由。";
+  if (manifest.id === "yunque.pack.computer-use") {
+    doesNot = "当前不会执行本机桌面控制、键鼠输入或云桌面动作，只生成计划、门禁和只读证据。";
+  } else if (manifest.id === "yunque.pack.wasm-plugin") {
+    doesNot = "远程安装、签名校验、包检查、注册和 host 执行都受门禁约束，不会跳过审批直接写入或运行未知模块。";
+  } else if (flags.isIframeBundle) {
+    doesNot = "独立界面拿不到云雀 token、本机桌面能力或未声明后端路由；越权 bridge call 会被拒绝。";
+  } else if (limitation) {
+    doesNot = `不会超出当前限制：${limitation}`;
+  }
+
+  return [
+    {
+      key: "gets",
+      label: "它会获得",
+      detail: risk.requiresAuthorization
+        ? `${permissionLabels}；启用不等于自动执行，高风险动作仍要看具体授权。`
+        : `${permissionLabels}；启用后按能力声明出现在对应入口或主路径。`,
+      tone: risk.requiresAuthorization ? "danger" : groups.length > 0 ? "warning" : "safe",
+    },
+    {
+      key: "doesNot",
+      label: "它不会做",
+      detail: doesNot,
+      tone: risk.requiresAuthorization || flags.hasWasm || flags.isIframeBundle ? "warning" : "safe",
+    },
+    {
+      key: "verify",
+      label: "怎么验收",
+      detail: verification.map((step) => `${step.label}：${step.detail}`).join(" "),
+      tone: usability.kind === "experimental" ? "warning" : "safe",
+    },
+    {
+      key: "rollback",
+      label: "不合适时",
+      detail: flags.canRollback
+        ? "可以先禁用；若版本回滚已声明，也可以从详情页或中心走回滚路径复验。"
+        : "可以先禁用并回中心确认状态；这个包暂未声明版本回滚。",
+      tone: flags.canRollback ? "safe" : "warning",
     },
   ];
 }
