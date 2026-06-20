@@ -38,6 +38,25 @@ const boundaryItems = [
   "如果相关能力包停用，这里只显示已有记录或空态引导。",
 ];
 
+const workflowLoopItems = [
+  {
+    title: "1. 选一条线索",
+    body: "从好奇心、反思或夜游里挑一个值得继续的问题，不把它当结论。",
+  },
+  {
+    title: "2. 带回 Chat",
+    body: "让云雀把线索拆成任务、调研问题或知识整理请求。",
+  },
+  {
+    title: "3. 看结果位置",
+    body: "任务进度在任务中心，确认后的事实再沉淀到记忆或知识。",
+  },
+  {
+    title: "4. 继续补能力",
+    body: "如果这个包还不够好，回工坊让小羽基于真实体验继续改。",
+  },
+];
+
 function formatTimestamp(iso: string): string {
   if (!iso) return "—";
   try {
@@ -354,6 +373,42 @@ export default function InnerLifePackPage() {
               </div>
             </div>
           </div>
+        </div>
+      </Card>
+
+      <Card className="section-card p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>从线索到行动的闭环</div>
+            <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
+              内在生活的价值不在于“看见内部状态”，而在于把线索变成下一次对话、任务、记忆或知识。
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link href={chatPromptHref("请从内在生活里挑一条最值得继续的线索，帮我拆成一个可执行任务，并说明结果应该沉淀到记忆还是知识库。")}>
+              <Button size="sm" className="btn-accent">
+                <Send size={13} /> 带回 Chat
+              </Button>
+            </Link>
+            <Link href="/missions">
+              <Button size="sm" variant="outline">
+                <ClipboardList size={13} /> 看任务
+              </Button>
+            </Link>
+          </div>
+        </div>
+        <div className="mt-3 grid gap-2 md:grid-cols-4">
+          {workflowLoopItems.map((item) => (
+            <div key={item.title} className="rounded-md border p-3" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-surface)" }}>
+              <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>{item.title}</div>
+              <div className="mt-2 text-[11px] leading-5" style={{ color: "var(--yunque-text-muted)" }}>{item.body}</div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2 text-xs">
+          <Link href="/memory"><Button size="sm" variant="ghost">沉淀到记忆</Button></Link>
+          <Link href="/knowledge"><Button size="sm" variant="ghost">沉淀到知识</Button></Link>
+          <Link href="/packs/studio?packId=yunque.pack.inner-life"><Button size="sm" variant="ghost">让小羽继续改</Button></Link>
         </div>
       </Card>
 

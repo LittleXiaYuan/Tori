@@ -38,6 +38,25 @@ const boundaryItems = [
   "不会替代你对经验是否有用的判断。",
 ];
 
+const workflowLoopItems = [
+  {
+    title: "1. 找到经验",
+    body: "先看梦境、规则或失败模式，确认它来自哪类已完成任务。",
+  },
+  {
+    title: "2. 应用到下一次",
+    body: "把经验带回 Chat，让云雀按它改写计划或补充检查项。",
+  },
+  {
+    title: "3. 验证结果",
+    body: "在任务中心看新任务是否真的少犯同类错误。",
+  },
+  {
+    title: "4. 修正画像",
+    body: "如果画像不准，把反馈写回记忆或继续交给小羽优化页面说明。",
+  },
+];
+
 function applyDistillPrompt(entry: DistillEntry): string {
   return [
     "请把这条夜校蒸馏出的经验应用到我接下来的任务里，并告诉我应该怎么改进工作方式：",
@@ -342,6 +361,42 @@ export default function NightSchoolPackPage() {
 
       <Card className="section-card p-4 text-sm" style={{ color: "var(--yunque-text-muted)" }}>
         Agent 会在夜间复盘：从已完成任务中蒸馏可复用的规则与模式，并通过对话学习关于你的偏好画像。
+      </Card>
+
+      <Card className="section-card p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>从夜间复盘到下一次任务</div>
+            <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
+              夜校不是后台故事板；它应该把已完成任务里的经验变成下一次任务的检查清单。
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link href={chatPromptHref("请从夜校里挑一条最有价值的经验，应用到我接下来的任务计划里，并列出需要验证的检查项。")}>
+              <Button size="sm" className="btn-accent">
+                <Send size={13} /> 带回 Chat
+              </Button>
+            </Link>
+            <Link href="/missions">
+              <Button size="sm" variant="outline">
+                <ClipboardList size={13} /> 看任务
+              </Button>
+            </Link>
+          </div>
+        </div>
+        <div className="mt-3 grid gap-2 md:grid-cols-4">
+          {workflowLoopItems.map((item) => (
+            <div key={item.title} className="rounded-md border p-3" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-surface)" }}>
+              <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>{item.title}</div>
+              <div className="mt-2 text-[11px] leading-5" style={{ color: "var(--yunque-text-muted)" }}>{item.body}</div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2 text-xs">
+          <Link href="/memory"><Button size="sm" variant="ghost">修正记忆画像</Button></Link>
+          <Link href="/trace"><Button size="sm" variant="ghost">查看执行轨迹</Button></Link>
+          <Link href="/packs/studio?packId=yunque.pack.night-school"><Button size="sm" variant="ghost">让小羽继续改</Button></Link>
+        </div>
       </Card>
 
       {error ? (

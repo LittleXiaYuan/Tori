@@ -61,6 +61,14 @@ describe("InnerLifePackPage", () => {
     expect(screen.getByText("夜游记录")).toBeInTheDocument();
     expect(screen.getByText("当前边界")).toBeInTheDocument();
     expect(screen.getByText("不会替你自动执行任务、发送消息或修改文件；它只整理可继续处理的线索。")).toBeInTheDocument();
+    expect(screen.getByText("从线索到行动的闭环")).toBeInTheDocument();
+    expect(screen.getByText("2. 带回 Chat")).toBeInTheDocument();
+    expect(screen.getByText("3. 看结果位置")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /带回 Chat/ })).toHaveAttribute("href", expect.stringContaining("/chat?q="));
+    expect(screen.getByRole("link", { name: /看任务/ })).toHaveAttribute("href", "/missions");
+    expect(screen.getByRole("link", { name: "沉淀到记忆" })).toHaveAttribute("href", "/memory");
+    expect(screen.getByRole("link", { name: "沉淀到知识" })).toHaveAttribute("href", "/knowledge");
+    expect(screen.getByRole("link", { name: "让小羽继续改" })).toHaveAttribute("href", "/packs/studio?packId=yunque.pack.inner-life");
   });
 
   it("keeps curiosity items connected to a concrete chat action", async () => {

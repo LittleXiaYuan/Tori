@@ -46,5 +46,13 @@ describe("ExperiencePackPage", () => {
     expect(screen.getByText("当前不会做什么")).toBeInTheDocument();
     expect(screen.getByText("不会替你自动修改偏好画像。")).toBeInTheDocument();
     expect(screen.getByText("不会把低置信度推荐当成必须执行的决定。")).toBeInTheDocument();
+    expect(screen.getByText("从经验到下一次交付")).toBeInTheDocument();
+    expect(screen.getByText("2. 规划下一步")).toBeInTheDocument();
+    expect(screen.getByText("3. 验证偏好")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /带回 Chat/ })).toHaveAttribute("href", expect.stringContaining("/chat?q="));
+    expect(screen.getByRole("link", { name: /看任务/ })).toHaveAttribute("href", "/missions");
+    expect(screen.getByRole("link", { name: "查看记忆画像" })).toHaveAttribute("href", "/memory");
+    expect(screen.getByRole("link", { name: "核对执行轨迹" })).toHaveAttribute("href", "/trace");
+    expect(screen.getByRole("link", { name: "让小羽继续改" })).toHaveAttribute("href", "/packs/studio?packId=yunque.pack.experience");
   });
 });

@@ -38,6 +38,25 @@ const boundaryItems = [
   "不会隐藏任务自评中的失败原因。",
 ];
 
+const workflowLoopItems = [
+  {
+    title: "1. 看推荐",
+    body: "先确认云雀建议继续使用哪些能力，以及理由是否可信。",
+  },
+  {
+    title: "2. 规划下一步",
+    body: "把推荐或自评带回 Chat，生成下一次任务计划。",
+  },
+  {
+    title: "3. 验证偏好",
+    body: "在任务结果里确认偏好画像是否真的改善了输出。",
+  },
+  {
+    title: "4. 继续沉淀",
+    body: "把有效经验留在记忆里；不准的地方回到工坊补说明或入口。",
+  },
+];
+
 function useRecommendationPrompt(item: Recommendation): string {
   return [
     "请基于云雀当前推荐的能力，帮我设计下一步任务方案：",
@@ -354,6 +373,42 @@ export default function ExperiencePackPage() {
 
       <Card className="section-card p-4 text-sm" style={{ color: "var(--yunque-text-muted)" }}>
         Agent 会根据你的反馈累积经验：动态推荐最值得使用的技能、维护对你的偏好画像，并对每次任务做自我评分。
+      </Card>
+
+      <Card className="section-card p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>从经验到下一次交付</div>
+            <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
+              经验页不是分数墙；它要帮助你把推荐、偏好和自评变成下一次更稳的任务方案。
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link href={chatPromptHref("请根据经验页里的推荐、偏好和最近任务自评，帮我规划下一次任务，并说明哪些经验应该继续保留。")}>
+              <Button size="sm" className="btn-accent">
+                <Send size={13} /> 带回 Chat
+              </Button>
+            </Link>
+            <Link href="/missions">
+              <Button size="sm" variant="outline">
+                <ClipboardList size={13} /> 看任务
+              </Button>
+            </Link>
+          </div>
+        </div>
+        <div className="mt-3 grid gap-2 md:grid-cols-4">
+          {workflowLoopItems.map((item) => (
+            <div key={item.title} className="rounded-md border p-3" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-surface)" }}>
+              <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>{item.title}</div>
+              <div className="mt-2 text-[11px] leading-5" style={{ color: "var(--yunque-text-muted)" }}>{item.body}</div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2 text-xs">
+          <Link href="/memory"><Button size="sm" variant="ghost">查看记忆画像</Button></Link>
+          <Link href="/trace"><Button size="sm" variant="ghost">核对执行轨迹</Button></Link>
+          <Link href="/packs/studio?packId=yunque.pack.experience"><Button size="sm" variant="ghost">让小羽继续改</Button></Link>
+        </div>
       </Card>
 
       {error ? (
