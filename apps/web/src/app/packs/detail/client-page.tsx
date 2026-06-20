@@ -85,6 +85,12 @@ function deliveryToneStyle(tone: ReturnType<typeof packDeliveryProfile>["tone"])
   return { background: "rgba(239,68,68,0.10)", borderColor: "rgba(239,68,68,0.26)", color: "var(--yunque-danger)" };
 }
 
+function displayDeliveryLabel(label?: string, level?: string): string {
+  const value = label || level || "";
+  if (value === "待补肉" || value === "needs_meat") return "需打磨";
+  return value || "未知";
+}
+
 function formatTime(value?: string): string {
   if (!value) return "-";
   const d = new Date(value);
@@ -307,6 +313,7 @@ export default function PackDetailClientPage() {
   const usability = packUsability(manifest);
   const readiness = packReadiness(manifest);
   const delivery = packDeliveryProfile(manifest);
+  const deliveryLabel = displayDeliveryLabel(delivery.label, delivery.level);
   const deliveryStyle = deliveryToneStyle(delivery.tone);
   const openPath = usability.primaryActionPath || menus[0]?.path || routesFrontend[0]?.path;
   const installSource = installSourceForPack({ manifest, catalogEntry, releaseEntry });
@@ -320,7 +327,7 @@ export default function PackDetailClientPage() {
     "请用普通用户能理解的话告诉我：它能做什么、适合哪些任务、第一句话该怎么说、启用前要注意什么。",
     `能力包说明：${manifest.description || "暂无说明"}`,
     `可用性：${usability.label}；${usability.description}`,
-    `交付状态：${delivery.label}；${delivery.description}`,
+    `交付状态：${deliveryLabel}；${delivery.description}`,
     `建议下一步：${delivery.nextStep}`,
     readiness.missing.length > 0 ? `当前还缺：${readiness.missing.join("、")}` : "当前体检：说明基本完整",
     usability.limitation ? `当前限制：${usability.limitation}` : "",
@@ -372,7 +379,7 @@ export default function PackDetailClientPage() {
     return run("install", () =>
       packsClient.install(request), {
         title: "能力包已安装",
-        detail: "下一步先确认权限并启用；也可以回能力包中心聚焦这个包，查看入口、固定侧栏或继续交给小羽补肉。",
+        detail: "下一步先确认权限并启用；也可以回能力包中心聚焦这个包，查看入口、固定侧栏或继续交给小羽打磨。",
         href: packCenterFocusHref(manifest.id),
         actionLabel: "回中心管理",
         inlineActionLabel: "立即启用",
@@ -467,8 +474,8 @@ export default function PackDetailClientPage() {
           },
           {
             key: "improve",
-            label: "交给小羽补齐",
-            detail: "如果用户觉得它像空壳，可以让小羽只读检查 yqpack，再补用途、示例、权限边界和入口说明。",
+            label: "交给小羽打磨",
+            detail: "如果用户觉得它像空壳，可以让小羽只读检查 yqpack，再打磨用途、示例、权限边界和入口说明。",
             href: studioHref,
           },
         ];
@@ -499,7 +506,7 @@ export default function PackDetailClientPage() {
             </Chip>
           )}
           <Chip size="sm" style={{ background: deliveryStyle.background, color: deliveryStyle.color }}>
-            {delivery.label}
+            {deliveryLabel}
           </Chip>
           <Chip size="sm" variant="soft">v{manifest.version}</Chip>
           <Chip size="sm" style={{ background: "rgba(59,130,246,0.08)", color: "var(--yunque-primary)" }}>
@@ -637,7 +644,7 @@ export default function PackDetailClientPage() {
           </div>
           <div className="mt-3 rounded-md border p-3" style={{ borderColor: deliveryStyle.borderColor, background: deliveryStyle.background }}>
             <div className="mb-1 text-xs font-medium" style={{ color: deliveryStyle.color }}>
-              交付状态：{delivery.label}
+              交付状态：{deliveryLabel}
             </div>
             <div className="text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
               {delivery.description}
@@ -669,7 +676,7 @@ export default function PackDetailClientPage() {
             </Link>
             <Link href={studioHref}>
               <Button size="sm" variant="ghost">
-                <Sparkles size={14} /> 交给小羽补齐
+                <Sparkles size={14} /> 交给小羽打磨
               </Button>
             </Link>
           </div>
@@ -763,9 +770,9 @@ export default function PackDetailClientPage() {
           </div>
           {readiness.missing.length > 0 ? (
             <div className="mt-3 rounded-md p-3 text-xs" style={{ background: "rgba(245,158,11,0.08)", color: "var(--yunque-text-secondary)" }}>
-              <div>还缺：{readiness.missing.join("、")}。可以让小羽补齐用途、入口、示例或边界说明。</div>
+              <div>还缺：{readiness.missing.join("、")}。可以让小羽打磨用途、入口、示例或边界说明。</div>
               <Link href={studioHref} className="mt-2 inline-flex items-center gap-1 font-medium" style={{ color: "var(--yunque-accent)" }}>
-                交给小羽补齐 <Sparkles size={12} />
+                交给小羽打磨 <Sparkles size={12} />
               </Link>
             </div>
           ) : (

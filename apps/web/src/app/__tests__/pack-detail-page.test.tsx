@@ -93,8 +93,8 @@ describe("PackDetailClientPage", () => {
     expect(screen.getAllByText("回中心管理和固定").length).toBeGreaterThan(0);
     expect(screen.getByText(/如果用户觉得它像空壳/)).toBeInTheDocument();
     expect(screen.getByText("用户能拿它做什么")).toBeInTheDocument();
-    expect(screen.getAllByText("待补肉").length).toBeGreaterThan(0);
-    expect(screen.getByText(/交付状态：待补肉/)).toBeInTheDocument();
+    expect(screen.getAllByText("需打磨").length).toBeGreaterThan(0);
+    expect(screen.getByText(/交付状态：需打磨/)).toBeInTheDocument();
     expect(screen.getByText("能力包体检")).toBeInTheDocument();
     expect(screen.getByText(/还缺：使用示例/)).toBeInTheDocument();
     expect(screen.getByText("交接给小羽改包")).toBeInTheDocument();
@@ -119,10 +119,10 @@ describe("PackDetailClientPage", () => {
     const chatLink = screen.getByRole("link", { name: /问云雀怎么用/ });
     expect(chatLink).toHaveAttribute("href", expect.stringContaining("/chat?q="));
     expect(decodeURIComponent(chatLink.getAttribute("href") || "")).toContain("Needs Context Pack");
-    expect(decodeURIComponent(chatLink.getAttribute("href") || "")).toContain("交付状态：待补肉");
+    expect(decodeURIComponent(chatLink.getAttribute("href") || "")).toContain("交付状态：需打磨");
     expect(decodeURIComponent(chatLink.getAttribute("href") || "")).toContain("不要把实验能力说成稳定能力");
 
-    const studioLinks = screen.getAllByRole("link", { name: /交给小羽补齐/ });
+    const studioLinks = screen.getAllByRole("link", { name: /交给小羽打磨/ });
     expect(studioLinks.length).toBeGreaterThan(0);
     expect(studioLinks[0]).toHaveAttribute("href", expect.stringContaining("/packs/studio?packId=yunque.pack.needs-context"));
     expect(studioLinks[0]).toHaveAttribute("href", expect.stringContaining("goal="));
@@ -231,7 +231,7 @@ describe("PackDetailClientPage", () => {
     expect(sourceStudioLink).toHaveAttribute("href", expect.stringContaining("sha256=abc123"));
     expect(screen.getByRole("link", { name: /回能力包中心/ })).toHaveAttribute("href", "/packs?q=yunque.pack.needs-context");
 
-    const studioLinks = screen.getAllByRole("link", { name: /交给小羽补齐/ });
+    const studioLinks = screen.getAllByRole("link", { name: /交给小羽打磨/ });
     expect(studioLinks[0]).toHaveAttribute("href", expect.stringContaining("packageUrl=https%3A%2F%2Fexample.com%2Fneeds-context.yqpack"));
     expect(studioLinks[0]).toHaveAttribute("href", expect.stringContaining("sha256=abc123"));
     const handoffStudioLink = screen.getByRole("link", { name: /带上下文进入工坊/ });
@@ -252,7 +252,7 @@ describe("PackDetailClientPage", () => {
       expect(showToastMock).toHaveBeenCalledWith("能力包已安装", "success");
     });
     expect(await screen.findByText("能力包已安装")).toBeInTheDocument();
-    expect(screen.getByText("下一步先确认权限并启用；也可以回能力包中心聚焦这个包，查看入口、固定侧栏或继续交给小羽补肉。")).toBeInTheDocument();
+    expect(screen.getByText("下一步先确认权限并启用；也可以回能力包中心聚焦这个包，查看入口、固定侧栏或继续交给小羽打磨。")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /回中心管理/ })).toHaveAttribute("href", "/packs?q=yunque.pack.needs-context");
     expect(screen.getByRole("button", { name: /立即启用/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "启用" })).toBeInTheDocument();
