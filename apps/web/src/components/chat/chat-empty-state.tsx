@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { AlertTriangle } from "lucide-react";
-import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import type { ChatDispatch } from "@/lib/chat-state";
-import { CHAT_EMPTY_SCENARIOS } from "@/lib/product-scenarios";
+import { CHAT_AGENT_SCENES, CHAT_EMPTY_SCENARIOS, PRODUCT_SCENARIOS, type ProductScenario } from "@/lib/product-scenarios";
 
 interface StarterChip {
   label: string;
@@ -24,6 +23,7 @@ interface ChatEmptyStateProps {
 /** Scenario ids used as offline/fallback starter chips. Labels and prompts are
  *  localized at render via i18n so English users don't see Chinese chips. */
 const FALLBACK_SCENARIO_IDS = CHAT_EMPTY_SCENARIOS.map((s) => s.id);
+const SCENARIO_BY_ID = new Map(PRODUCT_SCENARIOS.map((s) => [s.id, s]));
 
 /** Aurora (northern-lights) brand mark — flat monoline curtains in a single
  *  accent color (no gradient), so it reads as a calm, friendly glyph. */
@@ -55,40 +55,20 @@ function useGreetingKey(): string {
 
 export function ChatEmptyState({ setupNeeded, chatD, inputRef, composer }: ChatEmptyStateProps) {
   const { t } = useI18n();
-  // null = still loading (show skeleton); array = resolved (LLM or fallback).
-  const [chips, setChips] = useState<StarterChip[] | null>(null);
+  const [activeSceneId, setActiveSceneId] = useState(CHAT_AGENT_SCENES[0]?.id || "general");
   const greetingKey = useGreetingKey();
   const greeting = t(`chat.empty.greet.${greetingKey}`);
-  // Localized offline/fallback chips (t is memoized on locale, so this only
-  // recomputes when the language changes).
-  const fallbackChips = useMemo<StarterChip[]>(
-    () =>
-      FALLBACK_SCENARIO_IDS.map((id) => ({
-        label: t(`scenario.${id}.label`),
-        prompt: t(`scenario.${id}.prompt`),
-      })),
-    [t],
-  );
-
-  useEffect(() => {
-    let alive = true;
-    if (setupNeeded) {
-      setChips(fallbackChips);
-      return;
-    }
-    api
-      .starterSuggestions()
-      .then((res) => {
-        if (!alive) return;
-        setChips(res.suggestions?.length ? res.suggestions : fallbackChips);
-      })
-      .catch(() => {
-        if (alive) setChips(fallbackChips);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [setupNeeded, fallbackChips]);
+  const activeScene = CHAT_AGENT_SCENES.find((scene) => scene.id === activeSceneId) || CHAT_AGENT_SCENES[0];
+  const chips = useMemo<StarterChip[]>(() => {
+    const ids = activeScene?.promptIds?.length ? activeScene.promptIds : FALLBACK_SCENARIO_IDS;
+    return ids
+      .map((id) => SCENARIO_BY_ID.get(id))
+      .filter((s): s is ProductScenario => Boolean(s))
+      .map((s) => ({
+        label: t(`scenario.${s.id}.label`),
+        prompt: t(`scenario.${s.id}.prompt`),
+      }));
+  }, [activeScene, t]);
 
   const pickChip = (prompt: string) => {
     chatD({ type: "SET_INPUT", value: prompt });
@@ -121,14 +101,37 @@ export function ChatEmptyState({ setupNeeded, chatD, inputRef, composer }: ChatE
 
       <div className="chat-empty__composer">{composer}</div>
 
-      <div className="chat-empty__chips" aria-label={t("chat.empty.suggestions")}>
-        {chips === null
-          ? Array.from({ length: 4 }).map((_, i) => (
-              <span key={i} className="chat-empty__chip chat-empty__chip--skeleton" aria-hidden />
-            ))
-          : chips.map((chip) => (
+      <section className="chat-empty__scene" aria-labelledby="chat-scene-title">
+        <div className="chat-empty__scene-copy">
+          <p className="chat-empty__scene-eyebrow">{t("chat.scene.eyebrow")}</p>
+          <h2 id="chat-scene-title" className="chat-empty__scene-title">{t("chat.scene.title")}</h2>
+          <p className="chat-empty__scene-desc">{t(`chat.scene.${activeScene.id}.desc`)}</p>
+        </div>
+
+        <ul className="chat-empty__scene-list" aria-label={t("chat.scene.options")}>
+          {CHAT_AGENT_SCENES.map((scene) => {
+            const active = scene.id === activeScene.id;
+            return (
+              <li key={scene.id}>
+                <button
+                  type="button"
+                  className="chat-empty__scene-btn"
+                  data-active={active ? "true" : undefined}
+                  aria-current={active ? "true" : undefined}
+                  onClick={() => setActiveSceneId(scene.id)}
+                >
+                  <span className="chat-empty__scene-icon" aria-hidden>{scene.icon}</span>
+                  <span>{t(`chat.scene.${scene.id}.label`)}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+
+        <ul className="chat-empty__chips" aria-label={t("chat.empty.suggestions")}>
+          {chips.map((chip) => (
+            <li key={chip.label}>
               <button
-                key={chip.label}
                 type="button"
                 className="chat-empty__chip"
                 onClick={() => pickChip(chip.prompt)}
@@ -136,8 +139,10 @@ export function ChatEmptyState({ setupNeeded, chatD, inputRef, composer }: ChatE
               >
                 {chip.label}
               </button>
-            ))}
-      </div>
+            </li>
+          ))}
+        </ul>
+      </section>
     </div>
   );
 }

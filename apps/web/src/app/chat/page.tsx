@@ -1056,9 +1056,6 @@ export default function ChatPage() {
         {/* Chat Messages */}
         {chat.messages.length === 0 ? (
           <div className="flex-1 overflow-y-auto chat-scroll-area chat-scroll-area--empty px-5 py-4 xl:px-6">
-            <div className="mx-auto mb-4 max-w-5xl">
-              <PackSurfaceGuide surface="chat" compact />
-            </div>
             <ChatEmptyState setupNeeded={setupNeeded} chatD={chatD} inputRef={inputRef} composer={composer} />
           </div>
         ) : (
