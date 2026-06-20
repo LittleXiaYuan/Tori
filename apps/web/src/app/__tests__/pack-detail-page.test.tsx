@@ -107,6 +107,8 @@ describe("PackDetailClientPage", () => {
     expect(screen.getByText("本机已安装记录；可在工坊先做只读检查，再准备工作区。")).toBeInTheDocument();
     expect(screen.getByText("验收路径")).toBeInTheDocument();
     expect(screen.getByText("先触发一次 -> 看结果在哪 -> 决定留下还是改")).toBeInTheDocument();
+    expect(screen.getByText("验收出口：")).toBeInTheDocument();
+    expect(screen.getByText(/回中心确认状态，进详情复查权限，再打开入口复验。/)).toBeInTheDocument();
     expect(screen.getByText("确认来源")).toBeInTheDocument();
     expect(screen.getByText(/来源：本机已安装记录/)).toBeInTheDocument();
     expect(screen.getByText("能力边界")).toBeInTheDocument();

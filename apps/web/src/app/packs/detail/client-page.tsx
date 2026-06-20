@@ -714,6 +714,10 @@ export default function PackDetailClientPage() {
               怎么验证它有用
             </div>
           </div>
+          <div className="mb-3 rounded-md border px-3 py-2 text-xs leading-5" style={{ borderColor: "rgba(59,130,246,0.22)", background: "rgba(59,130,246,0.07)", color: "var(--yunque-text-secondary)" }}>
+            <span className="font-semibold" style={{ color: "var(--yunque-text)" }}>验收出口：</span>
+            回中心确认状态，进详情复查权限{openPath ? "，再打开入口复验。" : "；这个包没有独立入口，需从 Chat、任务、记忆或知识流程触发并观察结果。"}
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {verificationSteps.map((step, idx) => (
               <div
