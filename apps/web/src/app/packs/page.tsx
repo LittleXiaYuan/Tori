@@ -259,6 +259,10 @@ function packStudioHref(manifest: PackManifest, options?: { packageUrl?: string;
   return `/packs/studio?${params.toString()}`;
 }
 
+function packCenterFocusHref(packId?: string): string {
+  return packId ? `/packs?q=${encodeURIComponent(packId)}&from=studio` : "/packs?from=studio";
+}
+
 function packPolishGuidance(manifest: PackManifest): PackPolishGuidance {
   const readiness = packReadiness(manifest);
   const delivery = packDeliveryProfile(manifest);
@@ -366,6 +370,7 @@ function buildBatchReadinessPrompt(
       const risk = riskProfileForPack(item.manifest);
       const guidance = packPolishGuidance(item.manifest);
       const priority = packPolishPriority(item.manifest);
+      const primaryPath = packUsability(item.manifest).primaryActionPath || item.manifest.frontend?.menus?.[0]?.path || item.manifest.frontend?.routes?.[0]?.path;
       return {
         id: item.manifest.id,
         name: item.manifest.name,
@@ -397,6 +402,12 @@ function buildBatchReadinessPrompt(
           verify: guidance.verify,
           handoff: guidance.handoff,
         },
+        handoff_links: {
+          center: packCenterFocusHref(item.manifest.id),
+          detail: `/packs/detail?id=${encodeURIComponent(item.manifest.id)}`,
+          open: primaryPath || null,
+          studio: packStudioHref(item.manifest, { packageUrl: item.packageUrl, sha256: item.sha256 }),
+        },
         studio_url: packStudioHref(item.manifest, { packageUrl: item.packageUrl, sha256: item.sha256 }),
         package_url: item.packageUrl,
         sha256: item.sha256,
@@ -407,6 +418,7 @@ function buildBatchReadinessPrompt(
     "请以“小羽改包”的方式批量处理下面这些能力包。",
     "目标是先补齐用户可感知的用途、入口、示例、权限边界和回滚说明，而不是直接扩大能力或绕过能力包工坊。",
     "请按优先级逐包输出计划；需要具体改单文件时，只输出 yunque.pack_studio.patch_draft_request.v1 或 patch_draft.v1，并要求用户回到能力包工坊预览差异 / 审计 / 重打包。",
+    "每个包完成后必须按 handoff_links 回能力包中心、详情页和入口复验；没有 open 链接的包要说明应从 Chat、任务、记忆或知识流程验收。",
     "",
     "```json",
     JSON.stringify(request, null, 2),

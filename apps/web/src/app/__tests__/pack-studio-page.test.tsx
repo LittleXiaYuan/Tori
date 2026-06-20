@@ -533,6 +533,12 @@ describe("PackStudioPage", () => {
             verify: "改完回到 /packs/wasm-plugin 验证入口、提示、结果位置和回滚路径是否可见。",
             handoff: "只读检查 -> 准备工作区 -> 预览差异 -> 审计 -> 重新打包 -> 复检 SHA -> 安装/启用/回滚。",
           },
+          handoff_links: {
+            center: "/packs?q=yunque.pack.wasm-plugin&from=studio",
+            detail: "/packs/detail?id=yunque.pack.wasm-plugin",
+            open: "/packs/wasm-plugin",
+            studio: "/packs/studio?packId=yunque.pack.wasm-plugin&goal=%E8%A1%A5%E9%BD%90%20WASM%20%E7%94%A8%E9%80%94",
+          },
           studio_url: "/packs/studio?packId=yunque.pack.wasm-plugin&goal=%E8%A1%A5%E9%BD%90%20WASM%20%E7%94%A8%E9%80%94",
           package_url: "https://oss.example.com/wasm-plugin.yqpack",
           sha256: "9".repeat(64),
@@ -550,6 +556,12 @@ describe("PackStudioPage", () => {
           },
           missing: ["用户感知位置"],
           readiness: "需补说明",
+          handoff_links: {
+            center: "/packs?q=yunque.pack.documents&from=studio",
+            detail: "/packs/detail?id=yunque.pack.documents",
+            open: "/chat?q=generate-doc",
+            studio: "/packs/studio?packId=yunque.pack.documents",
+          },
           studio_url: "/packs/studio?packId=yunque.pack.documents",
         },
       ],
@@ -604,6 +616,8 @@ describe("PackStudioPage", () => {
     expect(screen.getByText("先补 metadata.example1-3，用真实用户动作描述它能产出什么结果。")).toBeInTheDocument();
     expect(screen.getByText("验收路径：")).toBeInTheDocument();
     expect(screen.getByText("改完回到 /packs/wasm-plugin 验证入口、提示、结果位置和回滚路径是否可见。")).toBeInTheDocument();
+    expect(screen.getAllByText(/验收出口：/).length).toBeGreaterThan(1);
+    expect(screen.getAllByText(/回中心确认状态，进详情复查权限，再打开入口复验。/).length).toBeGreaterThan(1);
     expect(screen.getAllByText("本页已载入").length).toBeGreaterThan(0);
     expect(screen.getAllByText("已安装").length).toBeGreaterThan(0);
     expect(screen.getByText("yqpack：https://oss.example.com/wasm-plugin.yqpack")).toBeInTheDocument();
@@ -611,8 +625,10 @@ describe("PackStudioPage", () => {
     expect(screen.getAllByRole("link", { name: /打开工坊/ })[0]).toHaveAttribute("href", expect.stringContaining("packId=yunque.pack.wasm-plugin"));
     expect(screen.getAllByRole("link", { name: /查看详情/ }).some((link) => link.getAttribute("href") === "/packs/detail?id=yunque.pack.wasm-plugin")).toBe(true);
     expect(screen.getAllByRole("link", { name: /回中心/ }).some((link) => link.getAttribute("href") === "/packs?q=yunque.pack.wasm-plugin&from=studio")).toBe(true);
+    expect(screen.getAllByRole("link", { name: /打开入口/ }).some((link) => link.getAttribute("href") === "/packs/wasm-plugin")).toBe(true);
     expect(screen.getAllByRole("link", { name: /查看详情/ }).some((link) => link.getAttribute("href") === "/packs/detail?id=yunque.pack.documents")).toBe(true);
     expect(screen.getAllByRole("link", { name: /回中心/ }).some((link) => link.getAttribute("href") === "/packs?q=yunque.pack.documents&from=studio")).toBe(true);
+    expect(screen.getAllByRole("link", { name: /打开入口/ }).some((link) => link.getAttribute("href") === "/chat?q=generate-doc")).toBe(true);
 
     fireEvent.click(screen.getAllByRole("button", { name: "载入本页" })[0]);
 

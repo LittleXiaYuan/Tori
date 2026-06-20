@@ -111,6 +111,12 @@ export type PackStudioBatchDraftRequest = {
       verify: string;
       handoff: string;
     };
+    handoffLinks?: {
+      center: string;
+      detail: string;
+      open: string;
+      studio: string;
+    };
     studioUrl: string;
     packageUrl: string;
     sha256: string;
@@ -187,6 +193,17 @@ function polishGuidance(value: unknown): PackStudioBatchDraftRequest["packs"][nu
   const handoff = stringValue(record.handoff);
   if (!reason && !firstEdit && !verify && !handoff) return undefined;
   return { reason, firstEdit, verify, handoff };
+}
+
+function handoffLinks(value: unknown): PackStudioBatchDraftRequest["packs"][number]["handoffLinks"] | undefined {
+  const record = asRecord(value);
+  if (!record) return undefined;
+  const center = stringValue(record.center);
+  const detail = stringValue(record.detail);
+  const open = stringValue(record.open);
+  const studio = stringValue(record.studio);
+  if (!center && !detail && !open && !studio) return undefined;
+  return { center, detail, open, studio };
 }
 
 function displayTextWithoutJsonBlocks(text: string, markers?: string | string[]): string {
@@ -374,6 +391,7 @@ export function parsePackStudioBatchDraftRequestPrompt(text?: string): PackStudi
         const risk = riskSummary(pack.risk);
         const priority = prioritySummary(pack.priority);
         const guidance = polishGuidance(pack.polish_guidance) || polishGuidance(pack.polishGuidance);
+        const links = handoffLinks(pack.handoff_links) || handoffLinks(pack.handoffLinks);
         return {
           id: stringValue(pack.id),
           name: stringValue(pack.name),
@@ -387,6 +405,7 @@ export function parsePackStudioBatchDraftRequestPrompt(text?: string): PackStudi
           permissionSummary: stringValue(pack.permission_summary) || stringValue(pack.permissionSummary),
           ...(delivery ? { delivery } : {}),
           ...(guidance ? { polishGuidance: guidance } : {}),
+          ...(links ? { handoffLinks: links } : {}),
           studioUrl: stringValue(pack.studio_url),
           packageUrl: stringValue(pack.package_url),
           sha256: stringValue(pack.sha256),

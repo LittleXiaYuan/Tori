@@ -1940,7 +1940,10 @@ export default function PackStudioPage() {
               <div className="grid gap-2 lg:grid-cols-2">
                 {importedBatchRequest.packs.map((pack) => {
                   const candidate = candidates.find((item) => item.manifest.id === pack.id);
-                  const href = pack.studioUrl || `/packs/studio?packId=${encodeURIComponent(pack.id)}`;
+                  const href = pack.handoffLinks?.studio || pack.studioUrl || `/packs/studio?packId=${encodeURIComponent(pack.id)}`;
+                  const detailHref = pack.handoffLinks?.detail || `/packs/detail?id=${encodeURIComponent(pack.id)}`;
+                  const centerHref = pack.handoffLinks?.center || packCenterFocusHref(pack.id);
+                  const openHref = pack.handoffLinks?.open;
                   const active = pack.id === manifest?.id;
                   const stage = batchPackStage(pack, candidate);
                   return (
@@ -2002,6 +2005,12 @@ export default function PackStudioPage() {
                           {pack.polishGuidance.verify && <div><span className="font-medium" style={{ color: "var(--yunque-text)" }}>验收路径：</span>{pack.polishGuidance.verify}</div>}
                         </div>
                       )}
+                      {pack.handoffLinks && (
+                        <div className="mt-2 rounded border px-2 py-2 text-[11px] leading-5" style={{ borderColor: "rgba(59,130,246,0.18)", background: "rgba(59,130,246,0.06)", color: "var(--yunque-text-secondary)" }}>
+                          <span className="font-medium" style={{ color: "var(--yunque-text)" }}>验收出口：</span>
+                          回中心确认状态，进详情复查权限{openHref ? "，再打开入口复验。" : "；此包没有独立入口，需从 Chat、任务、记忆或知识流程复验。"}
+                        </div>
+                      )}
                       {pack.missing.length > 0 && (
                         <div className="mt-2 flex flex-wrap gap-1">
                           {pack.missing.map((gap) => (
@@ -2024,16 +2033,23 @@ export default function PackStudioPage() {
                             打开工坊 <ArrowRight size={13} />
                           </Button>
                         </Link>
-                        <Link href={`/packs/detail?id=${encodeURIComponent(pack.id)}`}>
+                        <Link href={detailHref}>
                           <Button size="sm" variant="ghost">
                             查看详情 <FileSearch size={13} />
                           </Button>
                         </Link>
-                        <Link href={packCenterFocusHref(pack.id)}>
+                        <Link href={centerHref}>
                           <Button size="sm" variant="ghost">
                             回中心 <ArrowRight size={13} />
                           </Button>
                         </Link>
+                        {openHref && (
+                          <Link href={openHref}>
+                            <Button size="sm" variant="ghost">
+                              打开入口 <ExternalLink size={13} />
+                            </Button>
+                          </Link>
+                        )}
                       </div>
                       {!candidate && (
                         <div className="mt-2 text-[11px]" style={{ color: "var(--yunque-warning)" }}>

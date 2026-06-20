@@ -548,6 +548,10 @@ describe("PacksPageOptimized", () => {
     expect(batchPrompt).toContain("不要自动应用改动");
     expect(batchPrompt).toContain("预览差异");
     expect(batchPrompt).toContain("studio_url");
+    expect(batchPrompt).toContain("\"handoff_links\"");
+    expect(batchPrompt).toContain("\"center\": \"/packs?q=yunque.pack.needs-entry&from=studio\"");
+    expect(batchPrompt).toContain("\"detail\": \"/packs/detail?id=yunque.pack.needs-entry\"");
+    expect(batchPrompt).toContain("\"open\": null");
     expect(batchPrompt).toContain("\"delivery\"");
     expect(batchPrompt).toContain("\"permission_summary\"");
     expect(batchPrompt).toContain("\"risk\"");
@@ -564,6 +568,9 @@ describe("PacksPageOptimized", () => {
     expect(batchStudioPrompt).toContain("yunque.pack_studio.batch_draft_request.v1");
     expect(batchStudioPrompt).toContain("yunque.pack.needs-entry");
     expect(batchStudioPrompt).toContain("studio_url");
+    expect(batchStudioPrompt).toContain("handoff_links");
+    expect(batchStudioPrompt).toContain("/packs?q=yunque.pack.needs-entry&from=studio");
+    expect(batchStudioPrompt).toContain("/packs/detail?id=yunque.pack.needs-entry");
     expect(batchStudioPrompt).toContain("permission_summary");
     expect(batchStudioPrompt).toContain("polish_guidance");
     expect(batchStudioPrompt).toContain("\"priority\"");
