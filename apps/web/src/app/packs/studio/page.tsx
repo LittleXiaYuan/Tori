@@ -168,6 +168,9 @@ function buildDeliverySummary(params: {
   const { manifest, goal, workspaceReport, patchReport, auditReport, repackReport, reinspectReport, installedRepack, workflowSteps } = params;
   const verificationManifest = installedRepack?.manifest || manifest;
   const verificationSteps = verificationManifest ? packVerificationSteps(verificationManifest) : [];
+  const centerHref = verificationManifest ? packCenterFocusHref(verificationManifest.id) : "/packs?from=studio";
+  const detailHref = verificationManifest ? `/packs/detail?id=${encodeURIComponent(verificationManifest.id)}` : undefined;
+  const openPath = verificationManifest ? packPrimaryPath(verificationManifest) : undefined;
   const lines = [
     "# 能力包工坊改包交付摘要",
     "",
@@ -208,6 +211,18 @@ function buildDeliverySummary(params: {
       ? `- 安装状态：${installedRepack.status}；安装包：${installedRepack.manifest.name} (${installedRepack.manifest.id})`
       : "- 安装状态：尚未安装",
     "- 回滚策略：新包应作为显式安装版本处理；验证失败时先禁用，再回滚到上一版本或原始 yqpack。",
+    "",
+    "## 产品验收入口",
+    `- 能力包中心：${centerHref}（聚焦这个包，确认来源、版本、安装/启用状态和侧栏入口）`,
+    detailHref
+      ? `- 权限与来源详情：${detailHref}（复查权限、风险、入口、回滚和小羽补齐建议）`
+      : "- 权限与来源详情：尚未选择能力包，无法生成详情链接。",
+    openPath
+      ? `- 打开入口复验：${openPath}（按用户主路径触发一次，确认结果、产物或状态变化可见）`
+      : "- 打开入口复验：此包没有独立入口，应从 Chat、任务、记忆或知识流程触发并观察效果。",
+    installedRepack
+      ? `- 当前安装状态：${installedRepack.status === "enabled" ? "已启用，可先验证入口；失败时禁用或回滚。" : "已安装未启用，先确认权限后启用；不符合预期则禁用或回滚。"}`
+      : "- 当前安装状态：尚未安装；复检 SHA 通过后再本机安装验证。",
     "",
     "## 验证路径",
     ...(verificationSteps.length > 0

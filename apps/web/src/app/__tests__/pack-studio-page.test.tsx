@@ -1109,6 +1109,11 @@ describe("PackStudioPage", () => {
     expect(deliverySummary).toContain("- 包路径：C:\\yunque\\packs\\studio\\yunque.pack.wasm-plugin-0.1.0-studio.yqpack");
     expect(deliverySummary).toContain("- SHA256：" + "d".repeat(64));
     expect(deliverySummary).toContain("- 安装状态：installed；安装包：WASM 能力包 (yunque.pack.wasm-plugin)");
+    expect(deliverySummary).toContain("## 产品验收入口");
+    expect(deliverySummary).toContain("- 能力包中心：/packs?q=yunque.pack.wasm-plugin&from=studio（聚焦这个包，确认来源、版本、安装/启用状态和侧栏入口）");
+    expect(deliverySummary).toContain("- 权限与来源详情：/packs/detail?id=yunque.pack.wasm-plugin（复查权限、风险、入口、回滚和小羽补齐建议）");
+    expect(deliverySummary).toContain("- 打开入口复验：/packs/wasm-plugin（按用户主路径触发一次，确认结果、产物或状态变化可见）");
+    expect(deliverySummary).toContain("- 当前安装状态：已安装未启用，先确认权限后启用；不符合预期则禁用或回滚。");
     expect(deliverySummary).toContain("## 验证路径");
     expect(deliverySummary).toContain("- 先触发一次：从「检查 WASM 能力」进入");
     expect(deliverySummary).toContain("- 看结果在哪：回到 /packs/wasm-plugin 查看页面状态、结果或下一步动作");
