@@ -521,6 +521,14 @@ describe("PacksPageOptimized", () => {
     expect(screen.getByRole("button", { name: /需补入口1/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /查看打磨队列/ })).toBeInTheDocument();
     expect(screen.getByText("按体检缺口和交付状态自动挑出最需要小羽补用途、入口、示例、真实结果或能力边界的能力包。当前第 1 / 1 批，展示 2 个，共 2 个待打磨。")).toBeInTheDocument();
+    expect(screen.getByText("本批焦点")).toBeInTheDocument();
+    expect(screen.getByText("P0 1 · P1 1 · P2 0；先处理缺入口 1 个，再补说明 1 个。")).toBeInTheDocument();
+    expect(screen.getByText("处理顺序")).toBeInTheDocument();
+    expect(screen.getByText("先看权限与来源，再进工坊只读检查；每包都走差异预览、审计、重新打包和复检。")).toBeInTheDocument();
+    expect(screen.getByText("验收出口")).toBeInTheDocument();
+    expect(screen.getByText("1 个有入口可打开复验；其余从 Chat、任务、记忆或知识流程观察结果。")).toBeInTheDocument();
+    expect(screen.getByText("边界提醒")).toBeInTheDocument();
+    expect(screen.getByText("高风险 0 个 · 实验/计划 0 个；不能把计划能力包装成稳定执行。")).toBeInTheDocument();
     expect(screen.getByText("还缺：使用示例、用户感知位置、打开/使用入口、后端能力声明")).toBeInTheDocument();
     expect(screen.getByText("P0 先补可用路径：")).toBeInTheDocument();
     expect(screen.getByText("缺后端能力声明或打开入口，用户很难确认这个能力是否真的可用。")).toBeInTheDocument();
@@ -627,6 +635,8 @@ describe("PacksPageOptimized", () => {
     const queue = screen.getByText("补肉优先队列").closest("#readiness-queue");
     expect(queue).not.toBeNull();
     expect(screen.getByText("按体检缺口和交付状态自动挑出最需要小羽补用途、入口、示例、真实结果或能力边界的能力包。当前第 1 / 2 批，展示 6 个，共 8 个待打磨。")).toBeInTheDocument();
+    expect(screen.getByText("P0 6 · P1 0 · P2 0；先处理缺入口 6 个，再补说明 0 个。")).toBeInTheDocument();
+    expect(screen.getByText("0 个有入口可打开复验；其余从 Chat、任务、记忆或知识流程观察结果。")).toBeInTheDocument();
     expect(screen.getByText("补肉队列 · 第 1 / 2 页 · 共 8 个")).toBeInTheDocument();
     expect(within(queue as HTMLElement).getByText("Needs Entry Pack 1")).toBeInTheDocument();
     expect(within(queue as HTMLElement).getByText("Needs Entry Pack 6")).toBeInTheDocument();
@@ -645,6 +655,7 @@ describe("PacksPageOptimized", () => {
     fireEvent.click(screen.getByRole("button", { name: "下一页" }));
 
     expect(screen.getByText("按体检缺口和交付状态自动挑出最需要小羽补用途、入口、示例、真实结果或能力边界的能力包。当前第 2 / 2 批，展示 2 个，共 8 个待打磨。")).toBeInTheDocument();
+    expect(screen.getByText("P0 2 · P1 0 · P2 0；先处理缺入口 2 个，再补说明 0 个。")).toBeInTheDocument();
     expect(within(queue as HTMLElement).getByText("Needs Entry Pack 7")).toBeInTheDocument();
     expect(within(queue as HTMLElement).getByText("Needs Entry Pack 8")).toBeInTheDocument();
     expect(within(queue as HTMLElement).queryByText("Needs Entry Pack 1")).not.toBeInTheDocument();
@@ -673,6 +684,8 @@ describe("PacksPageOptimized", () => {
     expect(screen.getByText("补肉优先队列")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /优先打磨1/ })).toBeInTheDocument();
     expect(screen.getByText("交付状态：实验/计划。先保留限制说明；如果要变成主路径，下一轮补真实执行、结果查看和回滚证据。")).toBeInTheDocument();
+    expect(screen.getByText("P0 0 · P1 1 · P2 0；先处理缺入口 0 个，再补说明 0 个。")).toBeInTheDocument();
+    expect(screen.getByText("高风险 0 个 · 实验/计划 1 个；不能把计划能力包装成稳定执行。")).toBeInTheDocument();
 
     const batchChatLink = screen.getByRole("link", { name: /交给 Chat 批量打磨/ });
     const batchPrompt = new URL(batchChatLink.getAttribute("href")!, "http://localhost").searchParams.get("q") || "";

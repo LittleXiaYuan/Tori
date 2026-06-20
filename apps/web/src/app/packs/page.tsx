@@ -615,6 +615,34 @@ export default function PacksPageOptimized() {
     () => paginate(readinessItems, currentReadinessQueuePage, READINESS_QUEUE_PAGE_SIZE),
     [currentReadinessQueuePage, readinessItems],
   );
+  const readinessBatchSummary = useMemo(() => {
+    const summary = {
+      p0: 0,
+      p1: 0,
+      p2: 0,
+      highRisk: 0,
+      needsEntry: 0,
+      needsContext: 0,
+      planOnly: 0,
+      withOpenPath: 0,
+    };
+    for (const item of readinessQueue) {
+      const priority = packPolishPriority(item.manifest);
+      const risk = riskProfileForPack(item.manifest);
+      const readiness = packReadiness(item.manifest);
+      const delivery = packDeliveryProfile(item.manifest);
+      const usability = packUsability(item.manifest);
+      if (priority.level === "P0") summary.p0 += 1;
+      if (priority.level === "P1") summary.p1 += 1;
+      if (priority.level === "P2") summary.p2 += 1;
+      if (risk.requiresAuthorization) summary.highRisk += 1;
+      if (readiness.level === "needs_entry") summary.needsEntry += 1;
+      if (readiness.level === "needs_context") summary.needsContext += 1;
+      if (delivery.level === "plan_only") summary.planOnly += 1;
+      if (usability.primaryActionPath || item.manifest.frontend?.menus?.[0]?.path || item.manifest.frontend?.routes?.[0]?.path) summary.withOpenPath += 1;
+    }
+    return summary;
+  }, [readinessQueue]);
   const packKindStats = useMemo(() => {
     const manifests = new Map<string, PackManifest>();
     for (const pack of packs) manifests.set(pack.manifest.id, pack.manifest);
@@ -1372,6 +1400,32 @@ export default function PacksPageOptimized() {
                   交给 Chat 批量打磨 <ArrowRight size={14} />
                 </Button>
               </Link>
+            </div>
+            <div className="mb-3 grid gap-2 lg:grid-cols-4">
+              <div className="rounded-md border p-3" style={{ borderColor: "rgba(239,68,68,0.18)", background: "rgba(239,68,68,0.06)" }}>
+                <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>本批焦点</div>
+                <div className="mt-1 text-[11px] leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
+                  P0 {readinessBatchSummary.p0} · P1 {readinessBatchSummary.p1} · P2 {readinessBatchSummary.p2}；先处理缺入口 {readinessBatchSummary.needsEntry} 个，再补说明 {readinessBatchSummary.needsContext} 个。
+                </div>
+              </div>
+              <div className="rounded-md border p-3" style={{ borderColor: "rgba(59,130,246,0.18)", background: "rgba(59,130,246,0.06)" }}>
+                <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>处理顺序</div>
+                <div className="mt-1 text-[11px] leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
+                  先看权限与来源，再进工坊只读检查；每包都走差异预览、审计、重新打包和复检。
+                </div>
+              </div>
+              <div className="rounded-md border p-3" style={{ borderColor: "rgba(34,197,94,0.18)", background: "rgba(34,197,94,0.06)" }}>
+                <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>验收出口</div>
+                <div className="mt-1 text-[11px] leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
+                  {readinessBatchSummary.withOpenPath} 个有入口可打开复验；其余从 Chat、任务、记忆或知识流程观察结果。
+                </div>
+              </div>
+              <div className="rounded-md border p-3" style={{ borderColor: readinessBatchSummary.highRisk > 0 ? "rgba(239,68,68,0.22)" : "rgba(245,158,11,0.18)", background: readinessBatchSummary.highRisk > 0 ? "rgba(239,68,68,0.07)" : "rgba(245,158,11,0.06)" }}>
+                <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>边界提醒</div>
+                <div className="mt-1 text-[11px] leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
+                  高风险 {readinessBatchSummary.highRisk} 个 · 实验/计划 {readinessBatchSummary.planOnly} 个；不能把计划能力包装成稳定执行。
+                </div>
+              </div>
             </div>
             <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
               {readinessQueue.map((item) => {
