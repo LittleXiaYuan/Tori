@@ -2818,6 +2818,14 @@ export default function PackStudioPage() {
                                   ))}
                                 </div>
                               </div>
+                              <div className="mt-3 rounded-md border p-3" style={{ borderColor: "rgba(245,158,11,0.22)", background: "rgba(245,158,11,0.06)" }}>
+                                <div className="mb-2 text-xs font-medium" style={{ color: "var(--yunque-text)" }}>复验失败怎么退</div>
+                                <div className="space-y-1 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
+                                  <div>1. 先禁用新包，停止它继续影响入口、Chat 或任务流程。</div>
+                                  <div>2. 再执行回滚，恢复上一版本或原始 yqpack 的安装记录。</div>
+                                  <div>3. 回能力包中心确认状态，保留交付摘要里的 SHA、审计结果和回滚记录。</div>
+                                </div>
+                              </div>
                               <div className="mt-3 flex flex-wrap gap-2">
                                 {packPrimaryPath(installedRepack.manifest) && (
                                   <Link href={packPrimaryPath(installedRepack.manifest)!}>

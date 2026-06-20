@@ -1074,6 +1074,9 @@ describe("PackStudioPage", () => {
     expect(screen.getByText("安装后怎么验收")).toBeInTheDocument();
     expect(screen.getByText(/先触发一次：从「检查 WASM 能力」进入/)).toBeInTheDocument();
     expect(screen.getByText(/看结果在哪：回到 \/packs\/wasm-plugin 查看页面状态、结果或下一步动作/)).toBeInTheDocument();
+    expect(screen.getByText("复验失败怎么退")).toBeInTheDocument();
+    expect(screen.getByText("1. 先禁用新包，停止它继续影响入口、Chat 或任务流程。")).toBeInTheDocument();
+    expect(screen.getByText("2. 再执行回滚，恢复上一版本或原始 yqpack 的安装记录。")).toBeInTheDocument();
     expect(screen.getAllByText("下一步：确认权限后启用或回滚").length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole("button", { name: "启用" }));
@@ -1088,6 +1091,13 @@ describe("PackStudioPage", () => {
     expect(screen.getByText("新包已经启用。建议先打开入口跑一遍主路径；如果结果不符合预期，可以回到这里禁用或回滚。")).toBeInTheDocument();
     expect(screen.getAllByText("下一步：打开入口或查看详情").length).toBeGreaterThan(0);
 
+    fireEvent.click(screen.getByRole("button", { name: "回滚" }));
+    await waitFor(() => {
+      expect(packsClientMock.rollback).toHaveBeenCalledWith("yunque.pack.wasm-plugin");
+    });
+    expect(await screen.findByText("下一步：确认权限后再启用")).toBeInTheDocument();
+    expect(toastMock).toHaveBeenCalledWith("已回滚能力包", "success");
+
     fireEvent.click(screen.getByRole("button", { name: "复制交付摘要" }));
     const deliverySummary = vi.mocked(navigator.clipboard.writeText).mock.calls.at(-1)?.[0] || "";
     expect(deliverySummary).toContain("# 能力包工坊改包交付摘要");
@@ -1095,7 +1105,7 @@ describe("PackStudioPage", () => {
     expect(deliverySummary).toContain("- 审计：通过；风险：medium；改动：1；可改：1；需源码/专项审计：0");
     expect(deliverySummary).toContain("- 包路径：C:\\yunque\\packs\\studio\\yunque.pack.wasm-plugin-0.1.0-studio.yqpack");
     expect(deliverySummary).toContain("- SHA256：" + "d".repeat(64));
-    expect(deliverySummary).toContain("- 安装状态：enabled；安装包：WASM 能力包 (yunque.pack.wasm-plugin)");
+    expect(deliverySummary).toContain("- 安装状态：installed；安装包：WASM 能力包 (yunque.pack.wasm-plugin)");
     expect(deliverySummary).toContain("## 验证路径");
     expect(deliverySummary).toContain("- 先触发一次：从「检查 WASM 能力」进入");
     expect(deliverySummary).toContain("- 看结果在哪：回到 /packs/wasm-plugin 查看页面状态、结果或下一步动作");
