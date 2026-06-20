@@ -1738,6 +1738,13 @@ export default function PackStudioPage() {
                           {pack.delivery.nextStep ? ` 下一步：${pack.delivery.nextStep}` : ""}
                         </div>
                       )}
+                      {pack.polishGuidance && (
+                        <div className="mt-2 rounded border px-2 py-2 text-[11px] leading-5" style={{ borderColor: "rgba(245,158,11,0.18)", background: "rgba(245,158,11,0.06)", color: "var(--yunque-text-secondary)" }}>
+                          {pack.polishGuidance.reason && <div><span className="font-medium" style={{ color: "var(--yunque-text)" }}>为什么进队列：</span>{pack.polishGuidance.reason}</div>}
+                          {pack.polishGuidance.firstEdit && <div><span className="font-medium" style={{ color: "var(--yunque-text)" }}>优先修改：</span>{pack.polishGuidance.firstEdit}</div>}
+                          {pack.polishGuidance.verify && <div><span className="font-medium" style={{ color: "var(--yunque-text)" }}>验收路径：</span>{pack.polishGuidance.verify}</div>}
+                        </div>
+                      )}
                       {pack.missing.length > 0 && (
                         <div className="mt-2 flex flex-wrap gap-1">
                           {pack.missing.map((gap) => (

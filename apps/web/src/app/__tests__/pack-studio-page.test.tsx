@@ -516,6 +516,12 @@ describe("PackStudioPage", () => {
             description: "可以体验、验证边界或生成计划，但不应包装成稳定可交付能力。",
             next_step: "先保留限制说明。",
           },
+          polish_guidance: {
+            reason: "体检缺口：使用示例、用户感知位置。",
+            first_edit: "先补 metadata.example1-3，用真实用户动作描述它能产出什么结果。",
+            verify: "改完回到 /packs/wasm-plugin 验证入口、提示、结果位置和回滚路径是否可见。",
+            handoff: "只读检查 -> 准备工作区 -> 预览 diff -> 审计 -> 重新打包 -> 复检 SHA -> 安装/启用/回滚。",
+          },
           studio_url: "/packs/studio?packId=yunque.pack.wasm-plugin&goal=%E8%A1%A5%E9%BD%90%20WASM%20%E7%94%A8%E9%80%94",
           package_url: "https://oss.example.com/wasm-plugin.yqpack",
           sha256: "9".repeat(64),
@@ -561,6 +567,12 @@ describe("PackStudioPage", () => {
     expect(screen.getAllByText("权限：沙箱、联网、写入；需要授权后使用").length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText(/交付状态：可以体验、验证边界或生成计划/)).toBeInTheDocument();
     expect(screen.getByText(/下一步：先保留限制说明/)).toBeInTheDocument();
+    expect(screen.getByText("为什么进队列：")).toBeInTheDocument();
+    expect(screen.getByText("体检缺口：使用示例、用户感知位置。")).toBeInTheDocument();
+    expect(screen.getByText("优先修改：")).toBeInTheDocument();
+    expect(screen.getByText("先补 metadata.example1-3，用真实用户动作描述它能产出什么结果。")).toBeInTheDocument();
+    expect(screen.getByText("验收路径：")).toBeInTheDocument();
+    expect(screen.getByText("改完回到 /packs/wasm-plugin 验证入口、提示、结果位置和回滚路径是否可见。")).toBeInTheDocument();
     expect(screen.getAllByText("待载入").length).toBeGreaterThan(0);
     expect(screen.getByText("yqpack：https://oss.example.com/wasm-plugin.yqpack")).toBeInTheDocument();
     expect(screen.getByText(`SHA：${"9".repeat(64)}`)).toBeInTheDocument();

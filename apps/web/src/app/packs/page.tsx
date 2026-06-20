@@ -72,6 +72,12 @@ type ReadinessQueueItem = {
   packageUrl?: string;
   sha256?: string;
 };
+type PackPolishGuidance = {
+  reason: string;
+  firstEdit: string;
+  verify: string;
+  handoff: string;
+};
 
 const KIND_FILTER_LABELS: Record<KindFilter, string> = {
   all: "全部类型",
@@ -231,6 +237,41 @@ function packStudioHref(manifest: PackManifest, options?: { packageUrl?: string;
   return `/packs/studio?${params.toString()}`;
 }
 
+function packPolishGuidance(manifest: PackManifest): PackPolishGuidance {
+  const readiness = packReadiness(manifest);
+  const delivery = packDeliveryProfile(manifest);
+  const usability = packUsability(manifest);
+  const primaryPath = usability.primaryActionPath || manifest.frontend?.menus?.[0]?.path || manifest.frontend?.routes?.[0]?.path;
+  const missing = readiness.missing;
+  const reason = missing.length > 0
+    ? `体检缺口：${missing.join("、")}。`
+    : `交付状态：${delivery.label}。${delivery.description}`;
+  let firstEdit = "先补 manifest metadata：用途、入口、示例、限制和回滚说明。";
+
+  if (missing.includes("后端能力声明")) {
+    firstEdit = "先确认是否真有后端能力：有则补 routeSpecs、permissions 和测试；没有就明确标为前端/说明型能力，不能伪造执行能力。";
+  } else if (missing.includes("打开/使用入口")) {
+    firstEdit = "先补 metadata.primaryActionPath 或 frontend menu/route，让用户知道启用后从哪里进入。";
+  } else if (missing.includes("用户感知位置")) {
+    firstEdit = "先补 metadata.usageSurface，说明它会在 Chat、任务、记忆、知识或设置中的哪个位置被看见。";
+  } else if (missing.includes("使用示例")) {
+    firstEdit = "先补 metadata.example1-3，用真实用户动作描述它能产出什么结果。";
+  } else if (delivery.level === "plan_only") {
+    firstEdit = "先保留实验边界，补真实结果位置、当前限制、验证步骤和转稳定的最小待办。";
+  } else if (delivery.level === "needs_meat") {
+    firstEdit = "先补用途、入口、示例、权限边界和可回滚说明，避免看起来只是空壳。";
+  }
+
+  return {
+    reason,
+    firstEdit,
+    verify: primaryPath
+      ? `改完回到 ${primaryPath} 验证入口、提示、结果位置和回滚路径是否可见。`
+      : "改完回到能力包详情与 Chat/任务主路径验证：用户是否知道怎么触发、结果在哪里、出问题怎么禁用或回滚。",
+    handoff: "只读检查 -> 准备工作区 -> 预览 diff -> 审计 -> 重新打包 -> 复检 SHA -> 安装/启用/回滚。",
+  };
+}
+
 function buildBatchReadinessPrompt(
   items: ReadinessQueueItem[],
   batch: { page: number; pageCount: number; total: number; pageSize: number },
@@ -255,6 +296,7 @@ function buildBatchReadinessPrompt(
       const readiness = packReadiness(item.manifest);
       const delivery = packDeliveryProfile(item.manifest);
       const risk = riskProfileForPack(item.manifest);
+      const guidance = packPolishGuidance(item.manifest);
       return {
         id: item.manifest.id,
         name: item.manifest.name,
@@ -274,6 +316,12 @@ function buildBatchReadinessPrompt(
           label: delivery.label,
           description: delivery.description,
           next_step: delivery.nextStep,
+        },
+        polish_guidance: {
+          reason: guidance.reason,
+          first_edit: guidance.firstEdit,
+          verify: guidance.verify,
+          handoff: guidance.handoff,
         },
         studio_url: packStudioHref(item.manifest, { packageUrl: item.packageUrl, sha256: item.sha256 }),
         package_url: item.packageUrl,
@@ -960,6 +1008,7 @@ export default function PacksPageOptimized() {
                 const readiness = packReadiness(item.manifest);
                 const delivery = packDeliveryProfile(item.manifest);
                 const deliveryStyle = deliveryToneStyle(delivery.tone);
+                const guidance = packPolishGuidance(item.manifest);
                 const queueReason = readiness.missing.length > 0
                   ? `还缺：${readiness.missing.join("、")}`
                   : `交付状态：${delivery.label}。${delivery.nextStep}`;
@@ -977,6 +1026,11 @@ export default function PacksPageOptimized() {
                     </div>
                     <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
                       {queueReason}
+                    </div>
+                    <div className="mt-2 rounded-md border p-2 text-[11px] leading-5" style={{ borderColor: "rgba(245,158,11,0.18)", background: "rgba(245,158,11,0.06)", color: "var(--yunque-text-secondary)" }}>
+                      <div><span className="font-medium" style={{ color: "var(--yunque-text)" }}>为什么进队列：</span>{guidance.reason}</div>
+                      <div><span className="font-medium" style={{ color: "var(--yunque-text)" }}>优先修改：</span>{guidance.firstEdit}</div>
+                      <div><span className="font-medium" style={{ color: "var(--yunque-text)" }}>验收路径：</span>{guidance.verify}</div>
                     </div>
                     <div className="mt-2">
                       <Link href={packStudioHref(item.manifest, { packageUrl: item.packageUrl, sha256: item.sha256 })}>

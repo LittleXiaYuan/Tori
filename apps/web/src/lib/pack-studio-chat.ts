@@ -100,6 +100,12 @@ export type PackStudioBatchDraftRequest = {
       description: string;
       nextStep: string;
     };
+    polishGuidance?: {
+      reason: string;
+      firstEdit: string;
+      verify: string;
+      handoff: string;
+    };
     studioUrl: string;
     packageUrl: string;
     sha256: string;
@@ -155,6 +161,17 @@ function riskSummary(value: unknown): PackStudioBatchDraftRequest["packs"][numbe
   const requiresAuthorization = record.requires_authorization === true || record.requiresAuthorization === true;
   if (!level && !label && !requiresAuthorization) return undefined;
   return { level, label, requiresAuthorization };
+}
+
+function polishGuidance(value: unknown): PackStudioBatchDraftRequest["packs"][number]["polishGuidance"] | undefined {
+  const record = asRecord(value);
+  if (!record) return undefined;
+  const reason = stringValue(record.reason);
+  const firstEdit = stringValue(record.first_edit) || stringValue(record.firstEdit);
+  const verify = stringValue(record.verify);
+  const handoff = stringValue(record.handoff);
+  if (!reason && !firstEdit && !verify && !handoff) return undefined;
+  return { reason, firstEdit, verify, handoff };
 }
 
 function displayTextWithoutJsonBlocks(text: string, marker?: string): string {
@@ -332,6 +349,7 @@ export function parsePackStudioBatchDraftRequestPrompt(text?: string): PackStudi
         const pack = asRecord(item) || {};
         const delivery = deliverySummary(pack.delivery);
         const risk = riskSummary(pack.risk);
+        const guidance = polishGuidance(pack.polish_guidance) || polishGuidance(pack.polishGuidance);
         return {
           id: stringValue(pack.id),
           name: stringValue(pack.name),
@@ -343,6 +361,7 @@ export function parsePackStudioBatchDraftRequestPrompt(text?: string): PackStudi
           ...(risk ? { risk } : {}),
           permissionSummary: stringValue(pack.permission_summary) || stringValue(pack.permissionSummary),
           ...(delivery ? { delivery } : {}),
+          ...(guidance ? { polishGuidance: guidance } : {}),
           studioUrl: stringValue(pack.studio_url),
           packageUrl: stringValue(pack.package_url),
           sha256: stringValue(pack.sha256),

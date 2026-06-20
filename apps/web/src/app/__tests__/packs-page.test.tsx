@@ -417,6 +417,12 @@ describe("PacksPageOptimized", () => {
     expect(screen.getByRole("button", { name: /查看打磨队列/ })).toBeInTheDocument();
     expect(screen.getByText("按体检缺口和交付状态自动挑出最需要小羽补用途、入口、示例、真实结果或能力边界的能力包。当前第 1 / 1 批，展示 2 个，共 2 个待打磨。")).toBeInTheDocument();
     expect(screen.getByText("还缺：使用示例、用户感知位置、打开/使用入口、后端能力声明")).toBeInTheDocument();
+    expect(screen.getAllByText("为什么进队列：").length).toBeGreaterThan(0);
+    expect(screen.getByText("体检缺口：使用示例、用户感知位置、打开/使用入口、后端能力声明。")).toBeInTheDocument();
+    expect(screen.getAllByText("优先修改：").length).toBeGreaterThan(0);
+    expect(screen.getByText("先确认是否真有后端能力：有则补 routeSpecs、permissions 和测试；没有就明确标为前端/说明型能力，不能伪造执行能力。")).toBeInTheDocument();
+    expect(screen.getAllByText("验收路径：").length).toBeGreaterThan(0);
+    expect(screen.getByText("改完回到能力包详情与 Chat/任务主路径验证：用户是否知道怎么触发、结果在哪里、出问题怎么禁用或回滚。")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "复制批量打磨任务" })).toBeInTheDocument();
     const batchChatLink = screen.getByRole("link", { name: /交给 Chat 批量打磨/ });
     expect(batchChatLink).toHaveAttribute("href", expect.stringContaining("/chat?q="));
@@ -430,6 +436,10 @@ describe("PacksPageOptimized", () => {
     expect(batchPrompt).toContain("\"delivery\"");
     expect(batchPrompt).toContain("\"permission_summary\"");
     expect(batchPrompt).toContain("\"risk\"");
+    expect(batchPrompt).toContain("\"polish_guidance\"");
+    expect(batchPrompt).toContain("\"first_edit\"");
+    expect(batchPrompt).toContain("不能伪造执行能力");
+    expect(batchPrompt).toContain("改完回到能力包详情与 Chat/任务主路径验证");
     const batchStudioLink = screen.getByRole("link", { name: /导入 Studio 逐包处理/ });
     expect(batchStudioLink).toHaveAttribute("href", expect.stringContaining("/packs/studio?batch="));
     const batchStudioPrompt = new URL(batchStudioLink.getAttribute("href")!, "http://localhost").searchParams.get("batch") || "";
@@ -437,6 +447,7 @@ describe("PacksPageOptimized", () => {
     expect(batchStudioPrompt).toContain("yunque.pack.needs-entry");
     expect(batchStudioPrompt).toContain("studio_url");
     expect(batchStudioPrompt).toContain("permission_summary");
+    expect(batchStudioPrompt).toContain("polish_guidance");
     const queueStudioLink = screen.getAllByRole("link", { name: /交给小羽补齐/ })
       .find((link) => link.getAttribute("href")?.includes("yunque.pack.needs-entry"));
     expect(queueStudioLink).toHaveAttribute("href", expect.stringContaining("/packs/studio?"));
