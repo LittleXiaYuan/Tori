@@ -78,6 +78,13 @@ type PackPolishGuidance = {
   verify: string;
   handoff: string;
 };
+type CenterActionNotice = {
+  title: string;
+  detail: string;
+  href?: string;
+  actionLabel?: string;
+  packId?: string;
+};
 
 const KIND_FILTER_LABELS: Record<KindFilter, string> = {
   all: "全部类型",
@@ -450,6 +457,7 @@ export default function PacksPageOptimized() {
   const [manifestPath, setManifestPath] = useState(OFFICIAL_BACKUP_MANIFEST);
   const [busy, setBusy] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [actionNotice, setActionNotice] = useState<CenterActionNotice | null>(null);
   const [query, setQuery] = useState("");
   const [kindFilter, setKindFilter] = useState<KindFilter>("all");
   const [installFilter, setInstallFilter] = useState<InstallFilter>("all");
@@ -660,10 +668,44 @@ export default function PacksPageOptimized() {
     showToast("已复制批量打磨任务", "success");
   };
 
-  const run = async (label: string, op: () => Promise<unknown>, successMsg = "操作成功") => {
+  const noticeForInstalled = (manifest: PackManifest): CenterActionNotice => ({
+    title: "能力包已安装",
+    detail: "下一步先查看详情确认权限和入口，再启用；也可以继续筛选、固定或交给小羽补肉。",
+    href: `/packs/detail?id=${encodeURIComponent(manifest.id)}`,
+    actionLabel: "查看详情并启用",
+    packId: manifest.id,
+  });
+  const noticeForEnabled = (manifest: PackManifest): CenterActionNotice => {
+    const usability = packUsability(manifest);
+    const openPath = usability.primaryActionPath || manifest.frontend?.menus?.[0]?.path || manifest.frontend?.routes?.[0]?.path;
+    return {
+      title: "能力包已启用",
+      detail: openPath ? "可以打开入口验证结果；如果它有侧栏入口，也可以固定到侧栏减少下次寻找。" : "这个包没有独立入口，启用后会在 Chat、任务、记忆或知识流程中被云雀感知。",
+      href: openPath || `/packs/detail?id=${encodeURIComponent(manifest.id)}`,
+      actionLabel: openPath ? (usability.primaryActionLabel || "打开入口") : "查看详情",
+      packId: manifest.id,
+    };
+  };
+  const noticeForDisabled = (id: string): CenterActionNotice => ({
+    title: "能力包已禁用",
+    detail: "云雀不会再把它纳入可用能力；如需恢复，可在本页搜索这个能力包后重新启用。",
+    href: `/packs?q=${encodeURIComponent(id)}`,
+    actionLabel: "回到这个包",
+    packId: id,
+  });
+  const noticeForRollback = (id: string): CenterActionNotice => ({
+    title: "能力包已回滚",
+    detail: "建议回到这个包确认版本、权限和入口；如果仍不符合预期，可以继续禁用或交给小羽检查。",
+    href: `/packs?q=${encodeURIComponent(id)}`,
+    actionLabel: "回到这个包",
+    packId: id,
+  });
+
+  const run = async (label: string, op: () => Promise<unknown>, successMsg = "操作成功", notice?: CenterActionNotice) => {
     setBusy(label);
     try {
       await op();
+      if (notice) setActionNotice(notice);
       showToast(successMsg, "success");
       await refreshAll();
       window.dispatchEvent(new CustomEvent("yunque:packs-changed"));
@@ -674,7 +716,12 @@ export default function PacksPageOptimized() {
     }
   };
 
-  const installLocal = () => run("install:local", () => packsClient.install({ manifestPath, download: false }), "已安装，可在详情页启用");
+  const installLocal = () => run("install:local", () => packsClient.install({ manifestPath, download: false }), "已安装，可在详情页启用", {
+    title: "能力包已安装",
+    detail: "下一步回到详情页确认权限和入口，再决定是否启用。若这个本地包还像空壳，可交给小羽先做只读检查。",
+    href: "/packs/studio",
+    actionLabel: "去 Studio 检查",
+  });
   const installRelease = (entry: PackReleaseCatalogEntry) => {
     const action = catalogActionForEntry(entry);
     if (action.kind === "enable") return enable(entry.manifest.id);
@@ -683,7 +730,7 @@ export default function PacksPageOptimized() {
       showToast("此能力包没有可用的安装源", "error");
       return;
     }
-    return run(`install:${entry.package_url}`, () => packsClient.install(request), "已安装，可继续启用或打开详情");
+    return run(`install:${entry.package_url}`, () => packsClient.install(request), "已安装，可继续启用或打开详情", noticeForInstalled(entry.manifest));
   };
   const installCatalogEntry = (entry: PackCatalogEntry) => {
     const action = catalogActionForEntry(entry);
@@ -693,11 +740,18 @@ export default function PacksPageOptimized() {
       showToast("此能力包没有可用的安装源", "error");
       return;
     }
-    return run(`install:${entry.manifest.id}`, () => packsClient.install(request), "已安装，可继续启用或打开详情");
+    return run(`install:${entry.manifest.id}`, () => packsClient.install(request), "已安装，可继续启用或打开详情", noticeForInstalled(entry.manifest));
   };
-  const enable = (id: string) => run(`enable:${id}`, () => packsClient.enable(id), "已启用，可在命令菜单、扩展分组或本页入口打开");
-  const disable = (id: string) => run(`disable:${id}`, () => packsClient.disable(id), "已禁用");
-  const rollback = (id: string) => run(`rollback:${id}`, () => packsClient.rollback(id), "已回滚");
+  const manifestById = (id: string) =>
+    packs.find((pack) => pack.manifest.id === id)?.manifest
+    || releaseEntries.find((entry) => entry.manifest.id === id)?.manifest
+    || privateCatalogEntries.find((entry) => entry.manifest.id === id)?.manifest;
+  const enable = (id: string) => {
+    const manifest = manifestById(id);
+    return run(`enable:${id}`, () => packsClient.enable(id), "已启用，可在命令菜单、扩展分组或本页入口打开", manifest ? noticeForEnabled(manifest) : undefined);
+  };
+  const disable = (id: string) => run(`disable:${id}`, () => packsClient.disable(id), "已禁用", noticeForDisabled(id));
+  const rollback = (id: string) => run(`rollback:${id}`, () => packsClient.rollback(id), "已回滚", noticeForRollback(id));
 
   const navItemsForPack = (pack: InstalledPack) => buildPackNavItems([pack]);
   const isPackPinned = (pack: InstalledPack) => {
@@ -797,6 +851,39 @@ export default function PacksPageOptimized() {
             <div className="kpi-value">{stats.enabled}</div>
           </Card>
         </div>
+
+        {actionNotice && (
+          <div className="mt-4 rounded-lg border p-4" style={{ borderColor: "rgba(34,197,94,0.22)", background: "rgba(34,197,94,0.07)" }}>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
+                  <PackageCheck size={16} style={{ color: "var(--yunque-success)" }} />
+                  {actionNotice.title}
+                </div>
+                <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
+                  {actionNotice.detail}
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {actionNotice.href && (
+                  <Link href={actionNotice.href}>
+                    <Button size="sm" variant="outline">
+                      {actionNotice.href.startsWith("/packs/") && !actionNotice.href.startsWith("/packs?") ? <ExternalLink size={14} /> : <ArrowRight size={14} />}
+                      {actionNotice.actionLabel || "继续"}
+                    </Button>
+                  </Link>
+                )}
+                {actionNotice.packId && (
+                  <Link href={packStudioHref(manifestById(actionNotice.packId) || { id: actionNotice.packId, name: actionNotice.packId, version: "", status: "beta" } as PackManifest)}>
+                    <Button size="sm" variant="ghost">
+                      <Wrench size={14} /> 交给小羽补齐
+                    </Button>
+                  </Link>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="mt-4 rounded-lg border p-4" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-bg-hover)" }}>
           <div className="mb-3 flex items-start justify-between gap-3">

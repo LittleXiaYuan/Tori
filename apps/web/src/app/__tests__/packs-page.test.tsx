@@ -302,6 +302,12 @@ describe("PacksPageOptimized", () => {
   });
 
   it("filters source and install state without hiding official release cards", async () => {
+    const remoteDocsManifest = {
+      ...documentsManifest,
+      id: "yunque.pack.remote-docs",
+      name: "Remote Docs Pack",
+    };
+    packsClientMock.install.mockResolvedValueOnce({ ok: true });
     packsClientMock.releaseCatalog.mockResolvedValueOnce({
       generated_at: "2026-06-19T00:00:00Z",
       releases: ["https://example.com/releases/tag/pack%2Fdocs%2Fv0.1.0"],
@@ -313,11 +319,7 @@ describe("PacksPageOptimized", () => {
         package_name: "docs.yqpack",
         size_bytes: 2048,
         sha256: "abc",
-        manifest: {
-          ...documentsManifest,
-          id: "yunque.pack.remote-docs",
-          name: "Remote Docs Pack",
-        },
+        manifest: remoteDocsManifest,
       }],
     });
 
@@ -347,6 +349,47 @@ describe("PacksPageOptimized", () => {
       .find((link) => link.getAttribute("href")?.includes("yunque.pack.remote-docs"));
     expect(remoteStudioLink).toHaveAttribute("href", expect.stringContaining("packageUrl=https%3A%2F%2Fexample.com%2Fdocs.yqpack"));
     expect(remoteStudioLink).toHaveAttribute("href", expect.stringContaining("sha256=abc"));
+
+    packsClientMock.installed.mockResolvedValueOnce({
+      packs: [
+        { manifest: documentsManifest, status: "enabled", updatedAt: "2026-06-19T00:00:00Z" },
+        { manifest: filesManifest, status: "enabled", updatedAt: "2026-06-19T00:00:00Z" },
+        { manifest: remoteDocsManifest, status: "disabled", updatedAt: "2026-06-19T00:01:00Z" },
+      ],
+      count: 3,
+    });
+    packsClientMock.catalog.mockResolvedValueOnce({
+      generated_at: "2026-06-19T00:01:00Z",
+      sources: [],
+      source_reports: [],
+      count: 0,
+      installed: 3,
+      enabled: 2,
+      downloadable: 0,
+      capabilities: 0,
+      entries: [],
+    });
+    packsClientMock.releaseCatalog.mockResolvedValueOnce({
+      generated_at: "2026-06-19T00:01:00Z",
+      releases: ["https://example.com/releases/tag/pack%2Fdocs%2Fv0.1.0"],
+      count: 0,
+      entries: [],
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "安装" }));
+
+    await waitFor(() => {
+      expect(packsClientMock.install).toHaveBeenCalledWith({
+        packageUrl: "https://example.com/docs.yqpack",
+        sha256: "abc",
+        source: "https://example.com/releases/tag/pack%2Fdocs%2Fv0.1.0",
+        download: true,
+      });
+    });
+    expect(await screen.findByText("能力包已安装")).toBeInTheDocument();
+    expect(screen.getByText("下一步先查看详情确认权限和入口，再启用；也可以继续筛选、固定或交给小羽补肉。")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /查看详情并启用/ })).toHaveAttribute("href", "/packs/detail?id=yunque.pack.remote-docs");
+    expect(screen.getByRole("link", { name: /交给小羽补齐/ })).toHaveAttribute("href", expect.stringContaining("/packs/studio?packId=yunque.pack.remote-docs"));
   });
 
   it("shows private catalog source origin on installable cards", async () => {
