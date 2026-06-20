@@ -30,6 +30,7 @@ import {
   packPermissionSummary,
   packReadiness,
   packUsability,
+  packVerificationSteps,
   riskProfileForPack,
 } from "@/lib/pack-presentation";
 import {
@@ -129,6 +130,8 @@ function buildDeliverySummary(params: {
   workflowSteps: StudioWorkflowStep[];
 }): string {
   const { manifest, goal, workspaceReport, patchReport, auditReport, repackReport, reinspectReport, installedRepack, workflowSteps } = params;
+  const verificationManifest = installedRepack?.manifest || manifest;
+  const verificationSteps = verificationManifest ? packVerificationSteps(verificationManifest) : [];
   const lines = [
     "# 能力包工坊改包交付摘要",
     "",
@@ -169,6 +172,11 @@ function buildDeliverySummary(params: {
       ? `- 安装状态：${installedRepack.status}；安装包：${installedRepack.manifest.name} (${installedRepack.manifest.id})`
       : "- 安装状态：尚未安装",
     "- 回滚策略：新包应作为显式安装版本处理；验证失败时先禁用，再回滚到上一版本或原始 yqpack。",
+    "",
+    "## 验证路径",
+    ...(verificationSteps.length > 0
+      ? verificationSteps.map((step) => `- ${step.label}：${step.detail}`)
+      : ["- 尚未选择能力包，无法生成验证路径。"]),
     "",
     "## 安全边界",
     "- 小羽输出不会自动写入文件，必须先进入差异预览。",
@@ -2572,6 +2580,7 @@ export default function PackStudioPage() {
                           const installedRisk = riskProfileForPack(installedRepack.manifest);
                           const installedPermissionSummary = packPermissionSummary(installedRepack.manifest);
                           const nextStep = postInstallNextStep(installedRepack);
+                          const verificationSteps = packVerificationSteps(installedRepack.manifest);
                           return (
                             <div className="mt-3 rounded-md border p-3" style={{ borderColor: "var(--yunque-border)" }}>
                               <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -2593,6 +2602,17 @@ export default function PackStudioPage() {
                               <div className="mt-3 rounded px-3 py-2 text-xs leading-5" style={{ background: "var(--yunque-bg-hover)", color: "var(--yunque-text-secondary)" }}>
                                 <div className="font-medium" style={{ color: "var(--yunque-text)" }}>{nextStep.title}</div>
                                 <div className="mt-1">{nextStep.detail}</div>
+                              </div>
+                              <div className="mt-3 rounded-md border p-3" style={{ borderColor: "rgba(34,197,94,0.16)", background: "rgba(34,197,94,0.05)" }}>
+                                <div className="mb-2 text-xs font-medium" style={{ color: "var(--yunque-text)" }}>安装后怎么验收</div>
+                                <div className="space-y-1">
+                                  {verificationSteps.map((step) => (
+                                    <div key={step.key} className="flex items-start gap-2 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
+                                      <span style={{ color: "var(--yunque-success)" }}>•</span>
+                                      <span>{step.label}：{step.detail}</span>
+                                    </div>
+                                  ))}
+                                </div>
                               </div>
                               <div className="mt-3 flex flex-wrap gap-2">
                                 {packPrimaryPath(installedRepack.manifest) && (

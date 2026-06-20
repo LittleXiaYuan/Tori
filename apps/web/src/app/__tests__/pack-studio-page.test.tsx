@@ -1033,6 +1033,9 @@ describe("PackStudioPage", () => {
     expect(screen.getByRole("link", { name: /回中心管理/ })).toHaveAttribute("href", "/packs?q=yunque.pack.wasm-plugin");
     expect(screen.getByText("下一步：确认权限后再启用")).toBeInTheDocument();
     expect(screen.getByText("新包已经安装但未启用。先确认权限、来源和风险；确认后启用，或回中心继续管理这个包。")).toBeInTheDocument();
+    expect(screen.getByText("安装后怎么验收")).toBeInTheDocument();
+    expect(screen.getByText(/先触发一次：从「检查 WASM 能力」进入/)).toBeInTheDocument();
+    expect(screen.getByText(/看结果在哪：回到 \/packs\/wasm-plugin 查看页面状态、结果或下一步动作/)).toBeInTheDocument();
     expect(screen.getAllByText("下一步：确认权限后启用或回滚").length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole("button", { name: "启用" }));
@@ -1055,6 +1058,9 @@ describe("PackStudioPage", () => {
     expect(deliverySummary).toContain("- 包路径：C:\\yunque\\packs\\studio\\yunque.pack.wasm-plugin-0.1.0-studio.yqpack");
     expect(deliverySummary).toContain("- SHA256：" + "d".repeat(64));
     expect(deliverySummary).toContain("- 安装状态：enabled；安装包：WASM 能力包 (yunque.pack.wasm-plugin)");
+    expect(deliverySummary).toContain("## 验证路径");
+    expect(deliverySummary).toContain("- 先触发一次：从「检查 WASM 能力」进入");
+    expect(deliverySummary).toContain("- 看结果在哪：回到 /packs/wasm-plugin 查看页面状态、结果或下一步动作");
     expect(deliverySummary).toContain("- 高风险或审计阻断改动不得继续打包/安装。");
     await waitFor(() => {
       expect(toastMock).toHaveBeenCalledWith("已复制改包交付摘要", "success");
