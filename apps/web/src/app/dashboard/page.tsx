@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Card, Button, Spinner, Chip, Tooltip, Table, ProgressBar,
+  Button, Chip, Tooltip, Table, ProgressBar,
 } from "@heroui/react";
 import {
   api,
@@ -14,16 +14,15 @@ import {
   type SystemInfo as SysInfo,
 } from "@/lib/api";
 import {
-  Activity, Zap, Clock, Package, AlertTriangle, Server, Cpu,
+  Activity, Zap, Clock, Package, AlertTriangle, Server,
   ArrowRight, RefreshCw, TrendingUp, TrendingDown,
-  DollarSign, BarChart3, GitCommit, HardDrive, Settings, Rocket,
-  MessageCircle, CheckCircle2,
+  DollarSign, BarChart3, Rocket,
+  MessageCircle, CheckCircle2, BookOpen, Brain, ClipboardCheck,
 } from "lucide-react";
 import { usePolling } from "@/lib/use-polling";
 import { DashboardSkeleton } from "@/components/skeleton-loader";
 import { formatErrorMessage } from "@/lib/error-utils";
 import { DASHBOARD_SCENARIOS, scenarioChatHref } from "@/lib/product-scenarios";
-import PackSurfaceGuide from "@/components/pack-surface-guide";
 
 /* ── helpers ───────────────────────────────────── */
 
@@ -194,7 +193,12 @@ export default function DashboardPage() {
   const skillMetrics = metrics?.skills ?? [];
   const barData = useMemo(() => skillMetrics.map(s => s.total), [skillMetrics]);
   const barLabels = useMemo(() => skillMetrics.map(s => s.name?.slice(0, 6) ?? ""), [skillMetrics]);
-  const latencyData = useMemo(() => skillMetrics.map(s => s.latency?.avg_ms ?? 0), [skillMetrics]);
+  const workspaceSteps = [
+    { label: "开口", desc: "从对话说明目标", icon: <MessageCircle size={14} /> },
+    { label: "执行", desc: "需要时生成任务并跟进", icon: <Zap size={14} /> },
+    { label: "验收", desc: "查看产物、文件和结论", icon: <ClipboardCheck size={14} /> },
+    { label: "沉淀", desc: "把偏好与资料写入记忆/知识", icon: <Brain size={14} /> },
+  ];
 
   if (loading) {
     return <DashboardSkeleton />;
@@ -208,7 +212,7 @@ export default function DashboardPage() {
         <div>
           <h1 className="page-title">工作台</h1>
           <div className="page-subtitle" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span>先选场景，再验收产物</span>
+            <span>把今天的目标交给云雀，从对话推进到结果</span>
             <span className={`status-dot ${serviceOnline ? "status-dot--online" : "status-dot--offline"}`} />
             {serviceOnline ? "运行中" : "离线"}
             {version ? ` · v${version.version}` : ""}
@@ -222,8 +226,6 @@ export default function DashboardPage() {
           <Tooltip.Content>刷新</Tooltip.Content>
         </Tooltip>
       </div>
-
-      <PackSurfaceGuide surface="dashboard" />
 
       {/* ── Setup Banner ── */}
       {setupNeeded && (
@@ -251,7 +253,76 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {/* ── Action first workspace ── */}
+      <section className="section-card dashboard-action-hero" aria-labelledby="dashboard-action-title">
+        <div className="dashboard-action-hero__copy">
+          <div className="dashboard-action-hero__eyebrow">今日行动</div>
+          <h2 id="dashboard-action-title" className="dashboard-action-hero__title">从一句话开始，交付一个可验收结果</h2>
+          <p className="dashboard-action-hero__desc">
+            云雀会优先从 Chat 承接目标；需要执行时进入任务中心，完成后把产物、知识和记忆留在你能找回的位置。
+          </p>
+          <div className="dashboard-action-hero__actions">
+            <Button onPress={() => router.push("/chat")} size="md">
+              <MessageCircle size={15} /> 开始对话
+            </Button>
+            <Button variant="secondary" onPress={() => router.push("/missions")} size="md">
+              <Zap size={15} /> 查看任务中心
+            </Button>
+            <Button variant="ghost" onPress={() => router.push("/knowledge")} size="md">
+              <BookOpen size={15} /> 整理知识
+            </Button>
+          </div>
+        </div>
+        <ol className="dashboard-workflow" aria-label="云雀工作闭环">
+          {workspaceSteps.map((step) => (
+            <li key={step.label} className="dashboard-workflow__item">
+              <span className="dashboard-workflow__icon" aria-hidden>{step.icon}</span>
+              <span>
+                <span className="dashboard-workflow__label">{step.label}</span>
+                <span className="dashboard-workflow__desc">{step.desc}</span>
+              </span>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      <section className="dashboard-scenarios" aria-labelledby="dashboard-scenarios-title">
+        <div className="dashboard-section-head">
+          <div>
+            <h2 id="dashboard-scenarios-title" className="dashboard-section-title">常用开始方式</h2>
+            <p className="dashboard-section-desc">不用先理解功能分类，直接选一个目标进入对话。</p>
+          </div>
+          <Button variant="ghost" size="sm" onPress={() => router.push("/chat")}>
+            去对话 <ArrowRight size={12} />
+          </Button>
+        </div>
+        <ul className="dashboard-scenario-grid">
+          {DASHBOARD_SCENARIOS.map((a) => (
+            <li key={a.id}>
+              <button
+                type="button"
+                onClick={() => router.push(scenarioChatHref(a.prompt))}
+                className="dashboard-scenario-card"
+              >
+                <span className="dashboard-scenario-card__icon" aria-hidden>{a.icon}</span>
+                <span className="dashboard-scenario-card__body">
+                  <span className="dashboard-scenario-card__title">{a.label}</span>
+                  <span className="dashboard-scenario-card__desc">{a.description}</span>
+                </span>
+                <ArrowRight size={12} aria-hidden className="dashboard-scenario-card__arrow" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      </section>
+
       {/* ── KPI Strip ── */}
+      <div className="dashboard-section-head" style={{ marginTop: "var(--sp-2)" }}>
+        <div>
+          <h2 className="dashboard-section-title">运行概况</h2>
+          <p className="dashboard-section-desc">这些数据用来判断云雀是否稳定，不需要先读懂它们才能开始使用。</p>
+        </div>
+      </div>
       <div className="kpi-grid">
         <KPICard
           label="请求"
@@ -363,33 +434,6 @@ export default function DashboardPage() {
 
         {/* Right sidebar: stacked info cards */}
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-4)" }}>
-
-          {/* Scenario launcher */}
-          <div className="section-card" style={{ padding: "var(--card-pad-sm)" }}>
-            <div className="section-title">从一个场景开始</div>
-            <p style={{ fontSize: "var(--text-xs)", color: "var(--yunque-text-muted)", margin: "-2px 0 var(--sp-3)" }}>
-              云雀会从 Chat 出发，把目标推进到行动、产物和可验收结论。
-            </p>
-            <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-2)" }}>
-              {DASHBOARD_SCENARIOS.map(a => (
-                <button
-                  key={a.id}
-                  onClick={() => router.push(scenarioChatHref(a.prompt))}
-                  className="quick-action-btn"
-                  style={{ alignItems: "flex-start", padding: "10px 12px" }}
-                >
-                  <span style={{ color: "var(--yunque-accent)", display: "flex", marginTop: 2 }}>{a.icon}</span>
-                  <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-                    <span>{a.label}</span>
-                    <span style={{ fontSize: "var(--text-2xs)", color: "var(--yunque-text-muted)", lineHeight: 1.4 }}>
-                      {a.description}
-                    </span>
-                  </span>
-                  <ArrowRight size={11} className="ml-auto" style={{ opacity: 0.4 }} />
-                </button>
-              ))}
-            </div>
-          </div>
 
           {/* Cost */}
           <div className="section-card" style={{ padding: "var(--card-pad-sm)" }}>

@@ -86,7 +86,9 @@ export const ONBOARDING_SCENARIOS = PRODUCT_SCENARIOS.slice(0, 3);
 export const CHAT_EMPTY_SCENARIOS = ["ask-explain", "knowledge-brief", "remember-pref", "weekly-report"]
   .map((id) => PRODUCT_SCENARIOS.find((s) => s.id === id))
   .filter((s): s is ProductScenario => Boolean(s));
-export const DASHBOARD_SCENARIOS = PRODUCT_SCENARIOS.slice(0, 3);
+export const DASHBOARD_SCENARIOS = ["weekly-report", "knowledge-brief", "remember-pref", "pack-improve"]
+  .map((id) => PRODUCT_SCENARIOS.find((s) => s.id === id))
+  .filter((s): s is ProductScenario => Boolean(s));
 
 export const CHAT_AGENT_SCENES: ChatAgentScene[] = [
   {
