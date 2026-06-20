@@ -275,7 +275,7 @@ function packPolishGuidance(manifest: PackManifest): PackPolishGuidance {
     verify: primaryPath
       ? `改完回到 ${primaryPath} 验证入口、提示、结果位置和回滚路径是否可见。`
       : "改完回到能力包详情与 Chat/任务主路径验证：用户是否知道怎么触发、结果在哪里、出问题怎么禁用或回滚。",
-    handoff: "只读检查 -> 准备工作区 -> 预览 diff -> 审计 -> 重新打包 -> 复检 SHA -> 安装/启用/回滚。",
+    handoff: "只读检查 -> 准备工作区 -> 预览差异 -> 审计 -> 重新打包 -> 复检 SHA -> 安装/启用/回滚。",
   };
 }
 
@@ -294,7 +294,7 @@ function buildBatchReadinessPrompt(
     },
     rules: [
       "不要自动应用改动。",
-      "每个包先给独立 Patch Draft Request，再回到 Pack Studio 只读检查、准备工作区、预览 diff、运行审计、重新打包和复检 SHA。",
+      "每个包先给独立改包草稿请求，再回到能力包工坊只读检查、准备工作区、预览差异、运行审计、重新打包和复检 SHA。",
       "缺后端能力声明时，不要伪造能力；如果需要新增 routeSpecs、权限或源码测试，请明确列为待办。",
       "实验/计划型能力不能包装成稳定承诺，高风险权限必须保留授权和回滚说明。",
       "如果交付状态是实验/计划，优先补真实结果位置、限制说明、验证步骤和后续转稳定的最小待办。",
@@ -338,8 +338,8 @@ function buildBatchReadinessPrompt(
   };
   return [
     "请以“小羽改包”的方式批量处理下面这些能力包。",
-    "目标是先补齐用户可感知的用途、入口、示例、权限边界和回滚说明，而不是直接扩大能力或绕过 Pack Studio。",
-    "请按优先级逐包输出计划；需要具体改单文件时，只输出 yunque.pack_studio.patch_draft_request.v1 或 patch_draft.v1，并要求用户回到 Pack Studio 预览 diff / 审计 / 重打包。",
+    "目标是先补齐用户可感知的用途、入口、示例、权限边界和回滚说明，而不是直接扩大能力或绕过能力包工坊。",
+    "请按优先级逐包输出计划；需要具体改单文件时，只输出 yunque.pack_studio.patch_draft_request.v1 或 patch_draft.v1，并要求用户回到能力包工坊预览差异 / 审计 / 重打包。",
     "",
     "```json",
     JSON.stringify(request, null, 2),
@@ -734,7 +734,7 @@ export default function PacksPageOptimized() {
     title: "能力包已安装",
     detail: "下一步回到详情页确认权限和入口，再决定是否启用。若这个本地包还像空壳，可交给小羽先做只读检查。",
     href: "/packs/studio",
-    actionLabel: "去 Studio 检查",
+    actionLabel: "去工坊检查",
   });
   const installRelease = (entry: PackReleaseCatalogEntry) => {
     const action = catalogActionForEntry(entry);
@@ -1095,7 +1095,7 @@ export default function PacksPageOptimized() {
               </Button>
               <Link href={batchReadinessStudioHref}>
                 <Button size="sm" variant="outline">
-                  导入 Studio 逐包处理 <Wrench size={14} />
+                  导入工坊逐包处理 <Wrench size={14} />
                 </Button>
               </Link>
               <Link href={batchReadinessChatHref}>

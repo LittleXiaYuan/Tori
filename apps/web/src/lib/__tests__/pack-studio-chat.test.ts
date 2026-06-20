@@ -11,7 +11,7 @@ function promptWithPlan() {
   return [
     "请以小羽改包方式优化能力包。",
     "",
-    "下面是 Pack Studio 已准备好的 Patch Plan。请只把它当作结构化导航和安全约束。",
+    "下面是能力包工坊已准备好的改包计划。请只把它当作结构化导航和安全约束。",
     "",
     "```json",
     JSON.stringify({
@@ -26,11 +26,11 @@ function promptWithPlan() {
       candidates: [
         {
           key: "manifest:C:\\yunque\\packs\\studio\\pack.json",
-          label: "manifest 草稿",
+          label: "能力声明草稿",
           file_path: "C:\\yunque\\packs\\studio\\pack.json",
           risk_level: "low",
           applyable: true,
-          gates: ["预览 diff", "内置审计"],
+          gates: ["预览差异", "内置审计"],
           content_summary: { length: 1200, hash: "abcd1234" },
         },
       ],
@@ -46,12 +46,21 @@ describe("parsePackStudioPatchPlanPrompt", () => {
     expect(parsed?.pack.id).toBe("yunque.pack.wasm-plugin");
     expect(parsed?.workspace.id).toBe("yunque.pack.wasm-plugin-0.1.0-aaaaaaaaaaaa");
     expect(parsed?.candidates[0]).toMatchObject({
-      label: "manifest 草稿",
+      label: "能力声明草稿",
       filePath: "C:\\yunque\\packs\\studio\\pack.json",
       riskLevel: "low",
       applyable: true,
     });
     expect(parsed?.candidates[0].contentSummary).toEqual({ length: 1200, hash: "abcd1234" });
+    expect(parsed?.displayText).toBe("请以小羽改包方式优化能力包。");
+  });
+
+  it("keeps old Pack Studio handoff prompts readable", () => {
+    const parsed = parsePackStudioPatchPlanPrompt(
+      promptWithPlan().replace("下面是能力包工坊已准备好的改包计划", "下面是 Pack Studio 已准备好的 Patch Plan"),
+    );
+
+    expect(parsed?.pack.id).toBe("yunque.pack.wasm-plugin");
     expect(parsed?.displayText).toBe("请以小羽改包方式优化能力包。");
   });
 
@@ -62,7 +71,7 @@ describe("parsePackStudioPatchPlanPrompt", () => {
 });
 
 describe("parsePackStudioPatchDraftPrompt", () => {
-  it("extracts a single-file draft that still needs Studio diff preview", () => {
+  it("extracts a single-file draft that still needs workshop difference preview", () => {
     const parsed = parsePackStudioPatchDraftPrompt([
       "小羽给出的单文件草稿：",
       "```json",
@@ -79,7 +88,7 @@ describe("parsePackStudioPatchDraftPrompt", () => {
         content: "{\n  \"description\": \"更清楚\"\n}\n",
         reason: "补强说明",
         risk_level: "low",
-        gates: ["预览 diff", "内置审计"],
+        gates: ["预览差异", "内置审计"],
       }, null, 2),
       "```",
     ].join("\n"));
@@ -87,7 +96,7 @@ describe("parsePackStudioPatchDraftPrompt", () => {
     expect(parsed?.pack.id).toBe("yunque.pack.wasm-plugin");
     expect(parsed?.filePath).toBe("C:\\yunque\\packs\\studio\\pack.json");
     expect(parsed?.content).toContain("\"description\": \"更清楚\"");
-    expect(parsed?.gates).toEqual(["预览 diff", "内置审计"]);
+    expect(parsed?.gates).toEqual(["预览差异", "内置审计"]);
   });
 
   it("requires a real file path and content", () => {
@@ -99,9 +108,9 @@ describe("parsePackStudioPatchDraftRequestPrompt", () => {
   it("extracts a draft generation request without exposing starter content as display text", () => {
     const starterContent = "<!doctype html>\n<p>完整草稿内容不应该直接展示</p>\n";
     const parsed = parsePackStudioPatchDraftRequestPrompt([
-      "请让小羽生成单文件 Draft。",
+      "请让小羽生成单文件草稿。",
       "",
-      "下面是 Pack Studio 的 Patch Draft Request。",
+      "下面是能力包工坊的改包草稿请求。",
       "```json",
       JSON.stringify({
         kind: "yunque.pack_studio.patch_draft_request.v1",
@@ -117,7 +126,7 @@ describe("parsePackStudioPatchDraftRequestPrompt", () => {
           label: "前端界面草稿",
           reason: "补结果界面",
           risk_level: "medium",
-          gates: ["预览 diff", "内置审计"],
+          gates: ["预览差异", "内置审计"],
           content_summary: { length: starterContent.length, hash: "feedbeef" },
         },
         starter_content: starterContent,
@@ -131,8 +140,29 @@ describe("parsePackStudioPatchDraftRequestPrompt", () => {
     expect(parsed?.target.contentSummary).toEqual({ length: starterContent.length, hash: "feedbeef" });
     expect(parsed?.starterContentLength).toBe(starterContent.length);
     expect(parsed?.expectedKind).toBe("yunque.pack_studio.patch_draft.v1");
-    expect(parsed?.displayText).toBe("请让小羽生成单文件 Draft。");
+    expect(parsed?.displayText).toBe("请让小羽生成单文件草稿。");
     expect(parsed?.displayText).not.toContain("完整草稿内容不应该直接展示");
+  });
+
+  it("keeps old Pack Studio draft request prompts readable", () => {
+    const starterContent = "<!doctype html>\n<p>完整草稿内容不应该直接展示</p>\n";
+    const parsed = parsePackStudioPatchDraftRequestPrompt([
+      "请让小羽生成单文件草稿。",
+      "",
+      "下面是 Pack Studio 的 Patch Draft Request。",
+      "```json",
+      JSON.stringify({
+        kind: "yunque.pack_studio.patch_draft_request.v1",
+        pack: { id: "yunque.pack.wasm-plugin", name: "WASM 能力包", version: "0.1.0" },
+        workspace: { id: "ws", path: "C:\\studio\\pack", original_sha256: "a".repeat(64) },
+        target: { file_path: "C:\\studio\\pack\\pack.json" },
+        starter_content: starterContent,
+      }, null, 2),
+      "```",
+    ].join("\n"));
+
+    expect(parsed?.target.filePath).toBe("C:\\studio\\pack\\pack.json");
+    expect(parsed?.displayText).toBe("请让小羽生成单文件草稿。");
   });
 
   it("requires a target file path", () => {
@@ -150,7 +180,7 @@ describe("parsePackStudioBatchDraftRequestPrompt", () => {
         kind: "yunque.pack_studio.batch_draft_request.v1",
         goal: "把看得到但不知道怎么用的能力包补成可打开、可验证、可回滚。",
         batch: { page: 2, page_count: 4, total: 22, page_size: 6 },
-        rules: ["不要自动应用改动", "逐包生成 Draft Request"],
+        rules: ["不要自动应用改动", "逐包生成改包草稿请求"],
         packs: [
           {
             id: "yunque.pack.needs-entry",
@@ -177,7 +207,7 @@ describe("parsePackStudioBatchDraftRequestPrompt", () => {
 
     expect(parsed?.goal).toContain("可打开");
     expect(parsed?.batch).toEqual({ page: 2, pageCount: 4, total: 22, pageSize: 6 });
-    expect(parsed?.rules).toEqual(["不要自动应用改动", "逐包生成 Draft Request"]);
+    expect(parsed?.rules).toEqual(["不要自动应用改动", "逐包生成改包草稿请求"]);
     expect(parsed?.packs[0]).toMatchObject({
       id: "yunque.pack.needs-entry",
       name: "Needs Entry Pack",

@@ -116,11 +116,11 @@ function props(overrides: Partial<ChatMessageListProps> = {}): ChatMessageListPr
 }
 
 describe("ChatMessageList file preview", () => {
-  it("renders Pack Studio patch plans as a guarded user task card", () => {
+  it("renders ability package workshop patch plans as a guarded user task card", () => {
     const prompt = [
       "请以小羽改包方式优化能力包。",
       "",
-      "下面是 Pack Studio 已准备好的 Patch Plan。请只把它当作结构化导航和安全约束。",
+      "下面是能力包工坊已准备好的改包计划。请只把它当作结构化导航和安全约束。",
       "",
       "```json",
       JSON.stringify({
@@ -135,11 +135,11 @@ describe("ChatMessageList file preview", () => {
         candidates: [
           {
             key: "manifest:C:\\yunque\\packs\\studio\\pack.json",
-            label: "manifest 草稿",
+            label: "能力声明草稿",
             file_path: "C:\\yunque\\packs\\studio\\pack.json",
             risk_level: "low",
             applyable: true,
-            gates: ["预览 diff", "内置审计"],
+            gates: ["预览差异", "内置审计"],
             content_summary: { length: 1200, hash: "abcd1234" },
           },
         ],
@@ -153,21 +153,21 @@ describe("ChatMessageList file preview", () => {
 
     expect(screen.getByText("小羽改包任务")).toBeInTheDocument();
     expect(screen.getByText(/WASM 能力包/)).toBeInTheDocument();
-    expect(screen.getByText("manifest 草稿")).toBeInTheDocument();
+    expect(screen.getByText("能力声明草稿")).toBeInTheDocument();
     expect(screen.getByText("风险：low")).toBeInTheDocument();
     expect(screen.getByText("摘要：abcd1234")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /导入 Plan/ })).toHaveAttribute("href", expect.stringContaining("/packs/studio?packId=yunque.pack.wasm-plugin"));
-    expect(screen.getByRole("link", { name: /导入 Plan/ })).toHaveAttribute("href", expect.stringContaining("#import-plan"));
+    expect(screen.getByRole("link", { name: /导入改包计划/ })).toHaveAttribute("href", expect.stringContaining("/packs/studio?packId=yunque.pack.wasm-plugin"));
+    expect(screen.getByRole("link", { name: /导入改包计划/ })).toHaveAttribute("href", expect.stringContaining("#import-plan"));
     expect(screen.getByRole("link", { name: /查看能力包详情/ })).toHaveAttribute("href", "/packs/detail?id=yunque.pack.wasm-plugin");
     expect(screen.getByRole("link", { name: /回中心定位/ })).toHaveAttribute("href", "/packs?q=yunque.pack.wasm-plugin");
     expect(screen.getByText("请以小羽改包方式优化能力包。")).toBeInTheDocument();
     expect(screen.queryByText(/yunque.pack_studio.patch_plan.v1/)).not.toBeInTheDocument();
   });
 
-  it("renders Pack Studio patch drafts without exposing full file content", () => {
+  it("renders ability package workshop drafts without exposing full file content", () => {
     const onCopy = vi.fn();
     const draftMessage = [
-      "我已经准备好单文件草稿，先回 Studio 审一下。",
+      "我已经准备好单文件草稿，先回工坊审一下。",
       "",
       "```json",
       JSON.stringify({
@@ -183,7 +183,7 @@ describe("ChatMessageList file preview", () => {
         content: "{\n  \"description\": \"这段完整内容不应该直接展示在 Chat 气泡里\"\n}\n",
         reason: "补强能力说明",
         risk_level: "low",
-        gates: ["预览 diff", "内置审计"],
+        gates: ["预览差异", "内置审计"],
       }, null, 2),
       "```",
     ].join("\n");
@@ -197,12 +197,12 @@ describe("ChatMessageList file preview", () => {
     expect(screen.getByText(/WASM 能力包/)).toBeInTheDocument();
     expect(screen.getByText(/C:\\yunque\\packs\\studio\\pack\.json/)).toBeInTheDocument();
     expect(screen.getByText("风险：low")).toBeInTheDocument();
-    expect(screen.getByText("预览 diff")).toBeInTheDocument();
+    expect(screen.getByText("预览差异")).toBeInTheDocument();
     expect(screen.getByText("内置审计")).toBeInTheDocument();
     expect(screen.getByText(/原因：补强能力说明/)).toBeInTheDocument();
-    expect(screen.getByText("我已经准备好单文件草稿，先回 Studio 审一下。")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /导入 Draft/ })).toHaveAttribute("href", expect.stringContaining("/packs/studio?packId=yunque.pack.wasm-plugin"));
-    expect(screen.getByRole("link", { name: /导入 Draft/ })).toHaveAttribute("href", expect.stringContaining("#import-draft"));
+    expect(screen.getByText("我已经准备好单文件草稿，先回工坊审一下。")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /导入改包草稿/ })).toHaveAttribute("href", expect.stringContaining("/packs/studio?packId=yunque.pack.wasm-plugin"));
+    expect(screen.getByRole("link", { name: /导入改包草稿/ })).toHaveAttribute("href", expect.stringContaining("#import-draft"));
     expect(screen.getByRole("link", { name: /查看能力包详情/ })).toHaveAttribute("href", "/packs/detail?id=yunque.pack.wasm-plugin");
     expect(screen.getByRole("link", { name: /回中心定位/ })).toHaveAttribute("href", "/packs?q=yunque.pack.wasm-plugin");
     expect(screen.queryByText(/yunque.pack_studio.patch_draft.v1/)).not.toBeInTheDocument();
@@ -216,13 +216,13 @@ describe("ChatMessageList file preview", () => {
     expect(onCopy.mock.calls[0][1]).not.toContain("这段完整内容不应该直接展示");
   });
 
-  it("renders Pack Studio draft requests without exposing starter content", () => {
+  it("renders ability package workshop draft requests without exposing starter content", () => {
     const onCopy = vi.fn();
     const starterContent = "<!doctype html>\n<p>starter 内容不应该直接展示在 Chat 气泡里</p>\n";
     const requestMessage = [
-      "请生成这个能力包界面的 Draft。",
+      "请生成这个能力包界面的草稿。",
       "",
-      "下面是 Pack Studio 的 Patch Draft Request。",
+      "下面是能力包工坊的改包草稿请求。",
       "```json",
       JSON.stringify({
         kind: "yunque.pack_studio.patch_draft_request.v1",
@@ -238,7 +238,7 @@ describe("ChatMessageList file preview", () => {
           label: "前端界面草稿",
           reason: "补结果界面",
           risk_level: "medium",
-          gates: ["预览 diff", "内置审计", "重新打包"],
+          gates: ["预览差异", "内置审计", "重新打包"],
           content_summary: { length: starterContent.length, hash: "feedbeef" },
         },
         starter_content: starterContent,
@@ -263,7 +263,7 @@ describe("ChatMessageList file preview", () => {
     expect(screen.getByRole("link", { name: /查看草稿队列/ })).toHaveAttribute("href", expect.stringContaining("#draft-queue"));
     expect(screen.getByRole("link", { name: /查看能力包详情/ })).toHaveAttribute("href", "/packs/detail?id=yunque.pack.wasm-plugin");
     expect(screen.getByRole("link", { name: /回中心定位/ })).toHaveAttribute("href", "/packs?q=yunque.pack.wasm-plugin");
-    expect(screen.getByText("请生成这个能力包界面的 Draft。")).toBeInTheDocument();
+    expect(screen.getByText("请生成这个能力包界面的草稿。")).toBeInTheDocument();
     expect(screen.queryByText(/yunque.pack_studio.patch_draft_request.v1/)).not.toBeInTheDocument();
     expect(screen.queryByText(/starter 内容不应该直接展示/)).not.toBeInTheDocument();
 
@@ -275,7 +275,7 @@ describe("ChatMessageList file preview", () => {
     expect(onCopy.mock.calls[0][1]).not.toContain("starter 内容不应该直接展示");
   });
 
-  it("renders Pack Studio batch draft requests as a guarded queue card", () => {
+  it("renders ability package workshop batch draft requests as a guarded queue card", () => {
     const onCopy = vi.fn();
     const batchMessage = [
       "请批量补肉这批能力包。",
@@ -287,7 +287,7 @@ describe("ChatMessageList file preview", () => {
         batch: { page: 2, page_count: 4, total: 20, page_size: 6 },
         rules: [
           "不要自动应用改动。",
-          "每个包先给独立 Patch Draft Request，再回到 Pack Studio 只读检查、准备工作区、预览 diff、运行审计、重新打包和复检 SHA。",
+          "每个包先给独立改包草稿请求，再回到能力包工坊只读检查、准备工作区、预览差异、运行审计、重新打包和复检 SHA。",
         ],
         packs: [
           {
@@ -322,7 +322,7 @@ describe("ChatMessageList file preview", () => {
       messages: [{ role: "assistant", content: batchMessage, id: "a-batch" }],
     })} />);
 
-    expect(screen.getByText("小羽批量补肉任务")).toBeInTheDocument();
+    expect(screen.getByText("小羽批量打磨任务")).toBeInTheDocument();
     expect(screen.getByText(/第 2 \/ 4 批 · 本批 2 个 · 总计 20 个待补肉/)).toBeInTheDocument();
     expect(screen.getByText("Needs Entry Pack")).toBeInTheDocument();
     expect(screen.getByText("Experimental Pack")).toBeInTheDocument();
@@ -347,14 +347,14 @@ describe("ChatMessageList file preview", () => {
 
     fireEvent.click(screen.getByTestId("copy").closest("button")!);
     expect(onCopy).toHaveBeenCalledTimes(1);
-    expect(onCopy.mock.calls[0][1]).toContain("小羽批量补肉任务: 2 个能力包");
+    expect(onCopy.mock.calls[0][1]).toContain("小羽批量打磨任务: 2 个能力包");
     expect(onCopy.mock.calls[0][1]).toContain("队列批次：第 2 / 4 批；总计 20 个待补肉");
     expect(onCopy.mock.calls[0][1]).toContain("Needs Entry Pack");
     expect(onCopy.mock.calls[0][1]).toContain("请逐包生成改包草稿请求");
     expect(onCopy.mock.calls[0][1]).not.toContain("yunque.pack_studio.batch_draft_request.v1");
   });
 
-  it("does not fall back to raw JSON when a structured Pack Studio user message has no prose", () => {
+  it("does not fall back to raw JSON when a structured workshop user message has no prose", () => {
     const rawPlanOnly = [
       "```json",
       JSON.stringify({

@@ -122,7 +122,7 @@ function packStudioToolSummary(content: string): string | null {
     });
     return [
       batchRequest.displayText,
-      `小羽批量补肉任务: ${batchRequest.packs.length} 个能力包`,
+      `小羽批量打磨任务: ${batchRequest.packs.length} 个能力包`,
       batchRequest.batch?.total ? `队列批次：第 ${batchRequest.batch.page || 1} / ${batchRequest.batch.pageCount || 1} 批；总计 ${batchRequest.batch.total} 个待补肉` : "",
       batchRequest.goal ? `目标：${batchRequest.goal}` : "",
       batchRequest.rules.length ? `规则：${batchRequest.rules.join(" / ")}` : "",
@@ -269,7 +269,7 @@ function renderPackStudioPlan(plan: PackStudioPatchPlanSummary) {
           className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1.5 text-[11px] font-medium"
           style={{ background: "var(--yunque-accent-muted)", color: "var(--yunque-accent)" }}
         >
-          导入 Plan <ArrowRight size={11} />
+          导入改包计划 <ArrowRight size={11} />
         </a>
       </div>
       <div className="mt-2 break-all font-mono text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
@@ -322,7 +322,7 @@ function renderPackStudioDraft(draft: PackStudioPatchDraft) {
           className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1.5 text-[11px] font-medium"
           style={{ background: "var(--yunque-success-muted)", color: "var(--yunque-success)" }}
         >
-          导入 Draft <ArrowRight size={11} />
+          导入改包草稿 <ArrowRight size={11} />
         </a>
       </div>
       <div className="mt-2 break-all font-mono text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
@@ -362,12 +362,12 @@ function renderPackStudioBatchDraftRequest(request: PackStudioBatchDraftRequest)
         <div className="min-w-0">
           <div className="flex items-center gap-2 font-semibold">
             <Sparkles size={14} style={{ color: "var(--yunque-accent)" }} />
-            <span>小羽批量补肉任务</span>
+            <span>小羽批量打磨任务</span>
           </div>
           <div className="mt-1 truncate" style={{ color: "var(--yunque-text-muted)" }}>
             {request.batch?.total
               ? `第 ${request.batch.page || 1} / ${request.batch.pageCount || 1} 批 · 本批 ${request.packs.length} 个 · 总计 ${request.batch.total} 个待补肉`
-              : `${request.packs.length} 个能力包 · 小羽逐包生成 Draft Request`}
+              : `${request.packs.length} 个能力包 · 小羽逐包生成改包草稿请求`}
           </div>
         </div>
         <a
@@ -454,7 +454,7 @@ function renderPackStudioDraftRequest(request: PackStudioPatchDraftRequest) {
             <span>小羽改包请求</span>
           </div>
           <div className="mt-1 truncate" style={{ color: "var(--yunque-text-muted)" }}>
-            {request.pack.name || request.pack.id} · {request.pack.version || "unknown"} · 让小羽生成单文件 Draft
+            {request.pack.name || request.pack.id} · {request.pack.version || "unknown"} · 让小羽生成单文件草稿
           </div>
         </div>
         <a

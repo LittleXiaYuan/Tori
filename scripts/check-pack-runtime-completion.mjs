@@ -86,16 +86,16 @@ requireTokens("Backend Pack module and gateway route gates", backend + gateway, 
   "http.StatusMethodNotAllowed",
 ]);
 
-requireTokens("能力包中心和 Studio 闭环", packCenter + packDetail + packStudio + presentation + releaseSources, [
+requireTokens("能力包中心和工坊闭环", packCenter + packDetail + packStudio + presentation + releaseSources, [
   "能力包中心",
   "官方源",
   "私有源",
   "本地高级安装",
   "来源与安装包",
-  "先在 Studio 只读检查",
-  "Pack Studio",
+  "先在工坊只读检查",
+  "能力包工坊",
   "只读检查",
-  "diff 预览",
+  "差异预览",
   "运行内置审计",
   "重新打包",
   "回滚",

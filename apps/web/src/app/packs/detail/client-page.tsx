@@ -696,7 +696,7 @@ export default function PackDetailClientPage() {
             <div className="mt-3 flex flex-wrap gap-2">
               <Link href={studioHref}>
                 <Button size="sm" variant="outline">
-                  <Sparkles size={14} /> 先在 Studio 只读检查
+                  <Sparkles size={14} /> 先在工坊只读检查
                 </Button>
               </Link>
               <Link href={packCenterFocusHref(manifest.id)}>

@@ -345,7 +345,7 @@ describe("PacksPageOptimized", () => {
     expect(screen.getByText("能力边界")).toBeInTheDocument();
     expect(screen.getByText("回滚路径")).toBeInTheDocument();
     expect(screen.getByText("权限：读取、写入、沙箱；启用前建议确认")).toBeInTheDocument();
-    expect(screen.getByText("来源：官方源 · example.com。安装前可先在 Studio 只读检查包内容、SHA 与能力声明。")).toBeInTheDocument();
+    expect(screen.getByText("来源：官方源 · example.com。安装前可先在工坊只读检查包内容、SHA 与能力声明。")).toBeInTheDocument();
     expect(screen.getByText("边界：不会自动泄露 API Key，不会绕过权限声明，也不能调用未声明的后端路由。")).toBeInTheDocument();
     const remoteStudioLink = screen.getAllByRole("link", { name: /小羽优化/ })
       .find((link) => link.getAttribute("href")?.includes("yunque.pack.remote-docs"));
@@ -432,7 +432,7 @@ describe("PacksPageOptimized", () => {
     expect(screen.getByText("来源：私有源 · oss.example.com")).toBeInTheDocument();
     expect(screen.getByText("https://oss.example.com/yunque/private/private-pack.yqpack")).toBeInTheDocument();
     expect(screen.getByText("安装前看这几点")).toBeInTheDocument();
-    expect(screen.getByText("来源：私有源 · oss.example.com。安装前可先在 Studio 只读检查包内容、SHA 与能力声明。")).toBeInTheDocument();
+    expect(screen.getByText("来源：私有源 · oss.example.com。安装前可先在工坊只读检查包内容、SHA 与能力声明。")).toBeInTheDocument();
     expect(screen.getByText("回滚：声明支持版本回滚；也可以随时禁用能力包。")).toBeInTheDocument();
   });
 
@@ -476,7 +476,7 @@ describe("PacksPageOptimized", () => {
     expect(batchPrompt).toContain("yunque.pack.needs-entry");
     expect(batchPrompt).toContain("yunque.pack.needs-context");
     expect(batchPrompt).toContain("不要自动应用改动");
-    expect(batchPrompt).toContain("预览 diff");
+    expect(batchPrompt).toContain("预览差异");
     expect(batchPrompt).toContain("studio_url");
     expect(batchPrompt).toContain("\"delivery\"");
     expect(batchPrompt).toContain("\"permission_summary\"");
@@ -485,7 +485,7 @@ describe("PacksPageOptimized", () => {
     expect(batchPrompt).toContain("\"first_edit\"");
     expect(batchPrompt).toContain("不能伪造执行能力");
     expect(batchPrompt).toContain("改完回到能力包详情与 Chat/任务主路径验证");
-    const batchStudioLink = screen.getByRole("link", { name: /导入 Studio 逐包处理/ });
+    const batchStudioLink = screen.getByRole("link", { name: /导入工坊逐包处理/ });
     expect(batchStudioLink).toHaveAttribute("href", expect.stringContaining("/packs/studio?batch="));
     const batchStudioPrompt = new URL(batchStudioLink.getAttribute("href")!, "http://localhost").searchParams.get("batch") || "";
     expect(batchStudioPrompt).toContain("yunque.pack_studio.batch_draft_request.v1");
@@ -551,7 +551,7 @@ describe("PacksPageOptimized", () => {
     expect(within(queue as HTMLElement).getByText("Needs Entry Pack 6")).toBeInTheDocument();
     expect(within(queue as HTMLElement).queryByText("Needs Entry Pack 7")).not.toBeInTheDocument();
 
-    const firstBatchLink = screen.getByRole("link", { name: /导入 Studio 逐包处理/ });
+    const firstBatchLink = screen.getByRole("link", { name: /导入工坊逐包处理/ });
     const firstBatch = new URL(firstBatchLink.getAttribute("href")!, "http://localhost").searchParams.get("batch") || "";
     expect(firstBatch).toContain("yunque.pack.needs-entry-1");
     expect(firstBatch).toContain("yunque.pack.needs-entry-6");
@@ -567,7 +567,7 @@ describe("PacksPageOptimized", () => {
     expect(within(queue as HTMLElement).getByText("Needs Entry Pack 7")).toBeInTheDocument();
     expect(within(queue as HTMLElement).getByText("Needs Entry Pack 8")).toBeInTheDocument();
     expect(within(queue as HTMLElement).queryByText("Needs Entry Pack 1")).not.toBeInTheDocument();
-    const secondBatchLink = screen.getByRole("link", { name: /导入 Studio 逐包处理/ });
+    const secondBatchLink = screen.getByRole("link", { name: /导入工坊逐包处理/ });
     const secondBatch = new URL(secondBatchLink.getAttribute("href")!, "http://localhost").searchParams.get("batch") || "";
     expect(secondBatch).toContain("yunque.pack.needs-entry-7");
     expect(secondBatch).toContain("yunque.pack.needs-entry-8");

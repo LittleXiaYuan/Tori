@@ -264,7 +264,7 @@ export function packDeliveryProfile(manifest: PackManifest): PackDeliveryProfile
       level: "needs_meat",
       label: "待补肉",
       description: "资料还没把用途、入口或后端能力讲完整，用户装上后容易不知道怎么验证。",
-      nextStep: `交给小羽先补 ${readiness.missing.join("、")}，再预览 diff、审计并重新打包。`,
+      nextStep: `交给小羽先补 ${readiness.missing.join("、")}，再预览差异、审计并重新打包。`,
       tone: "danger",
     };
   }
@@ -409,7 +409,7 @@ export function packInstallChecklist(
   const risk = riskProfileForPack(manifest);
   const flags = packFeatureFlags(manifest);
   const sourceDetail = options.sourceLabel
-    ? `来源：${options.sourceLabel}。安装前可先在 Studio 只读检查包内容、SHA 与能力声明。`
+    ? `来源：${options.sourceLabel}。安装前可先在工坊只读检查包内容、SHA 与能力声明。`
     : options.installed
       ? "来源：本机已安装记录。可从详情页查看版本、入口和权限声明。"
       : "来源：未标注安装源。建议先确认发布者、SHA 和能力声明后再安装。";

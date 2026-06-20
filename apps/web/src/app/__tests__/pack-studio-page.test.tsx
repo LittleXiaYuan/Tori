@@ -147,7 +147,7 @@ describe("PackStudioPage", () => {
       surfaces: packId === "yunque.pack.wasm-plugin" ? ["frontend", "backend", "wasm"] : ["manifest"],
       editable: ["用途说明、起手示例、入口文案、可用度分层和权限解释可以从 manifest/前端展示层优化。"],
       guarded: [
-        "不直接修改已签名或已安装包；先生成 diff 方案，用户确认后再打包为新 yqpack。",
+        "不直接修改已签名或已安装包；先生成差异方案，用户确认后再打包为新 yqpack。",
         "不要反编译后硬改 WASM；需要源码、ABI 说明和 wasm-plugin 回归测试。",
       ],
       warnings: ["这个包仍是实验能力，改造时不要把它包装成稳定承诺。"],
@@ -171,7 +171,7 @@ describe("PackStudioPage", () => {
         `用户目标：${goal}`,
         "POST /v1/wasm-plugin/run",
         "可改文件候选：",
-        "diff 预览草案：",
+        "差异预览草案：",
         "不要直接扩大权限或绕过签名",
         "重新打包与回滚：",
         "go test ./internal/packs/wasmplugin ./internal/controlplane/gateway -run WASM -count=1",
@@ -233,7 +233,7 @@ describe("PackStudioPage", () => {
         "go run ./cmd/yunque-plugin pack C:\\yunque\\packs\\studio\\yunque.pack.wasm-plugin-0.1.0-aaaaaaaaaaaa --out dist\\packs\\yunque.pack.wasm-plugin-0.1.0-studio.yqpack",
       ],
       rollback_commands: ["新包安装后若验证失败，执行 /v1/packs/disable 禁用新包。"],
-      next_steps: ["让小羽只修改 editable_files 中的文件，先给 diff 预览。"],
+      next_steps: ["让小羽只修改 editable_files 中的文件，先给差异预览。"],
       warnings: [],
     });
     packsClientMock.studioPatch.mockImplementation(({ apply }: { apply?: boolean }) => Promise.resolve({
@@ -318,7 +318,7 @@ describe("PackStudioPage", () => {
     expect((screen.getByLabelText("SHA256") as HTMLInputElement).value).toBe("9".repeat(64));
     expect(screen.getByText("当前能力包：WASM 能力包")).toBeInTheDocument();
     expect(screen.getByText("已带 yqpack 来源")).toBeInTheDocument();
-    expect(screen.getByText("先在这里做只读检查、工作区、diff、审计和重新打包；完成后回详情确认权限，或回能力包中心刷新入口与状态。")).toBeInTheDocument();
+    expect(screen.getByText("先在这里做只读检查、工作区、差异预览、审计和重新打包；完成后回详情确认权限，或回能力包中心刷新入口与状态。")).toBeInTheDocument();
     expect(screen.getByText("当前阶段：只读检查 · 下一步：填写路径/URL 后点击只读检查。小羽只生成计划和草稿，不会自动应用改动。")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /查看详情/ })).toHaveAttribute("href", "/packs/detail?id=yunque.pack.wasm-plugin");
     expect(screen.getByRole("link", { name: /打开能力入口/ })).toHaveAttribute("href", "/packs/wasm-plugin");
@@ -331,7 +331,7 @@ describe("PackStudioPage", () => {
     expect(screen.getAllByText("下一步：填写路径/URL 后点击只读检查").length).toBeGreaterThan(0);
     expect(screen.getByRole("link", { name: /跳到当前操作/ })).toHaveAttribute("href", "#yqpack-check");
     expect(screen.getByText("已从能力包中心接入这个 yqpack")).toBeInTheDocument();
-    expect(screen.getByText("不用回到商店手动找包；先在这里做只读检查，再进入工作区、diff 预览、审计和重新打包。这一步只校验 SHA、manifest 与文件分类，不会安装、启用或改动本地能力包。")).toBeInTheDocument();
+    expect(screen.getByText("不用回到商店手动找包；先在这里做只读检查，再进入工作区、差异预览、审计和重新打包。这一步只校验 SHA、能力声明与文件分类，不会安装、启用或改动本地能力包。")).toBeInTheDocument();
     expect(screen.getByText("URL: https://oss.example.com/wasm-plugin.yqpack")).toBeInTheDocument();
     expect(screen.getByText(`SHA256: ${"9".repeat(64)}`)).toBeInTheDocument();
 
@@ -494,7 +494,7 @@ describe("PackStudioPage", () => {
       kind: "yunque.pack_studio.batch_draft_request.v1",
       goal: "批量把这些能力包补齐用途和入口。",
       batch: { page: 2, page_count: 5, total: 26, page_size: 6 },
-      rules: ["不要自动应用改动。", "回到 Pack Studio 预览 diff / 审计 / 重新打包。"],
+      rules: ["不要自动应用改动。", "回到能力包工坊预览差异 / 审计 / 重新打包。"],
       packs: [
         {
           id: "yunque.pack.wasm-plugin",
@@ -520,7 +520,7 @@ describe("PackStudioPage", () => {
             reason: "体检缺口：使用示例、用户感知位置。",
             first_edit: "先补 metadata.example1-3，用真实用户动作描述它能产出什么结果。",
             verify: "改完回到 /packs/wasm-plugin 验证入口、提示、结果位置和回滚路径是否可见。",
-            handoff: "只读检查 -> 准备工作区 -> 预览 diff -> 审计 -> 重新打包 -> 复检 SHA -> 安装/启用/回滚。",
+            handoff: "只读检查 -> 准备工作区 -> 预览差异 -> 审计 -> 重新打包 -> 复检 SHA -> 安装/启用/回滚。",
           },
           studio_url: "/packs/studio?packId=yunque.pack.wasm-plugin&goal=%E8%A1%A5%E9%BD%90%20WASM%20%E7%94%A8%E9%80%94",
           package_url: "https://oss.example.com/wasm-plugin.yqpack",
@@ -550,10 +550,10 @@ describe("PackStudioPage", () => {
     expect(screen.getByText("第 2 / 5 批")).toBeInTheDocument();
     expect(screen.getByText("逐包处理")).toBeInTheDocument();
     expect(screen.getByText("目标：批量把这些能力包补齐用途和入口。")).toBeInTheDocument();
-    expect(screen.getByText("规则：不要自动应用改动。；回到 Pack Studio 预览 diff / 审计 / 重新打包。")).toBeInTheDocument();
+    expect(screen.getByText("规则：不要自动应用改动。；回到能力包工坊预览差异 / 审计 / 重新打包。")).toBeInTheDocument();
     expect(screen.getByText("来自补肉队列第 2 / 5 批：本批 2 个，队列总计 26 个，每批最多 6 个。")).toBeInTheDocument();
     expect(screen.getByText("批量处理进度")).toBeInTheDocument();
-    expect(screen.getByText("逐包载入、逐包检查、逐包重打包；Studio 不会把批量任务自动应用到多个能力包。")).toBeInTheDocument();
+    expect(screen.getByText("逐包载入、逐包检查、逐包重打包；能力包工坊不会把批量任务自动应用到多个能力包。")).toBeInTheDocument();
     await waitFor(() => {
       expect(screen.getAllByText((_, element) => /批量进度：\s*1\s*\/\s*2/.test(element?.textContent || "")).length).toBeGreaterThan(0);
     });
@@ -576,7 +576,7 @@ describe("PackStudioPage", () => {
     expect(screen.getAllByText("待载入").length).toBeGreaterThan(0);
     expect(screen.getByText("yqpack：https://oss.example.com/wasm-plugin.yqpack")).toBeInTheDocument();
     expect(screen.getByText(`SHA：${"9".repeat(64)}`)).toBeInTheDocument();
-    expect(screen.getAllByRole("link", { name: /打开 Studio/ })[0]).toHaveAttribute("href", expect.stringContaining("packId=yunque.pack.wasm-plugin"));
+    expect(screen.getAllByRole("link", { name: /打开工坊/ })[0]).toHaveAttribute("href", expect.stringContaining("packId=yunque.pack.wasm-plugin"));
     expect(screen.getAllByRole("link", { name: /查看详情/ }).some((link) => link.getAttribute("href") === "/packs/detail?id=yunque.pack.wasm-plugin")).toBe(true);
     expect(screen.getAllByRole("link", { name: /回中心/ }).some((link) => link.getAttribute("href") === "/packs?q=yunque.pack.wasm-plugin")).toBe(true);
     expect(screen.getAllByRole("link", { name: /查看详情/ }).some((link) => link.getAttribute("href") === "/packs/detail?id=yunque.pack.documents")).toBe(true);
@@ -631,7 +631,7 @@ describe("PackStudioPage", () => {
     render(<PackStudioPage />);
 
     expect(await screen.findByText("匹配 14 个 · 第 1 / 2 页")).toBeInTheDocument();
-    expect(screen.getByText("Studio 候选 · 每页 12 个")).toBeInTheDocument();
+    expect(screen.getByText("工坊候选 · 每页 12 个")).toBeInTheDocument();
     expect(screen.getAllByText("待补肉").length).toBeGreaterThan(0);
     expect(screen.getAllByText(/交给小羽先补/).length).toBeGreaterThan(0);
     expect(screen.getAllByText("Bulk Pack 1").length).toBeGreaterThan(0);
@@ -649,7 +649,7 @@ describe("PackStudioPage", () => {
     expect(screen.getByText("匹配 14 个 · 第 2 / 2 页")).toBeInTheDocument();
     expect(screen.getByText("Bulk Pack 9")).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText("搜索 Studio 能力包"), { target: { value: "bulk-14" } });
+    fireEvent.change(screen.getByLabelText("搜索工坊能力包"), { target: { value: "bulk-14" } });
 
     expect(screen.getByText("匹配 1 个 · 第 1 / 1 页")).toBeInTheDocument();
     expect(screen.getByText("Bulk Pack 14")).toBeInTheDocument();
@@ -658,9 +658,9 @@ describe("PackStudioPage", () => {
   it("turns real pack metadata into a guarded Xiaoyu modification task", async () => {
     render(<PackStudioPage />);
 
-    expect(await screen.findByText("Pack Studio")).toBeInTheDocument();
+    expect(await screen.findByText("能力包工坊")).toBeInTheDocument();
     expect(screen.getByText("匹配 2 个 · 第 1 / 1 页")).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("搜索 Studio 能力包"), { target: { value: "documents" } });
+    fireEvent.change(screen.getByLabelText("搜索工坊能力包"), { target: { value: "documents" } });
     expect(screen.getByText("匹配 1 个 · 第 1 / 1 页")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "清除搜索" }));
     expect(screen.getByText("WASM 能力包")).toBeInTheDocument();
@@ -695,12 +695,12 @@ describe("PackStudioPage", () => {
     expect(task.value).toContain("验证交付状态是否改善");
     expect(task.value).toContain("POST /v1/wasm-plugin/run");
     expect(task.value).toContain("可改文件候选：");
-    expect(task.value).toContain("diff 预览草案：");
+    expect(task.value).toContain("差异预览草案：");
     expect(task.value).toContain("不要直接扩大权限或绕过签名");
     expect(task.value).toContain("重新打包与回滚：");
     expect(task.value).toContain("go test ./internal/packs/wasmplugin ./internal/controlplane/gateway -run WASM -count=1");
 
-    const diffPreview = screen.getByLabelText("改包 diff 预览") as HTMLTextAreaElement;
+    const diffPreview = screen.getByLabelText("改包差异预览") as HTMLTextAreaElement;
     expect(diffPreview.value).toContain("diff --git a/packs/official/wasm-plugin-pack/pack.json");
     expect(diffPreview.value).toContain("\"description\": \"增加一个可查看运行结果的界面\"");
     expect(screen.getByText("packs/official/wasm-plugin-pack/pack.json")).toBeInTheDocument();
@@ -740,17 +740,17 @@ describe("PackStudioPage", () => {
         goal: "增加一个可查看运行结果的界面",
       });
     });
-    expect(await screen.findByText("Pack Studio 工作区")).toBeInTheDocument();
+    expect(await screen.findByText("能力包工坊工作区")).toBeInTheDocument();
     expect(screen.getAllByText("yunque.pack.wasm-plugin-0.1.0-aaaaaaaaaaaa").length).toBeGreaterThan(0);
     expect(screen.getByText("go run ./cmd/yunque-plugin pack C:\\yunque\\packs\\studio\\yunque.pack.wasm-plugin-0.1.0-aaaaaaaaaaaa --out dist\\packs\\yunque.pack.wasm-plugin-0.1.0-studio.yqpack")).toBeInTheDocument();
     expect(screen.getByText("新包安装后若验证失败，执行 /v1/packs/disable 禁用新包。")).toBeInTheDocument();
     expect(screen.getByText("工作区是可编辑副本，不会启用能力包；安装新 yqpack 前仍需重新检查、测试和确认回滚路径。")).toBeInTheDocument();
     expect(screen.getByText("改包工作流状态")).toBeInTheDocument();
-    expect(screen.getByText("小羽可以帮你生成计划和草稿，但每一步都必须经过 diff、审计、复检和显式安装确认。")).toBeInTheDocument();
+    expect(screen.getByText("小羽可以帮你生成计划和草稿，但每一步都必须经过差异预览、审计、复检和显式安装确认。")).toBeInTheDocument();
     expect(screen.getByText("不自动应用")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "复制交付摘要" })).toBeInTheDocument();
     expect(screen.getByText("交付闭环")).toBeInTheDocument();
-    expect(screen.getByText("改包完成不是停在 diff；新 yqpack 需要复检、安装验证，再回能力包中心刷新来源与入口。")).toBeInTheDocument();
+    expect(screen.getByText("改包完成不是停在差异预览；新 yqpack 需要复检、安装验证，再回能力包中心刷新来源与入口。")).toBeInTheDocument();
     expect(screen.getByText("还需继续检查")).toBeInTheDocument();
     expect(screen.getByText("本地复检")).toBeInTheDocument();
     expect(screen.getByText("本地安装验证")).toBeInTheDocument();
@@ -759,22 +759,22 @@ describe("PackStudioPage", () => {
     expect(screen.getByText("全部就绪后再把新 yqpack 放到 Release 或 OSS；清单不会替你上传，也不会自动启用能力包。")).toBeInTheDocument();
     expect(screen.getByText("继续检查")).toBeInTheDocument();
     expect(screen.getByText("回滚路径已记录")).toBeInTheDocument();
-    expect(screen.getAllByText("Plan / Draft").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("下一步：载入草稿或交给小羽生成 Draft").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("小羽草稿").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("下一步：载入草稿或交给小羽生成草稿").length).toBeGreaterThan(0);
     expect(screen.getByRole("link", { name: /跳到当前操作/ })).toHaveAttribute("href", "#draft-queue");
 
     expect(screen.getByText("小羽改造草稿队列")).toBeInTheDocument();
-    expect(screen.getByText("从 Chat 导入 Patch Plan").closest("#import-plan")).not.toBeNull();
-    expect(screen.getByText("从 Chat 导入 Patch Draft").closest("#import-draft")).not.toBeNull();
+    expect(screen.getByText("从 Chat 导入改包计划").closest("#import-plan")).not.toBeNull();
+    expect(screen.getByText("从 Chat 导入改包草稿").closest("#import-draft")).not.toBeNull();
     expect(screen.getByText("小羽改造草稿队列").closest("#draft-queue")).not.toBeNull();
     expect(screen.getByText("C:\\yunque\\packs\\studio\\frontend\\index.html")).toBeInTheDocument();
-    expect(screen.getByText("原因：manifest 是能力包契约入口，适合先补用户能理解的用途、入口、限制和回滚提示。")).toBeInTheDocument();
+    expect(screen.getByText("原因：能力声明是能力包契约入口，适合先补用户能理解的用途、入口、限制和回滚提示。")).toBeInTheDocument();
     expect(screen.getByText("原因：HTML 前端资源可在 yqpack 工作区内预览和替换，适合补独立界面、权限说明和结果区。")).toBeInTheDocument();
-    expect(screen.getByText("Pack 可用性扫描")).toBeInTheDocument();
+    expect(screen.getByText("能力包可用性扫描")).toBeInTheDocument();
     expect(screen.getByText("复检 yqpack")).toBeInTheDocument();
-    expect(screen.getByText("结构化计划只包含目标文件、风险、原因、门禁和内容摘要；真正内容仍需载入草稿后预览 diff。")).toBeInTheDocument();
+    expect(screen.getByText("结构化计划只包含目标文件、风险、原因、门禁和内容摘要；真正内容仍需载入草稿后预览差异。")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "复制 Patch Plan JSON" }));
+    fireEvent.click(screen.getByRole("button", { name: "复制改包计划" }));
     const patchPlanText = vi.mocked(navigator.clipboard.writeText).mock.calls.at(-1)?.[0] || "";
     const patchPlan = JSON.parse(patchPlanText);
     expect(patchPlan.kind).toBe("yunque.pack_studio.patch_plan.v1");
@@ -782,7 +782,7 @@ describe("PackStudioPage", () => {
     expect(patchPlan.workspace.id).toBe("yunque.pack.wasm-plugin-0.1.0-aaaaaaaaaaaa");
     expect(patchPlan.candidates).toHaveLength(2);
     expect(patchPlan.candidates[0]).toMatchObject({
-      label: "体检缺口 manifest 草稿",
+      label: "体检缺口能力声明草稿",
       risk_level: "low",
       applyable: true,
     });
@@ -792,15 +792,15 @@ describe("PackStudioPage", () => {
     expect(patchPlan.candidates[1].content_summary.length).toBeGreaterThan(100);
     expect(patchPlanText).not.toContain("<!doctype html>");
     await waitFor(() => {
-      expect(toastMock).toHaveBeenCalledWith("已复制结构化 Patch Plan", "success");
+      expect(toastMock).toHaveBeenCalledWith("已复制结构化改包计划", "success");
     });
 
-    const patchPlanLink = screen.getByRole("link", { name: /交给 Chat 里的小羽（带 Patch Plan）/ });
+    const patchPlanLink = screen.getByRole("link", { name: /交给 Chat 里的小羽（带改包计划）/ });
     expect(patchPlanLink).toHaveAttribute("href", expect.stringContaining("/chat?q="));
     const patchPlanQuery = new URL(patchPlanLink.getAttribute("href")!, "http://localhost").searchParams.get("q") || "";
     expect(patchPlanQuery).toContain("yunque.pack_studio.patch_plan.v1");
-    expect(patchPlanQuery).toContain("体检缺口 manifest 草稿");
-    expect(patchPlanQuery).toContain("预览 diff");
+    expect(patchPlanQuery).toContain("体检缺口能力声明草稿");
+    expect(patchPlanQuery).toContain("预览差异");
     expect(patchPlanQuery).toContain("运行内置审计");
     expect(patchPlanQuery).not.toContain("<!doctype html>");
     const patchPlanJson = patchPlanQuery.match(/```json\n([\s\S]+?)\n```/)?.[1] || "";
@@ -808,7 +808,7 @@ describe("PackStudioPage", () => {
     expect(linkedPatchPlan.candidates[1].file_path).toBe("C:\\yunque\\packs\\studio\\frontend\\index.html");
     expect(linkedPatchPlan.candidates[1].content_summary.length).toBeGreaterThan(100);
 
-    const draftRequestButtons = screen.getAllByRole("button", { name: "复制 Draft 请求" });
+    const draftRequestButtons = screen.getAllByRole("button", { name: "复制草稿请求" });
     fireEvent.click(draftRequestButtons[1]);
     const draftRequestPrompt = vi.mocked(navigator.clipboard.writeText).mock.calls.at(-1)?.[0] || "";
     expect(draftRequestPrompt).toContain("yunque.pack_studio.patch_draft_request.v1");
@@ -817,15 +817,15 @@ describe("PackStudioPage", () => {
     expect(draftRequestPrompt).toContain("\"delivery\"");
     expect(draftRequestPrompt).toContain("本包交付状态：待补肉");
     expect(draftRequestPrompt).toContain("readiness_gaps");
-    expect(draftRequestPrompt).toContain("content 必须是完整的新文件内容，不要输出 diff、片段或解释文本");
+    expect(draftRequestPrompt).toContain("content 必须是完整的新文件内容，不要输出差异补丁、片段或解释文本");
     expect(draftRequestPrompt).toContain("starter_content");
     expect(draftRequestPrompt).toContain("<!doctype html>");
     expect(draftRequestPrompt).toContain("不要声称已经应用改动");
     await waitFor(() => {
-      expect(toastMock).toHaveBeenCalledWith("已复制 Patch Draft 请求", "success");
+      expect(toastMock).toHaveBeenCalledWith("已复制改包草稿请求", "success");
     });
 
-    const draftRequestLinks = screen.getAllByRole("link", { name: /交给小羽生成 Draft/ });
+    const draftRequestLinks = screen.getAllByRole("link", { name: /交给小羽生成草稿/ });
     const draftRequestLink = draftRequestLinks[draftRequestLinks.length - 1];
     expect(draftRequestLink).toHaveAttribute("href", expect.stringContaining("/chat?q="));
     const draftRequestQuery = new URL(draftRequestLink.getAttribute("href")!, "http://localhost").searchParams.get("q") || "";
@@ -836,20 +836,20 @@ describe("PackStudioPage", () => {
     expect(linkedDraftRequest.target.file_path).toBe("C:\\yunque\\packs\\studio\\frontend\\index.html");
     expect(linkedDraftRequest.target.readiness_gaps).toEqual(["使用示例", "用户感知位置"]);
     expect(linkedDraftRequest.expected_output.kind).toBe("yunque.pack_studio.patch_draft.v1");
-    const readinessDraftLink = screen.getByRole("link", { name: /按体检缺口交给小羽生成 Draft/ });
+    const readinessDraftLink = screen.getByRole("link", { name: /按体检缺口交给小羽生成草稿/ });
     expect(readinessDraftLink).toHaveAttribute("href", expect.stringContaining("/chat?q="));
     const readinessDraftQuery = new URL(readinessDraftLink.getAttribute("href")!, "http://localhost").searchParams.get("q") || "";
     expect(readinessDraftQuery).toContain("这次必须优先补齐体检缺口：使用示例、用户感知位置");
-    expect(readinessDraftQuery).toContain("体检缺口 manifest 草稿");
+    expect(readinessDraftQuery).toContain("体检缺口能力声明草稿");
 
     const importedChatMessage = [
-      "小羽整理好了 Pack Studio Patch Plan。",
+      "小羽整理好了能力包工坊改包计划。",
       "",
       "```json",
       JSON.stringify(patchPlan, null, 2),
       "```",
     ].join("\n");
-    fireEvent.change(screen.getByLabelText("导入 Patch Plan JSON"), { target: { value: importedChatMessage } });
+    fireEvent.change(screen.getByLabelText("导入改包计划 JSON"), { target: { value: importedChatMessage } });
     expect(screen.getByText("工作区匹配")).toBeInTheDocument();
     expect(screen.getByText("2 个候选")).toBeInTheDocument();
     expect(screen.getAllByText(/包：WASM 能力包/).length).toBeGreaterThan(0);
@@ -858,7 +858,7 @@ describe("PackStudioPage", () => {
     fireEvent.click(importButtons[1]);
     expect(screen.getByDisplayValue("C:\\yunque\\packs\\studio\\frontend\\index.html")).toBeInTheDocument();
     expect((screen.getByLabelText("新的文件内容") as HTMLTextAreaElement).value).toBe("");
-    expect(toastMock).toHaveBeenCalledWith("已填入 Patch Plan 目标文件；请补入新内容后再预览 diff", "success");
+    expect(toastMock).toHaveBeenCalledWith("已填入改包计划目标文件；请补入新内容后再预览差异", "success");
 
     const mismatchedPatchPlan = {
       ...patchPlan,
@@ -869,22 +869,22 @@ describe("PackStudioPage", () => {
         original_sha256: "f".repeat(64),
       },
     };
-    fireEvent.change(screen.getByLabelText("导入 Patch Plan JSON"), {
+    fireEvent.change(screen.getByLabelText("导入改包计划 JSON"), {
       target: { value: `\`\`\`json\n${JSON.stringify(mismatchedPatchPlan, null, 2)}\n\`\`\`` },
     });
     expect(screen.getByText("工作区待确认")).toBeInTheDocument();
     expect(screen.getByText(/工作区或原始 SHA 与当前工作区不一致/)).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "填入文件" })[0]).toBeDisabled();
 
-    fireEvent.change(screen.getByLabelText("导入 Patch Draft JSON"), {
+    fireEvent.change(screen.getByLabelText("导入改包草稿 JSON"), {
       target: { value: draftRequestPrompt },
     });
-    expect(screen.getByText("这是 Patch Draft Request，还不是可导入 Draft")).toBeInTheDocument();
-    expect(screen.getByText("Request 工作区匹配")).toBeInTheDocument();
-    expect(screen.getByText(/生成出的 yunque\.pack_studio\.patch_draft\.v1 才能载入 diff 预览/)).toBeInTheDocument();
+    expect(screen.getByText("这是草稿请求，还不是可导入草稿")).toBeInTheDocument();
+    expect(screen.getByText("请求工作区匹配")).toBeInTheDocument();
+    expect(screen.getByText(/生成出的改包草稿才能载入差异预览/)).toBeInTheDocument();
     expect(screen.getByText(/starter [\d,]+ chars/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /交给 Chat 生成 Draft/ })).toHaveAttribute("href", expect.stringContaining("/chat?q="));
-    expect(screen.queryByText("未识别到 yunque.pack_studio.patch_draft.v1。Patch Draft 必须包含 file_path 和 content。")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /交给 Chat 生成草稿/ })).toHaveAttribute("href", expect.stringContaining("/chat?q="));
+    expect(screen.queryByText("未识别到可导入的改包草稿。草稿必须包含 file_path 和 content。")).not.toBeInTheDocument();
 
     const patchDraft = {
       kind: "yunque.pack_studio.patch_draft.v1",
@@ -896,21 +896,21 @@ describe("PackStudioPage", () => {
       goal: "增加一个可查看运行结果的界面",
       workspace: patchPlan.workspace,
       file_path: "C:\\yunque\\packs\\studio\\pack.json",
-      content: "{\n  \"description\": \"Patch Draft 内容\"\n}\n",
-      reason: "Chat 里的小羽补了一版 manifest 内容",
+      content: "{\n  \"description\": \"改包草稿内容\"\n}\n",
+      reason: "Chat 里的小羽补了一版能力声明内容",
       risk_level: "low",
-      gates: ["预览 diff", "内置审计"],
+      gates: ["预览差异", "内置审计"],
     };
-    fireEvent.change(screen.getByLabelText("导入 Patch Draft JSON"), {
+    fireEvent.change(screen.getByLabelText("导入改包草稿 JSON"), {
       target: { value: `\`\`\`json\n${JSON.stringify(patchDraft, null, 2)}\n\`\`\`` },
     });
-    expect(screen.getByText("Draft 工作区匹配")).toBeInTheDocument();
+    expect(screen.getByText("草稿工作区匹配")).toBeInTheDocument();
     expect(screen.queryByText("2 chars")).not.toBeInTheDocument();
-    expect(screen.getByText("原因：Chat 里的小羽补了一版 manifest 内容")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "载入 Draft" }));
+    expect(screen.getByText("原因：Chat 里的小羽补了一版能力声明内容")).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole("button", { name: "载入草稿" })[0]);
     expect(screen.getByDisplayValue("C:\\yunque\\packs\\studio\\pack.json")).toBeInTheDocument();
-    expect((screen.getByLabelText("新的文件内容") as HTMLTextAreaElement).value).toContain("Patch Draft 内容");
-    expect(toastMock).toHaveBeenCalledWith("已载入 Patch Draft，请先预览 diff 再应用", "success");
+    expect((screen.getByLabelText("新的文件内容") as HTMLTextAreaElement).value).toContain("改包草稿内容");
+    expect(toastMock).toHaveBeenCalledWith("已载入改包草稿，请先预览差异再应用", "success");
 
     const mismatchedPatchDraft = {
       ...patchDraft,
@@ -921,14 +921,14 @@ describe("PackStudioPage", () => {
         original_sha256: "f".repeat(64),
       },
     };
-    fireEvent.change(screen.getByLabelText("导入 Patch Draft JSON"), {
+    fireEvent.change(screen.getByLabelText("导入改包草稿 JSON"), {
       target: { value: `\`\`\`json\n${JSON.stringify(mismatchedPatchDraft, null, 2)}\n\`\`\`` },
     });
-    expect(screen.getByText("Draft 待确认")).toBeInTheDocument();
-    expect(screen.getByText(/Patch Draft 的工作区或原始 SHA 与当前工作区不一致/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "载入 Draft" })).toBeDisabled();
+    expect(screen.getByText("草稿待确认")).toBeInTheDocument();
+    expect(screen.getByText(/改包草稿的工作区或原始 SHA 与当前工作区不一致/)).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "载入草稿" })[0]).toBeDisabled();
 
-    const draftButtons = screen.getAllByRole("button", { name: "载入草稿" });
+    const draftButtons = screen.getAllByRole("button", { name: "载入草稿" }).slice(1);
     fireEvent.click(draftButtons[0]);
     const manifestDraft = screen.getByLabelText("新的文件内容") as HTMLTextAreaElement;
     const draftJSON = JSON.parse(manifestDraft.value);
@@ -937,8 +937,8 @@ describe("PackStudioPage", () => {
     expect(draftJSON.metadata.usageSurface).toContain("/packs/wasm-plugin");
     expect(draftJSON.metadata.example3).toContain("保存到记忆或知识");
     expect(draftJSON.metadata.studioGoal).toBe("增加一个可查看运行结果的界面");
-    expect(toastMock).toHaveBeenCalledWith("已生成 体检缺口 manifest 草稿，请先预览 diff 再应用", "success");
-    expect(screen.getByText("草稿只会填入工作区改动框；真正写入仍需先预览 diff，并在应用后运行内置审计。")).toBeInTheDocument();
+    expect(toastMock).toHaveBeenCalledWith("已生成 体检缺口能力声明草稿，请先预览差异再应用", "success");
+    expect(screen.getByText("草稿只会填入工作区改动框；真正写入仍需先预览差异，并在应用后运行内置审计。")).toBeInTheDocument();
 
     fireEvent.click(draftButtons[1]);
     const frontendDraft = screen.getByLabelText("新的文件内容") as HTMLTextAreaElement;
@@ -946,12 +946,12 @@ describe("PackStudioPage", () => {
     expect(frontendDraft.value).toContain("<title>WASM 能力包</title>");
     expect(frontendDraft.value).toContain("能力包界面草稿 · yunque.pack.wasm-plugin");
     expect(frontendDraft.value).toContain("这次补齐的体检缺口");
-    expect(frontendDraft.value).toContain("接入真实 bridge/API 前必须先预览 diff、运行审计并重新打包");
-    expect(screen.getAllByText("下一步：点击预览 diff").length).toBeGreaterThan(0);
+    expect(frontendDraft.value).toContain("接入真实调用前必须先预览差异、运行审计并重新打包");
+    expect(screen.getAllByText("下一步：点击预览差异").length).toBeGreaterThan(0);
 
     fireEvent.click(draftButtons[0]);
     fireEvent.change(screen.getByLabelText("新的文件内容"), { target: { value: "{\n  \"description\": \"更清楚\"\n}" } });
-    fireEvent.click(screen.getByRole("button", { name: "预览 diff" }));
+    fireEvent.click(screen.getByRole("button", { name: "预览差异" }));
     await waitFor(() => {
       expect(packsClientMock.studioPatch).toHaveBeenCalledWith({
         workspacePath: "C:\\yunque\\packs\\studio\\yunque.pack.wasm-plugin-0.1.0-aaaaaaaaaaaa",
@@ -961,7 +961,7 @@ describe("PackStudioPage", () => {
         apply: false,
       });
     });
-    const workspaceDiffPreview = await screen.findByLabelText("工作区 diff 预览") as HTMLTextAreaElement;
+    const workspaceDiffPreview = await screen.findByLabelText("工作区差异预览") as HTMLTextAreaElement;
     expect(workspaceDiffPreview.value).toContain("\"description\": \"更清楚\"");
     expect(screen.getByText("仅预览")).toBeInTheDocument();
 
@@ -1049,7 +1049,7 @@ describe("PackStudioPage", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "复制交付摘要" }));
     const deliverySummary = vi.mocked(navigator.clipboard.writeText).mock.calls.at(-1)?.[0] || "";
-    expect(deliverySummary).toContain("# Pack Studio 改包交付摘要");
+    expect(deliverySummary).toContain("# 能力包工坊改包交付摘要");
     expect(deliverySummary).toContain("- 改包目标：增加一个可查看运行结果的界面");
     expect(deliverySummary).toContain("- 审计：通过；风险：medium；改动：1；可改：1；需源码/专项审计：0");
     expect(deliverySummary).toContain("- 包路径：C:\\yunque\\packs\\studio\\yunque.pack.wasm-plugin-0.1.0-studio.yqpack");

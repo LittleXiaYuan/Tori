@@ -174,8 +174,10 @@ function polishGuidance(value: unknown): PackStudioBatchDraftRequest["packs"][nu
   return { reason, firstEdit, verify, handoff };
 }
 
-function displayTextWithoutJsonBlocks(text: string, marker?: string): string {
-  const beforeMarker = marker && text.includes(marker) ? text.slice(0, text.indexOf(marker)) : text;
+function displayTextWithoutJsonBlocks(text: string, markers?: string | string[]): string {
+  const markerList = Array.isArray(markers) ? markers : markers ? [markers] : [];
+  const marker = markerList.find((item) => text.includes(item));
+  const beforeMarker = marker ? text.slice(0, text.indexOf(marker)) : text;
   return beforeMarker
     .replace(/```json[\s\S]*?```/g, "")
     .trim();
@@ -244,7 +246,10 @@ export function parsePackStudioPatchPlanPrompt(text?: string): PackStudioPatchPl
           originalSha256: stringValue(workspace.original_sha256),
         },
         candidates: parsedCandidates,
-        displayText: displayTextWithoutJsonBlocks(text, "下面是 Pack Studio 已准备好的 Patch Plan"),
+        displayText: displayTextWithoutJsonBlocks(text, [
+          "下面是能力包工坊已准备好的改包计划",
+          "下面是 Pack Studio 已准备好的 Patch Plan",
+        ]),
       };
   }
   return null;
@@ -320,7 +325,10 @@ export function parsePackStudioPatchDraftRequestPrompt(text?: string): PackStudi
       },
       starterContentLength: starterContent.length,
       expectedKind: stringValue(expectedOutput?.kind),
-      displayText: displayTextWithoutJsonBlocks(text, "下面是 Pack Studio 的 Patch Draft Request"),
+      displayText: displayTextWithoutJsonBlocks(text, [
+        "下面是能力包工坊的改包草稿请求",
+        "下面是 Pack Studio 的 Patch Draft Request",
+      ]),
     };
   }
   return null;

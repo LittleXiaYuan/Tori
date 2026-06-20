@@ -186,10 +186,10 @@ describe("PackDetailClientPage", () => {
     expect(screen.getByText("SHA256 abc123")).toBeInTheDocument();
     expect(screen.getByText("4 KB")).toBeInTheDocument();
     expect(screen.getByText(/来源：官方发布源 · example.com/)).toBeInTheDocument();
-    expect(screen.getByText(/安装前可先在 Studio 只读检查包内容、SHA 与能力声明/)).toBeInTheDocument();
+    expect(screen.getByText(/安装前可先在工坊只读检查包内容、SHA 与能力声明/)).toBeInTheDocument();
     expect(screen.getByText("权限：记忆/知识；启用前建议确认")).toBeInTheDocument();
 
-    const sourceStudioLink = screen.getByRole("link", { name: /先在 Studio 只读检查/ });
+    const sourceStudioLink = screen.getByRole("link", { name: /先在工坊只读检查/ });
     expect(sourceStudioLink).toHaveAttribute("href", expect.stringContaining("/packs/studio?"));
     expect(sourceStudioLink).toHaveAttribute("href", expect.stringContaining("packId=yunque.pack.needs-context"));
     expect(sourceStudioLink).toHaveAttribute("href", expect.stringContaining("packageUrl=https%3A%2F%2Fexample.com%2Fneeds-context.yqpack"));
