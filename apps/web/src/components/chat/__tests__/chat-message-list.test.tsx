@@ -298,6 +298,29 @@ describe("ChatMessageList file preview", () => {
             source: "已安装",
             missing: ["使用示例", "用户感知位置", "打开/使用入口", "后端能力声明"],
             readiness: "需补入口",
+            priority: {
+              level: "P0",
+              label: "P0 先补可用路径",
+              reason: "缺入口和后端声明。",
+            },
+            risk: {
+              level: "medium",
+              label: "需要确认来源",
+              requires_authorization: true,
+            },
+            permission_summary: "权限：联网、写入",
+            delivery: {
+              level: "needs_meat",
+              label: "待补肉",
+              description: "用户装上后不知道如何验证。",
+              next_step: "先补入口和结果位置。",
+            },
+            polish_guidance: {
+              reason: "入口不清楚",
+              first_edit: "先补 pack.json metadata.example",
+              verify: "回中心、详情和入口复验",
+              handoff: "只读检查 -> 差异预览 -> 审计 -> 重打包",
+            },
             handoff_links: {
               center: "/packs?q=yunque.pack.needs-entry&from=studio",
               detail: "/packs/detail?id=yunque.pack.needs-entry",
@@ -357,6 +380,10 @@ describe("ChatMessageList file preview", () => {
     expect(batchParam).toContain("\"page_count\": 4");
     expect(batchParam).toContain("studio_url");
     expect(batchParam).toContain("handoff_links");
+    expect(batchParam).toContain("permission_summary");
+    expect(batchParam).toContain("\"requires_authorization\": true");
+    expect(batchParam).toContain("\"next_step\": \"先补入口和结果位置。\"");
+    expect(batchParam).toContain("polish_guidance");
     expect(batchParam).toContain("/packs/needs-entry");
     expect(screen.getByRole("link", { name: /返回能力包中心队列/ })).toHaveAttribute("href", "/packs#readiness-queue");
     expect(screen.getByText("请批量补肉这批能力包。")).toBeInTheDocument();

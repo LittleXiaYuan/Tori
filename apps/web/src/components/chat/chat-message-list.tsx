@@ -270,6 +270,29 @@ function packStudioBatchHandoffHref(request: PackStudioBatchDraftRequest): strin
       source: pack.source,
       missing: pack.missing,
       readiness: pack.readiness,
+      priority: pack.priority ? {
+        level: pack.priority.level,
+        label: pack.priority.label,
+        reason: pack.priority.reason,
+      } : undefined,
+      risk: pack.risk ? {
+        level: pack.risk.level,
+        label: pack.risk.label,
+        requires_authorization: pack.risk.requiresAuthorization,
+      } : undefined,
+      permission_summary: pack.permissionSummary,
+      delivery: pack.delivery ? {
+        level: pack.delivery.level,
+        label: pack.delivery.label,
+        description: pack.delivery.description,
+        next_step: pack.delivery.nextStep,
+      } : undefined,
+      polish_guidance: pack.polishGuidance ? {
+        reason: pack.polishGuidance.reason,
+        first_edit: pack.polishGuidance.firstEdit,
+        verify: pack.polishGuidance.verify,
+        handoff: pack.polishGuidance.handoff,
+      } : undefined,
       handoff_links: pack.handoffLinks ? {
         center: pack.handoffLinks.center,
         detail: pack.handoffLinks.detail,
