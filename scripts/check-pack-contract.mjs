@@ -42,6 +42,24 @@ runCheck("official yqpack catalog", ["scripts/check-official-yqpack-catalog.mjs"
 runCheck("description style", ["scripts/check-pack-description-style.mjs"]);
 runCheck("scaffold dry-run", ["scripts/check-pack-scaffold.mjs"]);
 
+const usabilityReportResult = spawnSync(process.execPath, ["scripts/check-pack-usability.mjs", "--json-report"], { cwd: repoRoot, encoding: "utf8" });
+if (usabilityReportResult.status !== 0) {
+  fail(`pack usability report failed:\n${usabilityReportResult.stderr || usabilityReportResult.stdout}`);
+} else {
+  try {
+    const report = JSON.parse(usabilityReportResult.stdout);
+    if (report.kind !== "yunque.pack_usability_report.v1") fail("pack usability report: unexpected kind");
+    if (!Array.isArray(report.packs) || report.packs.length === 0) fail("pack usability report: packs[] is required");
+    if (!Array.isArray(report.queue)) fail("pack usability report: queue[] is required");
+    if (typeof report.summary?.queue?.total !== "number") fail("pack usability report: summary.queue.total is required");
+    if (!report.packs.every((item) => item.handoff_links?.studio && item.next_step && item.verify)) {
+      fail("pack usability report: every pack must include studio handoff, next_step, and verify");
+    }
+  } catch (error) {
+    fail(`pack usability report is not valid JSON: ${error.message}`);
+  }
+}
+
 if (!existsSync(officialPacksDir)) fail("missing packs/official");
 
 let manifestCount = 0;

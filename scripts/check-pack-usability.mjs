@@ -2,7 +2,7 @@
 // Audits official capability packs for user-visible usefulness signals.
 // It does not prove a pack is feature-complete; it catches the common "there
 // is a menu, but no clear action or destination" failure mode.
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 
 const repoRoot = resolve(import.meta.dirname, "..");
@@ -11,6 +11,8 @@ const officialDir = resolveArgPath(argv["source-dir"] || "packs/official");
 const appDir = resolveArgPath(argv["app-dir"] || "apps/web/src/app");
 const surfaceGuidanceFile = resolveArgPath(argv["surface-guidance"] || "apps/web/src/lib/pack-surface-guidance.ts");
 const strict = argv.strict === true;
+const jsonReport = argv["json-report"] === true;
+const outputPath = typeof argv.output === "string" ? resolveArgPath(argv.output) : "";
 const surfaceGuidance = existsSync(surfaceGuidanceFile) ? readFileSync(surfaceGuidanceFile, "utf8") : "";
 
 const manifests = findPackManifests(officialDir)
@@ -23,28 +25,34 @@ const issueCounts = {};
 for (const row of rows) {
   for (const issue of row.issues) issueCounts[issue.code] = (issueCounts[issue.code] || 0) + 1;
 }
+const report = buildReport(rows, groups, issueCounts);
 
-console.log(JSON.stringify({
-  total: rows.length,
-  groups: Object.fromEntries([...groups.entries()].map(([key, value]) => [key, value.length])),
-  issueCounts,
-}, null, 2));
+if (outputPath) {
+  mkdirSync(dirname(outputPath), { recursive: true });
+  writeFileSync(outputPath, `${JSON.stringify(report, null, 2)}\n`);
+}
 
-for (const row of rows) {
-  const issues = row.issues.map((issue) => issue.code).join(",") || "-";
-  console.log([
-    row.grade,
-    row.id,
-    `status=${row.status || "-"}`,
-    `visible=${row.userVisible}`,
-    `paths=${row.entryPaths.length}`,
-    `examples=${row.examples.length}`,
-    `api=${row.backendApiCount}`,
-    `page=${row.hasConcretePage}`,
-    `usability=${row.usability || "-"}`,
-    `primary=${row.primaryActionPath || "-"}`,
-    `issues=${issues}`,
-  ].join("\t"));
+if (jsonReport) {
+  console.log(JSON.stringify(report, null, 2));
+} else {
+  console.log(JSON.stringify(report.summary, null, 2));
+
+  for (const row of rows) {
+    const issues = row.issues.map((issue) => issue.code).join(",") || "-";
+    console.log([
+      row.grade,
+      row.id,
+      `status=${row.status || "-"}`,
+      `visible=${row.userVisible}`,
+      `paths=${row.entryPaths.length}`,
+      `examples=${row.examples.length}`,
+      `api=${row.backendApiCount}`,
+      `page=${row.hasConcretePage}`,
+      `usability=${row.usability || "-"}`,
+      `primary=${row.primaryActionPath || "-"}`,
+      `issues=${issues}`,
+    ].join("\t"));
+  }
 }
 
 const blocking = rows.flatMap((row) => row.issues.filter((issue) => issue.blocking).map((issue) => `${row.id}: ${issue.code} - ${issue.message}`));
@@ -52,6 +60,133 @@ if (strict && blocking.length > 0) {
   console.error(`\n[pack-usability] ${blocking.length} blocking issue(s):`);
   for (const item of blocking) console.error(`  - ${item}`);
   process.exit(1);
+}
+
+function buildReport(rows, groups, issueCounts) {
+  const items = rows.map((row) => {
+    const priority = polishPriority(row);
+    const open = row.primaryActionPath || row.entryPaths[0] || null;
+    const missing = row.issues.map((issue) => issue.code);
+    return {
+      id: row.id,
+      name: row.name,
+      status: row.status || "",
+      manifest_path: row.manifestPath,
+      grade: row.grade,
+      priority,
+      user_visible: row.userVisible,
+      usability: row.usability || "",
+      primary_action_path: row.primaryActionPath || "",
+      entry_paths: row.entryPaths,
+      examples: row.examples,
+      backend_api_count: row.backendApiCount,
+      has_concrete_page: row.hasConcretePage,
+      uses_runtime_host: row.usesRuntimeHost,
+      issues: row.issues.map((issue) => ({
+        code: issue.code,
+        message: issue.message,
+        blocking: issue.blocking,
+      })),
+      handoff_links: {
+        center: `/packs?q=${encodeURIComponent(row.id)}&from=usability-audit`,
+        detail: `/packs/detail?id=${encodeURIComponent(row.id)}`,
+        open,
+        studio: `/packs/studio?packId=${encodeURIComponent(row.id)}&goal=${encodeURIComponent(polishGoal(row, missing))}`,
+      },
+      next_step: nextStepFor(row, priority, missing),
+      verify: verifyStepFor(row, open),
+    };
+  });
+  const queue = items
+    .filter((item) => item.priority.level !== "P3")
+    .sort((a, b) => a.priority.order - b.priority.order || a.grade.localeCompare(b.grade) || a.name.localeCompare(b.name));
+
+  return {
+    kind: "yunque.pack_usability_report.v1",
+    generated_at: new Date().toISOString(),
+    summary: {
+      total: rows.length,
+      groups: Object.fromEntries([...groups.entries()].map(([key, value]) => [key, value.length])),
+      issueCounts,
+      queue: {
+        total: queue.length,
+        p0: queue.filter((item) => item.priority.level === "P0").length,
+        p1: queue.filter((item) => item.priority.level === "P1").length,
+        p2: queue.filter((item) => item.priority.level === "P2").length,
+      },
+    },
+    queue,
+    packs: items,
+  };
+}
+
+function polishPriority(row) {
+  if (row.issues.some((issue) => issue.blocking)) {
+    return {
+      level: "P0",
+      label: "P0 修硬阻塞",
+      order: 0,
+      reason: "存在会阻止用户理解、打开或验证能力包的硬性缺口。",
+    };
+  }
+  if (row.grade === "experimental") {
+    return {
+      level: "P1",
+      label: "P1 实验能力补边界",
+      order: 1,
+      reason: "实验能力可以展示，但必须清楚说明限制、结果位置和转稳定待办。",
+    };
+  }
+  if (row.grade === "infrastructure") {
+    return {
+      level: "P2",
+      label: "P2 后台能力验收",
+      order: 2,
+      reason: "后台支撑能力不一定单独打开，重点验证它在 Chat、任务、记忆、知识或设置中的效果。",
+    };
+  }
+  return {
+    level: "P3",
+    label: "P3 常规巡检",
+    order: 3,
+    reason: "当前已具备入口、示例和可见页面，后续按真实反馈继续打磨。",
+  };
+}
+
+function polishGoal(row, missing) {
+  if (missing.length > 0) {
+    return `修复 ${row.name} 的能力包可用性缺口：${missing.join("、")}。不要伪造能力，改完必须回中心、详情和入口验收。`;
+  }
+  if (row.grade === "experimental") {
+    return `打磨 ${row.name} 的实验能力说明：补齐限制、结果位置、验证步骤和转稳定待办，不包装成稳定执行。`;
+  }
+  if (row.grade === "infrastructure") {
+    return `打磨 ${row.name} 的后台支撑说明：说明它在用户主路径哪里生效、如何触发、如何观察结果。`;
+  }
+  return `继续打磨 ${row.name} 的用户路径、验收出口和回滚说明。`;
+}
+
+function nextStepFor(row, priority, missing) {
+  if (missing.length > 0) {
+    return `先进工坊修复：${missing.join("、")}；再跑 check-pack-usability --strict。`;
+  }
+  if (priority.level === "P1") {
+    return "保留实验边界，补真实结果位置、限制说明、验证步骤和转稳定的最小待办。";
+  }
+  if (priority.level === "P2") {
+    return "从声明的用户感知位置触发一次，确认主路径能看到状态、结果或下一步提示。";
+  }
+  return "打开入口或从 Chat 主路径触发一次，确认结果、产物、状态或错误提示可见。";
+}
+
+function verifyStepFor(row, open) {
+  if (open) {
+    return `回到 ${open} 复验入口、提示、结果位置和回滚路径。`;
+  }
+  if (row.grade === "infrastructure") {
+    return "从 Chat、任务、记忆、知识或设置流程触发，观察结果、状态或提示是否出现。";
+  }
+  return "回能力包中心和详情页确认用户能理解如何触发、观察结果和回滚。";
 }
 
 function auditPack({ manifestPath, manifest }) {
