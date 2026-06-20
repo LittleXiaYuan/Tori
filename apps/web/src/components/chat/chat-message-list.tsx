@@ -184,6 +184,30 @@ function packStudioHandoffHref(pack: { id?: string }, goal: string | undefined, 
   return `/packs/studio${query ? `?${query}` : ""}${hash}`;
 }
 
+function packDetailHref(pack: { id?: string }): string | null {
+  return pack.id ? `/packs/detail?id=${encodeURIComponent(pack.id)}` : null;
+}
+
+function packCenterHref(pack: { id?: string }): string {
+  return pack.id ? `/packs?q=${encodeURIComponent(pack.id)}` : "/packs";
+}
+
+function renderPackGovernanceLinks(pack: { id?: string }, detailLabel = "查看详情", centerLabel = "回中心") {
+  const detailHref = packDetailHref(pack);
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-2">
+      {detailHref && (
+        <a href={detailHref} className="inline-flex items-center gap-1 text-[11px] font-medium" style={{ color: "var(--yunque-accent)" }}>
+          {detailLabel} <ArrowRight size={10} />
+        </a>
+      )}
+      <a href={packCenterHref(pack)} className="inline-flex items-center gap-1 text-[11px] font-medium" style={{ color: "var(--yunque-text-muted)" }}>
+        {centerLabel} <ArrowRight size={10} />
+      </a>
+    </div>
+  );
+}
+
 function packStudioBatchHandoffHref(request: PackStudioBatchDraftRequest): string {
   const payload = {
     kind: "yunque.pack_studio.batch_draft_request.v1",
@@ -268,6 +292,7 @@ function renderPackStudioPlan(plan: PackStudioPatchPlanSummary) {
       <div className="mt-2 leading-5" style={{ color: "var(--yunque-text-muted)" }}>
         这张卡只展示结构化计划，不包含完整文件内容。请在 Studio 导入 Plan、载入草稿、预览 diff、运行审计、重新打包并复检 SHA 后再安装或回滚。
       </div>
+      {renderPackGovernanceLinks(plan.pack, "查看能力包详情", "回中心定位")}
     </div>
   );
 }
@@ -318,6 +343,7 @@ function renderPackStudioDraft(draft: PackStudioPatchDraft) {
       <div className="mt-2 leading-5" style={{ color: "var(--yunque-text-muted)" }}>
         完整文件内容已隐藏。请把这条消息粘贴到 Studio 的 Patch Draft 导入区，确认工作区匹配后预览 diff、运行审计，再应用和重新打包。
       </div>
+      {renderPackGovernanceLinks(draft.pack, "查看能力包详情", "回中心定位")}
     </div>
   );
 }
@@ -377,6 +403,7 @@ function renderPackStudioBatchDraftRequest(request: PackStudioBatchDraftRequest)
                 </a>
               )}
             </div>
+            {renderPackGovernanceLinks(pack, "详情", "中心")}
             <div className="mt-1.5 flex flex-wrap gap-1.5">
               {pack.readiness && <Chip size="sm" variant="soft">{pack.readiness}</Chip>}
               {pack.status && <Chip size="sm" variant="soft">稳定性：{pack.status}</Chip>}
@@ -457,6 +484,7 @@ function renderPackStudioDraftRequest(request: PackStudioPatchDraftRequest) {
       <div className="mt-2 leading-5" style={{ color: "var(--yunque-text-muted)" }}>
         这是一条生成请求，不是已应用改动。小羽应只返回 {request.expectedKind || "yunque.pack_studio.patch_draft.v1"}，用户再回到 Studio 导入、预览 diff、审计、重新打包。
       </div>
+      {renderPackGovernanceLinks(request.pack, "查看能力包详情", "回中心定位")}
     </div>
   );
 }

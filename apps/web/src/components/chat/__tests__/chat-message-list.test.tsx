@@ -158,6 +158,8 @@ describe("ChatMessageList file preview", () => {
     expect(screen.getByText("摘要：abcd1234")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /导入 Plan/ })).toHaveAttribute("href", expect.stringContaining("/packs/studio?packId=yunque.pack.wasm-plugin"));
     expect(screen.getByRole("link", { name: /导入 Plan/ })).toHaveAttribute("href", expect.stringContaining("#import-plan"));
+    expect(screen.getByRole("link", { name: /查看能力包详情/ })).toHaveAttribute("href", "/packs/detail?id=yunque.pack.wasm-plugin");
+    expect(screen.getByRole("link", { name: /回中心定位/ })).toHaveAttribute("href", "/packs?q=yunque.pack.wasm-plugin");
     expect(screen.getByText("请以小羽改包方式优化能力包。")).toBeInTheDocument();
     expect(screen.queryByText(/yunque.pack_studio.patch_plan.v1/)).not.toBeInTheDocument();
   });
@@ -201,6 +203,8 @@ describe("ChatMessageList file preview", () => {
     expect(screen.getByText("我已经准备好单文件草稿，先回 Studio 审一下。")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /导入 Draft/ })).toHaveAttribute("href", expect.stringContaining("/packs/studio?packId=yunque.pack.wasm-plugin"));
     expect(screen.getByRole("link", { name: /导入 Draft/ })).toHaveAttribute("href", expect.stringContaining("#import-draft"));
+    expect(screen.getByRole("link", { name: /查看能力包详情/ })).toHaveAttribute("href", "/packs/detail?id=yunque.pack.wasm-plugin");
+    expect(screen.getByRole("link", { name: /回中心定位/ })).toHaveAttribute("href", "/packs?q=yunque.pack.wasm-plugin");
     expect(screen.queryByText(/yunque.pack_studio.patch_draft.v1/)).not.toBeInTheDocument();
     expect(screen.queryByText(/这段完整内容不应该直接展示/)).not.toBeInTheDocument();
 
@@ -257,6 +261,8 @@ describe("ChatMessageList file preview", () => {
     expect(screen.getByText(/小羽应只返回 yunque\.pack_studio\.patch_draft\.v1/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /查看草稿队列/ })).toHaveAttribute("href", expect.stringContaining("/packs/studio?packId=yunque.pack.wasm-plugin"));
     expect(screen.getByRole("link", { name: /查看草稿队列/ })).toHaveAttribute("href", expect.stringContaining("#draft-queue"));
+    expect(screen.getByRole("link", { name: /查看能力包详情/ })).toHaveAttribute("href", "/packs/detail?id=yunque.pack.wasm-plugin");
+    expect(screen.getByRole("link", { name: /回中心定位/ })).toHaveAttribute("href", "/packs?q=yunque.pack.wasm-plugin");
     expect(screen.getByText("请生成这个能力包界面的 Draft。")).toBeInTheDocument();
     expect(screen.queryByText(/yunque.pack_studio.patch_draft_request.v1/)).not.toBeInTheDocument();
     expect(screen.queryByText(/starter 内容不应该直接展示/)).not.toBeInTheDocument();
@@ -324,6 +330,10 @@ describe("ChatMessageList file preview", () => {
     expect(screen.getByText("打开/使用入口")).toBeInTheDocument();
     expect(screen.getByText(/预览 diff、运行 audit、重新打包并复检 SHA/)).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: /打开 Studio/ })[0]).toHaveAttribute("href", "/packs/studio?pack=yunque.pack.needs-entry");
+    expect(screen.getAllByRole("link", { name: /^详情/ })[0]).toHaveAttribute("href", "/packs/detail?id=yunque.pack.needs-entry");
+    expect(screen.getAllByRole("link", { name: /^中心/ })[0]).toHaveAttribute("href", "/packs?q=yunque.pack.needs-entry");
+    expect(screen.getAllByRole("link", { name: /^详情/ })[1]).toHaveAttribute("href", "/packs/detail?id=yunque.pack.experimental");
+    expect(screen.getAllByRole("link", { name: /^中心/ })[1]).toHaveAttribute("href", "/packs?q=yunque.pack.experimental");
     const batchStudioLink = screen.getByRole("link", { name: /导入 Studio 逐包处理/ });
     expect(batchStudioLink).toHaveAttribute("href", expect.stringContaining("/packs/studio?batch="));
     const batchParam = new URL(batchStudioLink.getAttribute("href")!, "http://localhost").searchParams.get("batch") || "";
