@@ -90,6 +90,8 @@ describe("PackRuntimeRouteClientPage DLC route", () => {
     expect(screen.getByText("先触发一次")).toBeInTheDocument();
     expect(screen.getByText("看结果在哪")).toBeInTheDocument();
     expect(screen.getByText("决定留下还是改")).toBeInTheDocument();
+    expect(screen.getByText("验收出口：")).toBeInTheDocument();
+    expect(screen.getByText(/回中心确认状态，进详情复查权限，再打开入口复验。/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /看权限与来源/ })).toHaveAttribute("href", "/packs/detail?id=yunque.pack.dlc-demo");
     const handoffLink = screen.getByRole("link", { name: /让小羽改这个包/ });
     expect(handoffLink).toHaveAttribute("href", expect.stringContaining("/packs/studio?packId=yunque.pack.dlc-demo"));

@@ -232,6 +232,10 @@ export default function PackRuntimeRouteClientPage() {
                 </div>
               ))}
             </div>
+            <div className="mt-3 rounded-lg border px-3 py-2 text-xs leading-5" style={{ borderColor: "rgba(59,130,246,0.22)", background: "rgba(59,130,246,0.07)", color: "var(--yunque-text-secondary)" }}>
+              <span className="font-semibold" style={{ color: "var(--yunque-text)" }}>验收出口：</span>
+              回中心确认状态，进详情复查权限{usability.primaryActionPath ? "，再打开入口复验。" : "；这个包没有独立入口，需从 Chat、任务、记忆或知识流程触发并观察结果。"}
+            </div>
           </div>
           <div className="flex w-full flex-wrap gap-2 lg:w-auto lg:max-w-xs">
             <Link href={`/packs/detail?id=${encodeURIComponent(manifest.id)}`}>
