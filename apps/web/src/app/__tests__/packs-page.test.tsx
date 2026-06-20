@@ -312,6 +312,14 @@ describe("PacksPageOptimized", () => {
     expect(screen.getByText("工坊返回验收")).toBeInTheDocument();
     expect(screen.getByText("已聚焦 Files (产物文件)。先确认来源、权限和交付状态，再打开入口验证；如果结果不符合预期，可以继续回工坊补肉或禁用/回滚。")).toBeInTheDocument();
     expect(screen.getByText("搜索已聚焦")).toBeInTheDocument();
+    const returnPanel = screen.getByText("工坊返回验收").closest("div")?.parentElement?.parentElement;
+    expect(returnPanel).not.toBeNull();
+    expect(within(returnPanel as HTMLElement).getByText("先触发一次")).toBeInTheDocument();
+    expect(within(returnPanel as HTMLElement).getByText(/从「查看最近产物」进入/)).toBeInTheDocument();
+    expect(within(returnPanel as HTMLElement).getByText("看结果在哪")).toBeInTheDocument();
+    expect(within(returnPanel as HTMLElement).getByText(/到 Chat 产物区、任务结果页、文件预览与下载入口/)).toBeInTheDocument();
+    expect(within(returnPanel as HTMLElement).getByText("复验失败怎么退")).toBeInTheDocument();
+    expect(within(returnPanel as HTMLElement).getByText("先禁用这个能力包；如果有上一版本，再执行回滚。回中心确认状态后，可以继续让小羽改。")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /验收权限与来源/ })).toHaveAttribute("href", "/packs/detail?id=yunque.pack.files");
     expect(screen.getByRole("link", { name: /打开入口复验/ })).toHaveAttribute("href", "/chat?q=%E5%88%97%E5%87%BA%E6%88%91%E6%9C%80%E8%BF%91%E7%94%9F%E6%88%90%E7%9A%84%E6%96%87%E4%BB%B6");
     expect(screen.getByRole("link", { name: /继续让小羽改/ })).toHaveAttribute("href", expect.stringContaining("/packs/studio?packId=yunque.pack.files"));

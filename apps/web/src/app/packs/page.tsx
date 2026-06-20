@@ -857,6 +857,9 @@ export default function PacksPageOptimized() {
     : undefined;
   const studioReturnDelivery = studioReturnManifest ? packDeliveryProfile(studioReturnManifest) : undefined;
   const studioReturnRisk = studioReturnManifest ? riskProfileForPack(studioReturnManifest) : undefined;
+  const studioReturnVerificationSteps = studioReturnManifest
+    ? packVerificationSteps(studioReturnManifest).slice(0, 2)
+    : [];
   const enable = (id: string) => {
     const manifest = manifestById(id);
     return run(`enable:${id}`, () => packsClient.enable(id), "已启用，可在命令菜单、扩展分组或本页入口打开", manifest ? noticeForEnabled(manifest) : undefined);
@@ -1018,6 +1021,41 @@ export default function PacksPageOptimized() {
                       {studioReturnRisk?.label}
                     </Chip>
                     <Chip size="sm" variant="soft">搜索已聚焦</Chip>
+                  </div>
+                )}
+                {studioReturnManifest && (
+                  <div className="mt-3 grid gap-2 md:grid-cols-3">
+                    {studioReturnVerificationSteps.map((step) => (
+                      <div
+                        key={step.key}
+                        className="rounded-md border p-3"
+                        style={{
+                          borderColor: "rgba(59,130,246,0.18)",
+                          background: "rgba(59,130,246,0.06)",
+                        }}
+                      >
+                        <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>
+                          {step.label}
+                        </div>
+                        <div className="mt-1 text-[11px] leading-5" style={{ color: "var(--yunque-text-muted)" }}>
+                          {step.detail}
+                        </div>
+                      </div>
+                    ))}
+                    <div
+                      className="rounded-md border p-3"
+                      style={{
+                        borderColor: "rgba(245,158,11,0.22)",
+                        background: "rgba(245,158,11,0.06)",
+                      }}
+                    >
+                      <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>
+                        复验失败怎么退
+                      </div>
+                      <div className="mt-1 text-[11px] leading-5" style={{ color: "var(--yunque-text-muted)" }}>
+                        先禁用这个能力包；如果有上一版本，再执行回滚。回中心确认状态后，可以继续让小羽改。
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
