@@ -6,13 +6,10 @@ import {
   Chip,
   Label,
   ListBox,
-  Link,
   Popover,
   SearchField,
-  ToggleButton,
-  ToggleButtonGroup,
 } from "@heroui/react";
-import { Cpu, ChevronDown, Check, Zap, Sparkles, Heart, MessageCircle, Settings } from "lucide-react";
+import { Cpu, ChevronDown, Check } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 
 export interface ModelOption {
@@ -33,35 +30,14 @@ interface Props {
   currentModelId: string;
   currentModelLabel: string;
   onSelect: (model: ModelOption) => void;
-  chatMode?: ChatMode;
-  onModeChange?: (mode: ChatMode) => void;
-  airiAvailable?: boolean;
-  thinkingLevel?: ThinkingLevel;
-  onThinkingChange?: (level: ThinkingLevel) => void;
 }
 
-const MODE_DEFS: { key: ChatMode; label: string; icon: typeof Sparkles }[] = [
-  { key: "agent", label: "Agent", icon: Sparkles },
-  { key: "fast", label: "Fast", icon: Zap },
-  { key: "chat", label: "Chat", icon: MessageCircle },
-];
-
-// 全 HeroUI v3 实现：
-// - Popover 自动 portal 到 body，不会被 header 毛玻璃创建的 stacking context 困住，
-//   也不会被 ChatEmptyState 的"先完成模型配置"卡片遮挡。
-// - 触发按钮 / Mode Switcher / 搜索框 / 列表 / Footer 链接全部使用 HeroUI 原生组件。
-// - ListBox 内置键盘导航 + ARIA + 受控选择，根除手写 click outside 监听
-//   与 React 合成事件竞态导致"点击没反应"的问题。
-const EFFORT_KEYS: Record<ThinkingLevel, string> = {
-  none: "model.think.none",
-  auto: "model.think.auto",
-  deep: "model.think.deep",
-};
+// 纯模型列表弹窗（HeroUI v3 Popover + ListBox）。模式(Agent/Fast/Chat)与
+// 思维深度已移到输入框的「高级」按钮，这里只负责选模型，保持单一职责。
+// Popover 自动 portal 到 body，不受 header 毛玻璃 stacking context 影响。
 
 export function ModelSelectorPopup({
   models, currentModelId, currentModelLabel, onSelect,
-  chatMode, onModeChange, airiAvailable,
-  thinkingLevel = "auto", onThinkingChange,
 }: Props) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
@@ -103,7 +79,7 @@ export function ModelSelectorPopup({
           className="model-selector-trigger gap-1.5 rounded-full px-2.5 h-8 text-[11px] font-mono"
         >
           <Cpu size={12} />
-          <span className="max-w-[180px] truncate">{currentModelLabel} · {t(EFFORT_KEYS[thinkingLevel])}</span>
+          <span className="max-w-[180px] truncate">{currentModelLabel}</span>
           <ChevronDown
             size={10}
             style={{
@@ -132,51 +108,6 @@ export function ModelSelectorPopup({
             boxShadow: "0 12px 40px rgba(0,0,0,0.35)",
           }}
         >
-          {chatMode && onModeChange && (
-            <div
-              className="model-selector-modes"
-              style={{
-                padding: "8px 8px 4px",
-                borderBottom: "1px solid var(--yunque-border)",
-                flexShrink: 0,
-              }}
-            >
-              <ToggleButtonGroup
-                selectionMode="single"
-                disallowEmptySelection
-                fullWidth
-                size="sm"
-                isDetached
-                selectedKeys={new Set([chatMode])}
-                onSelectionChange={(keys) => {
-                  const next = Array.from(keys)[0] as ChatMode | undefined;
-                  if (next) onModeChange(next);
-                }}
-                aria-label={t("model.modeAria")}
-              >
-                {MODE_DEFS.map((md) => {
-                  const isAiri = md.key === "chat" && airiAvailable;
-                  const Icon = isAiri ? Heart : md.icon;
-                  const label = isAiri ? "Airi" : md.label;
-                  return (
-                    <ToggleButton
-                      key={md.key}
-                      id={md.key}
-                      variant="ghost"
-                      className="text-[11px] gap-1.5"
-                    >
-                      <Icon
-                        size={12}
-                        fill={isAiri && chatMode === md.key ? "currentColor" : "none"}
-                      />
-                      {label}
-                    </ToggleButton>
-                  );
-                })}
-              </ToggleButtonGroup>
-            </div>
-          )}
-
           {showSearch && (
             <div
               className="model-selector-search"
@@ -235,11 +166,16 @@ export function ModelSelectorPopup({
                       key={m.id}
                       id={m.id}
                       textValue={label}
-                      className="text-[12px] rounded-lg"
-                      style={{ padding: "6px 10px", minHeight: 0 }}
+                      className="text-[12px] rounded-lg flex items-center gap-2"
+                      style={{
+                        padding: "7px 10px",
+                        minHeight: 0,
+                        background: isActive ? "var(--yunque-accent-soft)" : "transparent",
+                        color: isActive ? "var(--yunque-text)" : "var(--yunque-text-secondary)",
+                      }}
                     >
                       <Label className="truncate flex-1">{label}</Label>
-                      {isActive && <Check size={13} />}
+                      {isActive && <Check size={13} style={{ color: "var(--yunque-accent)" }} />}
                     </ListBox.Item>
                   );
                 })}
@@ -247,58 +183,6 @@ export function ModelSelectorPopup({
             )}
           </div>
 
-          {onThinkingChange && chatMode !== "chat" && (
-            <div
-              style={{
-                padding: "10px 12px",
-                borderTop: "1px solid var(--yunque-border)",
-                flexShrink: 0,
-              }}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[10px] font-medium uppercase tracking-wider" style={{ color: "var(--yunque-text-muted)" }}>{t("model.thinkDepth")}</span>
-                <span className="text-[9px] tabular-nums" style={{ color: "var(--yunque-text-muted)", opacity: 0.6 }}>
-                  {thinkingLevel === "none" ? t("model.cost.low") : thinkingLevel === "deep" ? t("model.cost.high") : t("model.cost.balanced")}
-                </span>
-              </div>
-              <div className="flex items-center gap-1 rounded-[10px] p-1" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
-                {(["none", "auto", "deep"] as ThinkingLevel[]).map((lvl) => {
-                  const active = thinkingLevel === lvl;
-                  return (
-                    <button
-                      key={lvl}
-                      onClick={() => onThinkingChange(lvl)}
-                      className="flex-1 flex items-center justify-center gap-1 rounded-lg py-1.5 text-[11px] font-medium transition-all duration-200 whitespace-nowrap"
-                      style={{
-                        background: active ? "var(--yunque-accent)" : "transparent",
-                        color: active ? "#fff" : "var(--yunque-text-muted)",
-                        boxShadow: active ? "0 2px 8px rgba(59,130,246,0.25)" : "none",
-                      }}
-                    >
-                      {lvl === "none" && <Zap size={11} />}
-                      {lvl === "auto" && <Sparkles size={11} />}
-                      {lvl === "deep" && <Cpu size={11} />}
-                      {t(EFFORT_KEYS[lvl])}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          <Link
-            href="/settings/providers"
-            className="flex items-center justify-center gap-1 py-1.5 text-[10px] transition-colors"
-            style={{
-              borderTop: "1px solid var(--yunque-border)",
-              flexShrink: 0,
-              color: "var(--yunque-text-muted)",
-              opacity: 0.6,
-            }}
-          >
-            <Settings size={10} />
-            {t("model.settings")}
-          </Link>
         </Popover.Dialog>
       </Popover.Content>
     </Popover>

@@ -4878,6 +4878,16 @@ button, [role="button"] { border-radius: var(--radius-md); }
   border-radius: 8px;
 }
 
+/* Mode toggle (Agent/Fast/Chat): tone the selected state down from a solid
+   accent fill to a soft, neutral-leaning highlight so it doesn't fight the
+   model list and thinking-depth segment in the same popup. */
+.model-selector-modes [role="radio"][data-selected],
+.model-selector-modes [aria-pressed="true"] {
+  background: var(--yunque-accent-soft) !important;
+  color: var(--yunque-accent) !important;
+  box-shadow: none !important;
+}
+
 /* Non-fullscreen pages keep a little top spacing under the title bar. */
 .page-header {
   padding-top: 6px;
