@@ -5337,21 +5337,45 @@ button, [role="button"] { border-radius: var(--radius-md); }
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: clamp(48px, 8vh, 96px);
-  padding-bottom: 8vh;
+  gap: clamp(20px, 3vh, 32px);
+  padding-bottom: 2vh;
 }
 .chat-empty--centered .chat-empty__hero-title {
-  font-size: clamp(28px, 3.6vw, 44px);
+  font-size: clamp(20px, 2vw, 26px);
   font-weight: 500;
-  line-height: 1.25;
+  line-height: 1.4;
   letter-spacing: -0.01em;
-  color: var(--yunque-text-secondary, var(--yunque-text-muted));
+  color: var(--yunque-text-muted);
   text-align: center;
   margin: 0;
   padding: 0 var(--sp-4);
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+}
+.chat-empty--centered .chat-empty__suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  max-width: 640px;
+  margin-top: -8px;
+}
+.chat-empty__suggestion {
+  font-size: 13px;
+  line-height: 1;
+  padding: 8px 14px;
+  border-radius: 999px;
+  color: var(--yunque-text-secondary);
+  background: var(--yunque-bg-muted);
+  border: 1px solid var(--yunque-border);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.chat-empty__suggestion:hover {
+  background: var(--yunque-bg-hover);
+  color: var(--yunque-text);
+  border-color: var(--yunque-border-accent, var(--yunque-accent-border));
 }
 .chat-empty__hero-edit {
   display: inline-flex;
