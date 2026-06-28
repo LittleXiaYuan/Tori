@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * AccountRail —— 极窄左侧账号栏（64px 宽）
+ * AccountRail —— 桌面主导航栏
  *
  * 取代原 `sidebar.tsx` 的全功能侧栏。沿用其业务逻辑：
  *  - 后端在线状态轮询 + 在线点
@@ -9,8 +9,8 @@
  *  - 语言切换 (i18n locale)
  *  - 命令面板触发 (Cmd+K)
  *
- * 五大类功能性导航全部撤掉，转交命令面板。该 rail 上只放：头像 / 搜索 /
- * 主题切换 / 设置 / 帮助 / 语言 / 登出。
+ * 保留 Cherry-style 桌面应用的常驻主路径：对话 / 任务 / 知识 / 记忆。
+ * 低频入口仍进入「全部功能」弹层和 ⌘K，避免把桌面首页做成控制台。
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -18,6 +18,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { Avatar, Button, Tooltip } from "@heroui/react";
 import {
   Brain,
+  BookOpen,
+  Boxes,
   Languages,
   LayoutGrid,
   LogOut,
@@ -33,7 +35,6 @@ import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import { loadTheme, patchAndApply } from "@/lib/theme-engine";
 import AccountRailFlyout from "@/components/layout/account-rail-flyout";
-import { WindowControls } from "@/components/title-bar";
 import { buildPackNavItems, fetchEnabledPacks } from "@/lib/pack-sync";
 import { DEFAULT_ENABLED_PACK_IDS, type NavItem } from "@/lib/nav-items";
 import { useNavigationPreferences } from "@/hooks/use-user-preferences";
@@ -54,8 +55,6 @@ interface QuickLink {
  */
 const QUICK_LINKS: QuickLink[] = [
   { href: "/chat",      icon: <MessageCircle size={16} />, zh: "对话",   en: "Chat" },
-  { href: "/missions",  icon: <Zap size={16} />,           zh: "任务中心", en: "Missions" },
-  { href: "/memory",    icon: <Brain size={16} />,         zh: "记忆",   en: "Memory" },
 ];
 
 export default function AccountRail() {
@@ -96,7 +95,7 @@ export default function AccountRail() {
       .catch(() => {});
   }, []);
 
-  useEffect(() => {
+  const reloadPacks = useCallback(() => {
     fetchEnabledPacks()
       .then((packs) => {
         setEnabledPackIds(new Set(packs.map((p) => p.manifest.id)));
@@ -118,6 +117,15 @@ export default function AccountRail() {
         setPackItems([]);
       });
   }, []);
+
+  useEffect(() => {
+    reloadPacks();
+    // 启用/禁用能力包后，packs 页会派发 yunque:packs-changed，
+    // 侧栏据此重新拉取已启用列表，移除已禁用 pack 的残留入口。
+    const onChanged = () => reloadPacks();
+    window.addEventListener("yunque:packs-changed", onChanged);
+    return () => window.removeEventListener("yunque:packs-changed", onChanged);
+  }, [reloadPacks]);
 
   // hover 进入/离开延时控制
   const clearTimers = useCallback(() => {
@@ -258,10 +266,17 @@ export default function AccountRail() {
       offline: zh ? "离线" : "Offline",
       connecting: zh ? "连接中…" : "Connecting…",
       search: zh ? "搜索 (⌘K)" : "Search (⌘K)",
+      appName: zh ? "云雀" : "Yunque",
+      appHint: zh ? "桌面工作伙伴" : "Desktop AI",
+      main: zh ? "主路径" : "Main",
+      more: zh ? "全部功能" : "All features",
+      prefs: zh ? "偏好" : "Prefs",
       settings: zh ? "设置" : "Settings",
       help: zh ? "帮助" : "Help",
       logout: zh ? "退出" : "Logout",
       locale: zh ? "English" : "中文",
+      light: zh ? "亮色" : "Light",
+      dark: zh ? "暗色" : "Dark",
       themeLight: zh ? "切换到亮色" : "Switch to Light",
       themeDark: zh ? "切换到暗色" : "Switch to Dark",
     };
@@ -282,62 +297,18 @@ export default function AccountRail() {
       aria-label={locale === "zh" ? "主导航" : "Main navigation"}
     >
       <div className="account-rail-top">
-        <WindowControls />
-        <div className="account-rail-divider" aria-hidden="true" />
-        <Tooltip delay={0}>
-          <Tooltip.Trigger>
-            <button
-              className="account-rail-avatar-wrap"
-              onClick={() => router.push("/dashboard")}
-              aria-label={locale === "zh" ? "概览" : "Overview"}
-            >
-              <Avatar
-                size="sm"
-                style={{ background: "linear-gradient(135deg, var(--yunque-accent), var(--yunque-success))" }}
-              >
-                <Avatar.Fallback className="text-white text-[10px] font-bold">YQ</Avatar.Fallback>
-              </Avatar>
-              <span
-                className={online === true ? "online-dot" : ""}
-                style={{
-                  position: "absolute",
-                  bottom: -1,
-                  right: -1,
-                  width: 8,
-                  height: 8,
-                  borderRadius: "50%",
-                  background: onlineColor,
-                  border: "2px solid var(--yunque-sidebar)",
-                }}
-              />
-            </button>
-          </Tooltip.Trigger>
-          <Tooltip.Content placement="right">
-            {online === true
-              ? `${ui.online}${version ? ` · v${version}` : ""}`
-              : online === false
-              ? ui.offline
-              : ui.connecting}
-          </Tooltip.Content>
-        </Tooltip>
-
-        <Tooltip delay={0}>
-          <Tooltip.Trigger>
-            <Button
-              size="sm"
-              variant="ghost"
-              isIconOnly
-              className="account-rail-btn"
-              onPress={openCommandPalette}
-              aria-label={ui.search}
-            >
-              <Search size={16} />
-            </Button>
-          </Tooltip.Trigger>
-          <Tooltip.Content placement="right">{ui.search}</Tooltip.Content>
-        </Tooltip>
+        <button
+          type="button"
+          className="account-rail-search"
+          onClick={openCommandPalette}
+          aria-label={ui.search}
+        >
+          <Search size={15} />
+          <span>{ui.search}</span>
+        </button>
 
         <div className="account-rail-divider" aria-hidden="true" />
+        <div className="account-rail-section-label">{ui.main}</div>
 
         {[...QUICK_LINKS, ...packItems.filter((item) => navigationPrefs.pinnedItems.includes(item.id)).map((item) => ({
           href: item.href,
@@ -352,13 +323,13 @@ export default function AccountRail() {
                 <Button
                   size="sm"
                   variant="ghost"
-                  isIconOnly
                   className="account-rail-btn"
                   data-active={active || undefined}
                   onPress={() => router.push(link.href)}
                   aria-label={locale === "zh" ? link.zh : link.en}
                 >
                   {link.icon}
+                  <span className="account-rail-btn-label">{locale === "zh" ? link.zh : link.en}</span>
                 </Button>
               </Tooltip.Trigger>
               <Tooltip.Content placement="right">
@@ -390,6 +361,7 @@ export default function AccountRail() {
               aria-expanded={flyoutOpen}
             >
               <LayoutGrid size={16} />
+              <span className="account-rail-btn-label">{ui.more}</span>
             </button>
           </Tooltip.Trigger>
           <Tooltip.Content placement="right">
@@ -400,35 +372,18 @@ export default function AccountRail() {
       </div>
 
       <div className="account-rail-bottom">
+        <div className="account-rail-section-label">{ui.prefs}</div>
         <Tooltip delay={0}>
           <Tooltip.Trigger>
             <Button
               size="sm"
               variant="ghost"
-              isIconOnly
-              className="account-rail-btn"
-              onPress={toggleTheme}
-              aria-label={themeMode === "light" ? ui.themeDark : ui.themeLight}
-            >
-              {themeMode === "light" ? <Moon size={16} /> : <Sun size={16} />}
-            </Button>
-          </Tooltip.Trigger>
-          <Tooltip.Content placement="right">
-            {themeMode === "light" ? ui.themeDark : ui.themeLight}
-          </Tooltip.Content>
-        </Tooltip>
-
-        <Tooltip delay={0}>
-          <Tooltip.Trigger>
-            <Button
-              size="sm"
-              variant="ghost"
-              isIconOnly
               className="account-rail-btn"
               onPress={toggleLocale}
               aria-label={ui.locale}
             >
               <Languages size={16} />
+              <span className="account-rail-btn-label">{ui.locale}</span>
             </Button>
           </Tooltip.Trigger>
           <Tooltip.Content placement="right">{ui.locale}</Tooltip.Content>
@@ -439,29 +394,12 @@ export default function AccountRail() {
             <Button
               size="sm"
               variant="ghost"
-              isIconOnly
-              className="account-rail-btn"
-              data-active={pathname?.startsWith("/settings") || undefined}
-              onPress={() => router.push("/settings")}
-              aria-label={ui.settings}
-            >
-              <Settings size={16} />
-            </Button>
-          </Tooltip.Trigger>
-          <Tooltip.Content placement="right">{ui.settings}</Tooltip.Content>
-        </Tooltip>
-
-        <Tooltip delay={0}>
-          <Tooltip.Trigger>
-            <Button
-              size="sm"
-              variant="ghost"
-              isIconOnly
               className="account-rail-btn account-rail-btn--danger"
               onPress={handleLogout}
               aria-label={ui.logout}
             >
               <LogOut size={16} />
+              <span className="account-rail-btn-label">{ui.logout}</span>
             </Button>
           </Tooltip.Trigger>
           <Tooltip.Content placement="right">{ui.logout}</Tooltip.Content>

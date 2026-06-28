@@ -62,7 +62,7 @@ export default function CommandPalette() {
       .catch(() => {});
   }, []);
 
-  useEffect(() => {
+  const reloadPacks = useCallback(() => {
     fetchEnabledPacks()
       .then((packs) => {
         setEnabledPackIds(new Set(packs.map((p) => p.manifest.id)));
@@ -82,6 +82,14 @@ export default function CommandPalette() {
         setPackItems([]);
       });
   }, []);
+
+  useEffect(() => {
+    reloadPacks();
+    // 与侧栏一致：禁用/启用能力包后重新拉取，移除残留入口。
+    const onChanged = () => reloadPacks();
+    window.addEventListener("yunque:packs-changed", onChanged);
+    return () => window.removeEventListener("yunque:packs-changed", onChanged);
+  }, [reloadPacks]);
 
   const close = useCallback(() => {
     setOpen(false);
@@ -177,7 +185,7 @@ export default function CommandPalette() {
       action: () => {
         if (r.type === "memory") router.push("/memory");
         else if (r.type === "knowledge") router.push("/knowledge");
-        else if (r.type === "task") router.push(`/task-run?id=${r.id}`);
+        else if (r.type === "task") router.push(`/task-detail?id=${r.id}`);
         else router.push("/dashboard");
         close();
       },
@@ -227,12 +235,22 @@ export default function CommandPalette() {
 
   return (
     <div className="cmd-overlay" onClick={close}>
-      <div className="cmd-palette" data-mode={showBrowseMode ? "browse" : "search"} onClick={(e) => e.stopPropagation()}>
+      <div
+        className="cmd-palette"
+        data-mode={showBrowseMode ? "browse" : "search"}
+        role="dialog"
+        aria-modal="true"
+        aria-label={t("cmd.title")}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="cmd-input-wrap">
           <Search size={16} style={{ color: "var(--yunque-text-muted)", flexShrink: 0 }} />
           <input
             ref={inputRef}
             className="cmd-input"
+            name="command_palette_search"
+            aria-label={t("cmd.searchInput")}
+            autoComplete="off"
             placeholder="搜索任务、记忆、页面，或打开可选能力…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
