@@ -57,7 +57,7 @@ type pinnedSurfaceRuntime struct {
 	pinned map[string]bool
 }
 
-func (p pinnedSurfaceRuntime) BuildContext(context.Context, string, string, string) string {
+func (p pinnedSurfaceRuntime) BuildContext(context.Context, string, string, string, string) string {
 	return ""
 }
 func (p pinnedSurfaceRuntime) FilterSkills(_ string, _ string, _ string, in []skills.Skill) []skills.Skill {

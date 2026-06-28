@@ -369,11 +369,15 @@ collect:
 		}
 	}
 
-	// P3.6: Declarative Cogni context — assembled from cogni.Registry.Active()
-	// declarations whose ActivationRules match the current message/tenant/channel.
-	// The hook (pkg/cogni.Hook) handles evaluation, exclusivity, and rendering.
+	// P3.6: Unified Cogni context — merged Declaration context (pkg/cogni) +
+	// Pack perception/belief (pkg/cognisdk) in ONE layer. Step 2 of cogni
+	// consolidation: the former separate P3.7 belief layer is now merged in
+	// here, so the prompt has one cogni layer instead of two parallel ones.
+	// scope is derived from IntentHint so the belief scope gate (#34) filters
+	// scoped beliefs: emotional boundary dormant in technical turns, etc.
 	if injectCogniEnabled && pb.contextAssembly != nil {
-		if cgCtx := pb.contextAssembly.CogniContext(ctx, req.LastMessage, req.TenantID, req.Channel); cgCtx != "" {
+		scope := intentToScope(req.IntentHint)
+		if cgCtx := pb.contextAssembly.CogniContext(ctx, req.LastMessage, req.TenantID, req.Channel, scope); cgCtx != "" {
 			layers = append(layers, ctxwindow.Layer{
 				Name:     "cogni",
 				Priority: ctxwindow.LayerPriorityRetrieval,
@@ -382,13 +386,25 @@ collect:
 		}
 	}
 
-	// P3.7: Cognition SDK belief context — packed inner state and disposition.
-	if injectBeliefEnabled && pb.contextAssembly != nil && pb.contextAssembly.beliefContext != nil {
-		if beliefCtx := pb.contextAssembly.beliefContext(ctx, req.LastMessage, req.TenantID, req.Channel); beliefCtx != "" {
+	// P3.7: belief layer REMOVED in Step 2 of cogni consolidation. The belief
+	// context is now merged into P3.6's unified cogni layer via
+	// CogniRuntime.BuildContext (which internally combines pkg/cogni
+	// Declaration context + pkg/cognisdk Pack perception/belief). Keeping the
+	// injectBeliefEnabled gate would risk double-injecting belief, so the gate
+	// is now inert — the belief content flows only through P3.6. The
+	// BeliefContextFunc setter is retained for backward compat but no longer
+	// drives a separate prompt layer.
+
+	// P3.8: Runtime grade — trust gate tier, available skill list, dynamic risk
+	// level (#4). This is the "runtime self-awareness" layer: tells the model
+	// which skills exist (no hallucination), what trust tier it's on (which ops
+	// need approval), and the current risk level (calibrate caution).
+	if pb.contextAssembly != nil && pb.contextAssembly.runtimeGrade != nil {
+		if gradeCtx := pb.contextAssembly.runtimeGrade(req.TenantID, req.Channel); gradeCtx != "" {
 			layers = append(layers, ctxwindow.Layer{
-				Name:     "belief",
+				Name:     "runtime_grade",
 				Priority: ctxwindow.LayerPriorityCognition,
-				Content:  beliefCtx,
+				Content:  gradeCtx,
 			})
 		}
 	}
@@ -554,6 +570,25 @@ func buildToneGuide(e *emotion.Result) string {
 		return "\n\n【语调引导】用户当前有些紧张。请用确定性强的语言，给出清晰的步骤，减少不确定感。"
 	case e.Emotion == emotion.EmotionHappy:
 		return "\n\n【语调引导】用户当前心情不错。可以稍微轻松一些回应。"
+	default:
+		return ""
+	}
+}
+
+// intentToScope maps the LocalBrain intent category to the coarse conversation
+// scope used by pkg/belief's scope gate (#34). The mapping mirrors
+// prompt_builder's existing intent usage (e.g. IntentHint=="chat" already flags
+// casual conversation at line ~231):
+//   - "chat" → "emotional"  (闲聊/情感倾诉场景，emotional boundary 该激活)
+//   - "code"/"search"/"tool" → "technical" (技术任务，emotional boundary 该休眠)
+//   - "complex"/空 → "" (未明确，scope gate 走 empty 分支：scoped belief 不激活，
+//     只有 global belief 照常激活，保守不误触发)
+func intentToScope(intentHint string) string {
+	switch intentHint {
+	case "chat":
+		return "emotional"
+	case "code", "search", "tool":
+		return "technical"
 	default:
 		return ""
 	}

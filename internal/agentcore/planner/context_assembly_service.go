@@ -27,6 +27,7 @@ type ContextAssemblyService struct {
 	strategyContextFor func(query string) string
 	cognitiveContext   CognitiveContextFunc
 	beliefContext      BeliefContextFunc
+	runtimeGrade       RuntimeGradeFunc // #4: trust gate tier + skill list + risk_level
 	cogniService       *CogniContextService
 	// packContext lets enabled capability packs (Tier 0 microkernel) inject
 	// context into the prompt, so a Pack's enablement actually shows up in the
@@ -180,6 +181,16 @@ func (s *ContextAssemblyService) SetBeliefContext(fn BeliefContextFunc) {
 	}
 }
 
+// SetRuntimeGrade attaches the runtime-grade context source (#4): trust gate
+// tier, available skill list, and dynamic risk level. When wired, this is
+// injected as a dedicated context layer so the LLM knows its own capability
+// boundary and doesn't hallucinate tools or underestimate risk.
+func (s *ContextAssemblyService) SetRuntimeGrade(fn RuntimeGradeFunc) {
+	if s != nil {
+		s.runtimeGrade = fn
+	}
+}
+
 func (s *ContextAssemblyService) ensureCogniService() *CogniContextService {
 	if s.cogniService == nil {
 		s.cogniService = NewCogniContextService()
@@ -193,11 +204,11 @@ func (s *ContextAssemblyService) SetCogniRuntime(runtime CogniRuntime) {
 	}
 }
 
-func (s *ContextAssemblyService) CogniContext(ctx context.Context, message, tenantID, channel string) string {
+func (s *ContextAssemblyService) CogniContext(ctx context.Context, message, tenantID, channel, scope string) string {
 	if s == nil || s.cogniService == nil {
 		return ""
 	}
-	return s.cogniService.Context(ctx, message, tenantID, channel)
+	return s.cogniService.Context(ctx, message, tenantID, channel, scope)
 }
 
 // CogniTools resolves the extra tools (e.g. MCP-backed) contributed by the
@@ -245,7 +256,7 @@ func (s *ContextAssemblyService) ApplyCogniSkillFilter(message, tenantID, channe
 	return out
 }
 
-func (s *ContextAssemblyService) EmitCogniTrace(message, tenantID, channel, traceID, taskID string, callback func(observe.AgentEvent)) {
+func (s *ContextAssemblyService) EmitCogniTrace(message, tenantID, channel, traceID, sessionID, taskID string, callback func(observe.AgentEvent)) {
 	if s == nil || callback == nil || s.cogniService == nil || !s.cogniService.HasTrace() {
 		return
 	}
@@ -255,6 +266,7 @@ func (s *ContextAssemblyService) EmitCogniTrace(message, tenantID, channel, trac
 	}
 	evt := observe.NewEvent(traceID, observe.DomainPlanner, observe.EventPlan, detail.summary())
 	evt.Meta.TenantID = tenantID
+	evt.Meta.SessionID = sessionID
 	evt.Meta.TaskID = taskID
 	evt.Detail = detail
 	callback(evt)
@@ -264,7 +276,7 @@ func (s *ContextAssemblyService) EmitCogniTraceForRequest(req PlanRequest) {
 	if s == nil {
 		return
 	}
-	s.EmitCogniTrace(extractUserMessage(req), req.TenantID, req.ChannelType, req.TraceID, req.TaskID, req.StepCallback)
+	s.EmitCogniTrace(extractUserMessage(req), req.TenantID, req.ChannelType, req.TraceID, req.SessionID, req.TaskID, req.StepCallback)
 }
 
 func (s *ContextAssemblyService) BuildDynamicContext(ctx context.Context, req DynamicContextAssemblyRequest, builder *PromptBuilder) DynamicContextAssemblyResult {

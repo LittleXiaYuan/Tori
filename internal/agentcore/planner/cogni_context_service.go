@@ -22,11 +22,11 @@ func (s *CogniContextService) SetRuntime(runtime CogniRuntime) {
 	s.runtime = runtime
 }
 
-func (s *CogniContextService) Context(ctx context.Context, message, tenantID, channel string) string {
+func (s *CogniContextService) Context(ctx context.Context, message, tenantID, channel, scope string) string {
 	if s == nil || s.runtime == nil {
 		return ""
 	}
-	return s.runtime.BuildContext(ctx, message, tenantID, channel)
+	return s.runtime.BuildContext(ctx, message, tenantID, channel, scope)
 }
 
 func (s *CogniContextService) FilterSkills(message, tenantID, channel string, in []skills.Skill) []skills.Skill {

@@ -54,7 +54,7 @@ func (r plannerCogniRuntime) request(message, tenantID, channel string) cogni.Co
 	return cogni.ContextRequest{Message: message, TenantID: tenantID, Channel: channel}
 }
 
-func (r plannerCogniRuntime) BuildContext(ctx context.Context, message, tenantID, channel string) string {
+func (r plannerCogniRuntime) BuildContext(ctx context.Context, message, tenantID, channel, scope string) string {
 	if !r.active() && r.beliefAdapter == nil {
 		return ""
 	}
@@ -68,10 +68,8 @@ func (r plannerCogniRuntime) BuildContext(ctx context.Context, message, tenantID
 		}
 	}
 	if r.beliefAdapter != nil {
-		// scope derivation mirrors prompt_builder.intentToScope; Step 2 will
-		// pipe scope through the CogniRuntime.BuildContext signature so this
-		// stays in sync automatically.
-		scope := cogniScopeFromChannel(channel)
+		// scope is derived upstream by prompt_builder.intentToScope (from
+		// IntentHint) and drives the belief scope gate (#34).
 		if b := r.beliefAdapter.BuildContext(ctx, message, tenantID, channel, scope); b != "" {
 			parts = append(parts, b)
 		}
@@ -79,18 +77,8 @@ func (r plannerCogniRuntime) BuildContext(ctx context.Context, message, tenantID
 	return strings.Join(parts, "\n\n")
 }
 
-// cogniScopeFromChannel is a coarse scope derivation for Step 1 (cognisdk
-// belief gate called from the merged BuildContext). Step 2 will replace this
-// with the shared intentToScope once BuildContext accepts scope.
-func cogniScopeFromChannel(channel string) string {
-	switch channel {
-	case "chat", "im", "dm":
-		return "emotional"
-	case "cli", "terminal", "api":
-		return "technical"
-	}
-	return ""
-}
+// cogniScopeFromChannel removed in Step 2: scope now derived upstream by
+// prompt_builder.intentToScope and piped through CogniRuntime.BuildContext.
 
 func (r plannerCogniRuntime) FilterSkills(message, tenantID, channel string, in []skills.Skill) []skills.Skill {
 	if !r.active() {

@@ -120,7 +120,7 @@ type surfaceAuthorityStub struct {
 	authoritative bool
 }
 
-func (s surfaceAuthorityStub) BuildContext(context.Context, string, string, string) string {
+func (s surfaceAuthorityStub) BuildContext(context.Context, string, string, string, string) string {
 	return ""
 }
 func (s surfaceAuthorityStub) FilterSkills(_ string, _ string, _ string, in []skills.Skill) []skills.Skill {
@@ -731,16 +731,17 @@ func TestEmitCognitiveLoadEventCarriesDetail(t *testing.T) {
 	p := NewPlanner(nil, skills.NewRegistry(), 8)
 	var got observe.AgentEvent
 	req := PlanRequest{
-		TraceID:  "trace-load",
-		TenantID: "tenant-a",
-		TaskID:   "task-a",
+		TraceID:   "trace-load",
+		TenantID:  "tenant-a",
+		SessionID: "session-a",
+		TaskID:    "task-a",
 		StepCallback: func(evt observe.AgentEvent) {
 			got = evt
 		},
 	}
 	load := CognitiveLoadAssessment{Level: CognitiveLoadHigh, Score: 6, Signals: []string{"multi_action_request"}}
 	p.emitCognitiveLoadEvent(req, load)
-	if got.Type != observe.EventPlan || got.Meta.TaskID != "task-a" {
+	if got.Type != observe.EventPlan || got.Meta.SessionID != "session-a" || got.Meta.TaskID != "task-a" {
 		t.Fatalf("unexpected event: %#v", got)
 	}
 	detail, ok := got.Detail.(CognitiveLoadAssessment)
@@ -766,6 +767,7 @@ func TestEmitCogniTraceEventCarriesSurfaceDetail(t *testing.T) {
 	req := PlanRequest{
 		TraceID:     "trace-cogni",
 		TenantID:    "tenant-a",
+		SessionID:   "session-a",
 		TaskID:      "task-a",
 		ChannelType: "web",
 		Messages:    []llm.Message{{Role: "user", Content: "需要读取文档"}},
@@ -774,7 +776,7 @@ func TestEmitCogniTraceEventCarriesSurfaceDetail(t *testing.T) {
 		},
 	}
 	p.contextAssembly.EmitCogniTraceForRequest(req)
-	if got.Type != observe.EventPlan || got.Meta.TaskID != "task-a" {
+	if got.Type != observe.EventPlan || got.Meta.SessionID != "session-a" || got.Meta.TaskID != "task-a" {
 		t.Fatalf("unexpected event: %#v", got)
 	}
 	if !strings.Contains(got.Summary, "文档助手") || !strings.Contains(got.Summary, "12 → 3") {
@@ -941,13 +943,13 @@ func TestEmitLongHorizonCheckpointPersistsSnapshot(t *testing.T) {
 	pl := mgr.CreateFromSteps("persist me", []string{"读取文档"})
 	pl.Steps[0].Skill = "file_open"
 
-	p.emitLongHorizonCheckpoint(PlanRequest{TraceID: "trace", TaskID: "task-persist", TenantID: "tenant-a", StepCallback: func(observe.AgentEvent) {}}, pl, "boom")
+	p.emitLongHorizonCheckpoint(PlanRequest{TraceID: "trace", TaskID: "task-persist", TenantID: "tenant-a", SessionID: "session-persist", StepCallback: func(observe.AgentEvent) {}}, pl, "boom")
 
 	recent, err := store.Recent(context.Background(), 1)
 	if err != nil {
 		t.Fatalf("load recent checkpoints: %v", err)
 	}
-	if len(recent) != 1 || recent[0].TaskID != "task-persist" || recent[0].Error != "boom" || !recent[0].Recoverable {
+	if len(recent) != 1 || recent[0].TaskID != "task-persist" || recent[0].SessionID != "session-persist" || recent[0].Error != "boom" || !recent[0].Recoverable {
 		t.Fatalf("checkpoint was not persisted with recoverable failure: %#v", recent)
 	}
 }
@@ -968,17 +970,21 @@ func TestEmitLongHorizonCheckpointFriendlyEventKeepsRawPersisted(t *testing.T) {
 
 	var evtCP LongHorizonCheckpoint
 	p.emitLongHorizonCheckpoint(PlanRequest{
-		TraceID:  "trace-friendly-event",
-		TaskID:   "task-friendly-event",
-		TenantID: "tenant-a",
+		TraceID:   "trace-friendly-event",
+		TaskID:    "task-friendly-event",
+		TenantID:  "tenant-a",
+		SessionID: "session-friendly-event",
 		StepCallback: func(evt observe.AgentEvent) {
+			if evt.Meta.SessionID != "session-friendly-event" {
+				t.Fatalf("expected checkpoint event to carry session metadata, got %#v", evt.Meta)
+			}
 			if cp, ok := evt.Detail.(LongHorizonCheckpoint); ok {
 				evtCP = cp
 			}
 		},
 	}, pl, "handoff agent execution failed: context deadline exceeded EOF")
 
-	if evtCP.Error == "" || len(evtCP.PlanSnapshot) != 1 || evtCP.PlanSnapshot[0].Error == "" {
+	if evtCP.Error == "" || evtCP.SessionID != "session-friendly-event" || len(evtCP.PlanSnapshot) != 1 || evtCP.PlanSnapshot[0].Error == "" {
 		t.Fatalf("expected checkpoint detail in event, got %#v", evtCP)
 	}
 	assertPlannerTextHasNoRawDiagnostics(t, evtCP.Error)
@@ -1026,9 +1032,9 @@ func TestTextHandoffFailureEmitsRecoverableEvent(t *testing.T) {
 	if err := hr.Register(subagent.HandoffConfig{Name: "file_exec", Description: "文件解析"}); err != nil {
 		t.Fatalf("register handoff: %v", err)
 	}
-	hr.SetRunFunc(func(context.Context, string, string, string) (string, error) {
-		return "", context.DeadlineExceeded
-	})
+	hr.SetRunFunc(func(context.Context, string, string, string) (string, string, error) {
+	  return "", "", context.DeadlineExceeded
+	 })
 	p.SetHandoffRegistry(hr)
 
 	var done observe.AgentEvent
@@ -1693,6 +1699,7 @@ func TestResumeLongHorizonCheckpointFailureCallbackHidesRawError(t *testing.T) {
 	p := NewPlanner(client, reg, 4)
 	cp := LongHorizonCheckpoint{
 		PlanID:      "plan-resume-timeout",
+		SessionID:   "session-resume-timeout",
 		TaskID:      "task-resume-timeout",
 		Goal:        "继续恢复超时步骤",
 		Status:      "failed",
@@ -1709,6 +1716,9 @@ func TestResumeLongHorizonCheckpointFailureCallbackHidesRawError(t *testing.T) {
 		TaskID:   "task-resume-timeout",
 		StepCallback: func(evt observe.AgentEvent) {
 			if evt.Type == observe.EventToolResult && strings.Contains(evt.Summary, "暂停") {
+				if evt.Meta.SessionID != "session-resume-timeout" {
+					t.Fatalf("expected resumed event to inherit checkpoint session, got %#v", evt.Meta)
+				}
 				failedSummary = evt.Summary
 			}
 		},

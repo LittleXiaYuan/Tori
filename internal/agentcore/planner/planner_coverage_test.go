@@ -449,11 +449,15 @@ func TestPlanRequest_WithModelOverride(t *testing.T) {
 	}
 }
 
+// TestBuildMessages_WithBeliefContext verifies that belief content injected
+// via CogniRuntime.BuildContext (the unified cogni layer after Step 2 of cogni
+// consolidation) appears in the assembled messages. The former separate
+// belief layer (P3.7) was removed in Step 2 — belief now flows through the
+// same CogniRuntime.BuildContext path as Declaration context, so this test
+// wires a stub CogniRuntime whose BuildContext emits belief-shaped content.
 func TestBuildMessages_WithBeliefContext(t *testing.T) {
 	p := NewPlanner(nil, skills.NewRegistry(), 8)
-	p.SetBeliefContext(func(_ context.Context, message, tenantID, channel string) string {
-		return "belief-context-data:" + message + ":" + tenantID + ":" + channel
-	})
+	p.SetCogniRuntime(beliefStubRuntime{})
 
 	msgs, _ := p.BuildMessages(context.Background(), PlanRequest{
 		Messages:    []llm.Message{{Role: "user", Content: "hello world"}},
@@ -463,14 +467,37 @@ func TestBuildMessages_WithBeliefContext(t *testing.T) {
 
 	found := false
 	for _, m := range msgs {
-		if strings.Contains(m.Content, "belief-context-data:hello world:tenant-a:web") {
+		// IntentHint is empty here → intentToScope returns "" → scope segment
+		// appended to the stub content is the empty string, so the stub
+		// renders "...:web:" with a trailing colon. Match accordingly.
+		if strings.Contains(m.Content, "belief-context-data:hello world:tenant-a:web:") {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Fatalf("belief context not injected into messages: %#v", msgs)
+		t.Fatalf("belief context not injected into messages via unified cogni layer: %#v", msgs)
 	}
+}
+
+// beliefStubRuntime emits belief-shaped content from BuildContext to verify
+// the unified cogni layer carries belief content into the prompt after Step 2.
+type beliefStubRuntime struct{}
+
+func (beliefStubRuntime) BuildContext(_ context.Context, message, tenantID, channel, scope string) string {
+	return "belief-context-data:" + message + ":" + tenantID + ":" + channel + ":" + scope
+}
+func (beliefStubRuntime) FilterSkills(_ string, _ string, _ string, in []skills.Skill) []skills.Skill {
+	return in
+}
+func (beliefStubRuntime) Trace(_ string, _ string, _ string) (CogniTraceDetail, bool) {
+	return CogniTraceDetail{}, false
+}
+func (beliefStubRuntime) Tools(_ context.Context, _ string, _ string, _ string) []CogniTool {
+	return nil
+}
+func (beliefStubRuntime) SurfaceAuthoritative(_ string, _ string, _ string) bool { return false }
+func (beliefStubRuntime) RecordToolOutcome(_ string, _ string, _ string, _ string, _ bool) {
 }
 
 func TestBuildMessages_UsesQueryAwareStrategyContext(t *testing.T) {

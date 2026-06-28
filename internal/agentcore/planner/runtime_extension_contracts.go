@@ -19,7 +19,24 @@ type SkillIndexFunc func() []SkillIndexEntry
 
 // BeliefContextFunc returns the assembled Cognition SDK context block for the
 // current turn — empty string when no pack activates.
-type BeliefContextFunc func(ctx context.Context, message, tenantID, channel string) string
+//
+// scope is the coarse conversation kind ("emotional", "technical", ""),
+// derived from IntentHint. It drives pkg/belief's scope gate: a belief with
+// non-empty Scopes only activates when scope matches; empty scope = global
+// beliefs only (scoped beliefs stay dormant until a matching scope is declared).
+type BeliefContextFunc func(ctx context.Context, message, tenantID, channel, scope string) string
+
+// RuntimeGradeFunc returns a runtime-grade context block that informs the LLM
+// about the current execution environment's trust and capability posture (#4).
+//
+// This is the "runtime self-awareness" layer — it tells the model:
+//   - Which skills are available (so it doesn't hallucinate tools that don't exist)
+//   - The current trust gate tier (so it knows which operations need approval)
+//   - The dynamic risk level (so it can calibrate caution for high-risk actions)
+//
+// Empty string when no runtime grade information is available (preserves prior
+// behavior — the model operates without this awareness, as before #4).
+type RuntimeGradeFunc func(tenantID, channel string) string
 
 // CogniTool is an extra, runtime-resolved tool contributed by a Cogni that
 // activated for the current turn (today: the tools exposed by that Cogni's
@@ -40,7 +57,14 @@ type CogniTool struct {
 // Planner only passes request data through this interface and consumes the
 // rendered outputs.
 type CogniRuntime interface {
-	BuildContext(ctx context.Context, message, tenantID, channel string) string
+	// BuildContext assembles the unified cogni layer for the current turn.
+	// scope is the coarse conversation kind ("emotional", "technical", "")
+	// derived from IntentHint by prompt_builder.intentToScope. It drives the
+	// merged belief scope gate (#34) inside the runtime: a belief with
+	// non-empty Scopes only activates when scope matches; empty scope = global
+	// beliefs only. Step 2 of cogni consolidation: this single BuildContext
+	// replaces the former parallel BeliefContextFunc injection path.
+	BuildContext(ctx context.Context, message, tenantID, channel, scope string) string
 	FilterSkills(message, tenantID, channel string, in []skills.Skill) []skills.Skill
 	Trace(message, tenantID, channel string) (CogniTraceDetail, bool)
 	// Tools returns the extra tools contributed by the cognis activated for

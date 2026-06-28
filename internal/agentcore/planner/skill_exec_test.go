@@ -290,6 +290,9 @@ func TestRunNativeFCRepeatedFailuresEmitRecoverableStrategyEvent(t *testing.T) {
 				if !detail.Recoverable || detail.NextStep == "" {
 					t.Fatalf("expected recoverable strategy detail, got %#v", detail)
 				}
+				if detail.PrimaryTarget == nil || detail.PrimaryTarget.Href != "/settings/providers?tab=providers" {
+					t.Fatalf("expected provider recovery target, got %#v", detail.PrimaryTarget)
+				}
 				for _, raw := range []string{"context deadline exceeded", "all fallback", "EOF"} {
 					if strings.Contains(strings.ToLower(strings.Join(detail.RuledOut, "\n")), strings.ToLower(raw)) {
 						t.Fatalf("recovery ruled-out detail should hide raw %q, got %#v", raw, detail.RuledOut)
@@ -558,7 +561,7 @@ type mcpToolRuntime struct {
 	tool CogniTool
 }
 
-func (m mcpToolRuntime) BuildContext(context.Context, string, string, string) string { return "" }
+func (m mcpToolRuntime) BuildContext(context.Context, string, string, string, string) string { return "" }
 func (m mcpToolRuntime) FilterSkills(_ string, _ string, _ string, in []skills.Skill) []skills.Skill {
 	return in
 }

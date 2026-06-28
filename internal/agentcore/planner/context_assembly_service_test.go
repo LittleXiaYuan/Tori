@@ -16,7 +16,7 @@ type stubCogniRuntime struct {
 	trace   CogniTraceDetail
 }
 
-func (s stubCogniRuntime) BuildContext(_ context.Context, message, _, _ string) string {
+func (s stubCogniRuntime) BuildContext(_ context.Context, message, _, _, _ string) string {
 	return s.context + ":" + message
 }
 
@@ -79,7 +79,7 @@ func TestContextAssemblyServiceCogniRuntimeBoundary(t *testing.T) {
 		trace:   CogniTraceDetail{Activated: []string{"runtime-cogni"}, ContextBytes: 8},
 	})
 
-	if got := service.CogniContext(context.Background(), "hello", "tenant", "web"); got != "runtime:hello" {
+	if got := service.CogniContext(context.Background(), "hello", "tenant", "web", ""); got != "runtime:hello" {
 		t.Fatalf("unexpected cogni runtime context: %q", got)
 	}
 	filtered := service.ApplyCogniSkillFilter("hello", "tenant", "web", []skills.Skill{dummyPlannerSkill("a"), dummyPlannerSkill("b")})
@@ -90,6 +90,7 @@ func TestContextAssemblyServiceCogniRuntimeBoundary(t *testing.T) {
 	service.EmitCogniTraceForRequest(PlanRequest{
 		Messages:    []llm.Message{{Role: "user", Content: "hello"}},
 		TenantID:    "tenant",
+		SessionID:   "session-id",
 		ChannelType: "web",
 		TraceID:     "trace-id",
 		TaskID:      "task-id",
@@ -100,6 +101,9 @@ func TestContextAssemblyServiceCogniRuntimeBoundary(t *testing.T) {
 	detail, ok := emitted.Detail.(CogniTraceDetail)
 	if !ok || detail.ContextBytes != 8 || len(detail.Activated) != 1 || detail.Activated[0] != "runtime-cogni" {
 		t.Fatalf("unexpected runtime trace detail: %#v", emitted.Detail)
+	}
+	if emitted.Meta.SessionID != "session-id" {
+		t.Fatalf("expected cogni trace to carry session metadata, got %#v", emitted.Meta)
 	}
 }
 

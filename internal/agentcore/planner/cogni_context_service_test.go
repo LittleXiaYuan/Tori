@@ -11,7 +11,7 @@ import (
 func TestCogniContextServiceDefaultsToNoop(t *testing.T) {
 	svc := NewCogniContextService()
 
-	if got := svc.Context(context.Background(), "msg", "tenant", "web"); got != "" {
+	if got := svc.Context(context.Background(), "msg", "tenant", "web", ""); got != "" {
 		t.Fatalf("default context = %q, want empty", got)
 	}
 	in := []skills.Skill{dummyPlannerSkill("a")}
@@ -34,7 +34,7 @@ func TestPlannerSetCogniRuntimeUsesService(t *testing.T) {
 	if p.contextAssembly == nil {
 		t.Fatal("expected context assembly to be initialized")
 	}
-	if got := p.contextAssembly.CogniContext(context.Background(), "hello", "tenant", "web"); got != "cogni:hello" {
+	if got := p.contextAssembly.CogniContext(context.Background(), "hello", "tenant", "web", ""); got != "cogni:hello" {
 		t.Fatalf("context = %q, want cogni:hello", got)
 	}
 	filtered := p.contextAssembly.ApplyCogniSkillFilter("hello", "tenant", "web", []skills.Skill{dummyPlannerSkill("a"), dummyPlannerSkill("b")})
@@ -42,10 +42,13 @@ func TestPlannerSetCogniRuntimeUsesService(t *testing.T) {
 		t.Fatalf("unexpected filtered skills: %#v", filtered)
 	}
 	var emitted bool
-	p.contextAssembly.EmitCogniTrace("hello", "tenant", "web", "trace-id", "task-id", func(evt observe.AgentEvent) {
+	p.contextAssembly.EmitCogniTrace("hello", "tenant", "web", "trace-id", "session-id", "task-id", func(evt observe.AgentEvent) {
 		detail, ok := evt.Detail.(CogniTraceDetail)
 		if !ok || len(detail.Activated) != 1 || detail.Activated[0] != "demo" {
 			t.Fatalf("unexpected trace detail: %#v", evt.Detail)
+		}
+		if evt.Meta.SessionID != "session-id" {
+			t.Fatalf("expected session metadata, got %#v", evt.Meta)
 		}
 		emitted = true
 	})
