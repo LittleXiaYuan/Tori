@@ -21,6 +21,7 @@ import (
 	mcpkg "yunque-agent/internal/mcp"
 	cognikernelpack "yunque-agent/internal/packs/cognikernel"
 	"yunque-agent/pkg/cogni"
+	"yunque-agent/pkg/cognisdk"
 	"yunque-agent/pkg/packruntime"
 	"yunque-agent/pkg/safego"
 	"yunque-agent/pkg/skills"
@@ -36,6 +37,13 @@ type plannerCogniRuntime struct {
 	enabled func() bool
 	hook    *cogni.Hook
 	mcp     *cogni.MCPManager
+	// beliefAdapter (Step 1 of cogni consolidation) merges cognisdk Pack
+	// perception/belief into BuildContext output so the planner has ONE cogni
+	// layer instead of two parallel ones (cogni + belief). nil = cogni
+	// Declaration only (backward compatible). scope is derived upstream by
+	// prompt_builder's intentToScope and passed via BuildContext's scope param
+	// once Step 2 lands; for now the adapter uses its own scope derivation.
+	beliefAdapter *cognisdk.HostAdapter
 }
 
 func (r plannerCogniRuntime) active() bool {
@@ -46,11 +54,42 @@ func (r plannerCogniRuntime) request(message, tenantID, channel string) cogni.Co
 	return cogni.ContextRequest{Message: message, TenantID: tenantID, Channel: channel}
 }
 
-func (r plannerCogniRuntime) BuildContext(_ context.Context, message, tenantID, channel string) string {
-	if !r.active() {
+func (r plannerCogniRuntime) BuildContext(ctx context.Context, message, tenantID, channel string) string {
+	if !r.active() && r.beliefAdapter == nil {
 		return ""
 	}
-	return r.hook.BuildContext(r.request(message, tenantID, channel))
+	// Step 1 of cogni consolidation: merge cogni Declaration context + cognisdk
+	// Pack perception/belief into ONE output so the planner injects a single
+	// cogni layer instead of two parallel ones. Either side may be empty.
+	var parts []string
+	if r.active() {
+		if c := r.hook.BuildContext(r.request(message, tenantID, channel)); c != "" {
+			parts = append(parts, c)
+		}
+	}
+	if r.beliefAdapter != nil {
+		// scope derivation mirrors prompt_builder.intentToScope; Step 2 will
+		// pipe scope through the CogniRuntime.BuildContext signature so this
+		// stays in sync automatically.
+		scope := cogniScopeFromChannel(channel)
+		if b := r.beliefAdapter.BuildContext(ctx, message, tenantID, channel, scope); b != "" {
+			parts = append(parts, b)
+		}
+	}
+	return strings.Join(parts, "\n\n")
+}
+
+// cogniScopeFromChannel is a coarse scope derivation for Step 1 (cognisdk
+// belief gate called from the merged BuildContext). Step 2 will replace this
+// with the shared intentToScope once BuildContext accepts scope.
+func cogniScopeFromChannel(channel string) string {
+	switch channel {
+	case "chat", "im", "dm":
+		return "emotional"
+	case "cli", "terminal", "api":
+		return "technical"
+	}
+	return ""
 }
 
 func (r plannerCogniRuntime) FilterSkills(message, tenantID, channel string, in []skills.Skill) []skills.Skill {
@@ -583,10 +622,22 @@ func (m *cogniModule) Init(ctx context.Context, app *agentrt.App) error {
 			slog.Info("cogni: experience surface tuning enabled",
 				"min_observations", tuneCfg.MinObservations, "min_success_rate", tuneCfg.MinSuccessRate)
 		}
+		// Step 1 of cogni consolidation: pull the cognisdk belief adapter
+		// (exposed by init_task_cognition.go) and merge it into the unified
+		// plannerCogniRuntime so BuildContext emits ONE cogni layer containing
+		// both Declaration context and Pack perception/belief, instead of two
+		// parallel layers (cogni + belief) in the prompt.
+		var beliefAdapter *cognisdk.HostAdapter
+		if rawBA, ok := app.Get("cognisdk_belief_adapter"); ok {
+			if ba, ok := rawBA.(*cognisdk.HostAdapter); ok {
+				beliefAdapter = ba
+			}
+		}
 		app.Planner.SetCogniRuntime(plannerCogniRuntime{
-			enabled: m.cogniKernelPackEnabled,
-			hook:    hook,
-			mcp:     m.mcpMgr,
+			enabled:       m.cogniKernelPackEnabled,
+			hook:          hook,
+			mcp:           m.mcpMgr,
+			beliefAdapter: beliefAdapter,
 		})
 		// Wire cost tracking + bus routing on activation
 		{
