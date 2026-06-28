@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Button, Card, Chip, Input, Label, Spinner, TextField } from "@heroui/react";
+import { Button, Card, Chip, Disclosure, Input, Label, Modal, Spinner, TextField } from "@heroui/react";
+import { Segment } from "@heroui-pro/react";
 import {
   ArrowRight,
   Boxes,
@@ -31,7 +32,7 @@ import {
 } from "lucide-react";
 import PageHeader from "@/components/page-header";
 import { showToast } from "@/components/toast-provider";
-import { createPacksClient, type InstalledPack, type PackCatalogEntry, type PackManifest, type PackReleaseCatalogEntry } from "yunque-client/packs";
+import { createPacksClient, type InstalledPack, type PackBackendRouteAuditEntry, type PackCatalogEntry, type PackManifest, type PackReleaseCatalogEntry } from "yunque-client/packs";
 import { createYunqueSDKClientOptions } from "@/lib/sdk-client";
 import { useApiData } from "@/lib/use-api-data";
 import { buildPackNavItems } from "@/lib/pack-sync";
@@ -48,6 +49,7 @@ import {
   packInstallTroubleshooting,
   packExamples,
   packFeatureFlags,
+  packManifestAudit,
   packPermissionSummary,
   packReadiness,
   packSafeOpenPath,
@@ -151,17 +153,22 @@ const SORT_MODE_LABELS: Record<SortMode, string> = {
 
 const INSTALL_TROUBLESHOOTING = packInstallTroubleshooting();
 
+// Tone styles resolve to the app's semantic *-muted tokens (which track the
+// active theme / accent palette) instead of hardcoded rgba literals. Borders
+// are intentionally dropped to a single subtle neutral edge per the Pro
+// "minimize borders" principle — the soft tinted background already carries
+// the semantic meaning.
 function deliveryToneStyle(tone: ReturnType<typeof packDeliveryProfile>["tone"]): { background: string; borderColor: string; color: string } {
   if (tone === "danger") {
-    return { background: "rgba(239,68,68,0.08)", borderColor: "rgba(239,68,68,0.20)", color: "var(--yunque-danger)" };
+    return { background: "var(--yunque-danger-muted)", borderColor: "transparent", color: "var(--yunque-danger)" };
   }
   if (tone === "warning") {
-    return { background: "rgba(245,158,11,0.08)", borderColor: "rgba(245,158,11,0.20)", color: "var(--yunque-warning)" };
+    return { background: "var(--yunque-warning-muted)", borderColor: "transparent", color: "var(--yunque-warning)" };
   }
   if (tone === "primary") {
-    return { background: "rgba(59,130,246,0.08)", borderColor: "rgba(59,130,246,0.18)", color: "var(--yunque-primary)" };
+    return { background: "var(--yunque-accent-muted)", borderColor: "transparent", color: "var(--yunque-accent)" };
   }
-  return { background: "rgba(34,197,94,0.08)", borderColor: "rgba(34,197,94,0.18)", color: "var(--yunque-success)" };
+  return { background: "var(--yunque-success-muted)", borderColor: "transparent", color: "var(--yunque-success)" };
 }
 
 function formatTime(value?: string): string {
@@ -178,37 +185,135 @@ function formatBytes(bytes?: number): string {
   return `${(bytes / Math.pow(1024, index)).toFixed(index === 0 ? 0 : 1)} ${units[index]}`;
 }
 
-function statusTone(status: string): { label: string; color: string; bg: string } {
-  if (status === "enabled") return { label: "已启用", color: "var(--yunque-success)", bg: "rgba(34,197,94,0.10)" };
-  if (status === "disabled") return { label: "已禁用", color: "var(--yunque-text-muted)", bg: "rgba(255,255,255,0.05)" };
-  return { label: status || "未知", color: "var(--yunque-warning)", bg: "rgba(245,158,11,0.12)" };
+// `chip` is the HeroUI Chip semantic color so call sites can render
+// <Chip color={tone.chip} variant="soft"> instead of inline-styling bg/color.
+type ChipColor = "success" | "warning" | "danger" | "accent" | "default";
+
+function statusTone(status: string): { label: string; color: string; bg: string; chip: ChipColor } {
+  if (status === "enabled") return { label: "已启用", color: "var(--yunque-success)", bg: "var(--yunque-success-muted)", chip: "success" };
+  if (status === "disabled") return { label: "已禁用", color: "var(--yunque-text-muted)", bg: "var(--yunque-bg-muted)", chip: "default" };
+  return { label: status || "未知", color: "var(--yunque-warning)", bg: "var(--yunque-warning-muted)", chip: "warning" };
 }
 
-function packStatusBadge(packStatus?: string): { label: string; color: string; bg: string } {
-  if (packStatus === "stable") return { label: "正式版", color: "var(--yunque-success)", bg: "rgba(34,197,94,0.10)" };
-  if (packStatus === "beta") return { label: "测试版", color: "var(--yunque-warning)", bg: "rgba(245,158,11,0.12)" };
-  if (packStatus === "alpha") return { label: "开发中", color: "var(--yunque-text-muted)", bg: "rgba(255,255,255,0.05)" };
-  return { label: "未知", color: "var(--yunque-text-muted)", bg: "rgba(255,255,255,0.05)" };
+function packStatusBadge(packStatus?: string): { label: string; color: string; bg: string; chip: ChipColor } {
+  if (packStatus === "stable") return { label: "正式版", color: "var(--yunque-success)", bg: "var(--yunque-success-muted)", chip: "success" };
+  if (packStatus === "beta") return { label: "测试版", color: "var(--yunque-warning)", bg: "var(--yunque-warning-muted)", chip: "warning" };
+  if (packStatus === "alpha") return { label: "开发中", color: "var(--yunque-text-muted)", bg: "var(--yunque-bg-muted)", chip: "default" };
+  return { label: "未知", color: "var(--yunque-text-muted)", bg: "var(--yunque-bg-muted)", chip: "default" };
+}
+
+function shouldShowPackStatusBadge(packStatus: string | undefined, advancedVisible: boolean): boolean {
+  return advancedVisible || (packStatus !== "stable" && packStatus !== "beta");
+}
+
+type TrustTone = "safe" | "neutral" | "warning" | "danger" | "accent";
+
+function trustToneStyle(tone: TrustTone): { borderColor: string; background: string; color: string } {
+  if (tone === "danger") return { borderColor: "transparent", background: "var(--yunque-danger-muted)", color: "var(--yunque-danger)" };
+  if (tone === "warning") return { borderColor: "transparent", background: "var(--yunque-warning-muted)", color: "var(--yunque-warning)" };
+  if (tone === "accent") return { borderColor: "transparent", background: "var(--yunque-accent-muted)", color: "var(--yunque-accent)" };
+  if (tone === "safe") return { borderColor: "transparent", background: "var(--yunque-success-muted)", color: "var(--yunque-success)" };
+  return { borderColor: "transparent", background: "var(--yunque-bg-muted)", color: "var(--yunque-text-muted)" };
+}
+
+function deliveryToneToTrustTone(tone: ReturnType<typeof packDeliveryProfile>["tone"]): TrustTone {
+  if (tone === "danger") return "danger";
+  if (tone === "warning") return "warning";
+  if (tone === "primary") return "accent";
+  return "safe";
+}
+
+function sourceTrustHint(source: string): string {
+  if (source.includes("私有源")) return "先验 SHA/权限";
+  if (source.includes("官方源")) return "安装前只读检查";
+  if (source.includes("已安装")) return "可禁用/回滚";
+  return "先确认来源";
+}
+
+function PackTrustStrip({
+  source,
+  showSourceFact = true,
+  showSourceHint = false,
+  runtime,
+  runtimeTone,
+  risk,
+  delivery,
+  readiness,
+}: {
+  source: string;
+  showSourceFact?: boolean;
+  showSourceHint?: boolean;
+  runtime: string;
+  runtimeTone: TrustTone;
+  risk: ReturnType<typeof riskProfileForPack>;
+  delivery: ReturnType<typeof packDeliveryProfile>;
+  readiness: ReturnType<typeof packReadiness>;
+}) {
+  const riskTone: TrustTone = risk.level === "high" ? "danger" : risk.level === "medium" ? "warning" : "safe";
+  const deliveryTone = deliveryToneToTrustTone(delivery.tone);
+  const facts = [
+    ...(showSourceFact
+      ? [{
+        key: "source",
+        label: "验源",
+        value: source,
+        hint: showSourceHint ? sourceTrustHint(source) : "",
+        tone: "neutral" as const,
+        icon: <Store size={13} aria-hidden />,
+      }]
+      : []),
+    { key: "runtime", label: "运行", value: runtime, hint: "", tone: runtimeTone, icon: <Power size={13} aria-hidden /> },
+    { key: "trust", label: "信任", value: risk.label, hint: "", tone: riskTone, icon: risk.requiresAuthorization ? <ShieldAlert size={13} aria-hidden /> : <ShieldCheck size={13} aria-hidden /> },
+    {
+      key: "delivery",
+      label: "交付",
+      value: readiness.level === "complete" ? delivery.label : `${delivery.label} · ${readiness.label}`,
+      hint: "",
+      tone: deliveryTone,
+      icon: <PackageCheck size={13} aria-hidden />,
+    },
+  ];
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs" aria-label="能力包状态摘要">
+      {facts.map((fact) => {
+        const style = trustToneStyle(fact.tone);
+        return (
+          <span key={fact.key} className="inline-flex items-center gap-1.5 min-w-0">
+            <span style={{ color: style.color }} aria-hidden>{fact.icon}</span>
+            <span style={{ color: "var(--yunque-text-muted)" }}>{fact.label}</span>
+            <span className="truncate" title={fact.value} style={{ color: "var(--yunque-text)" }}>
+              {fact.value}
+            </span>
+            {fact.hint && (
+              <span className="truncate text-[11px]" title={fact.hint} style={{ color: "var(--yunque-text-muted)" }}>
+                {fact.hint}
+              </span>
+            )}
+          </span>
+        );
+      })}
+    </div>
+  );
 }
 
 function checklistToneStyle(tone: "safe" | "warning" | "danger"): { borderColor: string; background: string; color: string } {
   if (tone === "danger") {
     return {
-      borderColor: "rgba(239,68,68,0.22)",
-      background: "rgba(239,68,68,0.08)",
+      borderColor: "transparent",
+      background: "var(--yunque-danger-muted)",
       color: "var(--yunque-danger)",
     };
   }
   if (tone === "warning") {
     return {
-      borderColor: "rgba(245,158,11,0.22)",
-      background: "rgba(245,158,11,0.08)",
+      borderColor: "transparent",
+      background: "var(--yunque-warning-muted)",
       color: "var(--yunque-warning)",
     };
   }
   return {
-    borderColor: "var(--yunque-border)",
-    background: "var(--yunque-bg-hover)",
+    borderColor: "transparent",
+    background: "var(--yunque-success-muted)",
     color: "var(--yunque-success)",
   };
 }
@@ -268,18 +373,30 @@ function packCenterFocusHref(packId?: string): string {
   return packId ? `/packs?q=${encodeURIComponent(packId)}&from=studio` : "/packs?from=studio";
 }
 
-function packPolishGuidance(manifest: PackManifest): PackPolishGuidance {
+function packPolishGuidance(
+  manifest: PackManifest,
+  routeAuditEntries: readonly PackBackendRouteAuditEntry[] = [],
+): PackPolishGuidance {
   const readiness = packReadiness(manifest);
   const delivery = packDeliveryProfile(manifest);
   const usability = packUsability(manifest);
+  const audit = packManifestAudit(manifest, routeAuditEntries);
   const primaryPath = usability.primaryActionPath || manifest.frontend?.menus?.[0]?.path || manifest.frontend?.routes?.[0]?.path;
   const missing = readiness.missing;
-  const reason = missing.length > 0
+  const reason = audit.issues.length > 0
+    ? `Manifest 审计：${audit.issues.map((issue) => issue.label).join("、")}。`
+    : missing.length > 0
     ? `体检缺口：${missing.join("、")}。`
     : `交付状态：${delivery.label}。${delivery.description}`;
   let firstEdit = "先补能力声明里的用途、入口、示例、限制和回滚说明。";
 
-  if (missing.includes("后端能力声明")) {
+  if (audit.issues.some((issue) => issue.key === "static-pack-route")) {
+    firstEdit = "先修打开入口：补对应静态页面、改到详情页，或改成 Chat/任务入口，避免用户点开 404。";
+  } else if (audit.issues.some((issue) => issue.key === "missing-route-specs" || issue.key === "iframe-without-whitelist")) {
+    firstEdit = "先补 backend.routeSpecs，把 method/path/description 白名单写清楚，再跑 route audit 和 bridge 验收。";
+  } else if (audit.issues.some((issue) => issue.key === "capability-without-permission" || issue.key === "permission-without-capability")) {
+    firstEdit = "先对齐 capability 与 permissions：让用户既知道云雀能调度什么，也知道它触达哪些资源。";
+  } else if (missing.includes("后端能力声明")) {
     firstEdit = "先确认是否真有后端能力：有则补后端路由、权限和测试；没有就明确标为界面/说明型能力，不能伪造执行能力。";
   } else if (missing.includes("打开/使用入口")) {
     firstEdit = "先补主要入口或界面菜单，让用户知道启用后从哪里进入。";
@@ -303,12 +420,32 @@ function packPolishGuidance(manifest: PackManifest): PackPolishGuidance {
   };
 }
 
-function packPolishPriority(manifest: PackManifest): PackPolishPriority {
+function packPolishPriority(
+  manifest: PackManifest,
+  routeAuditEntries: readonly PackBackendRouteAuditEntry[] = [],
+): PackPolishPriority {
   const readiness = packReadiness(manifest);
   const delivery = packDeliveryProfile(manifest);
   const risk = riskProfileForPack(manifest);
+  const audit = packManifestAudit(manifest, routeAuditEntries);
   const missing = readiness.missing;
 
+  if (audit.level === "blocked") {
+    return {
+      level: "P0",
+      label: "P0 先修审计阻塞",
+      reason: "入口、routeSpecs 或白名单存在结构性缺口，用户可能点到 404 或无法验收能力门禁。",
+      order: 0,
+    };
+  }
+  if (audit.level === "watch") {
+    return {
+      level: "P1",
+      label: "P1 对齐能力边界",
+      reason: "Manifest 能力、权限或白名单还不够清楚，需要先复核再继续扩大能力。",
+      order: 1,
+    };
+  }
   if (missing.includes("后端能力声明") || missing.includes("打开/使用入口")) {
     return {
       level: "P0",
@@ -352,6 +489,7 @@ function packPolishPriority(manifest: PackManifest): PackPolishPriority {
 function buildBatchReadinessPrompt(
   items: ReadinessQueueItem[],
   batch: { page: number; pageCount: number; total: number; pageSize: number },
+  routeAuditEntries: readonly PackBackendRouteAuditEntry[] = [],
 ): string {
   const request = {
     kind: "yunque.pack_studio.batch_draft_request.v1",
@@ -373,8 +511,9 @@ function buildBatchReadinessPrompt(
       const readiness = packReadiness(item.manifest);
       const delivery = packDeliveryProfile(item.manifest);
       const risk = riskProfileForPack(item.manifest);
-      const guidance = packPolishGuidance(item.manifest);
-      const priority = packPolishPriority(item.manifest);
+      const audit = packManifestAudit(item.manifest, routeAuditEntries);
+      const guidance = packPolishGuidance(item.manifest, routeAuditEntries);
+      const priority = packPolishPriority(item.manifest, routeAuditEntries);
       const primaryPath = packSafeOpenPath(item.manifest);
       return {
         id: item.manifest.id,
@@ -400,6 +539,12 @@ function buildBatchReadinessPrompt(
           label: delivery.label,
           description: delivery.description,
           next_step: delivery.nextStep,
+        },
+        manifest_audit: {
+          level: audit.level,
+          label: audit.label,
+          issues: audit.issues,
+          summary: audit.summary,
         },
         polish_guidance: {
           reason: guidance.reason,
@@ -435,16 +580,21 @@ function buildPackCenterUsabilityReport(
   items: ReadinessQueueItem[],
   queueItems: ReadinessQueueItem[],
   batch: { page: number; pageCount: number; total: number; pageSize: number },
+  routeAuditEntries: readonly PackBackendRouteAuditEntry[] = [],
 ) {
   const groups = { actionable: 0, infrastructure: 0, experimental: 0, documented: 0 };
   const readiness = { complete: 0, needs_context: 0, needs_entry: 0 };
   const delivery = { ready: 0, support: 0, plan_only: 0, needs_meat: 0 };
+  const manifest_audit = { clear: 0, watch: 0, blocked: 0, issues: 0 };
   for (const item of items) {
     groups[packUsability(item.manifest).kind] += 1;
     readiness[packReadiness(item.manifest).level] += 1;
     delivery[packDeliveryProfile(item.manifest).level] += 1;
+    const audit = packManifestAudit(item.manifest, routeAuditEntries);
+    manifest_audit[audit.level] += 1;
+    manifest_audit.issues += audit.issues.length;
   }
-  const queue = queueItems.map((item) => packCenterReportItem(item));
+  const queue = queueItems.map((item) => packCenterReportItem(item, routeAuditEntries));
   return {
     kind: "yunque.pack_usability_report.v1",
     source: "pack-center",
@@ -454,6 +604,7 @@ function buildPackCenterUsabilityReport(
       groups,
       readiness,
       delivery,
+      manifest_audit,
       queue: {
         total: batch.total,
         page: batch.page,
@@ -465,18 +616,22 @@ function buildPackCenterUsabilityReport(
       },
     },
     queue,
-    packs: items.map((item) => packCenterReportItem(item)),
+    packs: items.map((item) => packCenterReportItem(item, routeAuditEntries)),
   };
 }
 
-function packCenterReportItem(item: ReadinessQueueItem) {
+function packCenterReportItem(
+  item: ReadinessQueueItem,
+  routeAuditEntries: readonly PackBackendRouteAuditEntry[] = [],
+) {
   const manifest = item.manifest;
   const usability = packUsability(manifest);
   const readiness = packReadiness(manifest);
   const delivery = packDeliveryProfile(manifest);
-  const priority = packPolishPriority(manifest);
+  const priority = packPolishPriority(manifest, routeAuditEntries);
   const risk = riskProfileForPack(manifest);
-  const guidance = packPolishGuidance(manifest);
+  const guidance = packPolishGuidance(manifest, routeAuditEntries);
+  const audit = packManifestAudit(manifest, routeAuditEntries);
   const open = packSafeOpenPath(manifest) || "";
   return {
     id: manifest.id,
@@ -502,6 +657,12 @@ function packCenterReportItem(item: ReadinessQueueItem) {
       label: delivery.label,
       description: delivery.description,
       next_step: delivery.nextStep,
+    },
+    manifest_audit: {
+      level: audit.level,
+      label: audit.label,
+      issues: audit.issues,
+      summary: audit.summary,
     },
     priority,
     risk: {
@@ -571,20 +732,31 @@ function renderFilterGroup(
   return (
     <div>
       <div className="mb-2 text-xs font-medium" style={{ color: "var(--yunque-text-muted)" }}>{label}</div>
-      <div className="flex flex-wrap gap-1.5">
+      <Segment
+        size="sm"
+        aria-label={label}
+        selectedKey={value}
+        onSelectionChange={(key) => {
+          // ToggleButtonGroup deselects on re-press, yielding an empty key.
+          // Filters are single-select with an explicit reset option, so ignore
+          // the empty case and keep the current value.
+          if (key != null && key !== "") onChange(String(key));
+        }}
+      >
         {options.map(([key, text]) => (
-          <Button
-            key={key}
-            size="sm"
-            variant="ghost"
-            className={value === key ? "btn-accent" : undefined}
-            aria-pressed={value === key}
-            onPress={() => onChange(key)}
-          >
-            {text}
-          </Button>
+          <Segment.Item key={key} id={key}>{text}</Segment.Item>
         ))}
-      </div>
+      </Segment>
+    </div>
+  );
+}
+
+function FilterInsightCard({ label, value, detail }: { label: string; value: string; detail: string }) {
+  return (
+    <div className="rounded-md border px-3 py-2" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-bg-muted)" }}>
+      <div className="text-[11px] font-medium" style={{ color: "var(--yunque-text-muted)" }}>{label}</div>
+      <div className="mt-1 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>{value}</div>
+      <div className="mt-1 text-[11px] leading-5" style={{ color: "var(--yunque-text-secondary)" }}>{detail}</div>
     </div>
   );
 }
@@ -631,6 +803,13 @@ export default function PacksPageOptimized() {
   const [manifestPath, setManifestPath] = useState(OFFICIAL_BACKUP_MANIFEST);
   const [busy, setBusy] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
+  const [sourcesOpen, setSourcesOpen] = useState(false);
+  const [officialDiagnosticsOpen, setOfficialDiagnosticsOpen] = useState(false);
+  const [privateDiagnosticsOpen, setPrivateDiagnosticsOpen] = useState(false);
+  const [expandedInstalledCards, setExpandedInstalledCards] = useState<Set<string>>(new Set());
+  const [expandedInstallableCards, setExpandedInstallableCards] = useState<Set<string>>(new Set());
   const [actionNotice, setActionNotice] = useState<CenterActionNotice | null>(null);
   const [query, setQuery] = useState("");
   const [kindFilter, setKindFilter] = useState<KindFilter>("all");
@@ -645,7 +824,28 @@ export default function PacksPageOptimized() {
   const [privatePage, setPrivatePage] = useState(1);
   const [readinessQueuePage, setReadinessQueuePage] = useState(1);
   const searchFocus = searchParams.get("q")?.trim() || searchParams.get("packId")?.trim() || "";
+  const maintenanceMode = searchParams.get("maintenance") === "1";
+  const advancedVisible = showAdvanced || maintenanceMode;
   const returnedFromStudio = searchParams.get("from") === "studio" && searchFocus.length > 0;
+  const [routeAuditEntries, setRouteAuditEntries] = useState<PackBackendRouteAuditEntry[]>([]);
+  const [routeAuditLoading, setRouteAuditLoading] = useState(false);
+  const [routeAuditLoaded, setRouteAuditLoaded] = useState(false);
+  const [routeAuditError, setRouteAuditError] = useState<string | null>(null);
+
+  const refreshRouteAudit = useCallback(async () => {
+    setRouteAuditLoading(true);
+    try {
+      const report = await packsClient.backendRouteAudit();
+      setRouteAuditEntries(report.entries || []);
+      setRouteAuditError(null);
+      setRouteAuditLoaded(true);
+    } catch (error) {
+      setRouteAuditError(error instanceof Error ? error.message : String(error || "运行态路由审计加载失败"));
+      setRouteAuditLoaded(true);
+    } finally {
+      setRouteAuditLoading(false);
+    }
+  }, []);
 
   const packs = data?.packs || [];
   const catalogEntries = catalog?.entries || [];
@@ -690,22 +890,27 @@ export default function PacksPageOptimized() {
       .filter((item) => {
         const readiness = packReadiness(item.manifest);
         const delivery = packDeliveryProfile(item.manifest);
-        return readiness.missing.length > 0 || delivery.level === "needs_meat" || delivery.level === "plan_only";
+        const audit = packManifestAudit(item.manifest, routeAuditEntries);
+        return audit.issues.length > 0 || readiness.missing.length > 0 || delivery.level === "needs_meat" || delivery.level === "plan_only";
       })
       .sort((a, b) => {
         const ra = packReadiness(a.manifest);
         const rb = packReadiness(b.manifest);
         const da = packDeliveryProfile(a.manifest);
         const db = packDeliveryProfile(b.manifest);
-        const pa = packPolishPriority(a.manifest);
-        const pb = packPolishPriority(b.manifest);
+        const aa = packManifestAudit(a.manifest, routeAuditEntries);
+        const ab = packManifestAudit(b.manifest, routeAuditEntries);
+        const pa = packPolishPriority(a.manifest, routeAuditEntries);
+        const pb = packPolishPriority(b.manifest, routeAuditEntries);
+        const auditOrder = { blocked: 0, watch: 1, clear: 2 } as const;
         return pa.order - pb.order
+          || auditOrder[aa.level] - auditOrder[ab.level]
           || deliveryOrder[da.level] - deliveryOrder[db.level]
           || readinessOrder[ra.level] - readinessOrder[rb.level]
           || rb.missing.length - ra.missing.length
           || a.manifest.name.localeCompare(b.manifest.name);
       });
-  }, [centerReportItems]);
+  }, [centerReportItems, routeAuditEntries]);
   const readinessQueueTotal = readinessItems.length;
   const readinessQueuePageCount = pageCountFor(readinessQueueTotal, READINESS_QUEUE_PAGE_SIZE);
   const currentReadinessQueuePage = Math.min(readinessQueuePage, readinessQueuePageCount);
@@ -723,13 +928,16 @@ export default function PacksPageOptimized() {
       needsContext: 0,
       planOnly: 0,
       withOpenPath: 0,
+      auditBlocked: 0,
+      auditWatch: 0,
     };
     for (const item of readinessQueue) {
-      const priority = packPolishPriority(item.manifest);
+      const priority = packPolishPriority(item.manifest, routeAuditEntries);
       const risk = riskProfileForPack(item.manifest);
       const readiness = packReadiness(item.manifest);
       const delivery = packDeliveryProfile(item.manifest);
       const usability = packUsability(item.manifest);
+      const audit = packManifestAudit(item.manifest, routeAuditEntries);
       if (priority.level === "P0") summary.p0 += 1;
       if (priority.level === "P1") summary.p1 += 1;
       if (priority.level === "P2") summary.p2 += 1;
@@ -738,9 +946,11 @@ export default function PacksPageOptimized() {
       if (readiness.level === "needs_context") summary.needsContext += 1;
       if (delivery.level === "plan_only") summary.planOnly += 1;
       if (usability.primaryActionPath || item.manifest.frontend?.menus?.[0]?.path || item.manifest.frontend?.routes?.[0]?.path) summary.withOpenPath += 1;
+      if (audit.level === "blocked") summary.auditBlocked += 1;
+      if (audit.level === "watch") summary.auditWatch += 1;
     }
     return summary;
-  }, [readinessQueue]);
+  }, [readinessQueue, routeAuditEntries]);
   const packKindStats = useMemo(() => {
     const manifests = new Map<string, PackManifest>();
     for (const pack of packs) manifests.set(pack.manifest.id, pack.manifest);
@@ -775,6 +985,25 @@ export default function PacksPageOptimized() {
     }
     return counts;
   }, [packs, releaseEntries, catalogEntries]);
+  const manifestAuditStats = useMemo(() => {
+    const manifests = new Map<string, PackManifest>();
+    for (const pack of packs) manifests.set(pack.manifest.id, pack.manifest);
+    for (const entry of releaseEntries) manifests.set(entry.manifest.id, entry.manifest);
+    for (const entry of catalogEntries) manifests.set(entry.manifest.id, entry.manifest);
+    const counts = {
+      total: manifests.size,
+      clear: 0,
+      watch: 0,
+      blocked: 0,
+      issues: 0,
+    };
+    for (const manifest of manifests.values()) {
+      const audit = packManifestAudit(manifest, routeAuditEntries);
+      counts[audit.level] += 1;
+      counts.issues += audit.issues.length;
+    }
+    return counts;
+  }, [packs, releaseEntries, catalogEntries, routeAuditEntries]);
   const deliveryStats = useMemo(() => {
     const manifests = new Map<string, PackManifest>();
     for (const pack of packs) manifests.set(pack.manifest.id, pack.manifest);
@@ -944,8 +1173,8 @@ export default function PacksPageOptimized() {
       pageCount: readinessQueuePageCount,
       total: readinessQueueTotal,
       pageSize: READINESS_QUEUE_PAGE_SIZE,
-    }),
-    [currentReadinessQueuePage, readinessQueue, readinessQueuePageCount, readinessQueueTotal],
+    }, routeAuditEntries),
+    [currentReadinessQueuePage, readinessQueue, readinessQueuePageCount, readinessQueueTotal, routeAuditEntries],
   );
   const batchReadinessChatHref = readinessQueue.length > 0 ? `/chat?q=${encodeURIComponent(batchReadinessPrompt)}` : "";
   const batchReadinessStudioHref = readinessQueue.length > 0 ? `/packs/studio?batch=${encodeURIComponent(batchReadinessPrompt)}` : "";
@@ -955,13 +1184,18 @@ export default function PacksPageOptimized() {
       pageCount: readinessQueuePageCount,
       total: readinessQueueTotal,
       pageSize: READINESS_QUEUE_PAGE_SIZE,
-    }),
-    [centerReportItems, currentReadinessQueuePage, readinessQueue, readinessQueuePageCount, readinessQueueTotal],
+    }, routeAuditEntries),
+    [centerReportItems, currentReadinessQueuePage, readinessQueue, readinessQueuePageCount, readinessQueueTotal, routeAuditEntries],
   );
 
   useEffect(() => {
     if (searchFocus) setQuery(searchFocus);
   }, [searchFocus]);
+
+  useEffect(() => {
+    if (!advancedVisible || routeAuditLoaded || routeAuditLoading) return;
+    void refreshRouteAudit();
+  }, [advancedVisible, refreshRouteAudit, routeAuditLoaded, routeAuditLoading]);
 
   useEffect(() => {
     setInstalledPage(1);
@@ -974,7 +1208,12 @@ export default function PacksPageOptimized() {
   }, [readinessQueueTotal]);
 
   const refreshAll = async () => {
-    await Promise.all([refresh(), refreshCatalog(), refreshReleaseCatalog()]);
+    await Promise.all([
+      refresh(),
+      refreshCatalog(),
+      refreshReleaseCatalog(),
+      advancedVisible ? refreshRouteAudit() : Promise.resolve(),
+    ]);
   };
 
   const copyBatchReadinessPrompt = async () => {
@@ -1103,6 +1342,32 @@ export default function PacksPageOptimized() {
     });
     showToast(pinned ? "已从侧边栏移除" : "已固定到侧边栏", "success");
   };
+  const resetFilters = () => {
+    setQuery("");
+    setKindFilter("all");
+    setInstallFilter("all");
+    setRiskFilter("all");
+    setSourceFilter("all");
+    setStabilityFilter("all");
+    setReadinessFilter("all");
+    setSortMode("name");
+  };
+  const toggleInstallableDetails = (key: string) => {
+    setExpandedInstallableCards((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+  const toggleInstalledDetails = (id: string) => {
+    setExpandedInstalledCards((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
   const activeFilters = [
     ...(query.trim() ? [{
       key: "query",
@@ -1159,32 +1424,46 @@ export default function PacksPageOptimized() {
   }
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden">
-      <div className="flex-shrink-0 p-5 border-b" style={{ borderColor: "var(--yunque-border)" }}>
+    <div className="flex flex-col" style={{ height: "100vh", overflowY: "auto" }}>
+      <div className="p-5 border-b" style={{ borderColor: "var(--yunque-border)" }}>
         <PageHeader
           icon={<Boxes size={20} />}
           title="能力包中心"
-          description="需要什么取什么，安装、启用、查看权限和打开入口都在这里完成"
+          description="安装、启用、权限、入口。"
           onRefresh={refreshAll}
+          actions={
+            <div className="flex flex-wrap items-center gap-2">
+              <Button size="sm" className="btn-accent" onPress={() => setSourcesOpen(true)}>
+                <Download size={14} /> 添加能力包
+              </Button>
+              {advancedVisible && (
+                <Link href="/packs/studio">
+                  <Button size="sm" variant="outline">
+                    <Wrench size={14} /> 能力包工坊
+                  </Button>
+                </Link>
+              )}
+            </div>
+          }
         />
 
-        <div className="grid grid-cols-3 gap-3 mt-4">
-          <Card className="section-card p-4">
-            <div className="kpi-label">可安装</div>
-            <div className="kpi-value">{releaseLoading || catalogLoading ? "…" : stats.available}</div>
-          </Card>
-          <Card className="section-card p-4">
-            <div className="kpi-label">已安装</div>
-            <div className="kpi-value">{stats.installed}</div>
-          </Card>
-          <Card className="section-card p-4">
-            <div className="kpi-label">已启用</div>
-            <div className="kpi-value">{stats.enabled}</div>
-          </Card>
+        <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-1 text-sm">
+          <span className="inline-flex items-baseline gap-1.5">
+            <span style={{ color: "var(--yunque-text-muted)" }}>可安装</span>
+            <span className="font-semibold tabular-nums" style={{ color: "var(--yunque-text)" }}>{releaseLoading || catalogLoading ? "…" : stats.available}</span>
+          </span>
+          <span className="inline-flex items-baseline gap-1.5">
+            <span style={{ color: "var(--yunque-text-muted)" }}>已安装</span>
+            <span className="font-semibold tabular-nums" style={{ color: "var(--yunque-text)" }}>{stats.installed}</span>
+          </span>
+          <span className="inline-flex items-baseline gap-1.5">
+            <span style={{ color: "var(--yunque-text-muted)" }}>已启用</span>
+            <span className="font-semibold tabular-nums" style={{ color: "var(--yunque-text)" }}>{stats.enabled}</span>
+          </span>
         </div>
 
         {actionNotice && (
-          <div className="mt-4 rounded-lg border p-4" style={{ borderColor: "rgba(34,197,94,0.22)", background: "rgba(34,197,94,0.07)" }}>
+          <div className="mt-4 rounded-lg border p-4" style={{ borderColor: "var(--yunque-success-border)", background: "var(--yunque-success-soft)" }}>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
@@ -1222,7 +1501,7 @@ export default function PacksPageOptimized() {
         )}
 
         {returnedFromStudio && (
-          <div className="mt-4 rounded-lg border p-4" style={{ borderColor: "rgba(59,130,246,0.22)", background: "rgba(59,130,246,0.07)" }}>
+          <div className="mt-4 rounded-lg border p-4" style={{ borderColor: "var(--yunque-accent-border)", background: "var(--yunque-accent-soft)" }}>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
@@ -1231,8 +1510,8 @@ export default function PacksPageOptimized() {
                 </div>
                 <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
                   {studioReturnManifest
-                    ? `已聚焦 ${studioReturnManifest.name}。先确认来源、权限和交付状态，再打开入口验证；如果结果不符合预期，可以继续回工坊打磨或禁用/回滚。`
-                    : `已按 ${searchFocus} 聚焦搜索。没有找到本机或源里的同名能力包时，先刷新官方源/私有源，或回工坊复检 yqpack 的包 ID。`}
+                    ? `已聚焦 ${studioReturnManifest.name}。查权限，复验入口；不符就回工坊或禁用。`
+                    : `已按 ${searchFocus} 聚焦。找不到时刷新来源，或回工坊复检包 ID。`}
                 </div>
                 {studioReturnManifest && (
                   <div className="mt-2 flex flex-wrap gap-2">
@@ -1252,8 +1531,8 @@ export default function PacksPageOptimized() {
                         key={step.key}
                         className="rounded-md border p-3"
                         style={{
-                          borderColor: "rgba(59,130,246,0.18)",
-                          background: "rgba(59,130,246,0.06)",
+                          borderColor: "var(--yunque-accent-border)",
+                          background: "var(--yunque-accent-soft)",
                         }}
                       >
                         <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>
@@ -1267,15 +1546,15 @@ export default function PacksPageOptimized() {
                     <div
                       className="rounded-md border p-3"
                       style={{
-                        borderColor: "rgba(245,158,11,0.22)",
-                        background: "rgba(245,158,11,0.06)",
+                        borderColor: "var(--yunque-warning-border)",
+                        background: "var(--yunque-warning-soft)",
                       }}
                     >
                       <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>
                         复验失败怎么退
                       </div>
                       <div className="mt-1 text-[11px] leading-5" style={{ color: "var(--yunque-text-muted)" }}>
-                        先禁用这个能力包；如果有上一版本，再执行回滚。回中心确认状态后，可以继续让小羽改。
+                        先禁用；有上一版再回滚。仍不符就交给小羽改。
                       </div>
                     </div>
                   </div>
@@ -1285,7 +1564,7 @@ export default function PacksPageOptimized() {
                 {studioReturnManifest && (
                   <Link href={`/packs/detail?id=${encodeURIComponent(studioReturnManifest.id)}`}>
                     <Button size="sm" variant="outline">
-                      <ShieldCheck size={14} /> 验收权限与来源
+                      <ShieldCheck size={14} /> 权限与详情
                     </Button>
                   </Link>
                 )}
@@ -1308,14 +1587,14 @@ export default function PacksPageOptimized() {
           </div>
         )}
 
-        {showAdvanced && (
+        {advancedVisible && (
           <>
         <div className="mt-4 rounded-lg border p-4" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-bg-hover)" }}>
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
               <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>能力包不是都要单独打开</div>
               <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
-                云雀会把能力包分成三类：能直接操作的入口、支撑 Chat/任务/知识的基础能力，以及仍在验证的实验能力。
+                按入口、底座、实验、待打磨分流。
               </div>
             </div>
             <Chip size="sm" variant="soft">按当前来源统计</Chip>
@@ -1324,7 +1603,7 @@ export default function PacksPageOptimized() {
             <button
               type="button"
               className="rounded-md p-3 text-left transition-colors hover:bg-white/5"
-              style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.18)" }}
+              style={{ background: "var(--yunque-success-soft)", border: "1px solid var(--yunque-success-border)" }}
               onClick={() => {
                 setKindFilter("actionable");
                 setSortMode("kind");
@@ -1335,13 +1614,13 @@ export default function PacksPageOptimized() {
                 <span className="text-lg font-semibold" style={{ color: "var(--yunque-success)" }}>{packKindStats.actionable}</span>
               </div>
               <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
-                有明确页面或主入口，适合用户查看、编辑、执行或继续处理。
+                有入口，可直接验证。
               </div>
             </button>
             <button
               type="button"
               className="rounded-md p-3 text-left transition-colors hover:bg-white/5"
-              style={{ background: "rgba(59,130,246,0.08)", border: "1px solid rgba(59,130,246,0.18)" }}
+              style={{ background: "var(--yunque-accent-soft)", border: "1px solid var(--yunque-accent-border)" }}
               onClick={() => {
                 setKindFilter("infrastructure");
                 setSortMode("kind");
@@ -1352,13 +1631,13 @@ export default function PacksPageOptimized() {
                 <span className="text-lg font-semibold" style={{ color: "var(--yunque-primary)" }}>{packKindStats.infrastructure + packKindStats.documented}</span>
               </div>
               <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
-                通常不单独当应用打开，而是在 Chat、任务、记忆、知识或设置页里生效。
+                在 Chat、任务、记忆、知识或设置页生效。
               </div>
             </button>
             <button
               type="button"
               className="rounded-md p-3 text-left transition-colors hover:bg-white/5"
-              style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.20)" }}
+              style={{ background: "var(--yunque-warning-soft)", border: "1px solid var(--yunque-warning-border)" }}
               onClick={() => {
                 setKindFilter("experimental");
                 setStabilityFilter("alpha");
@@ -1370,13 +1649,13 @@ export default function PacksPageOptimized() {
                 <span className="text-lg font-semibold" style={{ color: "var(--yunque-warning)" }}>{packKindStats.experimental}</span>
               </div>
               <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
-                可体验但不作为稳定主路径；启用前先看限制、权限和风险说明。
+                先看限制、权限和风险。
               </div>
             </button>
             <button
               type="button"
               className="rounded-md p-3 text-left transition-colors hover:bg-white/5"
-              style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.18)" }}
+              style={{ background: "var(--yunque-danger-soft)", border: "1px solid var(--yunque-danger-border)" }}
               onClick={() => {
                 setReadinessFilter("needs_entry");
                 setSortMode("readiness");
@@ -1387,7 +1666,7 @@ export default function PacksPageOptimized() {
                 <span className="text-lg font-semibold" style={{ color: "var(--yunque-danger)" }}>{readinessQueueTotal}</span>
               </div>
               <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
-                不是都不可用；优先从缺入口、实验边界和后台验收不清楚的包开始，逐包补用途、结果、入口和回滚说明。
+                先补入口、边界、验收。
               </div>
             </button>
           </div>
@@ -1398,7 +1677,10 @@ export default function PacksPageOptimized() {
             <div>
               <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>能力包体检总览</div>
               <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
-                已体检 {readinessStats.total} 个能力包，按用途说明、用户能感知的位置、入口和后端能力声明判断是否需要继续打磨；只有 P0 才代表会阻塞用户验证。
+                已体检 {readinessStats.total} 个；先看 P0。
+              </div>
+              <div className="mt-2">
+                <Chip size="sm" color="success">说明完整</Chip>
               </div>
             </div>
             <a href="#readiness-queue">
@@ -1422,7 +1704,7 @@ export default function PacksPageOptimized() {
             <button
               type="button"
               className="rounded-md p-3 text-left transition-colors hover:bg-white/5"
-              style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.18)" }}
+              style={{ background: "var(--yunque-success-soft)", border: "1px solid var(--yunque-success-border)" }}
               onClick={() => setReadinessFilter("complete")}
             >
               <div className="flex items-center justify-between gap-2">
@@ -1430,13 +1712,13 @@ export default function PacksPageOptimized() {
                 <span className="text-lg font-semibold" style={{ color: "var(--yunque-success)" }}>{readinessStats.complete}</span>
               </div>
               <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
-                用户能看懂用途、入口、示例和能力边界，可优先作为可用能力展示。
+                清楚，可展示。
               </div>
             </button>
             <button
               type="button"
               className="rounded-md p-3 text-left transition-colors hover:bg-white/5"
-              style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.20)" }}
+              style={{ background: "var(--yunque-warning-soft)", border: "1px solid var(--yunque-warning-border)" }}
               onClick={() => setReadinessFilter("needs_context")}
             >
               <div className="flex items-center justify-between gap-2">
@@ -1444,13 +1726,13 @@ export default function PacksPageOptimized() {
                 <span className="text-lg font-semibold" style={{ color: "var(--yunque-warning)" }}>{readinessStats.needs_context}</span>
               </div>
               <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
-                常见缺口：示例 {readinessStats.missingExamples}、感知位置 {readinessStats.missingSurface}。
+                缺示例 {readinessStats.missingExamples} · 感知位置 {readinessStats.missingSurface}
               </div>
             </button>
             <button
               type="button"
               className="rounded-md p-3 text-left transition-colors hover:bg-white/5"
-              style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.18)" }}
+              style={{ background: "var(--yunque-danger-soft)", border: "1px solid var(--yunque-danger-border)" }}
               onClick={() => setReadinessFilter("needs_entry")}
             >
               <div className="flex items-center justify-between gap-2">
@@ -1458,22 +1740,64 @@ export default function PacksPageOptimized() {
                 <span className="text-lg font-semibold" style={{ color: "var(--yunque-danger)" }}>{readinessStats.needs_entry}</span>
               </div>
               <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
-                常见缺口：打开入口 {readinessStats.missingEntry}、后端声明 {readinessStats.missingBackend}。
+                缺入口 {readinessStats.missingEntry} · 后端声明 {readinessStats.missingBackend}
               </div>
             </button>
           </div>
           <div className="mt-4 mb-3">
+            <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>Manifest 审计</div>
+            <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
+              拦 404、未挂载路由和权限缺口。
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <Chip size="sm" variant="soft">
+                {routeAuditLoading ? "运行态审计加载中" : routeAuditLoaded ? `运行态 ${routeAuditEntries.filter((entry) => entry.status !== "ok").length} 个问题` : "运行态待加载"}
+              </Chip>
+              {routeAuditError && <Chip size="sm" color="warning">运行态加载失败</Chip>}
+              <Button size="sm" variant="ghost" onPress={refreshRouteAudit} isDisabled={routeAuditLoading}>
+                刷新运行态审计
+              </Button>
+            </div>
+            {routeAuditError && (
+              <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-warning)" }}>
+                {routeAuditError}
+              </div>
+            )}
+          </div>
+          <div className="grid gap-3 md:grid-cols-3">
+            {([
+              ["clear", "审计清晰", manifestAuditStats.clear, "结构清晰。"],
+              ["watch", "需要复核", manifestAuditStats.watch, "需对齐。"],
+              ["blocked", "阻塞验收", manifestAuditStats.blocked, "会阻塞验收。"],
+            ] as const).map(([key, label, value, detail]) => {
+              const style = key === "blocked"
+                ? { borderColor: "var(--yunque-danger-border)", background: "var(--yunque-danger-soft)", color: "var(--yunque-danger)" }
+                : key === "watch"
+                  ? { borderColor: "var(--yunque-warning-border)", background: "var(--yunque-warning-soft)", color: "var(--yunque-warning)" }
+                  : { borderColor: "var(--yunque-success-border)", background: "var(--yunque-success-soft)", color: "var(--yunque-success)" };
+              return (
+                <div key={key} className="rounded-md border p-3" style={{ borderColor: style.borderColor, background: style.background }}>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>{label}</span>
+                    <span className="text-lg font-semibold" style={{ color: style.color }}>{value}</span>
+                  </div>
+                  <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>{detail}</div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-4 mb-3">
             <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>交付状态分布</div>
             <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
-              这层不是只看能力声明是否完整，而是看用户安装后能否直接验证价值。
+              能否直接验价值。
             </div>
           </div>
           <div className="grid gap-3 md:grid-cols-4">
             {([
-              ["ready", "可直接交付", deliveryStats.ready, "有明确入口、示例和结果验证路径。"],
-              ["support", "后台支撑", deliveryStats.support, "在 Chat、任务、记忆、知识或设置里生效。"],
-              ["plan_only", "实验/计划", deliveryStats.plan_only, "先体验边界、计划和证据，不包装成稳定主路径。"],
-              ["needs_meat", "需打磨", deliveryStats.needs_meat, "不等于不可用，通常是缺用途、入口说明或验收路径。"],
+              ["ready", "可直接交付", deliveryStats.ready, "入口和结果可验。"],
+              ["support", "后台支撑", deliveryStats.support, "在主流程生效。"],
+              ["plan_only", "实验/计划", deliveryStats.plan_only, "不当稳定主路径。"],
+              ["needs_meat", "需打磨", deliveryStats.needs_meat, "缺入口或验收路径。"],
             ] as const).map(([key, label, value, detail]) => {
               const style = deliveryToneStyle(key === "ready" ? "success" : key === "support" ? "primary" : key === "plan_only" ? "warning" : "danger");
               return (
@@ -1490,12 +1814,12 @@ export default function PacksPageOptimized() {
         </div>
 
         {readinessQueue.length > 0 && (
-          <div id="readiness-queue" className="mt-4 scroll-mt-24 rounded-lg border p-4" style={{ borderColor: "rgba(245,158,11,0.22)", background: "rgba(245,158,11,0.07)" }}>
+          <div id="readiness-queue" className="mt-4 scroll-mt-24 rounded-lg border p-4" style={{ borderColor: "var(--yunque-warning-border)", background: "var(--yunque-warning-soft)" }}>
             <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
               <div>
                 <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>打磨与验收队列</div>
                 <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
-                  按体检缺口和交付状态挑出需要继续解释、验收或补入口的能力包；P0 才是阻塞项，P1/P2 多数是可用但需要讲清楚边界和结果。当前第 {currentReadinessQueuePage} / {readinessQueuePageCount} 批，展示 {readinessQueue.length} 个，共 {readinessQueueTotal} 个待打磨。
+                  第 {currentReadinessQueuePage} / {readinessQueuePageCount} 批 · {readinessQueue.length} / {readinessQueueTotal} 个。
                 </div>
               </div>
               <Button size="sm" variant="outline" onPress={() => {
@@ -1522,28 +1846,28 @@ export default function PacksPageOptimized() {
               </Link>
             </div>
             <div className="mb-3 grid gap-2 lg:grid-cols-4">
-              <div className="rounded-md border p-3" style={{ borderColor: "rgba(239,68,68,0.18)", background: "rgba(239,68,68,0.06)" }}>
+              <div className="rounded-md border p-3" style={{ borderColor: "var(--yunque-danger-border)", background: "var(--yunque-danger-soft)" }}>
                 <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>本批焦点</div>
                 <div className="mt-1 text-[11px] leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
-                  P0 {readinessBatchSummary.p0} · P1 {readinessBatchSummary.p1} · P2 {readinessBatchSummary.p2}；先处理缺入口 {readinessBatchSummary.needsEntry} 个，再补说明 {readinessBatchSummary.needsContext} 个。
+                  P0 {readinessBatchSummary.p0} · P1 {readinessBatchSummary.p1} · P2 {readinessBatchSummary.p2}；缺入口 {readinessBatchSummary.needsEntry} · 补说明 {readinessBatchSummary.needsContext}
                 </div>
               </div>
-              <div className="rounded-md border p-3" style={{ borderColor: "rgba(59,130,246,0.18)", background: "rgba(59,130,246,0.06)" }}>
+              <div className="rounded-md border p-3" style={{ borderColor: "var(--yunque-accent-border)", background: "var(--yunque-accent-soft)" }}>
                 <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>处理顺序</div>
                 <div className="mt-1 text-[11px] leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
-                  P0 先进工坊只读检查和差异预览；P1/P2 先复验真实入口，再决定是否需要重新打包。
+                  P0 进工坊；P1/P2 先复验入口再重包。
                 </div>
               </div>
-              <div className="rounded-md border p-3" style={{ borderColor: "rgba(34,197,94,0.18)", background: "rgba(34,197,94,0.06)" }}>
-                <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>验收出口</div>
+              <div className="rounded-md border p-3" style={{ borderColor: "var(--yunque-success-border)", background: "var(--yunque-success-soft)" }}>
+                <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>验收</div>
                 <div className="mt-1 text-[11px] leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
-                  {readinessBatchSummary.withOpenPath} 个有入口可打开复验；其余从 Chat、任务、记忆或知识流程观察结果。
+                  {readinessBatchSummary.withOpenPath} 个有入口；其余走 Chat、任务、记忆或知识。
                 </div>
               </div>
-              <div className="rounded-md border p-3" style={{ borderColor: readinessBatchSummary.highRisk > 0 ? "rgba(239,68,68,0.22)" : "rgba(245,158,11,0.18)", background: readinessBatchSummary.highRisk > 0 ? "rgba(239,68,68,0.07)" : "rgba(245,158,11,0.06)" }}>
+              <div className="rounded-md border p-3" style={{ borderColor: readinessBatchSummary.highRisk > 0 ? "var(--yunque-danger-border)" : "var(--yunque-warning-border)", background: readinessBatchSummary.highRisk > 0 ? "var(--yunque-danger-soft)" : "var(--yunque-warning-soft)" }}>
                 <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>边界提醒</div>
                 <div className="mt-1 text-[11px] leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
-                  高风险 {readinessBatchSummary.highRisk} 个 · 实验/计划 {readinessBatchSummary.planOnly} 个；不能把计划能力包装成稳定执行。
+                  高风险 {readinessBatchSummary.highRisk} · 计划态 {readinessBatchSummary.planOnly} · 审计阻塞 {readinessBatchSummary.auditBlocked}。
                 </div>
               </div>
             </div>
@@ -1552,9 +1876,10 @@ export default function PacksPageOptimized() {
                 const readiness = packReadiness(item.manifest);
                 const delivery = packDeliveryProfile(item.manifest);
                 const deliveryStyle = deliveryToneStyle(delivery.tone);
-                const guidance = packPolishGuidance(item.manifest);
-                const priority = packPolishPriority(item.manifest);
+                const guidance = packPolishGuidance(item.manifest, routeAuditEntries);
+                const priority = packPolishPriority(item.manifest, routeAuditEntries);
                 const risk = riskProfileForPack(item.manifest);
+                const audit = packManifestAudit(item.manifest, routeAuditEntries);
                 const permissionSummary = packPermissionSummary(item.manifest);
                 const queueReason = readiness.missing.length > 0
                   ? `还缺：${readiness.missing.join("、")}`
@@ -1569,7 +1894,7 @@ export default function PacksPageOptimized() {
                       <div className="flex shrink-0 flex-wrap justify-end gap-1">
                         <Chip size="sm" color={priority.level === "P0" ? "danger" : priority.level === "P1" ? "warning" : "default"}>{priority.level}</Chip>
                         <Chip size="sm" color={readiness.level === "needs_entry" ? "danger" : readiness.level === "needs_context" ? "warning" : "success"}>{readiness.label}</Chip>
-                        <Chip size="sm" style={{ background: deliveryStyle.background, color: deliveryStyle.color }}>{delivery.label}</Chip>
+                        <Chip size="sm" variant="soft" color={delivery.tone === "danger" ? "danger" : delivery.tone === "warning" ? "warning" : delivery.tone === "primary" ? "accent" : "success"}>{delivery.label}</Chip>
                         <Chip size="sm" color={risk.level === "high" ? "danger" : risk.level === "medium" ? "warning" : "success"}>{risk.label}</Chip>
                       </div>
                     </div>
@@ -1579,16 +1904,31 @@ export default function PacksPageOptimized() {
                     <div
                       className="mt-2 rounded-md border p-2 text-[11px] leading-5"
                       style={{
-                        borderColor: risk.requiresAuthorization ? "rgba(239,68,68,0.22)" : "rgba(59,130,246,0.16)",
-                        background: risk.requiresAuthorization ? "rgba(239,68,68,0.07)" : "rgba(59,130,246,0.06)",
+                        borderColor: risk.requiresAuthorization ? "var(--yunque-danger-border)" : "var(--yunque-accent-border)",
+                        background: risk.requiresAuthorization ? "var(--yunque-danger-soft)" : "var(--yunque-accent-soft)",
                         color: "var(--yunque-text-secondary)",
                       }}
                     >
                       <div><span className="font-medium" style={{ color: "var(--yunque-text)" }}>来源：</span>{item.sourceLabel}{item.packageUrl ? ` · ${item.packageUrl}` : ""}</div>
                       <div><span className="font-medium" style={{ color: "var(--yunque-text)" }}>权限：</span>{permissionSummary}</div>
-                      <div><span className="font-medium" style={{ color: "var(--yunque-text)" }}>先做：</span>{priority.level === "P0" ? "先看详情确认是否缺入口或能力声明，再进工坊只读检查。" : risk.requiresAuthorization ? "先验收权限、来源和回滚，再进入工坊打磨边界。" : "先按入口或主路径复验；仍说不清楚时再交给小羽打磨。"}</div>
+                      <div><span className="font-medium" style={{ color: "var(--yunque-text)" }}>先做：</span>{priority.level === "P0" ? "先看详情确认是否缺入口或能力声明，再进工坊只读检查。" : risk.requiresAuthorization ? "先看详情复查权限和回滚，再进入工坊打磨边界。" : "先按入口或主路径复验；仍说不清楚时再交给小羽打磨。"}</div>
                     </div>
-                    <div className="mt-2 rounded-md border p-2 text-[11px] leading-5" style={{ borderColor: "rgba(245,158,11,0.18)", background: "rgba(245,158,11,0.06)", color: "var(--yunque-text-secondary)" }}>
+                    {audit.issues.length > 0 && (
+                      <div
+                        className="mt-2 rounded-md border p-2 text-[11px] leading-5"
+                        style={{
+                          borderColor: audit.level === "blocked" ? "var(--yunque-danger-border)" : "var(--yunque-warning-border)",
+                          background: audit.level === "blocked" ? "var(--yunque-danger-soft)" : "var(--yunque-warning-soft)",
+                          color: "var(--yunque-text-secondary)",
+                        }}
+                      >
+                        <div className="font-medium" style={{ color: audit.level === "blocked" ? "var(--yunque-danger)" : "var(--yunque-warning)" }}>
+                          Manifest 审计：{audit.label}
+                        </div>
+                        <div>{audit.issues.slice(0, 2).map((issue) => issue.label).join("、")}</div>
+                      </div>
+                    )}
+                    <div className="mt-2 rounded-md border p-2 text-[11px] leading-5" style={{ borderColor: "var(--yunque-warning-border)", background: "var(--yunque-warning-soft)", color: "var(--yunque-text-secondary)" }}>
                       <div><span className="font-medium" style={{ color: "var(--yunque-text)" }}>{priority.label}：</span>{priority.reason}</div>
                       <div><span className="font-medium" style={{ color: "var(--yunque-text)" }}>为什么进队列：</span>{guidance.reason}</div>
                       <div><span className="font-medium" style={{ color: "var(--yunque-text)" }}>优先修改：</span>{guidance.firstEdit}</div>
@@ -1596,7 +1936,7 @@ export default function PacksPageOptimized() {
                     </div>
                     <div className="mt-2 flex flex-wrap gap-2">
                       <Link href={`/packs/detail?id=${encodeURIComponent(item.manifest.id)}`}>
-                        <Button size="sm" variant={risk.requiresAuthorization ? "outline" : "ghost"}>先看权限与来源 <ShieldCheck size={14} /></Button>
+                        <Button size="sm" variant={risk.requiresAuthorization ? "outline" : "ghost"}>权限与详情 <ShieldCheck size={14} /></Button>
                       </Link>
                       <Link href={packStudioHref(item.manifest, { packageUrl: item.packageUrl, sha256: item.sha256 })}>
                         <Button size="sm" variant="ghost">交给小羽打磨 <Wrench size={14} /></Button>
@@ -1623,162 +1963,242 @@ export default function PacksPageOptimized() {
           </>
         )}
 
-        <div className="flex items-center gap-3 mt-4">
-          <Link href="/packs/studio">
-            <Button size="sm" variant="outline">
-              <Wrench size={14} /> 能力包工坊
+        {advancedVisible && !maintenanceMode && (
+          <div className="mt-4 flex items-center gap-3">
+            <Button size="sm" variant="ghost" onPress={() => setShowAdvanced(false)}>
+              <ChevronUp size={14} /> 隐藏维护视图
             </Button>
-          </Link>
-          <Button size="sm" variant="ghost" onPress={() => setShowAdvanced(!showAdvanced)}>
-            {showAdvanced ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-            {showAdvanced ? "隐藏" : "显示"}维护视图
-          </Button>
-        </div>
+          </div>
+        )}
 
         <Card className="mt-4 p-4" style={{ background: "var(--yunque-surface)", border: "1px solid var(--yunque-border)" }}>
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
-              <SlidersHorizontal size={15} style={{ color: "var(--yunque-accent)" }} />
-              商店筛选
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
+                当前匹配 {totalMatches} 个
+              </div>
+              <div className="mt-1 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+                已安装 {filteredInstalledPacks.length} 个 · 官方源 {filteredReleaseEntries.length} 个 · 私有源 {filteredPrivateCatalogEntries.length} 个
+              </div>
             </div>
-            <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>
-              匹配 {totalMatches} 个 · 已安装 {filteredInstalledPacks.length} · 官方源 {filteredReleaseEntries.length} · 私有源 {filteredPrivateCatalogEntries.length}
-            </div>
-          </div>
-          <div className="grid gap-3 lg:grid-cols-[minmax(220px,1fr)_auto]">
-            <TextField value={query} onChange={setQuery}>
-              <Label>搜索能力包</Label>
-              <Input placeholder="搜索名称、用途、权限、能力、入口" />
-            </TextField>
             <Button
+              size="sm"
               variant="outline"
-              className="self-end"
-              onPress={() => {
-                setQuery("");
-                setKindFilter("all");
-                setInstallFilter("all");
-                setRiskFilter("all");
-                setSourceFilter("all");
-                setStabilityFilter("all");
-                setReadinessFilter("all");
-                setSortMode("name");
-              }}
+              onPress={() => setFiltersOpen(true)}
             >
-              <Search size={14} /> 重置
+              <SlidersHorizontal size={14} /> 找能力包
             </Button>
           </div>
-          <div className="mt-3 grid gap-3 xl:grid-cols-7">
-            {renderFilterGroup("类型", [
-              ["all", "全部"],
-              ["actionable", "可用"],
-              ["infrastructure", "基础"],
-              ["experimental", "实验"],
-            ], kindFilter, (value) => setKindFilter(value as KindFilter))}
-            {renderFilterGroup("状态", [
-              ["all", "全部"],
-              ["installed", "已安装"],
-              ["enabled", "已启用"],
-              ["disabled", "已禁用"],
-              ["available", "可安装"],
-            ], installFilter, (value) => setInstallFilter(value as InstallFilter))}
-            {renderFilterGroup("风险", [
-              ["all", "全部"],
-              ["low", "低"],
-              ["medium", "留意"],
-              ["high", "授权"],
-            ], riskFilter, (value) => setRiskFilter(value as RiskFilter))}
-            {renderFilterGroup("来源", [
-              ["all", "全部"],
-              ["installed", "已安装"],
-              ["official", "官方"],
-              ["private", "私有"],
-            ], sourceFilter, (value) => setSourceFilter(value as SourceFilter))}
-            {renderFilterGroup("稳定性", [
-              ["all", "全部"],
-              ["stable", "正式"],
-              ["beta", "测试"],
-              ["alpha", "开发中"],
-            ], stabilityFilter, (value) => setStabilityFilter(value as StabilityFilter))}
-            {renderFilterGroup("体检", [
-              ["all", "全部"],
-              ["complete", "完整"],
-              ["needs_context", "补说明"],
-              ["needs_entry", "补入口"],
-            ], readinessFilter, (value) => setReadinessFilter(value as ReadinessFilter))}
-            {renderFilterGroup("排序", [
-              ["name", "名称"],
-              ["kind", "类型"],
-              ["risk", "风险"],
-              ["readiness", "体检"],
-              ["status", "阶段"],
-            ], sortMode, (value) => setSortMode(value as SortMode))}
-          </div>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="text-xs font-medium" style={{ color: "var(--yunque-text-muted)" }}>当前条件</span>
-            {activeFilters.length === 0 ? (
-              <Chip size="sm" variant="soft">未启用筛选</Chip>
-            ) : activeFilters.map((filter) => (
-              <Button key={filter.key} size="sm" variant="ghost" onPress={filter.clear} aria-label={filter.clearLabel}>
-                <span className="text-xs">{filter.label}</span>
-                <X size={13} />
-              </Button>
-            ))}
-          </div>
-          <div className="mt-3 rounded-md border px-3 py-2 text-xs leading-5" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-bg-hover)", color: "var(--yunque-text-secondary)" }}>
-            <span className="font-medium" style={{ color: "var(--yunque-text)" }}>当前视图：</span>
-            {totalMatches === 0
-              ? "没有匹配的能力包。可以清空搜索或放宽类型、风险、稳定性筛选。"
-              : `共 ${totalMatches} 个，${visibleKindStats.actionable} 个可直接使用、${visibleKindStats.infrastructure} 个作为 Chat/任务/记忆/知识的底座能力、${visibleKindStats.experimental} 个仍建议先看边界再启用。`}
-          </div>
-          <div className="mt-3 grid gap-2 md:grid-cols-4">
-            <div className="rounded-md border p-3" style={{ borderColor: "var(--yunque-border)", background: "rgba(255,255,255,0.03)" }}>
-              <div className="text-[11px] font-medium" style={{ color: "var(--yunque-text-muted)" }}>来源构成</div>
-              <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
-                已安装 {filteredInstalledPacks.length} · 官方 {filteredReleaseEntries.length} · 私有 {filteredPrivateCatalogEntries.length}
-              </div>
+          {!filtersOpen && (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {activeFilters.length === 0 ? (
+                <Chip size="sm" variant="soft">未启用筛选</Chip>
+              ) : activeFilters.map((filter) => (
+                <Button key={filter.key} size="sm" variant="ghost" onPress={filter.clear} aria-label={filter.clearLabel}>
+                  <span className="text-xs">{filter.label}</span>
+                  <X size={13} />
+                </Button>
+              ))}
             </div>
-            <div className="rounded-md border p-3" style={{ borderColor: "var(--yunque-border)", background: "rgba(255,255,255,0.03)" }}>
-              <div className="text-[11px] font-medium" style={{ color: "var(--yunque-text-muted)" }}>交付构成</div>
-              <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
-                可交付 {visibleDeliveryStats.ready} · 后台 {visibleDeliveryStats.support} · 实验 {visibleDeliveryStats.plan_only} · 待打磨 {visibleDeliveryStats.needs_meat}
-              </div>
+          )}
+          {(installFilter === "available" || sourceFilter === "official" || sourceFilter === "private") && (
+            <div className="mt-3 rounded-md border px-3 py-2 text-xs leading-5" style={{ borderColor: "var(--yunque-accent-border)", background: "var(--yunque-accent-soft)", color: "var(--yunque-text-secondary)" }}>
+              包含可安装来源；展开看官方、私有或本地。
             </div>
-            <div className="rounded-md border p-3" style={{ borderColor: "var(--yunque-border)", background: "rgba(255,255,255,0.03)" }}>
-              <div className="text-[11px] font-medium" style={{ color: "var(--yunque-text-muted)" }}>体检构成</div>
-              <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
-                完整 {visibleReadinessStats.complete} · 补说明 {visibleReadinessStats.needs_context} · 补入口 {visibleReadinessStats.needs_entry}
-              </div>
-            </div>
-            <div className="rounded-md border p-3 md:col-span-4" style={{ borderColor: "rgba(59,130,246,0.18)", background: "rgba(59,130,246,0.06)" }}>
-              <div className="text-[11px] font-medium" style={{ color: "var(--yunque-primary)" }}>建议下一步</div>
-              <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
-                <div className="min-w-0 flex-1 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
-                  {currentViewAdvice}
-                </div>
-                {currentViewAction.kind === "link" ? (
-                  <Link href={currentViewAction.href || "/chat"}>
-                    <Button size="sm" variant="outline">
-                      {currentViewAction.label} <ArrowRight size={14} />
-                    </Button>
-                  </Link>
-                ) : currentViewAction.kind === "anchor" ? (
-                  <a href={currentViewAction.href || "#readiness-queue"}>
-                    <Button size="sm" variant="outline">
-                      {currentViewAction.label} <ArrowRight size={14} />
-                    </Button>
-                  </a>
-                ) : (
-                  <Button size="sm" variant="outline" onPress={currentViewAction.onPress}>
-                    {currentViewAction.label} <ArrowRight size={14} />
-                  </Button>
-                )}
-              </div>
-            </div>
-          </div>
+          )}
         </Card>
+
+        <Modal.Backdrop isOpen={filtersOpen} onOpenChange={setFiltersOpen} variant="blur">
+          <Modal.Container scroll="inside" size="lg" placement="top">
+            <Modal.Dialog className="sm:max-w-[760px]">
+              <Modal.CloseTrigger />
+              <Modal.Header className="gap-3">
+                <Modal.Heading>筛选能力包</Modal.Heading>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Chip size="sm" variant="soft">结果 {totalMatches} 个</Chip>
+                  <Chip size="sm" variant="soft">已安装 {filteredInstalledPacks.length}</Chip>
+                  {(filteredReleaseEntries.length + filteredPrivateCatalogEntries.length) > 0 && (
+                    <Chip size="sm" color="accent">可安装 {filteredReleaseEntries.length + filteredPrivateCatalogEntries.length}</Chip>
+                  )}
+                </div>
+              </Modal.Header>
+              <Modal.Body className="space-y-5">
+                <div className="grid gap-3 lg:grid-cols-[minmax(220px,1fr)_auto]">
+                  <TextField value={query} onChange={setQuery} fullWidth>
+                    <Label>找能力包</Label>
+                    <Input placeholder="搜索名称、用途、权限、能力、入口" />
+                  </TextField>
+                  <Button variant="outline" className="self-end" onPress={resetFilters}>
+                    <Search size={14} aria-hidden /> 重置
+                  </Button>
+                </div>
+
+                <div className="rounded-lg border p-3" style={{ borderColor: "var(--yunque-accent-border)", background: "var(--yunque-accent-soft)" }}>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>当前建议</div>
+                      <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>{currentViewAdvice}</div>
+                    </div>
+                    {currentViewAction.kind === "anchor" && currentViewAction.href ? (
+                      <a href={currentViewAction.href}>
+                        <Button size="sm" variant="outline" onPress={() => setFiltersOpen(false)}>
+                          {currentViewAction.label} <ArrowRight size={14} aria-hidden />
+                        </Button>
+                      </a>
+                    ) : currentViewAction.kind === "link" && currentViewAction.href ? (
+                      <Link href={currentViewAction.href}>
+                        <Button size="sm" variant="outline" onPress={() => setFiltersOpen(false)}>
+                          {currentViewAction.label} <ArrowRight size={14} aria-hidden />
+                        </Button>
+                      </Link>
+                    ) : (
+                      <Button size="sm" variant="outline" onPress={currentViewAction.onPress}>
+                        {currentViewAction.label}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-3">
+                  {renderFilterGroup("状态", [
+                    ["all", "全部"],
+                    ["installed", "已安装"],
+                    ["enabled", "已启用"],
+                    ["disabled", "已禁用"],
+                    ["available", "可安装"],
+                  ], installFilter, (value) => setInstallFilter(value as InstallFilter))}
+                  {renderFilterGroup("来源信任", [
+                    ["all", "全部"],
+                    ["installed", "已安装"],
+                    ["official", "官方源"],
+                    ["private", "私有源"],
+                  ], sourceFilter, (value) => setSourceFilter(value as SourceFilter))}
+                  {renderFilterGroup("类型", [
+                    ["all", "全部"],
+                    ["actionable", "可用"],
+                    ["infrastructure", "基础"],
+                    ["experimental", "实验"],
+                  ], kindFilter, (value) => setKindFilter(value as KindFilter))}
+                </div>
+
+                <div className="grid gap-2 md:grid-cols-3">
+                  <FilterInsightCard
+                    label="已安装"
+                    value={`${filteredInstalledPacks.length} 个`}
+                    detail="已经进入本地运行面；优先看启用状态、入口和权限边界。"
+                  />
+                  <FilterInsightCard
+                    label="官方源"
+                    value={`${filteredReleaseEntries.length} 个`}
+                    detail="来自配置的发布源；安装前先看版本、摘要和回滚路径。"
+                  />
+                  <FilterInsightCard
+                    label="私有源"
+                    value={`${filteredPrivateCatalogEntries.length} 个`}
+                    detail="来自团队或本地 catalog；适合只读检查后再启用。"
+                  />
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2" aria-label="当前筛选">
+                  {activeFilters.length === 0 ? (
+                    <Chip size="sm" variant="soft">未启用筛选</Chip>
+                  ) : activeFilters.map((filter) => (
+                    <Button key={filter.key} size="sm" variant="ghost" onPress={filter.clear} aria-label={filter.clearLabel}>
+                      <span className="text-xs">{filter.label}</span>
+                      <X size={13} aria-hidden />
+                    </Button>
+                  ))}
+                </div>
+
+                <Disclosure isExpanded={advancedFiltersOpen} onExpandedChange={setAdvancedFiltersOpen}>
+                  <Disclosure.Heading>
+                    <Button slot="trigger" size="sm" variant="ghost">
+                      更多筛选
+                      <Disclosure.Indicator />
+                    </Button>
+                  </Disclosure.Heading>
+                  <Disclosure.Content>
+                    <Disclosure.Body className="mt-3 space-y-4 rounded-lg border p-3" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-bg-muted)" }}>
+                      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                        {renderFilterGroup("风险", [
+                          ["all", "全部"],
+                          ["low", "低"],
+                          ["medium", "留意"],
+                          ["high", "授权"],
+                        ], riskFilter, (value) => setRiskFilter(value as RiskFilter))}
+                        {renderFilterGroup("稳定性", [
+                          ["all", "全部"],
+                          ["stable", "正式"],
+                          ["beta", "测试"],
+                          ["alpha", "开发中"],
+                        ], stabilityFilter, (value) => setStabilityFilter(value as StabilityFilter))}
+                        {renderFilterGroup("体检", [
+                          ["all", "全部"],
+                          ["complete", "完整"],
+                          ["needs_context", "补说明"],
+                          ["needs_entry", "补入口"],
+                        ], readinessFilter, (value) => setReadinessFilter(value as ReadinessFilter))}
+                        {renderFilterGroup("排序", [
+                          ["name", "名称"],
+                          ["kind", "类型"],
+                          ["risk", "风险"],
+                          ["readiness", "体检"],
+                          ["status", "阶段"],
+                        ], sortMode, (value) => setSortMode(value as SortMode))}
+                      </div>
+                      <div className="grid gap-2 md:grid-cols-3">
+                        <FilterInsightCard
+                          label="来源构成"
+                          value={`已安装 ${filteredInstalledPacks.length} · 官方 ${filteredReleaseEntries.length} · 私有 ${filteredPrivateCatalogEntries.length}`}
+                          detail="用于判断是直接启用、从发布源安装，还是先检查团队源。"
+                        />
+                        <FilterInsightCard
+                          label="交付构成"
+                          value={`可交付 ${visibleDeliveryStats.ready} · 后台 ${visibleDeliveryStats.support} · 实验 ${visibleDeliveryStats.plan_only} · 待打磨 ${visibleDeliveryStats.needs_meat}`}
+                          detail="用于判断这批结果能否直接给用户验证。"
+                        />
+                        <FilterInsightCard
+                          label="当前视图"
+                          value={`共 ${totalMatches} 个 · 可用 ${visibleKindStats.actionable} · 基础 ${visibleKindStats.infrastructure} · 实验 ${visibleKindStats.experimental}`}
+                          detail="用于快速决定下一步打开、安装、授权或打磨。"
+                        />
+                      </div>
+                    </Disclosure.Body>
+                  </Disclosure.Content>
+                </Disclosure>
+              </Modal.Body>
+              <Modal.Footer>
+                <Button variant="secondary" onPress={resetFilters}>重置</Button>
+                <Button className="btn-accent" slot="close" onPress={() => setFiltersOpen(false)}>完成</Button>
+              </Modal.Footer>
+            </Modal.Dialog>
+          </Modal.Container>
+        </Modal.Backdrop>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-5 space-y-4">
+      <div className="p-5 space-y-4">
+        <section className="section-card rounded-lg border p-4" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-surface)" }}>
+          <Disclosure isExpanded={sourcesOpen} onExpandedChange={setSourcesOpen}>
+            <Disclosure.Heading>
+              <Button slot="trigger" variant="ghost" className="flex h-auto w-full justify-between gap-3 px-0 py-0 text-left">
+                <div className="flex items-start gap-2">
+                  <Store size={17} style={{ color: "var(--yunque-accent)" }} />
+                  <div>
+                    <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
+                      {sourcesOpen ? "收起来源与安装" : "展开来源与安装"}
+                    </div>
+                    <div className="mt-1 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+                      查看官方源、私有源和本地安装入口；当前可安装 {filteredReleaseEntries.length + filteredPrivateCatalogEntries.length} 个。
+                    </div>
+                  </div>
+                </div>
+                <Disclosure.Indicator />
+              </Button>
+            </Disclosure.Heading>
+          </Disclosure>
+        </section>
+
+        <div hidden={!sourcesOpen} className="space-y-4">
         <section className="space-y-3">
           <div className="flex items-center justify-between gap-3 mb-3">
             <div className="flex items-start gap-2">
@@ -1786,7 +2206,7 @@ export default function PacksPageOptimized() {
               <div>
                 <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>官方源</div>
                 <div className="text-xs mt-1" style={{ color: "var(--yunque-text-muted)" }}>
-                  从可信发布读取可安装能力包，安装前先看用途、入口和权限。
+                  可信发布源，先看用途、入口、权限。
                 </div>
               </div>
             </div>
@@ -1796,34 +2216,49 @@ export default function PacksPageOptimized() {
             </Button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
-            {PACK_RELEASE_SOURCES.map((source) => (
-              <div key={source.url} className="rounded-md p-3 border" style={{ borderColor: "var(--yunque-border)" }}>
-                <div className="flex items-center gap-2 text-sm" style={{ color: "var(--yunque-text)" }}>
-                  <Globe2 size={14} style={{ color: "var(--yunque-primary)" }} />
-                  <span className="font-medium">{source.label}</span>
+          <div className="mb-4 rounded-md border p-3" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-bg-muted)" }}>
+            <button
+              type="button"
+              className="flex w-full items-center justify-between gap-3 text-left text-xs font-medium"
+              style={{ color: "var(--yunque-text)" }}
+              aria-expanded={officialDiagnosticsOpen}
+              onClick={() => setOfficialDiagnosticsOpen((value) => !value)}
+            >
+              来源与安装诊断
+              {officialDiagnosticsOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </button>
+            {officialDiagnosticsOpen && (
+              <div className="mt-3 space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {PACK_RELEASE_SOURCES.map((source) => (
+                    <div key={source.url} className="rounded-md p-3 border" style={{ borderColor: "var(--yunque-border)" }}>
+                      <div className="flex items-center gap-2 text-sm" style={{ color: "var(--yunque-text)" }}>
+                        <Globe2 size={14} style={{ color: "var(--yunque-primary)" }} />
+                        <span className="font-medium">{source.label}</span>
+                      </div>
+                      <div className="text-xs mt-1" style={{ color: "var(--yunque-text-muted)" }}>{source.note}</div>
+                      <div className="text-[11px] font-mono break-all mt-2" style={{ color: "var(--yunque-text-muted)" }}>
+                        {sourceName(source.url)}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <div className="text-xs mt-1" style={{ color: "var(--yunque-text-muted)" }}>{source.note}</div>
-                <div className="text-[11px] font-mono break-all mt-2" style={{ color: "var(--yunque-text-muted)" }}>
-                  {sourceName(source.url)}
+                <div className="rounded-md border p-3" style={{ borderColor: "var(--yunque-accent-border)", background: "var(--yunque-accent-soft)" }}>
+                  <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>安装失败怎么处理</div>
+                  <div className="mt-2 grid grid-cols-1 md:grid-cols-3 gap-2">
+                    {INSTALL_TROUBLESHOOTING.slice(0, 3).map((item) => {
+                      const style = checklistToneStyle(item.tone);
+                      return (
+                        <div key={item.key} className="rounded-md border p-2" style={{ borderColor: style.borderColor, background: style.background }}>
+                          <div className="text-[11px] font-medium" style={{ color: style.color }}>{item.label}</div>
+                          <div className="mt-1 text-[11px] leading-4" style={{ color: "var(--yunque-text-muted)" }}>{item.detail}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
-            ))}
-          </div>
-
-          <div className="mb-4 rounded-md border p-3" style={{ borderColor: "rgba(59,130,246,0.18)", background: "rgba(59,130,246,0.06)" }}>
-            <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>安装失败怎么处理</div>
-            <div className="mt-2 grid grid-cols-1 md:grid-cols-3 gap-2">
-              {INSTALL_TROUBLESHOOTING.slice(0, 3).map((item) => {
-                const style = checklistToneStyle(item.tone);
-                return (
-                  <div key={item.key} className="rounded-md border p-2" style={{ borderColor: style.borderColor, background: style.background }}>
-                    <div className="text-[11px] font-medium" style={{ color: style.color }}>{item.label}</div>
-                    <div className="mt-1 text-[11px] leading-4" style={{ color: "var(--yunque-text-muted)" }}>{item.detail}</div>
-                  </div>
-                );
-              })}
-            </div>
+            )}
           </div>
 
           {releaseLoading ? (
@@ -1879,41 +2314,56 @@ export default function PacksPageOptimized() {
             </Button>
           </div>
 
-          {(catalog.source_reports?.length ?? 0) > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
-              {catalog.source_reports?.map((report) => (
-                <div key={report.source} className="rounded-md p-3 border" style={{ borderColor: "var(--yunque-border)" }}>
-                  <div className="flex items-center gap-2 text-sm" style={{ color: report.ok ? "var(--yunque-success)" : "var(--yunque-warning)" }}>
-                    {report.ok ? <ShieldCheck size={14} /> : <ShieldAlert size={14} />}
-                    <span className="font-medium">{report.ok ? "源可用" : "源需要处理"}</span>
+          <div className="mb-4 rounded-md border p-3" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-bg-muted)" }}>
+            <button
+              type="button"
+              className="flex w-full items-center justify-between gap-3 text-left text-xs font-medium"
+              style={{ color: "var(--yunque-text)" }}
+              aria-expanded={privateDiagnosticsOpen}
+              onClick={() => setPrivateDiagnosticsOpen((value) => !value)}
+            >
+              私有源诊断
+              {privateDiagnosticsOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </button>
+            {privateDiagnosticsOpen && (
+              <div className="mt-3 space-y-3">
+                {(catalog.source_reports?.length ?? 0) > 0 && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {catalog.source_reports?.map((report) => (
+                      <div key={report.source} className="rounded-md p-3 border" style={{ borderColor: "var(--yunque-border)" }}>
+                        <div className="flex items-center gap-2 text-sm" style={{ color: report.ok ? "var(--yunque-success)" : "var(--yunque-warning)" }}>
+                          {report.ok ? <ShieldCheck size={14} /> : <ShieldAlert size={14} />}
+                          <span className="font-medium">{report.ok ? "源可用" : "源需要处理"}</span>
+                        </div>
+                        <div className="text-[11px] font-mono break-all mt-1" style={{ color: "var(--yunque-text-muted)" }}>{report.source}</div>
+                        <div className="text-xs mt-2" style={{ color: "var(--yunque-text-muted)" }}>
+                          声明 {report.manifest_count} 个，匹配 {report.matched_entries} 个
+                        </div>
+                        {(report.errors?.length ?? 0) > 0 && (
+                          <div className="text-xs mt-2" style={{ color: "var(--yunque-warning)" }}>
+                            {report.errors?.[0]}
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
-                  <div className="text-[11px] font-mono break-all mt-1" style={{ color: "var(--yunque-text-muted)" }}>{report.source}</div>
-                  <div className="text-xs mt-2" style={{ color: "var(--yunque-text-muted)" }}>
-                    声明 {report.manifest_count} 个，匹配 {report.matched_entries} 个
+                )}
+                <div className="rounded-md border p-3" style={{ borderColor: "var(--yunque-warning-border)", background: "var(--yunque-warning-soft)" }}>
+                  <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>私有源安装前确认</div>
+                  <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {INSTALL_TROUBLESHOOTING.slice(1).map((item) => {
+                      const style = checklistToneStyle(item.tone);
+                      return (
+                        <div key={item.key} className="rounded-md border p-2" style={{ borderColor: style.borderColor, background: style.background }}>
+                          <div className="text-[11px] font-medium" style={{ color: style.color }}>{item.label}</div>
+                          <div className="mt-1 text-[11px] leading-4" style={{ color: "var(--yunque-text-muted)" }}>{item.detail}</div>
+                        </div>
+                      );
+                    })}
                   </div>
-                  {(report.errors?.length ?? 0) > 0 && (
-                    <div className="text-xs mt-2" style={{ color: "var(--yunque-warning)" }}>
-                      {report.errors?.[0]}
-                    </div>
-                  )}
                 </div>
-              ))}
-            </div>
-          )}
-
-          <div className="mb-4 rounded-md border p-3" style={{ borderColor: "rgba(245,158,11,0.18)", background: "rgba(245,158,11,0.06)" }}>
-            <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>私有源安装前确认</div>
-            <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
-              {INSTALL_TROUBLESHOOTING.slice(1).map((item) => {
-                const style = checklistToneStyle(item.tone);
-                return (
-                  <div key={item.key} className="rounded-md border p-2" style={{ borderColor: style.borderColor, background: style.background }}>
-                    <div className="text-[11px] font-medium" style={{ color: style.color }}>{item.label}</div>
-                    <div className="mt-1 text-[11px] leading-4" style={{ color: "var(--yunque-text-muted)" }}>{item.detail}</div>
-                  </div>
-                );
-              })}
-            </div>
+              </div>
+            )}
           </div>
 
           {catalogLoading ? (
@@ -1954,7 +2404,7 @@ export default function PacksPageOptimized() {
         <Card className="section-card p-4">
           <button
             type="button"
-            onClick={() => setShowAdvanced(!showAdvanced)}
+            onClick={() => setShowAdvanced((value) => !value)}
             className="flex items-center justify-between w-full"
           >
             <div className="flex items-start gap-2 text-left">
@@ -1962,13 +2412,13 @@ export default function PacksPageOptimized() {
               <div>
                 <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>本地高级安装</div>
                 <div className="text-xs mt-1" style={{ color: "var(--yunque-text-muted)" }}>
-                  适合开发者从本地 pack.json 安装。普通用户优先使用上方来源。
+                  开发者本地安装；普通用户用上方来源。
                 </div>
               </div>
             </div>
-            {showAdvanced ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            {advancedVisible ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
           </button>
-          {showAdvanced && (
+          {advancedVisible && (
             <div className="mt-4 pt-4 border-t" style={{ borderColor: "var(--yunque-border)" }}>
               <div className="flex gap-3">
                 <TextField value={manifestPath} onChange={(v: string) => setManifestPath(v)} className="flex-1">
@@ -1982,6 +2432,7 @@ export default function PacksPageOptimized() {
             </div>
           )}
         </Card>
+        </div>
 
         {packs.length === 0 ? (
           <Card className="section-card p-12 text-center">
@@ -1996,7 +2447,7 @@ export default function PacksPageOptimized() {
             <Boxes size={32} className="mx-auto mb-3" style={{ color: "var(--yunque-text-muted)" }} />
             <div className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>没有符合筛选条件的已安装能力包</div>
             <div className="text-xs mt-1" style={{ color: "var(--yunque-text-muted)" }}>
-              可以清空搜索，或切换类型、状态、风险和来源筛选。
+              可以清空搜索，或切换类型、状态、风险和来源信任。
             </div>
           </Card>
         ) : (
@@ -2022,7 +2473,7 @@ export default function PacksPageOptimized() {
       <div>
         <div className="flex items-center gap-2 mb-3">
           <h3 className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>{title} · {sectionPacks.length} 个</h3>
-          {note && <Chip size="sm" style={{ background: "rgba(245,158,11,0.12)", color: "var(--yunque-warning)" }}>{note}</Chip>}
+          {note && <Chip size="sm" variant="soft" color="warning">{note}</Chip>}
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {sectionPacks.map((pack) => renderPackCard(pack))}
@@ -2055,187 +2506,178 @@ export default function PacksPageOptimized() {
     const actionBusyKey = options.action.kind === "enable" ? `enable:${manifest.id}` : options.busyKey;
     const disabled = options.action.disabled || busy === actionBusyKey;
     const primaryPath = packSafeOpenPath(manifest);
+    const sourceSummary = options.sourceLabel || options.source || "来源待确认";
+    const runtimeTone: TrustTone = options.action.kind === "use" ? "safe" : options.action.kind === "enable" ? "accent" : "warning";
+    const showStabilityBadge = shouldShowPackStatusBadge(manifest.status, advancedVisible);
+    const showUsabilityChip = advancedVisible || usability.kind === "experimental";
+    const visibleLabels = labels.slice(0, advancedVisible ? labels.length : 2);
 
     return (
-      <Card key={options.key} className="section-card p-4 hover-lift">
-        <div className="flex items-start justify-between gap-3 mb-3">
-          <div className="min-w-0 flex-1">
+      <Card
+        key={options.key}
+        className="section-card pack-card hover-lift transition-all duration-300"
+        style={{
+          background: "var(--yunque-surface-1)",
+          border: "1px solid var(--glass-edge)",
+          borderRadius: "1.25rem",
+          overflow: "hidden"
+        }}
+      >
+        <Card.Header className="flex flex-row gap-4 items-start p-5 pb-3">
+          <div
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl"
+            style={{
+              background: "var(--yunque-bg-muted)",
+              border: "1px solid var(--glass-edge)"
+            }}
+          >
+            <PackageCheck size={24} style={{ color: "var(--yunque-accent)" }} />
+          </div>
+          <div className="flex flex-1 flex-col gap-1.5">
             <div className="flex items-center gap-2 flex-wrap">
-              <PackageCheck size={16} style={{ color: "var(--yunque-accent)" }} />
-              <span className="font-semibold text-sm" style={{ color: "var(--yunque-text)" }}>{manifest.name}</span>
-              <Chip size="sm" style={{ background: badge.bg, color: badge.color }}>{badge.label}</Chip>
-              <Chip size="sm" style={{ background: "rgba(59,130,246,0.08)", color: "var(--yunque-primary)" }}>{usability.label}</Chip>
-              <Chip size="sm" style={{
-                background: risk.level === "high" ? "rgba(239,68,68,0.12)" : risk.level === "medium" ? "rgba(245,158,11,0.12)" : "rgba(34,197,94,0.10)",
-                color: risk.level === "high" ? "var(--yunque-danger)" : risk.level === "medium" ? "var(--yunque-warning)" : "var(--yunque-success)",
-              }}>
-                {risk.label}
-              </Chip>
-              <Chip size="sm" style={{
-                background: readiness.level === "complete" ? "rgba(34,197,94,0.10)" : readiness.level === "needs_context" ? "rgba(245,158,11,0.12)" : "rgba(239,68,68,0.10)",
-                color: readiness.level === "complete" ? "var(--yunque-success)" : readiness.level === "needs_context" ? "var(--yunque-warning)" : "var(--yunque-danger)",
-              }}>
-                {readiness.label}
-              </Chip>
-              <Chip size="sm" style={{ background: deliveryStyle.background, color: deliveryStyle.color }}>
-                {delivery.label}
-              </Chip>
+              <Card.Title className="text-base font-semibold tracking-tight" style={{ color: "var(--yunque-text)" }}>
+                {manifest.name}
+              </Card.Title>
+              {showStabilityBadge && (
+                <Chip size="sm" variant="soft" color={badge.chip}>
+                  {badge.label}
+                </Chip>
+              )}
+              {showUsabilityChip && (
+                <Chip size="sm" variant="soft" color="accent">
+                  {usability.label}
+                </Chip>
+              )}
+              {risk.requiresAuthorization && (
+                <Chip size="sm" variant="soft" color="danger">
+                  需要授权
+                </Chip>
+              )}
             </div>
             {manifest.description && (
-              <div className="text-xs mt-2" style={{ color: "var(--yunque-text-secondary)" }}>{manifest.description}</div>
+              <Card.Description className="text-sm leading-relaxed line-clamp-2" style={{ color: "var(--yunque-text-secondary)" }}>
+                {manifest.description}
+              </Card.Description>
             )}
-            <div className="text-xs mt-2 font-medium" style={{ color: risk.requiresAuthorization ? "var(--yunque-warning)" : "var(--yunque-text-muted)" }}>
-              {permissionSummary}
-            </div>
           </div>
-          <Button
-            size="sm"
-            className={options.action.kind === "install" || options.action.kind === "update" || options.action.kind === "enable" ? "btn-accent" : undefined}
-            variant={options.action.kind === "use" ? "outline" : undefined}
-            isDisabled={disabled}
-            onPress={options.onInstall}
-          >
-            {options.action.kind === "enable" ? <Power size={14} /> : <Download size={14} />} {options.action.label}
-          </Button>
-        </div>
+        </Card.Header>
 
-        {examples.length > 0 && (
-          <div className="mb-3 space-y-1">
-            {examples.map((example) => (
-              <div key={example} className="flex items-start gap-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
-                <span style={{ color: "var(--yunque-accent)" }}>•</span>
-                <span>{example}</span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <div className="flex flex-wrap gap-1.5 mb-3">
-          {labels.map((label) => (
-            <Chip key={label} size="sm" style={{ background: "rgba(59,130,246,0.08)", color: "var(--yunque-primary)" }}>{label}</Chip>
-          ))}
-          {primaryPath && (
-            <Chip size="sm" style={{ background: "rgba(255,255,255,0.05)", color: "var(--yunque-text-muted)" }}>
-              入口 {primaryPath}
-            </Chip>
-          )}
-        </div>
-
-        <div className="text-xs mb-3" style={{ color: "var(--yunque-text-muted)" }}>
-          {usability.description}
-          {usability.limitation ? ` 当前限制：${usability.limitation}` : ""}
-        </div>
-
-        {showAdvanced && (
-          <>
-        <div className="mb-3 rounded-md border p-3" style={{ borderColor: deliveryStyle.borderColor, background: deliveryStyle.background }}>
-          <div className="mb-1 text-xs font-medium" style={{ color: deliveryStyle.color }}>交付状态：{delivery.label}</div>
-          <div className="text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>{delivery.description}</div>
-          <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>下一步：{delivery.nextStep}</div>
-        </div>
-
-        {usageLines.length > 0 && (
-          <div className="mb-3 rounded-md p-3" style={{ background: "var(--yunque-bg-hover)", border: "1px solid var(--yunque-border)" }}>
-            <div className="mb-2 text-xs font-medium" style={{ color: "var(--yunque-text)" }}>怎么用它</div>
-            <div className="space-y-1">
-              {usageLines.map((line) => (
-                <div key={line} className="flex items-start gap-2 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
-                  <span style={{ color: "var(--yunque-accent)" }}>•</span>
-                  <span>{line}</span>
-                </div>
+        <Card.Content className="px-5 py-2">
+          <div className="flex items-center justify-between">
+            <div className="flex flex-wrap gap-1.5">
+              {visibleLabels.map((label) => (
+                <Chip key={label} size="sm" variant="soft">
+                  {label}
+                </Chip>
               ))}
             </div>
-          </div>
-        )}
+            <Button
+              size="sm"
 
-        <div className="mb-3 rounded-md p-3" style={{ background: "rgba(34,197,94,0.05)", border: "1px solid rgba(34,197,94,0.14)" }}>
-          <div className="mb-2 text-xs font-medium" style={{ color: "var(--yunque-text)" }}>怎么判断有用</div>
-          <div className="space-y-1">
-            {verificationSteps.map((step) => (
-              <div key={step.key} className="flex items-start gap-2 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
-                <span style={{ color: "var(--yunque-success)" }}>•</span>
-                <span>{step.label}：{step.detail}</span>
-              </div>
-            ))}
+              className="px-4 font-medium"
+              style={{
+                background: options.action.kind === "install" || options.action.kind === "update" || options.action.kind === "enable" ? "var(--yunque-text)" : "transparent",
+                color: options.action.kind === "install" || options.action.kind === "update" || options.action.kind === "enable" ? "var(--yunque-bg)" : "var(--yunque-text)",
+                border: options.action.kind === "use" ? "1px solid var(--yunque-border)" : "none"
+              }}
+              isDisabled={disabled}
+              onPress={options.onInstall}
+            >
+              {options.action.kind === "enable" ? <Power size={14} /> : <Download size={14} />} {options.action.label}
+            </Button>
           </div>
-        </div>
+          <PackTrustStrip
+            source={sourceSummary}
+            showSourceHint={advancedVisible}
+            runtime={options.action.kind === "use" ? "已可用" : options.action.label}
+            runtimeTone={runtimeTone}
+            risk={risk}
+            delivery={delivery}
+            readiness={readiness}
+          />
+        </Card.Content>
 
-        {readiness.missing.length > 0 && (
-          <div className="mb-3 rounded-md p-3 text-xs" style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.18)", color: "var(--yunque-text-secondary)" }}>
-            可用性体检：还缺 {readiness.missing.join("、")}。可以交给小羽打磨用途、入口或使用说明。
-          </div>
-        )}
-
-        {(options.sourceLabel || options.source) && (
-          <div className="mb-3 rounded-md p-3 text-xs" style={{ background: "var(--yunque-bg-hover)", border: "1px solid var(--yunque-border)", color: "var(--yunque-text-secondary)" }}>
-            <div className="font-medium" style={{ color: "var(--yunque-text)" }}>来源：{options.sourceLabel || options.source}</div>
-            {options.sourceDetail && (
-              <div className="mt-1 break-all font-mono text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>{options.sourceDetail}</div>
-            )}
-            {options.sha256 && (
-              <div className="mt-1 break-all font-mono text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>SHA256 {options.sha256}</div>
-            )}
-            <div className="mt-2 text-[11px] leading-4" style={{ color: "var(--yunque-text-muted)" }}>
-              安装前可先进工坊只读检查；若 SHA、签名或声明异常，保持未启用并换源或让小羽打磨后重新打包。
-            </div>
-          </div>
-        )}
-
-        {permissionGroups.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mb-3">
-            {permissionGroups.slice(0, 4).map((group) => (
-              <Chip key={group.key} size="sm" style={{ background: "rgba(245,158,11,0.10)", color: "var(--yunque-warning)" }}>
-                {group.label}
-              </Chip>
-            ))}
-            {permissionGroups.length > 4 && <Chip size="sm" variant="soft">+{permissionGroups.length - 4}</Chip>}
-          </div>
-        )}
-
-        <div className="mb-3 rounded-md p-3" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid var(--yunque-border)" }}>
-          <div className="mb-2 text-xs font-medium" style={{ color: "var(--yunque-text)" }}>安装前看这几点</div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {installChecklist.map((item) => {
-              const style = checklistToneStyle(item.tone);
-              return (
-                <div
-                  key={item.key}
-                  className="rounded-md border p-2"
-                  style={{ borderColor: style.borderColor, background: style.background }}
+        <Card.Footer className="px-5 pb-4 pt-0">
+            <div className="w-full">
+              {advancedVisible && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="w-full justify-between mt-3 bg-white/5 border border-white/5"
+                  aria-expanded={expandedInstallableCards.has(options.key)}
+                  onPress={() => toggleInstallableDetails(options.key)}
                 >
-                  <div className="text-xs font-medium" style={{ color: style.color }}>{item.label}</div>
-                  <div className="mt-1 text-[11px] leading-4" style={{ color: "var(--yunque-text-muted)" }}>{item.detail}</div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-          </>
-        )}
+                  {expandedInstallableCards.has(options.key) ? "收起详情" : "展开详情"}
+                  {expandedInstallableCards.has(options.key) ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                </Button>
+              )}
+              <div hidden={!advancedVisible || !expandedInstallableCards.has(options.key)} className="mt-3 space-y-3">
+                  <div className="pl-1 text-xs space-y-1.5" style={{ color: "var(--yunque-text-muted)" }}>
+                      {(options.sourceLabel || options.source) && <div>来源：{options.sourceLabel || options.source}</div>}
+                      {options.sourceDetail && <div>{options.sourceDetail}</div>}
+                      {options.sha256 && <div>SHA256 {options.sha256}</div>}
+                      {options.size && <div>大小：{options.size}</div>}
+                      {permissionSummary && <div>{permissionSummary}</div>}
+                  </div>
+                  <div className="rounded-xl border p-3" style={{ borderColor: deliveryStyle.borderColor, background: deliveryStyle.background }}>
+                    <div className="mb-1 flex flex-wrap items-center gap-2 text-sm font-medium" style={{ color: deliveryStyle.color }}>
+                      <span>交付状态：{delivery.label}</span>
+                      <Chip size="sm" color={readiness.level === "complete" ? "success" : readiness.level === "needs_context" ? "warning" : "danger"}>
+                        {readiness.label}
+                      </Chip>
+                    </div>
+                    <div className="text-sm leading-relaxed" style={{ color: "var(--yunque-text-secondary)" }}>{delivery.description}</div>
+                    <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>下一步：{delivery.nextStep}</div>
+                  </div>
 
-        <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>
-          v{manifest.version}
-          {options.size ? ` · ${options.size}` : ""}
-          {options.source ? ` · ${options.source}` : ""}
-        </div>
-        <div className="flex items-center gap-2 mt-3">
-          <Link href={`/packs/detail?id=${encodeURIComponent(manifest.id)}`}>
-            <Button size="sm" variant="ghost">查看详情 <ArrowRight size={14} /></Button>
-          </Link>
-          {showAdvanced && (
-            <Link href={packStudioHref(manifest, { packageUrl: options.packageUrl, sha256: options.sha256 })}>
-              <Button size="sm" variant="ghost">小羽优化 <Wrench size={14} /></Button>
-            </Link>
-          )}
-          {primaryPath && (
-            <Link href={primaryPath}>
-              <Button size="sm" variant="ghost">{usability.primaryActionLabel || "打开入口"} <ExternalLink size={14} /></Button>
-            </Link>
-          )}
-          {risk.requiresAuthorization && (
-            <span className="text-xs" style={{ color: "var(--yunque-warning)" }}>启用前建议确认授权</span>
-          )}
-        </div>
+                  {usageLines.length > 0 && (
+                    <div className="rounded-xl p-3" style={{ background: "var(--yunque-surface-2)", border: "1px solid var(--yunque-border)" }}>
+                      <div className="mb-2 text-sm font-medium" style={{ color: "var(--yunque-text)" }}>如何使用</div>
+                      <ul className="space-y-1.5">
+                        {usageLines.map((line) => (
+                          <li key={line} className="flex items-start gap-2 text-sm leading-relaxed" style={{ color: "var(--yunque-text-secondary)" }}>
+                            <span style={{ color: "var(--yunque-accent)" }}>•</span>
+                            <span>{line}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {installChecklist.length > 0 && (
+                    <div className="rounded-xl p-3" style={{ background: "var(--yunque-bg-muted)", border: "1px solid var(--yunque-border)" }}>
+                      <div className="mb-3 text-sm font-medium" style={{ color: "var(--yunque-text)" }}>安装前看这几点</div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {installChecklist.map((item) => {
+                          const style = checklistToneStyle(item.tone);
+                          return (
+                            <div key={item.key} className="rounded-lg border p-3" style={{ borderColor: style.borderColor, background: style.background }}>
+                              <div className="text-sm font-medium" style={{ color: style.color }}>{item.label}</div>
+                              <div className="mt-1 text-xs leading-relaxed" style={{ color: "var(--yunque-text-muted)" }}>{item.detail}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="text-xs space-y-1.5" style={{ color: "var(--yunque-text-muted)" }}>
+                    {usability.description && <div>{usability.description}</div>}
+                    {usability.limitation && <div>当前限制：{usability.limitation}</div>}
+                    {primaryPath && <div>默认入口：{primaryPath}</div>}
+                    {permissionSummary && <div>权限提示：{permissionSummary}</div>}
+                    <div className="pt-2 flex items-center gap-2 border-t border-white/5">
+                      <Link href={`/packs/detail?id=${encodeURIComponent(manifest.id)}`}>
+                        <Button size="sm" variant="ghost">查看详情 <ArrowRight size={14} /></Button>
+                      </Link>
+                      <Link href={packStudioHref(manifest, { packageUrl: options.packageUrl, sha256: options.sha256 })}>
+                        <Button size="sm" variant="ghost">小羽优化 <Wrench size={14} /></Button>
+                      </Link>
+                    </div>
+                  </div>
+              </div>
+            </div>
+          </Card.Footer>
       </Card>
     );
   }
@@ -2264,191 +2706,222 @@ export default function PacksPageOptimized() {
         ? "可固定到侧栏，之后从侧栏或命令菜单直接打开。"
         : "启用后可固定到侧栏，减少下次寻找成本。"
       : "没有独立侧栏入口，通常在 Chat、任务或其他能力里自动生效。";
+    const sourceSummary = pack.status === "enabled" ? "已安装 · 已启用" : "已安装";
+    const runtimeTone: TrustTone = pack.status === "enabled" ? "safe" : pack.status === "disabled" ? "neutral" : "warning";
+    const detailsExpanded = expandedInstalledCards.has(manifest.id);
+    const detailsId = `installed-pack-details-${manifest.id}`;
+    const showStabilityBadge = shouldShowPackStatusBadge(manifest.status, advancedVisible);
+    const showUsabilityChip = advancedVisible || usability.kind === "experimental";
+    const visibleLabels = labels.slice(0, advancedVisible ? labels.length : 2);
 
     return (
-      <Card key={manifest.id} className="section-card p-4 hover-lift">
+      <Card
+        key={manifest.id}
+        className="section-card pack-card hover-lift transition-all duration-300"
+        style={{
+          background: "var(--yunque-surface-1)",
+          border: "1px solid var(--glass-edge)",
+          borderRadius: "1.25rem",
+          overflow: "hidden",
+          opacity: pack.status === "disabled" ? 0.8 : 1
+        }}
+      >
         <Link href={`/packs/detail?id=${encodeURIComponent(manifest.id)}`} className="block cursor-pointer">
-          <div className="flex items-start justify-between gap-3 mb-3">
-            <div className="min-w-0 flex-1">
+          <Card.Header className="flex flex-row gap-4 items-start p-5 pb-3">
+            <div
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl"
+              style={{
+                background: "var(--yunque-bg-muted)",
+                border: "1px solid var(--glass-edge)",
+                filter: pack.status === "disabled" ? "grayscale(100%) opacity(50%)" : "none"
+              }}
+            >
+              <PackageCheck size={24} style={{ color: pack.status === "disabled" ? "var(--yunque-text-muted)" : "var(--yunque-accent)" }} />
+            </div>
+            <div className="flex flex-1 flex-col gap-1.5">
               <div className="flex items-center gap-2 flex-wrap">
-                <PackageCheck size={16} style={{ color: "var(--yunque-accent)" }} />
-                <span className="font-semibold text-sm" style={{ color: "var(--yunque-text)" }}>{manifest.name}</span>
-                <Chip size="sm" style={{ background: tone.bg, color: tone.color }}>{tone.label}</Chip>
-                <Chip size="sm" style={{ background: badge.bg, color: badge.color }}>{badge.label}</Chip>
-                <Chip size="sm" style={{ background: "rgba(59,130,246,0.08)", color: "var(--yunque-primary)" }}>{usability.label}</Chip>
-                <Chip size="sm" style={{
-                  background: risk.level === "high" ? "rgba(239,68,68,0.12)" : risk.level === "medium" ? "rgba(245,158,11,0.12)" : "rgba(34,197,94,0.10)",
-                  color: risk.level === "high" ? "var(--yunque-danger)" : risk.level === "medium" ? "var(--yunque-warning)" : "var(--yunque-success)",
-                }}>
-                  {risk.label}
-                </Chip>
-                <Chip size="sm" style={{
-                  background: readiness.level === "complete" ? "rgba(34,197,94,0.10)" : readiness.level === "needs_context" ? "rgba(245,158,11,0.12)" : "rgba(239,68,68,0.10)",
-                  color: readiness.level === "complete" ? "var(--yunque-success)" : readiness.level === "needs_context" ? "var(--yunque-warning)" : "var(--yunque-danger)",
-                }}>
-                  {readiness.label}
-                </Chip>
-                <Chip size="sm" style={{ background: deliveryStyle.background, color: deliveryStyle.color }}>
-                  {delivery.label}
-                </Chip>
+                <Card.Title className="text-base font-semibold tracking-tight" style={{ color: "var(--yunque-text)" }}>
+                  {manifest.name}
+                </Card.Title>
+                <Chip size="sm" variant="soft" color={tone.chip}>{tone.label}</Chip>
+                {showStabilityBadge && (
+                  <Chip size="sm" variant="soft" color={badge.chip}>{badge.label}</Chip>
+                )}
+                {showUsabilityChip && (
+                  <Chip size="sm" variant="soft" color="accent">{usability.label}</Chip>
+                )}
+                {risk.requiresAuthorization && (
+                  <Chip size="sm" variant="soft" color="danger">
+                    需要授权
+                  </Chip>
+                )}
               </div>
-              <div className="text-xs mt-1 font-mono" style={{ color: "var(--yunque-text-muted)" }}>{manifest.id}</div>
+              {advancedVisible && <div className="text-[10px] mt-0.5 font-mono" style={{ color: "var(--yunque-text-muted)" }}>{manifest.id}</div>}
               {manifest.description && (
-                <div className="text-xs mt-2" style={{ color: "var(--yunque-text-secondary)" }}>{manifest.description}</div>
+                <Card.Description className="text-sm leading-relaxed line-clamp-2" style={{ color: "var(--yunque-text-secondary)" }}>
+                  {manifest.description}
+                </Card.Description>
               )}
-              <div className="text-xs mt-2 font-medium" style={{ color: risk.requiresAuthorization ? "var(--yunque-warning)" : "var(--yunque-text-muted)" }}>
-                {permissionSummary}
-              </div>
             </div>
-          </div>
+          </Card.Header>
 
-          {examples.length > 0 && (
-            <div className="mb-3 space-y-1">
-              {examples.map((example) => (
-                <div key={example} className="flex items-start gap-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
-                  <span style={{ color: "var(--yunque-accent)" }}>•</span>
-                  <span>{example}</span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="flex flex-wrap gap-1.5 mb-3">
-            {labels.map((label) => (
-              <Chip key={label} size="sm" style={{ background: "rgba(59,130,246,0.08)", color: "var(--yunque-primary)" }}>{label}</Chip>
-            ))}
-            {openPath && (
-              <Chip size="sm" style={{ background: "rgba(255,255,255,0.05)", color: "var(--yunque-text-muted)" }}>
-                入口 {openPath}
-              </Chip>
-            )}
-          </div>
-
-          <div className="text-xs mb-3" style={{ color: "var(--yunque-text-muted)" }}>
-            {usability.description}
-            {usability.limitation ? ` 当前限制：${usability.limitation}` : ""}
-          </div>
-
-          {showAdvanced && (
-            <>
-          <div className="mb-3 rounded-md border p-3" style={{ borderColor: deliveryStyle.borderColor, background: deliveryStyle.background }}>
-            <div className="mb-1 text-xs font-medium" style={{ color: deliveryStyle.color }}>交付状态：{delivery.label}</div>
-            <div className="text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>{delivery.description}</div>
-            <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>下一步：{delivery.nextStep}</div>
-          </div>
-
-          {usageLines.length > 0 && (
-            <div className="mb-3 rounded-md p-3" style={{ background: "var(--yunque-bg-hover)", border: "1px solid var(--yunque-border)" }}>
-              <div className="mb-2 text-xs font-medium" style={{ color: "var(--yunque-text)" }}>怎么用它</div>
-              <div className="space-y-1">
-                {usageLines.map((line) => (
-                  <div key={line} className="flex items-start gap-2 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
-                    <span style={{ color: "var(--yunque-accent)" }}>•</span>
-                    <span>{line}</span>
-                  </div>
+          <Card.Content className="px-5 py-2">
+            <div className="flex items-center justify-between">
+              <div className="flex flex-wrap gap-1.5">
+                {visibleLabels.map((label) => (
+                  <Chip key={label} size="sm" variant="soft">
+                    {label}
+                  </Chip>
                 ))}
+                {advancedVisible && openPath && (
+                  <Chip size="sm" variant="soft">
+                    入口 {openPath}
+                  </Chip>
+                )}
               </div>
             </div>
-          )}
-
-          <div className="mb-3 rounded-md p-3" style={{ background: "rgba(34,197,94,0.05)", border: "1px solid rgba(34,197,94,0.14)" }}>
-            <div className="mb-2 text-xs font-medium" style={{ color: "var(--yunque-text)" }}>怎么判断有用</div>
-            <div className="space-y-1">
-              {verificationSteps.map((step) => (
-                <div key={step.key} className="flex items-start gap-2 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
-                  <span style={{ color: "var(--yunque-success)" }}>•</span>
-                  <span>{step.label}：{step.detail}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="mb-3 rounded-md p-3" style={{ background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.14)" }}>
-            <div className="mb-2 text-xs font-medium" style={{ color: "var(--yunque-text)" }}>启用后去哪用</div>
-            <div className="space-y-1">
-              <div className="flex items-start gap-2 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
-                <span style={{ color: "var(--yunque-primary)" }}>•</span>
-                <span>主入口：{entryHint}</span>
-              </div>
-              <div className="flex items-start gap-2 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
-                <span style={{ color: "var(--yunque-primary)" }}>•</span>
-                <span>固定方式：{pinHint}</span>
-              </div>
-              <div className="flex items-start gap-2 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
-                <span style={{ color: "var(--yunque-primary)" }}>•</span>
-                <span>想继续打磨：进详情确认权限，或交给小羽优化用途、入口和示例。</span>
-              </div>
-            </div>
-          </div>
-
-          {readiness.missing.length > 0 && (
-            <div className="mb-3 rounded-md p-3 text-xs" style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.18)", color: "var(--yunque-text-secondary)" }}>
-              可用性体检：还缺 {readiness.missing.join("、")}。可以交给小羽打磨用途、入口或使用说明。
-            </div>
-          )}
-
-          {permissionGroups.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mb-3">
-              {permissionGroups.slice(0, 4).map((group) => (
-                <Chip key={group.key} size="sm" style={{ background: "rgba(245,158,11,0.10)", color: "var(--yunque-warning)" }}>
-                  {group.label}
-                </Chip>
-              ))}
-              {permissionGroups.length > 4 && <Chip size="sm" variant="soft">+{permissionGroups.length - 4}</Chip>}
-            </div>
-          )}
-            </>
-          )}
+            <PackTrustStrip
+              source={sourceSummary}
+              showSourceFact={advancedVisible}
+              showSourceHint={advancedVisible}
+              runtime={tone.label}
+              runtimeTone={runtimeTone}
+              risk={risk}
+              delivery={delivery}
+              readiness={readiness}
+            />
+          </Card.Content>
         </Link>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          {pack.status === "enabled" ? (
-            <Button size="sm" variant="outline" isDisabled={busy === `disable:${manifest.id}`} onPress={() => disable(manifest.id)}>
-              <PackageX size={14} /> 禁用
-            </Button>
-          ) : (
-            <Button size="sm" className="btn-accent" isDisabled={busy === `enable:${manifest.id}`} onPress={() => enable(manifest.id)}>
-              <Power size={14} /> 启用
-            </Button>
-          )}
-          {pack.status === "enabled" && openPath && (
-            <Link href={openPath}>
-              <Button size="sm" variant="ghost">
-                <ExternalLink size={14} /> {usability.primaryActionLabel || "打开"}
+        {advancedVisible && (
+          <Card.Footer className="px-5 pb-4 pt-0">
+            <div className="mt-3 w-full space-y-3">
+              <Button
+                size="sm"
+                variant="ghost"
+                className="w-full justify-between bg-white/5 border border-white/5"
+                aria-controls={detailsId}
+                aria-expanded={detailsExpanded}
+                onPress={() => toggleInstalledDetails(manifest.id)}
+              >
+                {detailsExpanded ? "收起详情" : "展开详情"}
+                {detailsExpanded ? <ChevronUp size={14} aria-hidden={true} /> : <ChevronDown size={14} aria-hidden={true} />}
               </Button>
-            </Link>
-          )}
-          {manifest.update?.rollback && pack.previousVersion && (
-            <Button size="sm" variant="ghost" isDisabled={busy === `rollback:${manifest.id}`} onPress={() => rollback(manifest.id)}>
-              <RotateCcw size={14} /> 回滚
-            </Button>
-          )}
-          {pack.status === "enabled" && navItems.length > 0 && (
-            <Button size="sm" variant="ghost" onPress={() => togglePackPinned(pack)}>
-              {isPackPinned(pack) ? <PinOff size={14} /> : <Pin size={14} />}
-              {isPackPinned(pack) ? "取消侧栏" : "固定侧栏"}
-            </Button>
-          )}
-          {showAdvanced && (
-            <Link href={packStudioHref(manifest)}>
-              <Button size="sm" variant="ghost">
-                <Wrench size={14} /> 小羽优化
-              </Button>
-            </Link>
-          )}
-          <Link href={`/packs/detail?id=${encodeURIComponent(manifest.id)}`} className="ml-auto">
-            <Button size="sm" variant="ghost">详情 <ArrowRight size={14} /></Button>
-          </Link>
-        </div>
+              <div id={detailsId} hidden={!detailsExpanded} className="space-y-3">
+                <div className="rounded-xl border p-3" style={{ borderColor: deliveryStyle.borderColor, background: deliveryStyle.background }}>
+                    <div className="mb-1 text-sm font-medium" style={{ color: deliveryStyle.color }}>交付状态：{delivery.label}</div>
+                    <div className="text-sm leading-relaxed" style={{ color: "var(--yunque-text-secondary)" }}>{delivery.description}</div>
+                    <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>下一步：{delivery.nextStep}</div>
+                </div>
+                {readiness.missing.length > 0 && (
+                  <div className="rounded-xl border p-3 text-sm leading-relaxed" style={{ borderColor: "var(--yunque-warning-border)", background: "var(--yunque-warning-soft)", color: "var(--yunque-text-secondary)" }}>
+                    可用性体检：还缺 {readiness.missing.join("、")}。可以交给小羽打磨用途、入口或使用说明。
+                  </div>
+                )}
 
-        {showAdvanced && (
-          <div className="mt-3 pt-3 border-t text-xs space-y-1" style={{ borderColor: "var(--yunque-border)", color: "var(--yunque-text-muted)" }}>
-            <div>版本：v{manifest.version}</div>
-            <div>更新时间：{formatTime(pack.updatedAt)}</div>
-            {pack.previousVersion && <div>上一版本：{pack.previousVersion}</div>}
-            {(manifest.backend?.capabilities?.length ?? 0) > 0 && <div>能力：{manifest.backend?.capabilities?.join(", ")}</div>}
-          </div>
+                {usageLines.length > 0 && (
+                  <div className="rounded-xl p-3" style={{ background: "var(--yunque-surface-2)", border: "1px solid var(--yunque-border)" }}>
+                    <div className="mb-2 text-sm font-medium" style={{ color: "var(--yunque-text)" }}>如何使用</div>
+                    <ul className="space-y-1.5">
+                      {usageLines.map((line) => (
+                        <li key={line} className="flex items-start gap-2 text-sm leading-relaxed" style={{ color: "var(--yunque-text-secondary)" }}>
+                          <span style={{ color: "var(--yunque-accent)" }}>•</span>
+                          <span>{line}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                <div className="rounded-xl p-3" style={{ background: "var(--yunque-success-soft)", border: "1px solid var(--yunque-success-border)" }}>
+                  <div className="mb-2 text-sm font-medium" style={{ color: "var(--yunque-text)" }}>怎么判断有用</div>
+                  <ul className="space-y-1.5">
+                    {verificationSteps.map((step) => (
+                      <li key={step.key} className="flex items-start gap-2 text-sm leading-relaxed" style={{ color: "var(--yunque-text-secondary)" }}>
+                        <span style={{ color: "var(--yunque-success)" }}>•</span>
+                        <span>{step.label}：{step.detail}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="rounded-xl p-3" style={{ background: "var(--yunque-accent-soft)", border: "1px solid var(--yunque-accent-border)" }}>
+                  <div className="mb-2 text-sm font-medium" style={{ color: "var(--yunque-text)" }}>启用后去哪用</div>
+                  <ul className="space-y-1.5">
+                    <li className="flex items-start gap-2 text-sm leading-relaxed" style={{ color: "var(--yunque-text-secondary)" }}>
+                      <span style={{ color: "var(--yunque-primary)" }}>•</span>
+                      <span>主入口：{entryHint}</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-sm leading-relaxed" style={{ color: "var(--yunque-text-secondary)" }}>
+                      <span style={{ color: "var(--yunque-primary)" }}>•</span>
+                      <span>固定方式：{pinHint}</span>
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="text-xs space-y-1.5" style={{ color: "var(--yunque-text-muted)" }}>
+                  {usability.description && <div>{usability.description}</div>}
+                  {usability.limitation && <div>当前限制：{usability.limitation}</div>}
+                  {permissionSummary && <div>权限提示：{permissionSummary}</div>}
+                  <div className="pt-2 flex items-center gap-2 border-t border-white/5">
+                    <Link href={packStudioHref(manifest)}>
+                      <Button size="sm" variant="ghost">小羽优化 <Wrench size={14} /></Button>
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Card.Footer>
         )}
+
+        <div className="px-5 py-4 border-t" style={{ borderColor: "var(--glass-edge)", background: "rgba(0,0,0,0.1)" }}>
+          <div className="flex items-center gap-2 flex-wrap">
+            {pack.status === "enabled" ? (
+              <Button size="sm" variant="outline" className="px-4" isDisabled={busy === `disable:${manifest.id}`} onPress={() => disable(manifest.id)}>
+                <PackageX size={14} /> 禁用
+              </Button>
+            ) : (
+              <Button size="sm" className="px-4" style={{ background: "var(--yunque-text)", color: "var(--yunque-bg)" }} isDisabled={busy === `enable:${manifest.id}`} onPress={() => enable(manifest.id)}>
+                <Power size={14} /> 启用
+              </Button>
+            )}
+            {pack.status === "enabled" && openPath && (
+              <Link href={openPath}>
+                <Button size="sm" variant="ghost">
+                  <ExternalLink size={14} /> {usability.primaryActionLabel || "打开"}
+                </Button>
+              </Link>
+            )}
+            {manifest.update?.rollback && pack.previousVersion && (
+              <Button size="sm" variant="ghost" isDisabled={busy === `rollback:${manifest.id}`} onPress={() => rollback(manifest.id)}>
+                <RotateCcw size={14} /> 回滚
+              </Button>
+            )}
+            {pack.status === "enabled" && navItems.length > 0 && (
+              <Button size="sm" variant="ghost" onPress={() => togglePackPinned(pack)}>
+                {isPackPinned(pack) ? <PinOff size={14} /> : <Pin size={14} />}
+                {isPackPinned(pack) ? "取消固定" : "固定侧栏"}
+              </Button>
+            )}
+            {advancedVisible && (
+              <Link href={packStudioHref(manifest)}>
+                <Button size="sm" variant="ghost">
+                  <Wrench size={14} /> 优化
+                </Button>
+              </Link>
+            )}
+            <div className="ml-auto flex items-center gap-3">
+              {advancedVisible && (
+                <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+                  v{manifest.version}
+                </div>
+              )}
+              <Link href={`/packs/detail?id=${encodeURIComponent(manifest.id)}`}>
+                <Button size="sm" variant="ghost" className="px-3">详情 <ArrowRight size={14} /></Button>
+              </Link>
+            </div>
+          </div>
+        </div>
       </Card>
     );
   }
