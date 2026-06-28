@@ -3,6 +3,7 @@ package gateway
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -27,6 +28,18 @@ type packActionRequest struct {
 type packBatchActionRequest struct {
 	IDs []string `json:"ids"`
 }
+
+// corePackIDs are always-on governance packs that own critical control-plane
+// surfaces (provider/model config, audit, trust). Disabling them silently
+// breaks the settings UI (e.g. /api/providers stops responding), so the
+// disable path refuses them. Enable/rollback are unaffected.
+var corePackIDs = map[string]bool{
+	"yunque.pack.control-plane": true,
+	"yunque.pack.cogni-kernel":  true,
+}
+
+// errCorePackProtected is returned when a disable targets a core pack.
+var errCorePackProtected = errors.New("这是常开核心包，禁用会影响模型配置与治理功能，不能被禁用")
 
 type packInstallRequest struct {
 	ManifestPath string `json:"manifest_path"`
@@ -2182,6 +2195,9 @@ func (g *Gateway) handlePackEnable(w http.ResponseWriter, r *http.Request) {
 
 func (g *Gateway) handlePackDisable(w http.ResponseWriter, r *http.Request) {
 	g.handlePackMutation(w, r, func(registry *packruntime.Registry, id string) (packruntime.InstalledPack, error) {
+		if corePackIDs[id] {
+			return packruntime.InstalledPack{}, errCorePackProtected
+		}
 		return registry.Disable(id)
 	})
 }
@@ -2240,6 +2256,9 @@ func (g *Gateway) handlePackBatchEnable(w http.ResponseWriter, r *http.Request) 
 
 func (g *Gateway) handlePackBatchDisable(w http.ResponseWriter, r *http.Request) {
 	g.handlePackBatchMutation(w, r, func(registry *packruntime.Registry, id string) (packruntime.InstalledPack, error) {
+		if corePackIDs[id] {
+			return packruntime.InstalledPack{}, errCorePackProtected
+		}
 		return registry.Disable(id)
 	})
 }

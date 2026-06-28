@@ -1937,6 +1937,29 @@ func TestPackRoutesTogglePackStatus(t *testing.T) {
 	}
 }
 
+func TestPackRoutesRefuseDisablingCorePack(t *testing.T) {
+	registry, err := packruntime.NewRegistry(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewRegistry: %v", err)
+	}
+	if _, err := registry.Install(packruntime.Manifest{ID: "yunque.pack.control-plane", Name: "Control Plane", Version: "0.1.0", Optional: true, DefaultState: "enabled"}, "test"); err != nil {
+		t.Fatalf("Install: %v", err)
+	}
+	gw := NewFromConfig(GatewayConfig{Packs: registry})
+
+	body := bytes.NewBufferString(`{"id":"yunque.pack.control-plane"}`)
+	req := httptest.NewRequest(http.MethodPost, "/v1/packs/disable", body)
+	req = req.WithContext(ctxWithTenant(req.Context(), "t1"))
+	w := httptest.NewRecorder()
+	gw.handlePackDisable(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected core pack disable to be refused (400), got %d body=%s", w.Code, w.Body.String())
+	}
+	if pack, ok := registry.Get("yunque.pack.control-plane"); !ok || pack.Status != packruntime.PackStatusEnabled {
+		t.Fatalf("core pack must stay enabled after refused disable, got %#v", pack)
+	}
+}
+
 func TestPackRoutesBatchTogglePackStatus(t *testing.T) {
 	registry, err := packruntime.NewRegistry(t.TempDir())
 	if err != nil {
