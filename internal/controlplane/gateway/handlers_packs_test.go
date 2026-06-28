@@ -1937,6 +1937,48 @@ func TestPackRoutesTogglePackStatus(t *testing.T) {
 	}
 }
 
+func TestPackRoutesBatchTogglePackStatus(t *testing.T) {
+	registry, err := packruntime.NewRegistry(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewRegistry: %v", err)
+	}
+	for _, id := range []string{"yunque.pack.a", "yunque.pack.b"} {
+		if _, err := registry.Install(packruntime.Manifest{ID: id, Name: id, Version: "0.1.0", Optional: true, DefaultState: "enabled"}, "test"); err != nil {
+			t.Fatalf("Install %s: %v", id, err)
+		}
+	}
+	gw := NewFromConfig(GatewayConfig{Packs: registry})
+
+	// Batch disable two real ids + one missing id; expect partial success.
+	body := bytes.NewBufferString(`{"ids":["yunque.pack.a","yunque.pack.b","yunque.pack.missing"]}`)
+	req := httptest.NewRequest(http.MethodPost, "/v1/packs/batch-disable", body)
+	req = req.WithContext(ctxWithTenant(req.Context(), "t1"))
+	w := httptest.NewRecorder()
+	gw.handlePackBatchDisable(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("batch-disable status=%d body=%s", w.Code, w.Body.String())
+	}
+	var resp struct {
+		Succeeded int `json:"succeeded"`
+		Total     int `json:"total"`
+		Results   []struct {
+			ID string `json:"id"`
+			OK bool   `json:"ok"`
+		} `json:"results"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode batch response: %v", err)
+	}
+	if resp.Total != 3 || resp.Succeeded != 2 {
+		t.Fatalf("expected 2/3 succeeded, got %d/%d", resp.Succeeded, resp.Total)
+	}
+	for _, id := range []string{"yunque.pack.a", "yunque.pack.b"} {
+		if pack, ok := registry.Get(id); !ok || pack.Status != packruntime.PackStatusDisabled {
+			t.Fatalf("expected %s disabled, got %#v", id, pack)
+		}
+	}
+}
+
 func TestBackendPackRouteSpecsGateByMethod(t *testing.T) {
 	registry, err := packruntime.NewRegistry(t.TempDir())
 	if err != nil {

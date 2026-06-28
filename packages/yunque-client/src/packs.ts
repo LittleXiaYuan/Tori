@@ -17,6 +17,8 @@ export type PackArtifacts = { packagePath?: string; sha256?: string; sizeBytes?:
 export type InstalledPack = { manifest: PackManifest; status: PackStatus; source?: string; artifacts?: PackArtifacts; previousArtifacts?: PackArtifacts; installedAt?: string; updatedAt?: string; previousVersion?: string; [key: string]: unknown };
 export type PacksListResponse = { packs: InstalledPack[]; enabled?: InstalledPack[]; count: number; [key: string]: unknown };
 export type PackMutationResponse = { pack: InstalledPack; status: PackStatus; [key: string]: unknown };
+export type PackBatchMutationResult = { id: string; ok: boolean; status?: string; error?: string };
+export type PackBatchMutationResponse = { results: PackBatchMutationResult[]; succeeded: number; total: number };
 export type PackCatalogEntry = { manifest_path?: string; manifest_url?: string; package_url?: string; source?: string; manifest: PackManifest; installed: boolean; enabled: boolean; status?: PackStatus; update_action: "use" | "enable" | "install" | "update" | string; downloadable: boolean; [key: string]: unknown };
 export type PackReleaseCatalogEntry = { release_url: string; release_tag?: string; release_name?: string; published_at?: string; package_url: string; asset_name?: string; sha256?: string; size_bytes?: number; manifest: PackManifest; installed: boolean; enabled: boolean; status?: PackStatus; update_action: "use" | "enable" | "install" | "update" | string; downloadable: boolean; [key: string]: unknown };
 export type PackReleaseCatalogReport = { generated_at: string; releases: string[]; count: number; entries: PackReleaseCatalogEntry[]; errors?: string[]; [key: string]: unknown };
@@ -131,6 +133,8 @@ export class PacksClient {
   enable(id: string): Promise<PackMutationResponse> { return this.mutate("/v1/packs/enable", id); }
   disable(id: string): Promise<PackMutationResponse> { return this.mutate("/v1/packs/disable", id); }
   rollback(id: string): Promise<PackMutationResponse> { return this.mutate("/v1/packs/rollback", id); }
+  batchEnable(ids: string[]): Promise<PackBatchMutationResponse> { return this.json<PackBatchMutationResponse>("POST", "/v1/packs/batch-enable", { ids }); }
+  batchDisable(ids: string[]): Promise<PackBatchMutationResponse> { return this.json<PackBatchMutationResponse>("POST", "/v1/packs/batch-disable", { ids }); }
   prune(): Promise<PackPruneResponse> { return this.json<PackPruneResponse>("POST", "/v1/packs/prune", {}); }
   async frontendSync(): Promise<{ menus: PackFrontendMenu[]; routes: PackFrontendRoute[]; sdk: PackSdkEntrypoint[]; distributions: PackDistributionManifest[]; routeBindings: PackRouteBinding[]; backendRouteBindings: PackBackendRouteBinding[]; capabilityBindings: PackCapabilityBinding[]; packs: InstalledPack[] }> {
     const response = await this.enabled();

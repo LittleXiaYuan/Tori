@@ -13,6 +13,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	backuppack "yunque-agent/internal/packs/backup"
@@ -21,6 +22,10 @@ import (
 
 type packActionRequest struct {
 	ID string `json:"id"`
+}
+
+type packBatchActionRequest struct {
+	IDs []string `json:"ids"`
 }
 
 type packInstallRequest struct {
@@ -60,6 +65,11 @@ type packReleaseCatalogReport struct {
 	Count       int                       `json:"count"`
 	Entries     []packReleaseCatalogEntry `json:"entries"`
 	Errors      []string                  `json:"errors,omitempty"`
+}
+
+type packReleaseCatalogSourceResult struct {
+	Entries []packReleaseCatalogEntry
+	Errors  []string
 }
 
 type githubReleaseAsset struct {
@@ -102,6 +112,8 @@ func (g *Gateway) registerPackRoutes() {
 	g.mux.HandleFunc("/v1/packs/install", g.requireAuth(g.handlePackInstall))
 	g.mux.HandleFunc("/v1/packs/enable", g.requireAuth(g.handlePackEnable))
 	g.mux.HandleFunc("/v1/packs/disable", g.requireAuth(g.handlePackDisable))
+	g.mux.HandleFunc("/v1/packs/batch-enable", g.requireAuth(g.handlePackBatchEnable))
+	g.mux.HandleFunc("/v1/packs/batch-disable", g.requireAuth(g.handlePackBatchDisable))
 	g.mux.HandleFunc("/v1/packs/rollback", g.requireAuth(g.handlePackRollback))
 	g.mux.HandleFunc("/v1/packs/prune", g.requireAuth(g.handlePackPrune))
 	// Pack UI bundles (DLC iframe host). Public static assets — see
@@ -422,7 +434,6 @@ func (g *Gateway) packReleaseCatalogReport(r *http.Request, releaseURLs []string
 		}
 	}
 	seenReleases := map[string]bool{}
-	seenPackages := map[string]bool{}
 	for _, releaseURL := range releaseURLs {
 		releaseURL = strings.TrimSpace(releaseURL)
 		if releaseURL == "" || seenReleases[releaseURL] {
@@ -430,72 +441,29 @@ func (g *Gateway) packReleaseCatalogReport(r *http.Request, releaseURLs []string
 		}
 		seenReleases[releaseURL] = true
 		report.Releases = append(report.Releases, releaseURL)
-		release, err := fetchGitHubRelease(r, releaseURL)
-		if err != nil {
-			fallbackRelease, fallbackErr := scrapeGitHubReleaseAssets(r, releaseURL)
-			if fallbackErr != nil {
-				report.Errors = append(report.Errors, fmt.Sprintf("%s: %v", releaseURL, err))
-				report.Errors = append(report.Errors, fmt.Sprintf("%s: fallback scrape: %v", releaseURL, fallbackErr))
+	}
+	results := make([]packReleaseCatalogSourceResult, len(report.Releases))
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, 4)
+	for i, releaseURL := range report.Releases {
+		i, releaseURL := i, releaseURL
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			results[i] = packReleaseCatalogEntriesForRelease(r, releaseURL, installed)
+		}()
+	}
+	wg.Wait()
+	seenPackages := map[string]bool{}
+	for _, result := range results {
+		report.Errors = append(report.Errors, result.Errors...)
+		for _, entry := range result.Entries {
+			if seenPackages[entry.PackageURL] {
 				continue
 			}
-			release = fallbackRelease
-		}
-		entryReleaseURL := release.HTMLURL
-		if strings.TrimSpace(entryReleaseURL) == "" {
-			entryReleaseURL = releaseURL
-		}
-		for _, asset := range release.Assets {
-			packageURL := strings.TrimSpace(asset.BrowserDownloadURL)
-			if packageURL == "" || !strings.HasSuffix(strings.ToLower(strings.TrimSpace(asset.Name)), ".yqpack") || seenPackages[packageURL] {
-				continue
-			}
-			seenPackages[packageURL] = true
-			manifest, artifactSHA, err := fetchYqpackManifest(r, packageURL)
-			if err != nil {
-				report.Errors = append(report.Errors, fmt.Sprintf("%s: %v", packageURL, err))
-				continue
-			}
-			if manifest.Distribution.PackageURL == "" {
-				manifest.Distribution.PackageURL = packageURL
-			}
-			assetSHA := strings.TrimSpace(asset.Digest)
-			if assetSHA == "" {
-				assetSHA = artifactSHA
-			}
-			if manifest.Distribution.SHA256 == "" {
-				manifest.Distribution.SHA256 = assetSHA
-			}
-			if manifest.Distribution.SizeBytes == 0 && asset.Size > 0 {
-				manifest.Distribution.SizeBytes = asset.Size
-			}
-			if manifest.Distribution.ManifestURL == "" {
-				manifest.Distribution.ManifestURL = entryReleaseURL
-			}
-			entry := packReleaseCatalogEntry{
-				ReleaseURL:   entryReleaseURL,
-				ReleaseTag:   release.TagName,
-				ReleaseName:  release.Name,
-				PublishedAt:  release.PublishedAt,
-				PackageURL:   packageURL,
-				AssetName:    asset.Name,
-				SHA256:       assetSHA,
-				SizeBytes:    asset.Size,
-				Manifest:     manifest,
-				UpdateAction: "install",
-				Downloadable: true,
-			}
-			if installedPack, ok := installed[manifest.ID]; ok {
-				entry.Installed = true
-				entry.Status = installedPack.Status
-				entry.Enabled = installedPack.Status == packruntime.PackStatusEnabled
-				if installedPack.Manifest.Version != manifest.Version {
-					entry.UpdateAction = "update"
-				} else if installedPack.Status == packruntime.PackStatusDisabled {
-					entry.UpdateAction = "enable"
-				} else {
-					entry.UpdateAction = "use"
-				}
-			}
+			seenPackages[entry.PackageURL] = true
 			report.Entries = append(report.Entries, entry)
 		}
 	}
@@ -507,6 +475,78 @@ func (g *Gateway) packReleaseCatalogReport(r *http.Request, releaseURLs []string
 	})
 	report.Count = len(report.Entries)
 	return report
+}
+
+func packReleaseCatalogEntriesForRelease(r *http.Request, releaseURL string, installed map[string]packruntime.InstalledPack) packReleaseCatalogSourceResult {
+	result := packReleaseCatalogSourceResult{}
+	release, err := fetchGitHubRelease(r, releaseURL)
+	if err != nil {
+		fallbackRelease, fallbackErr := scrapeGitHubReleaseAssets(r, releaseURL)
+		if fallbackErr != nil {
+			result.Errors = append(result.Errors, fmt.Sprintf("%s: %v", releaseURL, err))
+			result.Errors = append(result.Errors, fmt.Sprintf("%s: fallback scrape: %v", releaseURL, fallbackErr))
+			return result
+		}
+		release = fallbackRelease
+	}
+	entryReleaseURL := release.HTMLURL
+	if strings.TrimSpace(entryReleaseURL) == "" {
+		entryReleaseURL = releaseURL
+	}
+	for _, asset := range release.Assets {
+		packageURL := strings.TrimSpace(asset.BrowserDownloadURL)
+		if packageURL == "" || !strings.HasSuffix(strings.ToLower(strings.TrimSpace(asset.Name)), ".yqpack") {
+			continue
+		}
+		manifest, artifactSHA, err := fetchYqpackManifest(r, packageURL)
+		if err != nil {
+			result.Errors = append(result.Errors, fmt.Sprintf("%s: %v", packageURL, err))
+			continue
+		}
+		if manifest.Distribution.PackageURL == "" {
+			manifest.Distribution.PackageURL = packageURL
+		}
+		assetSHA := strings.TrimSpace(asset.Digest)
+		if assetSHA == "" {
+			assetSHA = artifactSHA
+		}
+		if manifest.Distribution.SHA256 == "" {
+			manifest.Distribution.SHA256 = assetSHA
+		}
+		if manifest.Distribution.SizeBytes == 0 && asset.Size > 0 {
+			manifest.Distribution.SizeBytes = asset.Size
+		}
+		if manifest.Distribution.ManifestURL == "" {
+			manifest.Distribution.ManifestURL = entryReleaseURL
+		}
+		entry := packReleaseCatalogEntry{
+			ReleaseURL:   entryReleaseURL,
+			ReleaseTag:   release.TagName,
+			ReleaseName:  release.Name,
+			PublishedAt:  release.PublishedAt,
+			PackageURL:   packageURL,
+			AssetName:    asset.Name,
+			SHA256:       assetSHA,
+			SizeBytes:    asset.Size,
+			Manifest:     manifest,
+			UpdateAction: "install",
+			Downloadable: true,
+		}
+		if installedPack, ok := installed[manifest.ID]; ok {
+			entry.Installed = true
+			entry.Status = installedPack.Status
+			entry.Enabled = installedPack.Status == packruntime.PackStatusEnabled
+			if installedPack.Manifest.Version != manifest.Version {
+				entry.UpdateAction = "update"
+			} else if installedPack.Status == packruntime.PackStatusDisabled {
+				entry.UpdateAction = "enable"
+			} else {
+				entry.UpdateAction = "use"
+			}
+		}
+		result.Entries = append(result.Entries, entry)
+	}
+	return result
 }
 
 func fetchGitHubRelease(r *http.Request, releaseURL string) (githubReleaseResponse, error) {
@@ -2190,4 +2230,61 @@ func (g *Gateway) handlePackMutation(w http.ResponseWriter, r *http.Request, mut
 		g.planner.InvalidatePromptCache()
 	}
 	writeJSON(w, map[string]any{"pack": pack, "status": pack.Status})
+}
+
+func (g *Gateway) handlePackBatchEnable(w http.ResponseWriter, r *http.Request) {
+	g.handlePackBatchMutation(w, r, func(registry *packruntime.Registry, id string) (packruntime.InstalledPack, error) {
+		return registry.Enable(id)
+	})
+}
+
+func (g *Gateway) handlePackBatchDisable(w http.ResponseWriter, r *http.Request) {
+	g.handlePackBatchMutation(w, r, func(registry *packruntime.Registry, id string) (packruntime.InstalledPack, error) {
+		return registry.Disable(id)
+	})
+}
+
+// handlePackBatchMutation applies the same mutation to many packs in one call.
+// Each id is processed independently; a failure on one does not abort the rest.
+// The response reports per-id outcomes so the caller can show partial success.
+func (g *Gateway) handlePackBatchMutation(w http.ResponseWriter, r *http.Request, mutate func(*packruntime.Registry, string) (packruntime.InstalledPack, error)) {
+	if r.Method != http.MethodPost {
+		writeJSONStatus(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+		return
+	}
+	if g.packRegistry == nil {
+		writeJSONStatus(w, http.StatusServiceUnavailable, map[string]any{"error": "pack registry not configured"})
+		return
+	}
+	var req packBatchActionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || len(req.IDs) == 0 {
+		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": "ids is required"})
+		return
+	}
+	type batchResult struct {
+		ID     string `json:"id"`
+		OK     bool   `json:"ok"`
+		Status string `json:"status,omitempty"`
+		Error  string `json:"error,omitempty"`
+	}
+	results := make([]batchResult, 0, len(req.IDs))
+	succeeded := 0
+	for _, id := range req.IDs {
+		if id == "" {
+			results = append(results, batchResult{ID: id, OK: false, Error: "empty id"})
+			continue
+		}
+		pack, err := mutate(g.packRegistry, id)
+		if err != nil {
+			results = append(results, batchResult{ID: id, OK: false, Error: err.Error()})
+			continue
+		}
+		results = append(results, batchResult{ID: id, OK: true, Status: string(pack.Status)})
+		succeeded++
+	}
+	// Invalidate planner cache once if anything changed, not per-pack.
+	if succeeded > 0 && g.planner != nil {
+		g.planner.InvalidatePromptCache()
+	}
+	writeJSON(w, map[string]any{"results": results, "succeeded": succeeded, "total": len(req.IDs)})
 }
