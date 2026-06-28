@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import Link from "next/link";
 import { Avatar, Button, Spinner, Tooltip, Chip, Popover } from "@heroui/react";
 import {
   Pencil, RotateCcw, Copy, Undo2, Check, Library,
@@ -8,12 +9,11 @@ import {
 } from "lucide-react";
 import { api, type FilePreviewResponse, type NotifyChannel } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
+import { useUserProfile, profileInitial } from "@/lib/user-profile";
 import MarkdownRenderer from "@/components/markdown-renderer";
 import { ExecutionTrace, type AgentEvent } from "@/components/execution-trace";
 import { BrowserConnectCard } from "@/components/browser-connect-card";
-import { SkillGrowthPanel } from "@/components/skill-growth-panel";
-import { EmotionBadge, StickerView, SkillTags, AgentActions, type AgentAction } from "@/components/chat-extras";
-import { CognitiveStatusBar } from "@/components/cognitive-status-bar";
+import { AgentActions, type AgentAction } from "@/components/chat-extras";
 import { ThinkingTimer } from "@/components/chat/thinking-timer";
 import { TaskPlanCard } from "@/components/chat/task-plan-card";
 import { openExternal } from "@/lib/safe-url";
@@ -53,6 +53,31 @@ export interface ChatMessageListProps {
   onBrowserRefresh: () => void;
   onBrowserContinue: (prompt: string) => void;
   onShare: (messageId: string, channel: NotifyChannel, payload: ChatSharePayload) => Promise<void>;
+}
+
+function isAppHref(href: string): boolean {
+  return href.startsWith("/") && !href.startsWith("//") && !href.startsWith("/api/");
+}
+
+function AppLink({
+  href,
+  className,
+  style,
+  children,
+}: {
+  href: string;
+  className?: string;
+  style?: CSSProperties;
+  children: ReactNode;
+}) {
+  if (isAppHref(href)) {
+    return <Link href={href} className={className} style={style}>{children}</Link>;
+  }
+  return (
+    <a href={href} className={className} style={style} target="_blank" rel="noopener noreferrer">
+      {children}
+    </a>
+  );
 }
 
 function filePreviewStatusLabel(status?: string): string {
@@ -212,21 +237,21 @@ function renderPackHandoffLinks(pack: PackStudioBatchDraftRequest["packs"][numbe
   return (
     <div className="mt-2">
       <div className="mb-1 text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
-        验收出口：回中心确认状态，进详情复查权限{openHref ? "，再打开入口复验。" : "；没有独立入口时，从 Chat、任务、记忆或知识流程复验。"}
+        验收：中心看状态，详情复查权限{openHref ? "，再打开入口复验。" : "；没有独立入口时，从 Chat、任务、记忆或知识流程触发。"}
       </div>
       <div className="flex flex-wrap items-center gap-2">
         {detailHref && (
-          <a href={detailHref} className="inline-flex items-center gap-1 text-[11px] font-medium" style={{ color: "var(--yunque-accent)" }}>
+          <AppLink href={detailHref} className="inline-flex items-center gap-1 text-[11px] font-medium" style={{ color: "var(--yunque-accent)" }}>
             详情 <ArrowRight size={10} />
-          </a>
+          </AppLink>
         )}
-        <a href={centerHref} className="inline-flex items-center gap-1 text-[11px] font-medium" style={{ color: "var(--yunque-text-muted)" }}>
+        <AppLink href={centerHref} className="inline-flex items-center gap-1 text-[11px] font-medium" style={{ color: "var(--yunque-text-muted)" }}>
           中心 <ArrowRight size={10} />
-        </a>
+        </AppLink>
         {openHref && (
-          <a href={openHref} className="inline-flex items-center gap-1 text-[11px] font-medium" style={{ color: "var(--yunque-success)" }}>
+          <AppLink href={openHref} className="inline-flex items-center gap-1 text-[11px] font-medium" style={{ color: "var(--yunque-success)" }}>
             打开入口 <ArrowRight size={10} />
-          </a>
+          </AppLink>
         )}
       </div>
     </div>
@@ -238,13 +263,13 @@ function renderPackGovernanceLinks(pack: { id?: string }, detailLabel = "查看�
   return (
     <div className="mt-2 flex flex-wrap items-center gap-2">
       {detailHref && (
-        <a href={detailHref} className="inline-flex items-center gap-1 text-[11px] font-medium" style={{ color: "var(--yunque-accent)" }}>
+        <AppLink href={detailHref} className="inline-flex items-center gap-1 text-[11px] font-medium" style={{ color: "var(--yunque-accent)" }}>
           {detailLabel} <ArrowRight size={10} />
-        </a>
+        </AppLink>
       )}
-      <a href={packCenterHref(pack)} className="inline-flex items-center gap-1 text-[11px] font-medium" style={{ color: "var(--yunque-text-muted)" }}>
+      <AppLink href={packCenterHref(pack)} className="inline-flex items-center gap-1 text-[11px] font-medium" style={{ color: "var(--yunque-text-muted)" }}>
         {centerLabel} <ArrowRight size={10} />
-      </a>
+      </AppLink>
     </div>
   );
 }
@@ -319,8 +344,8 @@ function renderPackStudioPlan(plan: PackStudioPatchPlanSummary) {
     <div
       className="mb-3 rounded-xl border p-3 text-xs"
       style={{
-        background: "rgba(59,130,246,0.08)",
-        borderColor: "rgba(59,130,246,0.22)",
+        background: "var(--yunque-accent-soft)",
+        borderColor: "var(--yunque-border-accent)",
         color: "var(--yunque-text)",
       }}
     >
@@ -334,13 +359,13 @@ function renderPackStudioPlan(plan: PackStudioPatchPlanSummary) {
             {plan.pack.name || plan.pack.id} · {plan.pack.version || "unknown"} · {plan.candidates.length} 个候选改动
           </div>
         </div>
-        <a
+        <AppLink
           href={packStudioHandoffHref(plan.pack, plan.goal, "#import-plan")}
           className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1.5 text-[11px] font-medium"
           style={{ background: "var(--yunque-accent-muted)", color: "var(--yunque-accent)" }}
         >
           导入改包计划 <ArrowRight size={11} />
-        </a>
+        </AppLink>
       </div>
       <div className="mt-2 break-all font-mono text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
         工作区：{plan.workspace.id || plan.workspace.path}
@@ -387,13 +412,13 @@ function renderPackStudioDraft(draft: PackStudioPatchDraft) {
             {draft.pack.name || draft.pack.id} · {draft.pack.version || "unknown"} · 单文件草稿
           </div>
         </div>
-        <a
+        <AppLink
           href={packStudioHandoffHref(draft.pack, draft.goal, "#import-draft")}
           className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1.5 text-[11px] font-medium"
           style={{ background: "var(--yunque-success-muted)", color: "var(--yunque-success)" }}
         >
           导入改包草稿 <ArrowRight size={11} />
-        </a>
+        </AppLink>
       </div>
       <div className="mt-2 break-all font-mono text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
         文件：{draft.filePath}
@@ -440,13 +465,13 @@ function renderPackStudioBatchDraftRequest(request: PackStudioBatchDraftRequest)
               : `${request.packs.length} 个能力包 · 小羽逐包生成改包草稿请求`}
           </div>
         </div>
-        <a
+        <AppLink
           href={packStudioBatchHandoffHref(request)}
           className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1.5 text-[11px] font-medium"
           style={{ background: "var(--yunque-accent-muted)", color: "var(--yunque-accent)" }}
         >
           导入工坊逐包处理 <ArrowRight size={11} />
-        </a>
+        </AppLink>
       </div>
       {request.goal && (
         <div className="mt-2 leading-5" style={{ color: "var(--yunque-text-muted)" }}>
@@ -464,13 +489,13 @@ function renderPackStudioBatchDraftRequest(request: PackStudioBatchDraftRequest)
                 </div>
               </div>
               {(pack.handoffLinks?.studio || pack.studioUrl) && (
-                <a
+                <AppLink
                   href={pack.handoffLinks?.studio || pack.studioUrl}
                   className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium"
                   style={{ background: "var(--yunque-accent-muted)", color: "var(--yunque-accent)" }}
                 >
                   打开工坊 <ArrowRight size={10} />
-                </a>
+                </AppLink>
               )}
             </div>
             {renderPackHandoffLinks(pack)}
@@ -499,9 +524,9 @@ function renderPackStudioBatchDraftRequest(request: PackStudioBatchDraftRequest)
         这只是批量生成请求，不会自动应用改动。每个包都要回到能力包工坊预览差异、运行审计、重新打包并复检 SHA 后再安装或回滚。
       </div>
       <div className="mt-2">
-        <a href="/packs#readiness-queue" className="inline-flex items-center gap-1 text-[11px] font-medium" style={{ color: "var(--yunque-accent)" }}>
+        <AppLink href="/packs#readiness-queue" className="inline-flex items-center gap-1 text-[11px] font-medium" style={{ color: "var(--yunque-accent)" }}>
           返回能力包中心队列 <ArrowRight size={10} />
-        </a>
+        </AppLink>
       </div>
     </div>
   );
@@ -527,13 +552,13 @@ function renderPackStudioDraftRequest(request: PackStudioPatchDraftRequest) {
             {request.pack.name || request.pack.id} · {request.pack.version || "unknown"} · 让小羽生成单文件草稿
           </div>
         </div>
-        <a
+        <AppLink
           href={packStudioHandoffHref(request.pack, request.goal, "#draft-queue")}
           className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1.5 text-[11px] font-medium"
           style={{ background: "var(--yunque-accent-muted)", color: "var(--yunque-accent)" }}
         >
           查看草稿队列 <ArrowRight size={11} />
-        </a>
+        </AppLink>
       </div>
       <div className="mt-2 break-all font-mono text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
         目标文件：{request.target.filePath}
@@ -598,6 +623,9 @@ export function ChatMessageList({
   onAction, onSlashSelect, onSend, onBrowserRefresh, onBrowserContinue, onShare,
 }: ChatMessageListProps) {
   const { t } = useI18n();
+  const profile = useUserProfile();
+  const userName = profile.nickname || t("chat.user");
+  const userInitial = profile.nickname ? profileInitial(profile.nickname) : "U";
   const isBubble = chatMode === "chat";
   const [shareOpenKey, setShareOpenKey] = useState<string | null>(null);
   const [shareChannels, setShareChannels] = useState<NotifyChannel[]>([]);
@@ -703,7 +731,7 @@ export function ChatMessageList({
         }}
       >
         <Popover.Trigger>
-          <Button isIconOnly variant="ghost" size="sm">
+          <Button isIconOnly aria-label={`预览 ${file.name || file.path}`} variant="ghost" size="sm">
             <Eye size={11} />
           </Button>
         </Popover.Trigger>
@@ -774,7 +802,7 @@ export function ChatMessageList({
       >
         <Popover.Trigger>
           {compact ? (
-            <Button isIconOnly variant="ghost" size="sm">
+            <Button isIconOnly aria-label="同步到协作应用" variant="ghost" size="sm">
               <Share2 size={11} />
             </Button>
           ) : (
@@ -803,9 +831,9 @@ export function ChatMessageList({
                 <div className="rounded-lg px-2 py-3 text-xs leading-5" style={{ color: "var(--yunque-text-muted)", background: "var(--yunque-bg-muted)" }}>
                   还没有可用的协作同步渠道。
                 </div>
-                <a href="/settings/notifications" className="flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium" style={{ background: "var(--yunque-accent-muted)", color: "var(--yunque-accent)" }}>
+                <AppLink href="/settings/notifications" className="flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium" style={{ background: "var(--yunque-accent-muted)", color: "var(--yunque-accent)" }}>
                   <Settings size={12} /> 去配置通知渠道
-                </a>
+                </AppLink>
               </div>
             )}
             {!shareChannelsLoading && enabledShareChannels.length > 0 && (
@@ -851,7 +879,7 @@ export function ChatMessageList({
     return (
       <Popover>
         <Popover.Trigger>
-          <Button isIconOnly variant="ghost" size="sm">
+          <Button isIconOnly aria-label="更多消息操作" variant="ghost" size="sm">
             <MoreHorizontal size={11} />
           </Button>
         </Popover.Trigger>
@@ -908,21 +936,24 @@ export function ChatMessageList({
   }
   return (
     <div className="mx-auto space-y-5" style={{ maxWidth: "min(860px, 92vw)" }} aria-live="polite" aria-relevant="additions" role="log">
-      {messages.map((msg, idx) => (
-        <div key={msg.id} className={`group chat-message-row flex gap-2.5 ${isBubble && msg.role === "user" ? "justify-end" : ""}`}>
+      {messages.map((msg, idx) => {
+        const isLastMessage = idx === messages.length - 1;
+        return (
+        <div key={msg.id} className={`group chat-message-row message-item flex gap-2.5 ${isBubble && msg.role === "user" ? "justify-end" : ""}`}>
           {(!isBubble || msg.role === "assistant") && (
             <Avatar size="sm" className="chat-message-avatar shrink-0 mt-1" style={{ background: msg.role === "assistant" ? "var(--yunque-accent)" : "#374151" }}>
-              <Avatar.Fallback className="text-white text-xs font-bold">{msg.role === "assistant" ? "Y" : "U"}</Avatar.Fallback>
+              {msg.role === "user" && profile.avatar && <Avatar.Image alt={userName} src={profile.avatar} />}
+              <Avatar.Fallback className="text-white text-xs font-bold">{msg.role === "assistant" ? "Y" : userInitial}</Avatar.Fallback>
             </Avatar>
           )}
           <div className={`chat-message-stack ${isBubble ? `max-w-[74%] xl:max-w-[72%] ${msg.role === "user" ? "flex flex-col items-end" : ""}` : "flex-1 min-w-0"}`}>
             {!isBubble && (
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-[13px] font-semibold" style={{ color: msg.role === "assistant" ? "var(--yunque-accent)" : "var(--yunque-text)" }}>
-                  {msg.role === "assistant" ? (msg.model || currentModel || "Yunque Agent") : t("chat.user")}
+                  {msg.role === "assistant" ? (msg.model || currentModel || "Yunque Agent") : userName}
                 </span>
                 {msg.timestamp && (
-                  <span className="text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
+                  <span className="chat-message-time text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
                     {new Date(msg.timestamp).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}
                   </span>
                 )}
@@ -1020,61 +1051,37 @@ export function ChatMessageList({
                 )
               )}
             </div>
-            {/* Emotion + Sticker + Airi */}
-            {msg.role === "assistant" && (msg.emotion || msg.sticker || msg.stickers || msg.airiSynced) && (
-              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                {msg.emotion && <EmotionBadge emotion={msg.emotion} />}
-                {msg.sticker && <StickerView sticker={msg.sticker} />}
-                {msg.stickers && Object.values(msg.stickers).map((s, i) => <StickerView key={i} sticker={s} />)}
-                {msg.airiSynced && (
-                  <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium" style={{ background: "linear-gradient(135deg, rgba(236,72,153,0.15), rgba(139,92,246,0.15))", color: "#d946ef", border: "1px solid rgba(217,70,239,0.2)" }}>
-                    <Heart size={10} fill="#d946ef" /> Airi {msg.airiEmotion && msg.airiEmotion !== "neutral" ? `· ${msg.airiEmotion}` : ""}
-                  </span>
-                )}
-              </div>
-            )}
-            {msg.role === "assistant" && msg.skills_used && msg.skills_used.length > 0 && <SkillTags skills={msg.skills_used} />}
-            {/* Context layers — only surface concrete signals (memory / knowledge
-                / emotion). The generic "strategy / 运用了积累的经验" badge was
-                noise: it appeared on essentially every reply, so it's dropped. */}
+            {/* Context layers stay discoverable without turning every reply into a dashboard. */}
             {msg.role === "assistant" && (() => {
               const layers = msg.contextLayers || [];
               const hasMemory = layers.includes("memory");
               const hasKnowledge = layers.includes("graph") || layers.includes("code");
               const hasEmotion = layers.includes("emotion");
               if (!hasMemory && !hasKnowledge && !hasEmotion) return null;
+              const contextItems = [
+                hasMemory ? { key: "memory", icon: <Brain size={11} />, label: "调用了你的记忆" } : null,
+                hasKnowledge ? { key: "knowledge", icon: <Library size={11} />, label: "参考了知识库" } : null,
+                hasEmotion ? { key: "emotion", icon: <Heart size={11} />, label: "感知了你的情绪" } : null,
+              ].filter(Boolean) as { key: string; icon: ReactNode; label: string }[];
               return (
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  {hasMemory && (
-                    <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium" style={{ background: "rgba(139,92,246,0.12)", color: "#a78bfa" }}>
-                      <Brain size={11} /> 调用了你的记忆
-                    </span>
-                  )}
-                  {hasKnowledge && (
-                    <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium" style={{ background: "rgba(6,182,212,0.12)", color: "#22d3ee" }}>
-                      <Library size={11} /> 参考了知识库
-                    </span>
-                  )}
-                  {hasEmotion && (
-                    <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium" style={{ background: "rgba(236,72,153,0.12)", color: "#f472b6" }}>
-                      <Heart size={11} /> 感知了你的情绪
-                    </span>
-                  )}
-                </div>
+                <details className="chat-context-disclosure mt-2">
+                  <summary className="inline-flex cursor-pointer items-center gap-1.5 rounded-full px-2 py-1 text-[11px] font-medium">
+                    <Brain size={11} />
+                    上下文 {contextItems.length}
+                  </summary>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    {contextItems.map((item) => (
+                      <span key={item.key} className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium">
+                        {item.icon}
+                        {item.label}
+                      </span>
+                    ))}
+                  </div>
+                </details>
               );
             })()}
-            {/* Cognitive status bar */}
-            {msg.role === "assistant" && (msg.cognitiveMemories?.length || msg.cognitiveReflections?.length || msg.cognitiveContextLayers?.length || msg.skills_used?.length) && (
-              <CognitiveStatusBar
-                memories={msg.cognitiveMemories}
-                reflections={msg.cognitiveReflections}
-                contextLayers={msg.cognitiveContextLayers}
-                activeSkills={msg.skills_used}
-                isLive={streaming && msg.id === messages[messages.length - 1]?.id}
-              />
-            )}
             {/* Actions */}
-            {msg.role === "assistant" && msg.actions && msg.actions.length > 0 && (
+            {msg.role === "assistant" && msg.actions && msg.actions.length > 0 && isLastMessage && (
               <div className="chat-inline-panel mt-2 rounded-xl border p-2" style={{ background: "var(--yunque-bg-muted)", borderColor: "var(--yunque-border)" }}>
                 <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: "var(--yunque-text-muted)" }}>{t("chat.suggestedActions")}</div>
                 <AgentActions actions={msg.actions} onAction={onAction} />
@@ -1085,7 +1092,7 @@ export function ChatMessageList({
               <div className="chat-inline-panel mt-2 rounded-xl border p-2" style={{ background: "var(--yunque-bg-muted)", borderColor: "var(--yunque-border)" }}>
                 <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: "var(--yunque-text-muted)" }}>{t("chat.browserArtifact")}</div>
                 <div className="flex flex-wrap items-center gap-2 text-[11px]" style={{ color: "var(--yunque-text-secondary)" }}>
-                  {msg.browserSummary.action && <span className="rounded-full px-2.5 py-1" style={{ background: "rgba(59,130,246,0.12)", color: "#93c5fd" }}>{browserActionLabel(msg.browserSummary.action)}</span>}
+                  {msg.browserSummary.action && <span className="rounded-full px-2.5 py-1" style={{ background: "var(--yunque-accent-muted)", color: "var(--yunque-accent-strong)" }}>{browserActionLabel(msg.browserSummary.action)}</span>}
                   {typeof msg.browserSummary.elementCount === "number" && <span className="rounded-full px-2.5 py-1" style={{ background: "var(--yunque-bg-muted)", color: "var(--yunque-text-muted)" }}>{msg.browserSummary.elementCount} {t("chat.elements")}</span>}
                   {msg.browserSummary.hasScreenshot && <span className="rounded-full px-2.5 py-1" style={{ background: "var(--yunque-success-muted)", color: "var(--yunque-success)" }}>{t("chat.screenshotReady")}</span>}
                   {typeof msg.browserSummary.textLength === "number" && msg.browserSummary.textLength > 0 && <span className="rounded-full px-2.5 py-1" style={{ background: "var(--yunque-bg-muted)", color: "var(--yunque-text-muted)" }}>{msg.browserSummary.textLength} {t("chat.chars")}</span>}
@@ -1109,7 +1116,7 @@ export function ChatMessageList({
             )}
             {/* E2B Sandbox */}
             {msg.role === "assistant" && msg.sandbox && (
-              <div className="chat-inline-panel mt-2 rounded-xl border p-3" style={{ background: "linear-gradient(135deg, rgba(34,197,94,0.06), rgba(59,130,246,0.06))", borderColor: "rgba(34,197,94,0.2)" }}>
+              <div className="chat-inline-panel mt-2 rounded-xl border p-3" style={{ background: "linear-gradient(135deg, rgba(34,197,94,0.06), var(--yunque-accent-soft))", borderColor: "rgba(34,197,94,0.2)" }}>
                 <div className="flex items-center gap-2 mb-2">
                   <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(34,197,94,0.15)" }}><Monitor size={16} style={{ color: "#22c55e" }} /></div>
                   <div>
@@ -1150,16 +1157,17 @@ export function ChatMessageList({
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
                             {renderFilePreview(`preview:${msg.id}:${i}`, f)}
-                            <Button isIconOnly variant="ghost" size="sm" onPress={() => onSend(continueFilePrompt(f))}>
+                            <Button isIconOnly aria-label={`继续处理 ${f.name || f.path}`} variant="ghost" size="sm" onPress={() => onSend(continueFilePrompt(f))}>
                               <Wand2 size={11} />
                             </Button>
-                            <Button isIconOnly variant="ghost" size="sm" onPress={() => onSend(dispatchToAIIDEPrompt(msg, f))}>
+                            <Button isIconOnly aria-label={`派给 AI IDE ${f.name || f.path}`} variant="ghost" size="sm" onPress={() => onSend(dispatchToAIIDEPrompt(msg, f))}>
                               <Cpu size={11} />
                             </Button>
                             {renderShareMenu(`file:${msg.id}:${i}`, msg, shareFilePayload(msg, f), true)}
                             <a
                               href={`/api/files/download?path=${encodeURIComponent(f.path)}`}
                               download={f.name || f.path}
+                              aria-label={`下载 ${f.name || f.path}`}
                               className="w-8 h-8 rounded-full flex items-center justify-center"
                               style={{ background: "var(--yunque-accent-muted)" }}
                             >
@@ -1196,19 +1204,19 @@ export function ChatMessageList({
               </div>
             )}
             {/* Suggestions */}
-            {msg.role === "assistant" && msg.suggestions && msg.suggestions.length > 0 && !streaming && (
+            {msg.role === "assistant" && msg.suggestions && msg.suggestions.length > 0 && !streaming && isLastMessage && (
               <details className="mt-3">
                 <summary className="cursor-pointer text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: "var(--yunque-text-muted)" }}>{t("chat.nextMoves")}</summary>
                 <div className="chat-inline-panel mt-2 rounded-xl border p-2" style={{ background: "var(--yunque-bg-muted)", borderColor: "var(--yunque-border)" }}>
                   <div className="flex flex-wrap gap-2">
                     {msg.suggestions.map((s, i) => (
-                      <button key={i} onClick={() => {
+                      <button key={i} type="button" onClick={() => {
                         if (s.label === "存入知识库") onSend("/save_knowledge Save the above response to knowledge base.");
                         else if (s.type === "save_skill") onSend("Turn this workflow into a reusable skill and save it for later.");
                         else onSend(s.label);
                       }}
                         className="chat-followup-chip px-3 py-1.5 rounded-full text-xs font-medium cursor-pointer"
-                        style={{ background: s.type === "save_skill" ? "rgba(139,92,246,0.12)" : "rgba(59,130,246,0.08)", border: `1px solid ${s.type === "save_skill" ? "rgba(139,92,246,0.3)" : "rgba(59,130,246,0.15)"}`, color: s.type === "save_skill" ? "#a78bfa" : "#93c5fd" }}>
+                        style={{ background: s.type === "save_skill" ? "rgba(139,92,246,0.12)" : "var(--yunque-accent-soft)", border: `1px solid ${s.type === "save_skill" ? "rgba(139,92,246,0.3)" : "var(--yunque-border-accent)"}`, color: s.type === "save_skill" ? "#a78bfa" : "var(--yunque-accent-strong)" }}>
                         {s.type === "save_skill" ? "Save " : "→ "}{s.label}
                       </button>
                     ))}
@@ -1230,25 +1238,15 @@ export function ChatMessageList({
                 continueLabel={t("chat.continueBlocked")}
               />
             )}
-            {/* Skill growth */}
-            {msg.role === "assistant" && msg.skillSuggestions && msg.skillSuggestions.length > 0 && (
-              <div className="mt-2 rounded-xl px-3 py-2.5" style={{ background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.15)" }}>
-                <div className="flex items-center gap-2 mb-2">
-                  <Sparkles size={13} style={{ color: "#4ade80" }} />
-                  <span className="text-[11px] font-semibold" style={{ color: "#4ade80" }}>{t("chat.skillLearned")}</span>
-                </div>
-                <SkillGrowthPanel suggestions={msg.skillSuggestions} onSave={(s) => onSend(`Turn this into a reusable skill.\n\nName: ${s.name}\nDescription: ${s.description}\nTrigger: ${s.trigger}`)} />
-              </div>
-            )}
             {/* Execution trace */}
-            {msg.role === "assistant" && msg.traceEvents && msg.traceEvents.length > 0 && (
-              <details className="mt-3">
+            {msg.role === "assistant" && msg.traceEvents && msg.traceEvents.length > 0 && (isLastMessage || streaming) && (
+              <details className="mt-3" open={streaming && isLastMessage ? true : undefined}>
                 <summary className="cursor-pointer text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>{t("chat.executionTrace")}</summary>
                 <div className="mt-2"><ExecutionTrace events={msg.traceEvents} isLive={streaming && idx === messages.length - 1} onRecoveryPrompt={onSend} /></div>
               </details>
             )}
             {/* Quick actions card for substantial responses */}
-            {msg.role === "assistant" && msg.content && msg.content.length > 400 && !streaming && (
+            {msg.role === "assistant" && msg.content && msg.content.length > 400 && !streaming && isLastMessage && (
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <button
                   onClick={() => onSend(dispatchToAIIDEPrompt(msg))}
@@ -1265,23 +1263,23 @@ export function ChatMessageList({
               <div className={`chat-message-tools flex gap-0.5 mt-1 ${!isBubble ? "justify-end" : ""}`} style={isBubble ? { justifyContent: msg.role === "user" ? "flex-end" : "flex-start" } : undefined}>
                 {msg.role === "user" && (
                   <>
-                    <Tooltip delay={0}><Button isIconOnly variant="ghost" size="sm" onPress={() => onEdit(msg.id)}><Pencil size={11} /></Button><Tooltip.Content>{t("chat.edit")}</Tooltip.Content></Tooltip>
-                    <Tooltip delay={0}><Button isIconOnly variant="ghost" size="sm" onPress={() => onSend(dispatchToAIIDEPrompt(msg))}><Cpu size={11} /></Button><Tooltip.Content>派给 AI IDE</Tooltip.Content></Tooltip>
+                    <Tooltip delay={0}><Button isIconOnly aria-label={t("chat.edit")} variant="ghost" size="sm" onPress={() => onEdit(msg.id)}><Pencil size={11} /></Button><Tooltip.Content>{t("chat.edit")}</Tooltip.Content></Tooltip>
+                    <Tooltip delay={0}><Button isIconOnly aria-label="派给 AI IDE" variant="ghost" size="sm" onPress={() => onSend(dispatchToAIIDEPrompt(msg))}><Cpu size={11} /></Button><Tooltip.Content>派给 AI IDE</Tooltip.Content></Tooltip>
                   </>
                 )}
                 {msg.role === "assistant" && (
                   <>
                     <Tooltip delay={0}>
-                      <Button isIconOnly variant="ghost" size="sm" onPress={() => onCopy(msg.id, displayMessageContentForTools(msg))}>
+                      <Button isIconOnly aria-label={copiedIdx === msg.id ? t("chat.copied") : t("chat.copy")} variant="ghost" size="sm" onPress={() => onCopy(msg.id, displayMessageContentForTools(msg))}>
                         {copiedIdx === msg.id ? <Check size={11} className="text-green-400" /> : <Copy size={11} />}
                       </Button>
                       <Tooltip.Content>{copiedIdx === msg.id ? t("chat.copied") : t("chat.copy")}</Tooltip.Content>
                     </Tooltip>
-                    <Tooltip delay={0}><Button isIconOnly variant="ghost" size="sm" onPress={() => onSend(dispatchToAIIDEPrompt(msg))}><Cpu size={11} /></Button><Tooltip.Content>派给 AI IDE</Tooltip.Content></Tooltip>
+                    <Tooltip delay={0}><Button isIconOnly aria-label="派给 AI IDE" variant="ghost" size="sm" onPress={() => onSend(dispatchToAIIDEPrompt(msg))}><Cpu size={11} /></Button><Tooltip.Content>派给 AI IDE</Tooltip.Content></Tooltip>
                     {renderMoreActions(`tools:${msg.id}`, msg)}
                   </>
                 )}
-                <Tooltip delay={0}><Button isIconOnly variant="ghost" size="sm" onPress={() => onRetry(msg.id)}><RotateCcw size={11} /></Button><Tooltip.Content>{t("chat.retry")}</Tooltip.Content></Tooltip>
+                <Tooltip delay={0}><Button isIconOnly aria-label={t("chat.retry")} variant="ghost" size="sm" onPress={() => onRetry(msg.id)}><RotateCcw size={11} /></Button><Tooltip.Content>{t("chat.retry")}</Tooltip.Content></Tooltip>
               </div>
             )}
             {!isBubble && <div className="mt-3" style={{ borderBottom: "1px solid var(--yunque-border)" }} />}
@@ -1292,7 +1290,8 @@ export function ChatMessageList({
             </Avatar>
           )}
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

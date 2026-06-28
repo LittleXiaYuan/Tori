@@ -17,10 +17,14 @@
  * each section.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Button, Switch, Select, ListBox, ToggleButton, ToggleButtonGroup, Label, Modal, TextField, Input } from "@heroui/react";
 import {
   Settings as SettingsIcon,
+  User,
+  Copy,
+  Trash2,
   Cpu,
   Database,
   KeyRound,
@@ -29,14 +33,15 @@ import {
   Sun,
   Sparkles,
   Palette,
-  Brain,
-  Network,
   Globe,
   Keyboard,
   Info,
   Wrench,
   ExternalLink,
   Search,
+  MousePointer2,
+  Plug,
+  Bell,
 } from "lucide-react";
 import { CherryModal } from "./overlay";
 import { api } from "@/lib/api";
@@ -44,6 +49,11 @@ import type { VersionInfo } from "@/lib/api-types";
 import { createPacksClient } from "yunque-client/packs";
 import { createYunqueSDKClientOptions } from "@/lib/sdk-client";
 import { loadTheme, patchAndApply, THEME_STORAGE_KEY } from "@/lib/theme-engine";
+import { GeneralConfigPanel } from "@/components/settings/general-config-panel";
+import { ThemePanel } from "@/components/settings/theme-panel";
+import { ProvidersPanel } from "@/components/settings/providers-panel";
+import { NotificationsPanel } from "@/components/settings/notifications-panel";
+import { showToast } from "@/components/toast-provider";
 
 export interface CherrySettingsModalProps {
   open: boolean;
@@ -55,39 +65,50 @@ const packsClient = createPacksClient(createYunqueSDKClientOptions());
 const BACKUP_PACK_ID = "yunque.pack.backup";
 
 type SectionId =
+  | "account"
   | "general"
   | "models"
   | "defaults"
   | "display"
+  | "desktop"
+  | "system"
   | "data"
-  | "mcp"
-  | "memory"
+  | "connectors"
+  | "notifications"
   | "search"
   | "hotkeys"
   | "about";
 
 const NAV: Array<{ id: SectionId; label: string; icon: typeof SettingsIcon; group: "基础" | "功能" | "系统" }> = [
+  { id: "account", label: "账户管理", icon: User, group: "基础" },
   { id: "general", label: "通用", icon: SettingsIcon, group: "基础" },
   { id: "display", label: "显示", icon: Palette, group: "基础" },
   { id: "models", label: "模型服务", icon: Cpu, group: "功能" },
   { id: "defaults", label: "默认模型", icon: Sparkles, group: "功能" },
-  { id: "mcp", label: "MCP 服务器", icon: Network, group: "功能" },
+  { id: "connectors", label: "频道接入", icon: Plug, group: "功能" },
+  { id: "notifications", label: "通知推送", icon: Bell, group: "功能" },
   { id: "search", label: "网络搜索", icon: Globe, group: "功能" },
-  { id: "memory", label: "全局记忆", icon: Brain, group: "功能" },
+  { id: "desktop", label: "桌面助手", icon: MousePointer2, group: "系统" },
+  { id: "system", label: "系统配置", icon: Wrench, group: "系统" },
   { id: "data", label: "数据", icon: Database, group: "系统" },
   { id: "hotkeys", label: "快捷键", icon: Keyboard, group: "系统" },
   { id: "about", label: "关于", icon: Info, group: "系统" },
 ];
 
+const VALID_SECTIONS = new Set<SectionId>(NAV.map((n) => n.id));
+function coerceSection(id: SectionId | undefined): SectionId {
+  return id && VALID_SECTIONS.has(id) ? id : "account";
+}
+
 export function CherrySettingsModal({
   open,
   onClose,
-  initialSection = "general",
+  initialSection = "account",
 }: CherrySettingsModalProps) {
-  const [section, setSection] = useState<SectionId>(initialSection);
+  const [section, setSection] = useState<SectionId>(coerceSection(initialSection));
 
   useEffect(() => {
-    if (open) setSection(initialSection);
+    if (open) setSection(coerceSection(initialSection));
   }, [open, initialSection]);
 
   const grouped = useMemo(() => {
@@ -136,16 +157,21 @@ export function CherrySettingsModal({
           ))}
         </nav>
         <div className="cherry-settings-content">
-          {section === "general" && <GeneralSection />}
-          {section === "display" && <DisplaySection />}
-          {section === "models" && <ModelsSection onClose={onClose} />}
-          {section === "defaults" && <DefaultsSection onClose={onClose} />}
-          {section === "mcp" && <MCPSection onClose={onClose} />}
-          {section === "search" && <SearchSection />}
-          {section === "memory" && <MemorySection onClose={onClose} />}
-          {section === "data" && <DataSection />}
-          {section === "hotkeys" && <HotkeysSection />}
-          {section === "about" && <AboutSection />}
+          <div key={section} className="cherry-settings-pane">
+            {section === "account" && <AccountSection />}
+            {section === "general" && <GeneralSection />}
+            {section === "display" && <DisplaySection />}
+            {section === "models" && <ModelsSection onClose={onClose} />}
+            {section === "defaults" && <DefaultsSection />}
+            {section === "connectors" && <ConnectorsSection />}
+            {section === "notifications" && <NotificationsPanel />}
+            {section === "search" && <SearchSection />}
+            {section === "desktop" && <DesktopSection />}
+            {section === "system" && <SystemSection />}
+            {section === "data" && <DataSection />}
+            {section === "hotkeys" && <HotkeysSection />}
+            {section === "about" && <AboutSection />}
+          </div>
         </div>
       </div>
     </CherryModal>
@@ -174,14 +200,11 @@ function writePresetTheme(next: Preset) {
 }
 
 function GeneralSection() {
-  const [theme, setTheme] = useState<Preset>("auto");
   const [hasLegacy, setHasLegacy] = useState(false);
   useEffect(() => {
-    setTheme(readPresetTheme());
-    // Detect legacy classic-theme customizations that clash with Cherry's
-    // flat look (bg image / reduced opacity / non-default radius). Show the
-    // "restore Cherry defaults" shortcut only when it would actually do
-    // something.
+    // Detect legacy classic-theme customizations that clash with the flat
+    // look (bg image / reduced opacity / non-default radius). Show the
+    // "restore defaults" shortcut only when it would actually do something.
     const cfg = loadTheme();
     setHasLegacy(
       !!cfg.interfaceBgImage ||
@@ -190,11 +213,6 @@ function GeneralSection() {
       (cfg.radius !== "default" && cfg.radius !== "medium"),
     );
   }, []);
-
-  const select = (next: Preset) => {
-    setTheme(next);
-    writePresetTheme(next);
-  };
 
   const restoreCherryDefaults = () => {
     patchAndApply({
@@ -211,61 +229,27 @@ function GeneralSection() {
   return (
     <>
       <h2 className="cherry-settings-title">通用</h2>
-      <p className="cherry-settings-subtitle">语言、外观主题、首屏行为</p>
+      <p className="cherry-settings-subtitle">主题与外观定制</p>
 
       <div className="cherry-settings-section">
-        <div className="cherry-settings-row">
-          <div>
-            <div className="cherry-settings-row-label">外观主题</div>
-            <div className="cherry-settings-row-desc">跟随系统切换深浅色，或手动锁定。</div>
-          </div>
-          <div className="cherry-settings-row-control">
-            <div className="cherry-segmented">
-              <button type="button" className={theme === "auto" ? "active" : ""} onClick={() => select("auto")}>
-                <Monitor size={12} style={{ marginRight: 4, verticalAlign: "-2px" }} />
-                系统
-              </button>
-              <button type="button" className={theme === "light" ? "active" : ""} onClick={() => select("light")}>
-                <Sun size={12} style={{ marginRight: 4, verticalAlign: "-2px" }} />
-                浅色
-              </button>
-              <button type="button" className={theme === "dark" ? "active" : ""} onClick={() => select("dark")}>
-                <Moon size={12} style={{ marginRight: 4, verticalAlign: "-2px" }} />
-                深色
-              </button>
-            </div>
-          </div>
-        </div>
-        <div className="cherry-settings-row">
-          <div>
-            <div className="cherry-settings-row-label">界面语言</div>
-            <div className="cherry-settings-row-desc">当前：简体中文（其他语言即将推出）</div>
-          </div>
-          <div className="cherry-settings-row-control">
-            <select className="cherry-select" defaultValue="zh-CN" style={{ width: 140 }}>
-              <option value="zh-CN">简体中文</option>
-              <option value="en-US" disabled>English（WIP）</option>
-            </select>
-          </div>
-        </div>
         {hasLegacy && (
           <div className="cherry-settings-row">
             <div>
-              <div className="cherry-settings-row-label">还原 Cherry 默认外观</div>
+              <div className="cherry-settings-row-label">还原默认外观</div>
               <div className="cherry-settings-row-desc">
-                检测到经典工作台中保存过的壁纸 / 半透明度 / 圆角设置。Cherry 默认是无壁纸的纯净背景。
+                检测到经典工作台保存过的壁纸 / 半透明度 / 圆角设置。默认是无壁纸的纯净背景。
               </div>
             </div>
             <div className="cherry-settings-row-control">
-              <button type="button" className="cherry-btn" onClick={restoreCherryDefaults}>
+              <Button size="sm" variant="ghost" onPress={restoreCherryDefaults}>
                 一键还原
-              </button>
+              </Button>
             </div>
           </div>
         )}
       </div>
 
-      <OpenInAdvancedHint label="更多主题定制（颜色、圆角、壁纸）" path="/settings/theme" />
+      <ThemePanel />
     </>
   );
 }
@@ -274,19 +258,47 @@ function GeneralSection() {
    Section: 显示 (Display)
    ══════════════════════════════════════════════════════════════ */
 
+import { Avatar, Chip, Slider } from "@heroui/react";
+import { usePreferences } from "@/lib/user-preferences";
+import { useUserProfile, profileInitial, setNickname, setAvatar, fileToAvatarDataUrl } from "@/lib/user-profile";
+
 const DENSITY_KEY = "yunque_chat_density";
 type Density = "cozy" | "compact";
 
 function DisplaySection() {
+  const { preferences, updatePreferences } = usePreferences();
   const [density, setDensity] = useState<Density>("cozy");
+  
+  // Local state for immediate feedback
+  const [fontScale, setFontScale] = useState(
+    preferences?.interface?.fontSize === "small" ? 0 :
+    preferences?.interface?.fontSize === "large" ? 2 : 1
+  );
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     setDensity((localStorage.getItem(DENSITY_KEY) as Density) || "cozy");
   }, []);
+  
+  useEffect(() => {
+    const val = preferences?.interface?.fontSize;
+    setFontScale(val === "small" ? 0 : val === "large" ? 2 : 1);
+  }, [preferences?.interface?.fontSize]);
+
   const applyDensity = (d: Density) => {
     setDensity(d);
     localStorage.setItem(DENSITY_KEY, d);
     document.documentElement.setAttribute("data-density", d);
+  };
+
+  const handleFontChange = (val: number | number[]) => {
+    const v = Array.isArray(val) ? val[0] : val;
+    setFontScale(v);
+    const fontSize = v === 0 ? "small" : v === 2 ? "large" : "default";
+    updatePreferences("interface", { fontSize });
+    
+    // Dispatch custom event to trigger immediate update in AppShell
+    window.dispatchEvent(new Event("yunque:preferences-updated"));
   };
 
   return (
@@ -296,19 +308,47 @@ function DisplaySection() {
 
       <div className="cherry-settings-section">
         <div className="cherry-settings-row">
+          <div style={{ flex: 1, paddingRight: 32 }}>
+            <div className="cherry-settings-row-label">全局字号</div>
+            <div className="cherry-settings-row-desc mb-6">调整界面和聊天消息的文字大小。</div>
+            <Slider
+              className="w-full"
+              step={1}
+              maxValue={2} 
+              minValue={0} 
+              value={fontScale}
+              onChange={handleFontChange}
+              aria-label="全局字号"
+            >
+              <Slider.Track className="h-1.5 rounded-full bg-[var(--yunque-bg-muted)]">
+                <Slider.Fill className="bg-[var(--yunque-accent)]" />
+                <Slider.Thumb className="size-4 rounded-full border-2 border-[var(--yunque-surface-1)] bg-[var(--yunque-accent)]" />
+              </Slider.Track>
+            </Slider>
+            <div className="mt-3 flex justify-between text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+              <span>小</span>
+              <span>标准</span>
+              <span>大</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="cherry-settings-row">
           <div>
             <div className="cherry-settings-row-label">消息密度</div>
             <div className="cherry-settings-row-desc">紧凑模式会压缩段落间距、缩小头像。</div>
           </div>
           <div className="cherry-settings-row-control">
-            <div className="cherry-segmented">
-              <button type="button" className={density === "cozy" ? "active" : ""} onClick={() => applyDensity("cozy")}>
-                宽松
-              </button>
-              <button type="button" className={density === "compact" ? "active" : ""} onClick={() => applyDensity("compact")}>
-                紧凑
-              </button>
-            </div>
+            <ToggleButtonGroup
+              selectionMode="single"
+              disallowEmptySelection
+              selectedKeys={new Set([density])}
+              onSelectionChange={(keys) => { const k = [...keys][0]; if (k) applyDensity(String(k) as "cozy" | "compact"); }}
+              aria-label="消息密度"
+            >
+              <ToggleButton id="cozy" variant="ghost">宽松</ToggleButton>
+              <ToggleButton id="compact" variant="ghost"><ToggleButtonGroup.Separator />紧凑</ToggleButton>
+            </ToggleButtonGroup>
           </div>
         </div>
       </div>
@@ -321,117 +361,11 @@ function DisplaySection() {
    ══════════════════════════════════════════════════════════════ */
 
 function ModelsSection({ onClose }: { onClose: () => void }) {
-  const router = useRouter();
-  const [mode, setMode] = useState<string>("smart");
-  const [presets, setPresets] = useState<Array<{ id: string; name: string }>>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const [m, p] = await Promise.all([
-          api.providerMode().catch(() => ({ mode: "smart" })),
-          api.providerPresets().catch(() => ({ presets: [] })),
-        ]);
-        if (!alive) return;
-        setMode(m.mode);
-        setPresets(
-          (p.presets || []).map((x) => ({
-            id: x.id,
-            name: x.name || x.id,
-          }))
-        );
-      } finally {
-        if (alive) setLoading(false);
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, []);
-
   return (
     <>
       <h2 className="cherry-settings-title">模型服务</h2>
-      <p className="cherry-settings-subtitle">选择接入模式、管理提供商密钥与 Tori 中转绑定</p>
-
-      <div className="cherry-settings-section">
-        <div className="cherry-settings-row">
-          <div>
-            <div className="cherry-settings-row-label">接入模式</div>
-            <div className="cherry-settings-row-desc">
-              智能混合：优先直连，故障自动回退 Tori。
-            </div>
-          </div>
-          <div className="cherry-settings-row-control">
-            <div className="cherry-segmented">
-              {["direct", "tori", "smart"].map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  className={mode === m ? "active" : ""}
-                  onClick={async () => {
-                    const next = await api.setProviderMode(m).catch(() => null);
-                    if (next) setMode(next.mode);
-                  }}
-                >
-                  {m === "direct" ? "自带 Key" : m === "tori" ? "Tori 中转" : "智能混合"}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="cherry-settings-section">
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-          <div style={{ fontSize: 13, fontWeight: 500, color: "var(--yunque-text)" }}>
-            内置提供商预设（{loading ? "…" : presets.length}）
-          </div>
-          <button
-            type="button"
-            className="cherry-btn"
-            onClick={() => {
-              onClose();
-              router.push("/settings/providers");
-            }}
-          >
-            <KeyRound size={12} />
-            管理密钥
-            <ExternalLink size={11} style={{ marginLeft: 4, opacity: 0.6 }} />
-          </button>
-        </div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-          {loading && <span style={{ color: "var(--yunque-text-muted)", fontSize: 12 }}>加载中…</span>}
-          {!loading && presets.length === 0 && (
-            <span style={{ color: "var(--yunque-text-muted)", fontSize: 12 }}>
-              暂无预设，点「管理密钥」去添加。
-            </span>
-          )}
-          {presets.slice(0, 14).map((p) => (
-            <span
-              key={p.id}
-              style={{
-                fontSize: 11.5,
-                padding: "3px 8px",
-                borderRadius: 999,
-                background: "var(--yunque-bg-muted)",
-                color: "var(--yunque-text-secondary)",
-              }}
-            >
-              {p.name}
-            </span>
-          ))}
-          {!loading && presets.length > 14 && (
-            <span style={{ fontSize: 11.5, color: "var(--yunque-text-muted)", padding: "3px 4px" }}>
-              +{presets.length - 14}
-            </span>
-          )}
-        </div>
-      </div>
-
-      <OpenInAdvancedHint label="详细的 Provider / Tori / 配额管理" path="/settings/providers" />
+      <p className="cherry-settings-subtitle">接入模式、提供商密钥、Tori 中转与路由</p>
+      <ProvidersPanel onNavigateChat={onClose} />
     </>
   );
 }
@@ -440,58 +374,21 @@ function ModelsSection({ onClose }: { onClose: () => void }) {
    Section: 默认模型 (Defaults)
    ══════════════════════════════════════════════════════════════ */
 
-function DefaultsSection({ onClose }: { onClose: () => void }) {
+function DefaultsSection() {
   return (
     <>
       <h2 className="cherry-settings-title">默认模型</h2>
-      <p className="cherry-settings-subtitle">为不同场景指派默认模型（会话 / 代码 / 视觉）</p>
-
-      <div className="cherry-settings-section">
-        <div className="cherry-settings-row">
-          <div>
-            <div className="cherry-settings-row-label">分场景路由</div>
-            <div className="cherry-settings-row-desc">
-              Cherry 目前把所有场景走同一主模型；细粒度分配在高级工作台里配置。
-            </div>
-          </div>
-          <div className="cherry-settings-row-control">
-            <OpenInAdvancedInline path="/settings/models" onClose={onClose} />
-          </div>
-        </div>
-      </div>
-    </>
-  );
-}
-
-/* ══════════════════════════════════════════════════════════════
-   Section: MCP
-   ══════════════════════════════════════════════════════════════ */
-
-function MCPSection({ onClose }: { onClose: () => void }) {
-  return (
-    <>
-      <h2 className="cherry-settings-title">MCP 服务器</h2>
-      <p className="cherry-settings-subtitle">挂载 MCP 插件（工具 / 资源 / 提示词）</p>
-
-      <div className="cherry-settings-section">
-        <div className="cherry-settings-row">
-          <div>
-            <div className="cherry-settings-row-label">连接状态</div>
-            <div className="cherry-settings-row-desc">
-              MCP 的完整列表、启停、鉴权流程在工作台里会更顺手，因为要看日志和 JSON 配置。
-            </div>
-          </div>
-          <div className="cherry-settings-row-control">
-            <OpenInAdvancedInline path="/mcp" onClose={onClose} />
-          </div>
-        </div>
-      </div>
+      <p className="cherry-settings-subtitle">向量嵌入模型与多模型池（快速 / 专家）配置</p>
+      <GeneralConfigPanel includeGroups={["embedding", "multimodel"]} hideToolbar showGroupHeaders />
     </>
   );
 }
 
 /* ══════════════════════════════════════════════════════════════
    Section: 网络搜索 (Search)
+   MCP and Memory sections were removed from settings: MCP is a power-user /
+   Cogni concern (lives at /mcp), and Memory is a main-path surface reachable
+   from the rail/dashboard — neither belongs as a settings jump-out.
    ══════════════════════════════════════════════════════════════ */
 
 const SEARCH_KEY = "yunque_web_search_enabled";
@@ -511,7 +408,7 @@ function SearchSection() {
   return (
     <>
       <h2 className="cherry-settings-title">网络搜索</h2>
-      <p className="cherry-settings-subtitle">让模型在需要时主动搜索互联网引用</p>
+      <p className="cherry-settings-subtitle">让模型在需要时主动搜索互联网，并配置搜索引擎</p>
 
       <div className="cherry-settings-section">
         <div className="cherry-settings-row">
@@ -522,43 +419,17 @@ function SearchSection() {
             </div>
           </div>
           <div className="cherry-settings-row-control">
-            <button
-              type="button"
-              className={`cherry-switch ${enabled ? "on" : ""}`}
-              aria-pressed={enabled}
-              aria-label="Toggle web search"
-              onClick={toggle}
-            />
+            <Switch isSelected={enabled} onChange={toggle} aria-label="允许网络搜索">
+              <Switch.Control><Switch.Thumb /></Switch.Control>
+            </Switch>
           </div>
         </div>
       </div>
-    </>
-  );
-}
 
-/* ══════════════════════════════════════════════════════════════
-   Section: 记忆 (Memory)
-   ══════════════════════════════════════════════════════════════ */
-
-function MemorySection({ onClose }: { onClose: () => void }) {
-  return (
-    <>
-      <h2 className="cherry-settings-title">全局记忆</h2>
-      <p className="cherry-settings-subtitle">跨会话记住事实、偏好、上下文</p>
-
-      <div className="cherry-settings-section">
-        <div className="cherry-settings-row">
-          <div>
-            <div className="cherry-settings-row-label">记忆编辑器</div>
-            <div className="cherry-settings-row-desc">
-              提取、审阅、手工编辑记忆块，并查看 GraphRAG 社区视图。
-            </div>
-          </div>
-          <div className="cherry-settings-row-control">
-            <OpenInAdvancedInline path="/memory" onClose={onClose} />
-          </div>
-        </div>
-      </div>
+      {/* Real engine config — SEARXNG_URL etc. live in the schema's "other"
+          group; surface them here so search is actually configurable, not
+          just a hollow on/off. */}
+      <GeneralConfigPanel includeGroups={["other"]} hideToolbar showGroupHeaders={false} />
     </>
   );
 }
@@ -607,16 +478,14 @@ function DataSection() {
             </div>
           </div>
           <div className="cherry-settings-row-control">
-            <button
-              type="button"
-              className="cherry-btn"
-              onClick={() => {
-                if (systemInfo?.data_dir) navigator.clipboard?.writeText(systemInfo.data_dir);
-              }}
-              disabled={!systemInfo?.data_dir}
+            <Button
+              size="sm"
+              variant="ghost"
+              isDisabled={!systemInfo?.data_dir}
+              onPress={() => { if (systemInfo?.data_dir) navigator.clipboard?.writeText(systemInfo.data_dir); }}
             >
               复制路径
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -631,9 +500,9 @@ function DataSection() {
             </div>
           </div>
           <div className="cherry-settings-row-control">
-            <button type="button" className="cherry-btn primary" onClick={() => router.push(backupPackStatus === "missing" ? "/packs" : "/packs/backup")}>
+            <Button size="sm" className="btn-accent" onPress={() => router.push(backupPackStatus === "missing" ? "/packs" : "/packs/backup")}>
               {backupPackStatus === "missing" ? "安装 Pack" : "打开备份 Pack"}
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -773,49 +642,269 @@ function OpenInAdvancedInline({
 }) {
   const router = useRouter();
   return (
-    <button
-      type="button"
-      className="cherry-btn"
-      onClick={() => {
-        onClose();
-        router.push(path);
-      }}
-    >
+    <Button size="sm" variant="ghost" onPress={() => { onClose(); router.push(path); }}>
       <Wrench size={12} />
       {label}
       <ExternalLink size={11} style={{ marginLeft: 4, opacity: 0.6 }} />
-    </button>
+    </Button>
   );
 }
 
-function OpenInAdvancedHint({ label, path }: { label: string; path: string }) {
-  const router = useRouter();
+/* ══════════════════════════════════════════════════════════════
+   Section: 系统配置 (System) — true system-level .env config only
+   ══════════════════════════════════════════════════════════════ */
+
+function SystemSection() {
+  // Terminal users don't touch JWT/RateLimit/CORS (security) or DB path/mode
+  // (storage) — those are self-host .env concerns and stay out of the desktop
+  // UI (the backend schema still defines them so .env round-trips work).
+  // filesystem/sandbox_cloud/advanced/other will move to their owning sections
+  // / Packs per SETTINGS-PACK-DELEGATION-DESIGN; kept here until then.
   return (
-    <div
-      style={{
-        marginTop: 8,
-        padding: "10px 12px",
-        background: "var(--yunque-bg)",
-        border: "1px dashed var(--yunque-border)",
-        borderRadius: 10,
-        fontSize: 12,
-        color: "var(--yunque-text-muted)",
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-      }}
-    >
-      <Search size={13} style={{ flexShrink: 0 }} />
-      <span style={{ flex: 1 }}>{label}</span>
-      <button
-        type="button"
-        className="cherry-btn"
-        onClick={() => router.push(path)}
-        style={{ padding: "4px 10px" }}
-      >
-        前往
-        <ExternalLink size={11} style={{ marginLeft: 4, opacity: 0.6 }} />
-      </button>
-    </div>
+    <>
+      <h2 className="cherry-settings-title">系统配置</h2>
+      <p className="cherry-settings-subtitle">文件系统、云沙箱、心跳等运行参数</p>
+      <GeneralConfigPanel includeGroups={["filesystem", "sandbox_cloud", "advanced"]} />
+    </>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Section: 频道接入 (Connectors) — channel tokens (Telegram, Feishu…)
+   ══════════════════════════════════════════════════════════════ */
+
+function ConnectorsSection() {
+  return (
+    <>
+      <h2 className="cherry-settings-title">频道接入</h2>
+      <p className="cherry-settings-subtitle">把云雀接到 Telegram / 飞书 / Discord / Slack / QQ 等渠道</p>
+      <GeneralConfigPanel includeGroups={["channels"]} hideToolbar showGroupHeaders={false} />
+    </>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Section: 桌面助手 (Desktop) — OS-level helpers, desktop-only
+   ══════════════════════════════════════════════════════════════ */
+
+function invokeDesktop<T>(cmd: string, args?: Record<string, unknown>): Promise<T | null> {
+  if (typeof window === "undefined") return Promise.resolve(null);
+  const invoke = (window as unknown as { __TAURI_INTERNALS__?: { invoke?: (c: string, a?: Record<string, unknown>) => Promise<unknown> } }).__TAURI_INTERNALS__?.invoke;
+  if (!invoke) return Promise.resolve(null);
+  return invoke(cmd, args).then((v) => v as T).catch(() => null);
+}
+
+function DesktopSection() {
+  const [isDesktop, setIsDesktop] = useState(false);
+  const [selection, setSelection] = useState<boolean | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const desktop = typeof window !== "undefined" && Boolean((window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__);
+    setIsDesktop(desktop);
+    if (desktop) {
+      invokeDesktop<boolean>("get_selection_assistant_enabled").then((v) => setSelection(typeof v === "boolean" ? v : false));
+    }
+  }, []);
+
+  const toggleSelection = async (next: boolean) => {
+    if (saving) return;
+    setSaving(true);
+    await invokeDesktop("set_selection_assistant_enabled", { enabled: next });
+    setSelection(next);
+    showToast(next ? "已开启划词助手" : "已关闭划词助手", "success");
+    setSaving(false);
+  };
+
+  return (
+    <>
+      <h2 className="cherry-settings-title">桌面助手</h2>
+      <p className="cherry-settings-subtitle">在云雀窗口之外工作的能力，默认关闭</p>
+      <div className="cherry-settings-section">
+        {!isDesktop ? (
+          <div className="cherry-settings-row-desc">这些能力只在桌面客户端可用。</div>
+        ) : (
+          <div className="cherry-settings-row">
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div className="cherry-settings-row-label">划词助手</div>
+              <div className="cherry-settings-row-desc">
+                在任意应用里选中文字后弹出云雀工具栏（搜索 / 翻译 / 解释 / 存储）。
+                开启会监听全局鼠标划选；关闭则只在云雀窗口内生效。
+              </div>
+            </div>
+            <div className="cherry-settings-row-control">
+              <Switch
+                isSelected={selection === true}
+                isDisabled={selection === null || saving}
+                onChange={(v) => toggleSelection(Boolean(v))}
+                aria-label="划词助手开关"
+              >
+                <Switch.Control><Switch.Thumb /></Switch.Control>
+              </Switch>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Section: 账户与仪表盘 (Account)
+   ══════════════════════════════════════════════════════════════ */
+
+import type { CostSummary, SystemInfo as SysInfo } from "@/lib/api";
+
+function AccountSection() {
+  const [costSummary, setCostSummary] = useState<CostSummary | null>(null);
+  const [sysInfo, setSysInfo] = useState<SysInfo | null>(null);
+  const [loading, setLoading] = useState(true);
+  const profile = useUserProfile();
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const displayName = profile.nickname || "云雀本地开发者";
+  const [nameOpen, setNameOpen] = useState(false);
+  const [nameDraft, setNameDraft] = useState("");
+  const editName = () => {
+    setNameDraft(profile.nickname || "");
+    setNameOpen(true);
+  };
+  const saveName = () => {
+    setNickname(nameDraft);
+    setNameOpen(false);
+  };
+  const pickAvatar = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    try {
+      setAvatar(await fileToAvatarDataUrl(file));
+    } catch {
+      /* ignore decode errors */
+    }
+  };
+
+  useEffect(() => {
+    let alive = true;
+    Promise.all([
+      api.costSummary().catch(() => null),
+      api.systemInfo().catch(() => null),
+    ]).then(([cost, sys]) => {
+      if (!alive) return;
+      setCostSummary(cost);
+      setSysInfo(sys);
+      setLoading(false);
+    });
+    return () => { alive = false; };
+  }, []);
+
+  return (
+    <>
+      <h2 className="cherry-settings-title">账户管理</h2>
+      <p className="cherry-settings-subtitle">查看身份信息、运行资源与配额</p>
+
+      <div className="cherry-settings-section" style={{ padding: 0, background: "transparent", border: "none", marginTop: 24 }}>
+        
+        {/* User Card */}
+        <div style={{ background: "var(--yunque-surface-1)", borderRadius: 12, padding: "20px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", border: "1px solid var(--yunque-border)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <button type="button" onClick={() => avatarInputRef.current?.click()} title="更换头像" style={{ borderRadius: "9999px", cursor: "pointer", lineHeight: 0 }}>
+              <Avatar className="size-12 text-large bg-[#4caf50]">
+                {profile.avatar && <Avatar.Image alt={displayName} src={profile.avatar} />}
+                <Avatar.Fallback>{profileInitial(profile.nickname)}</Avatar.Fallback>
+              </Avatar>
+            </button>
+            <input ref={avatarInputRef} type="file" accept="image/*" hidden onChange={pickAvatar} />
+            <div>
+              <div style={{ fontSize: 16, fontWeight: 600, color: "var(--yunque-text)" }}>{displayName}</div>
+              <div style={{ fontSize: 13, color: "var(--yunque-text-muted)" }}>Workspace Owner</div>
+            </div>
+          </div>
+          <Button size="sm" variant="ghost" onPress={editName}>管理身份</Button>
+        </div>
+
+        {/* 改名 Modal（HeroUI 原生，替代浏览器 prompt）。
+            z-index 高于 cherry 设置弹窗(10000)，否则会被压在它下面一层。 */}
+        <Modal.Backdrop isOpen={nameOpen} onOpenChange={setNameOpen} variant="blur" style={{ zIndex: 10001 }}>
+          <Modal.Container placement="center" size="sm">
+            <Modal.Dialog>
+              <Modal.CloseTrigger />
+              <Modal.Header>
+                <Modal.Heading>设置称呼</Modal.Heading>
+              </Modal.Header>
+              <Modal.Body>
+                <TextField value={nameDraft} onChange={setNameDraft} autoFocus>
+                  <Label>怎么称呼你？</Label>
+                  <Input placeholder="例如：夏鸢" onKeyDown={(e) => { if (e.key === "Enter") saveName(); }} />
+                </TextField>
+              </Modal.Body>
+              <Modal.Footer>
+                <Button variant="ghost" slot="close">取消</Button>
+                <Button className="btn-accent" onPress={saveName}>保存</Button>
+              </Modal.Footer>
+            </Modal.Dialog>
+          </Modal.Container>
+        </Modal.Backdrop>
+
+        {/* Dashboard / Credits Card — theme-token colors so it works in both
+            light and dark; data is real (costSummary / sysInfo). */}
+        <div style={{ marginTop: 16, background: "var(--yunque-surface-1)", borderRadius: 12, border: "1px solid var(--yunque-border)", overflow: "hidden", color: "var(--yunque-text)" }}>
+
+          <div style={{ padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--yunque-border)" }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <span style={{ fontSize: 15, fontWeight: 600, color: "var(--yunque-text)" }}>API 运行大盘</span>
+              <Chip size="sm" variant="soft">本地版</Chip>
+            </div>
+          </div>
+
+          <div style={{ padding: "20px", display: "flex", flexDirection: "column", gap: 24 }}>
+            {/* Total Cost */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+                  <Sparkles size={14} style={{ color: "var(--yunque-accent)" }} />
+                  <span style={{ fontSize: 13, color: "var(--yunque-text-muted)" }}>本月预估成本 (USD)</span>
+                </div>
+                <div style={{ color: "var(--yunque-text-muted)", fontSize: 12 }}>
+                  包含所有后端 LLM 的流式输出。
+                </div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontSize: 12, color: "var(--yunque-text-muted)", marginBottom: 4 }}>累计支出</div>
+                <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "ui-monospace, monospace", lineHeight: 1, color: "var(--yunque-text)" }}>
+                  ${costSummary ? costSummary.total_cost_usd?.toFixed(4) : "0.0000"}
+                </div>
+              </div>
+            </div>
+
+            {/* Packages */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                <div>
+                  <div style={{ fontWeight: 600, marginBottom: 4, color: "var(--yunque-text)" }}>基础模型调用</div>
+                  <div style={{ color: "var(--yunque-text-muted)", fontSize: 11 }}>通过云雀 Agent 产生的 API 调用总数</div>
+                </div>
+                <div style={{ textAlign: "right", fontFamily: "ui-monospace, monospace", color: "var(--yunque-text)" }}>
+                  <div style={{ color: "var(--yunque-text-muted)", marginBottom: 2 }}>总量: 无限制</div>
+                  <div style={{ fontWeight: 600 }}>已用: {costSummary ? costSummary.total_calls?.toLocaleString() : "0"}</div>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                <div>
+                  <div style={{ fontWeight: 600, marginBottom: 4, color: "var(--yunque-text)" }}>系统资源占用</div>
+                  <div style={{ color: "var(--yunque-text-muted)", fontSize: 11 }}>Agent 后台进程 (Go)</div>
+                </div>
+                <div style={{ textAlign: "right", fontFamily: "ui-monospace, monospace", color: "var(--yunque-text)" }}>
+                  <div style={{ color: "var(--yunque-text-muted)", marginBottom: 2 }}>内存: {sysInfo ? sysInfo.memory_mb?.toLocaleString() : "0"} MB</div>
+                  <div style={{ fontWeight: 600 }}>CPU: {sysInfo ? sysInfo.cpu_count : "0"} 核</div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+    </>
   );
 }
