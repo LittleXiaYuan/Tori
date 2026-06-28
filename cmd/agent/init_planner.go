@@ -299,6 +299,37 @@ func initPlanner(app *agentrt.App) error {
 		slog.Info("trust gate disabled (TRUST_GATE_DISABLED=true)")
 	}
 
+	// #4: Runtime grade — inject trust gate tier, skill list, and channel-level
+	// risk into the prompt so the LLM knows its own capability boundary.
+	// NOTE: risk_level here is CHANNEL-level (environment risk from where the
+	// request originates), distinct from cognisdk perception's MESSAGE-level
+	// risk (content risk from what the user said). They are orthogonal signals
+	// — channel=cli is high env risk regardless of message; a dependency-seeking
+	// message is high content risk regardless of channel. Both appear in the
+	// prompt under different labels; the LLM should weigh both.
+	p.SetRuntimeGrade(func(tenantID, channel string) string {
+		known := trustTracker.Top(0)
+		var b strings.Builder
+		b.WriteString("## 运行时环境\n\n")
+		b.WriteString("- trust_tier: active\n")
+		if len(known) > 0 {
+			b.WriteString("- available_skills:\n")
+			for _, e := range known {
+				b.WriteString(fmt.Sprintf("  - %s (trust: %d)\n", e.Name, e.Score))
+			}
+		}
+		risk := "low"
+		switch channel {
+		case "api", "webhook":
+			risk = "medium"
+		case "cli", "terminal":
+			risk = "high"
+		}
+		b.WriteString(fmt.Sprintf("- env_risk_level: %s\n", risk))
+		b.WriteString("- channel: " + channel + "\n")
+		return b.String()
+	})
+
 	// Per-tool execution timeout. Default 60s is too short for slow generative
 	// tools (e.g. deck_create asks an LLM to design a full HTML deck, which can
 	// take 1-3 min on a reasoning model). Override via TOOL_TIMEOUT (Go duration,

@@ -10,6 +10,14 @@ import (
 // ImmuneBridge is the cross-cutting safety layer that connects
 // Trust, Guardrails, and CircuitBreaker across all cognitive loops.
 //
+// Status (2026-06 audit): NOT WIRED in production. The ActiveLoop that would
+// call BeforeConversation is dead code (gateway calls Planner.Run directly),
+// and skill-level trust is already covered by planner.SkillTrustGate which
+// IS wired in init_planner.go. BeforeSkill/AfterSkill here would duplicate
+// SkillTrustGate.Check/Record. This type is retained as the future home for
+// unified immune gating once ActiveLoop is adopted or skill trust is
+// consolidated — until then, treat it as scaffolding, not a live gate.
+//
 // It acts as a unified gate: the kernel calls BeforeSkill/AfterSkill around
 // every skill execution, and HandleEvent processes security alerts.
 type ImmuneBridge struct {

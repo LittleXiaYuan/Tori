@@ -326,6 +326,13 @@ func initSoulLayer(deps soulDeps) {
 			if gwRaw, ok := app.Get(agentrt.CompGateway); ok {
 				if gw, ok := gwRaw.(*gateway.Gateway); ok {
 					gw.SetCogniKernel(kernel)
+					// S1 fix: wire gateway's ReflectiveLoop into the kernel so the
+					// 3-loop orchestration (active→reflective) is complete. Without
+					// this, kernel.OnConversationEnd publishes the event but no
+					// subscriber runs reflection (Start() checks k.reflective != nil).
+					if rl := gw.ReflectiveLoop(); rl != nil {
+						kernel.SetReflectiveLoop(rl)
+					}
 				}
 			}
 			slog.Info("cognikernel: ignited with 小羽 offline engine", "interval", interval, "model", xiaoyu.Model())

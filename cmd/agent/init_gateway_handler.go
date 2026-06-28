@@ -381,6 +381,23 @@ func buildChannelHandler(
 					SkillsUsed: result.SkillsUsed,
 				})
 			}
+			// S1 fix: also publish ConversationEnded event to the CogniKernel's
+			// event bus so the 3-loop orchestration (active→reflective) is wired.
+			// The kernel's own triggerReflection subscriber will pick this up and
+			// run its ReflectiveLoop instance (distinct from gateway's). When the
+			// offline engine is configured, this is the path that feeds experience
+			// distillation; when it's not, kernel is nil and this is a no-op.
+			if kernel := gw.CogniKernel(); kernel != nil {
+				kernel.OnConversationEnd(cognikernel.ConversationEndData{
+					TenantID:   tenantID,
+					SessionID:  sessionID,
+					UserIntent: msg.Content,
+					AgentReply: result.Reply,
+					SkillsUsed: result.SkillsUsed,
+					TaskID:     "",
+					Duration:   0, // gateway doesn't track turn duration here
+				})
+			}
 		})
 
 		replyContent := result.Reply

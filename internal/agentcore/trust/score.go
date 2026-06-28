@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"math"
 	"os"
+	"sort"
 	"sync"
 	"time"
 
@@ -200,6 +201,34 @@ func (t *Tracker) Get(slug string) Entry {
 		return *e
 	}
 	return Entry{}
+}
+
+// NamedEntry pairs a skill slug with its trust Entry, for ranked listings.
+type NamedEntry struct {
+	Name  string
+	Score int
+}
+
+// Top returns up to n skills sorted by score descending. n<=0 means all.
+// Used by the runtime-grade context layer (#4) to tell the LLM which skills
+// exist and how trusted each is, so it stops hallucinating tools.
+func (t *Tracker) Top(n int) []NamedEntry {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	out := make([]NamedEntry, 0, len(t.scores))
+	for name, e := range t.scores {
+		out = append(out, NamedEntry{Name: name, Score: e.Score})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Score != out[j].Score {
+			return out[i].Score > out[j].Score
+		}
+		return out[i].Name < out[j].Name
+	})
+	if n > 0 && len(out) > n {
+		out = out[:n]
+	}
+	return out
 }
 
 // Seed sets a skill's trust score directly without per-promotion logging.
