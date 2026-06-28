@@ -3,6 +3,17 @@
 @import "@heroui-pro/react/css";
 @import "highlight.js/styles/github-dark-dimmed.css";
 
+/* 让 Tailwind 的 rounded-{sm,md,lg,xl} 工具类读取运行时可变的 --yunque-radius-*，
+   这样主题面板调「圆角大小」（applyTheme 改 --yunque-radius-*）能影响全部
+   444 处 rounded-* 硬编码，而不仅是少量用 var(--radius-*) 的自定义 class。
+   @theme inline 使生成的工具类用 var() 引用，而非编译期固化像素值。 */
+@theme inline {
+  --radius-sm: var(--yunque-radius-sm);
+  --radius-md: var(--yunque-radius-md);
+  --radius-lg: var(--yunque-radius-lg);
+  --radius-xl: var(--yunque-radius-xl);
+}
+
 /* ═══════════════════════════════════════════════
    云雀 Agent Design Token System v5 (Liquid Glass)
    macOS Vibrancy / Win11 Acrylic 平台原生模糊 + CSS 玻璃层
@@ -119,11 +130,17 @@
   --text-kpi: calc(2.25rem * var(--font-scale));
   --text-kpi-lg: calc(2.75rem * var(--font-scale));
 
-  /* ── Border radius (略放大，向 macOS 靠拢) ── */
-  --radius-sm: 8px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-  --radius-xl: 18px;
+  /* ── Border radius (略放大，向 macOS 靠拢) ──
+     运行时由 applyTheme 改 --yunque-radius-*；--radius-* 引用它们，
+     这样自定义 class 和 Tailwind rounded-* 工具类都跟随主题圆角设置。 */
+  --yunque-radius-sm: 8px;
+  --yunque-radius-md: 10px;
+  --yunque-radius-lg: 14px;
+  --yunque-radius-xl: 18px;
+  --radius-sm: var(--yunque-radius-sm);
+  --radius-md: var(--yunque-radius-md);
+  --radius-lg: var(--yunque-radius-lg);
+  --radius-xl: var(--yunque-radius-xl);
 
   /* ── Shadows (柔和宽散) ── */
   --shadow-sm: 0 1px 2px rgba(0,0,0,0.20);

@@ -42,7 +42,7 @@ export interface ThemeConfig {
 export const DEFAULT_THEME: ThemeConfig = {
   presetTheme: "dark",
   colorTheme: "deep_sea",
-  customColor: "#0284c7",
+  customColor: "#4f7da6",
   radius: "default",
   sidebarOpacity: 100,
   contentOpacity: 100,
@@ -61,7 +61,7 @@ export const DEFAULT_THEME: ThemeConfig = {
 
 export const COLOR_THEMES: { id: string; name: string; color: string }[] = [
   { id: "time_monologue", name: "时光独白", color: "#a1a1aa" },
-  { id: "deep_sea", name: "深海微光", color: "#0284c7" },
+  { id: "deep_sea", name: "深海微光", color: "#4f7da6" },
   { id: "purple_jade", name: "紫玉幻境", color: "#a855f7" },
   { id: "mint_ice", name: "薄荷冰蓝", color: "#2dd4bf" },
   { id: "sakura_fall", name: "落樱飞雪", color: "#f472b6" },
@@ -192,7 +192,7 @@ export function applyTheme(cfg: ThemeConfig): void {
   const palette =
     cfg.colorTheme === "custom"
       ? cfg.customColor
-      : COLOR_THEMES.find((c) => c.id === cfg.colorTheme)?.color ?? "#0284c7";
+      : COLOR_THEMES.find((c) => c.id === cfg.colorTheme)?.color ?? "#4f7da6";
   const hoverColor = darkenHex(palette, 0.15);
   const { r: pr, g: pg, b: pb } = hexToRgb(palette);
 
@@ -218,10 +218,13 @@ export function applyTheme(cfg: ThemeConfig): void {
   };
   const rv = radiusMap[cfg.radius] ?? "10px";
   const rvNum = parseInt(rv);
-  s.setProperty("--radius-sm", rvNum === 0 ? "0px" : `${Math.max(rvNum - 2, 2)}px`);
-  s.setProperty("--radius-md", rv);
-  s.setProperty("--radius-lg", rvNum === 0 ? "0px" : `${rvNum + 4}px`);
-  s.setProperty("--radius-xl", rvNum === 0 ? "0px" : `${rvNum + 8}px`);
+  // Drive --yunque-radius-* (the source the CSS maps both custom classes and
+  // Tailwind's rounded-* utilities onto), so the radius setting affects the
+  // whole UI, not only the handful of var(--radius-*) custom classes.
+  s.setProperty("--yunque-radius-sm", rvNum === 0 ? "0px" : `${Math.max(rvNum - 2, 2)}px`);
+  s.setProperty("--yunque-radius-md", rv);
+  s.setProperty("--yunque-radius-lg", rvNum === 0 ? "0px" : `${rvNum + 4}px`);
+  s.setProperty("--yunque-radius-xl", rvNum === 0 ? "0px" : `${rvNum + 8}px`);
 
   const sidebarEl = document.querySelector<HTMLElement>("[data-sidebar]");
   if (sidebarEl) sidebarEl.style.opacity = String(cfg.sidebarOpacity / 100);
