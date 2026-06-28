@@ -25,6 +25,7 @@ import {
   Workflow,
 } from "lucide-react";
 import PageHeader from "@/components/page-header";
+import { confirmAction } from "@/components/confirm-dialog";
 import { showToast } from "@/components/toast-provider";
 import {
   createPacksClient,
@@ -44,6 +45,7 @@ import {
   packInstallChecklist,
   packDeliveryProfile,
   packFeatureFlags,
+  packManifestAudit,
   packPermissionSummary,
   packReadiness,
   packSafeOpenPath,
@@ -67,6 +69,44 @@ type DetailState = {
   releaseEntry?: PackReleaseCatalogEntry;
 };
 
+function CollapsibleSection({
+  title,
+  icon,
+  defaultOpen = false,
+  trailing,
+  children,
+}: {
+  title: string;
+  icon?: React.ReactNode;
+  defaultOpen?: boolean;
+  trailing?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <Card className="section-card p-4">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-2 text-sm font-semibold"
+        aria-expanded={open}
+        style={{ color: "var(--yunque-text)" }}
+      >
+        {icon}
+        <span>{title}</span>
+        {trailing}
+        <span className="ml-auto" style={{ color: "var(--yunque-text-muted)" }}>
+          {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+        </span>
+      </button>
+      {/* hidden 而非条件渲染：内容留在 DOM，满足测试 getByText，仅视觉折叠 */}
+      <div hidden={!open} className="mt-3 pt-3 border-t" style={{ borderColor: "var(--yunque-border)" }}>
+        {children}
+      </div>
+    </Card>
+  );
+}
+
 function statusTone(status: string): { label: string; color: string; bg: string } {
   if (status === "enabled") return { label: "已启用", color: "var(--yunque-success)", bg: "rgba(34,197,94,0.10)" };
   if (status === "disabled") return { label: "已禁用", color: "var(--yunque-text-muted)", bg: "rgba(255,255,255,0.05)" };
@@ -82,7 +122,7 @@ function packStatusBadge(packStatus?: string): { icon: string; label: string; co
 
 function deliveryToneStyle(tone: ReturnType<typeof packDeliveryProfile>["tone"]): { background: string; borderColor: string; color: string } {
   if (tone === "success") return { background: "rgba(34,197,94,0.10)", borderColor: "rgba(34,197,94,0.28)", color: "var(--yunque-success)" };
-  if (tone === "primary") return { background: "rgba(59,130,246,0.10)", borderColor: "rgba(59,130,246,0.24)", color: "var(--yunque-primary)" };
+  if (tone === "primary") return { background: "var(--yunque-accent-muted)", borderColor: "var(--yunque-border-accent)", color: "var(--yunque-primary)" };
   if (tone === "warning") return { background: "rgba(245,158,11,0.12)", borderColor: "rgba(245,158,11,0.28)", color: "var(--yunque-warning)" };
   return { background: "rgba(239,68,68,0.10)", borderColor: "rgba(239,68,68,0.26)", color: "var(--yunque-danger)" };
 }
@@ -315,6 +355,7 @@ export default function PackDetailClientPage() {
   const boundarySummary = packBoundarySummary(manifest);
   const usability = packUsability(manifest);
   const readiness = packReadiness(manifest);
+  const manifestAudit = packManifestAudit(manifest);
   const delivery = packDeliveryProfile(manifest);
   const deliveryLabel = displayDeliveryLabel(delivery.label, delivery.level);
   const deliveryStyle = deliveryToneStyle(delivery.tone);
@@ -354,6 +395,12 @@ export default function PackDetailClientPage() {
       detail: readiness.missing.length > 0
         ? readiness.missing.join("、")
         : "说明、入口、示例与能力边界已基本完整，可继续打磨更具体的用户路径。",
+    },
+    {
+      label: "Manifest 审计",
+      detail: manifestAudit.issues.length > 0
+        ? `${manifestAudit.label}：${manifestAudit.issues.map((issue) => issue.label).join("、")}`
+        : "入口、routeSpecs、能力和权限没有发现明显结构性缺口。",
     },
     {
       label: "来源与包",
@@ -400,20 +447,38 @@ export default function PackDetailClientPage() {
     secondaryHref: openPath ? packCenterFocusHref(manifest.id) : undefined,
     secondaryActionLabel: "回中心管理",
   });
-  const disable = () => run("disable", () => packsClient.disable(manifest.id), {
+  const disable = async () => {
+    const confirmed = await confirmAction({
+      title: "禁用能力包",
+      body: `确定禁用「${manifest.name || manifest.id}」吗？云雀将不再把它纳入可用能力。`,
+      confirmLabel: "禁用",
+      tone: "warning",
+    });
+    if (!confirmed) return;
+    return run("disable", () => packsClient.disable(manifest.id), {
     title: "能力包已禁用",
     detail: "云雀不会再把它纳入可用能力；你可以回中心确认状态，或稍后重新启用。",
     href: packCenterFocusHref(manifest.id),
     actionLabel: "回中心确认",
-  });
-  const rollback = () => run("rollback", () => packsClient.rollback(manifest.id), {
+    });
+  };
+  const rollback = async () => {
+    const confirmed = await confirmAction({
+      title: "回滚能力包",
+      body: `确定回滚「${manifest.name || manifest.id}」吗？当前版本的能力、入口或产物可能会退回上一版本。`,
+      confirmLabel: "回滚",
+      tone: "danger",
+    });
+    if (!confirmed) return;
+    return run("rollback", () => packsClient.rollback(manifest.id), {
     title: "能力包已回滚",
     detail: openPath ? "建议重新打开入口验证结果、权限和产物是否回到预期；如果仍有问题，回中心继续禁用或交给小羽检查。" : "建议回中心确认版本与状态；如果仍有问题，继续禁用或交给小羽检查。",
     href: openPath || packCenterFocusHref(manifest.id),
     actionLabel: openPath ? "打开入口复验" : "回中心确认",
     secondaryHref: openPath ? packCenterFocusHref(manifest.id) : undefined,
     secondaryActionLabel: "回中心排查",
-  });
+    });
+  };
   const nextSteps: NextStep[] = !installed
     ? [
         {
@@ -513,7 +578,7 @@ export default function PackDetailClientPage() {
             {deliveryLabel}
           </Chip>
           <Chip size="sm" variant="soft">v{manifest.version}</Chip>
-          <Chip size="sm" style={{ background: "rgba(59,130,246,0.08)", color: "var(--yunque-primary)" }}>
+          <Chip size="sm" style={{ background: "var(--yunque-accent-soft)", color: "var(--yunque-primary)" }}>
             {usability.label}
           </Chip>
           <Chip size="sm" variant="soft" className="font-mono">{manifest.id}</Chip>
@@ -609,7 +674,7 @@ export default function PackDetailClientPage() {
                 <div className="flex items-center gap-2">
                   <span
                     className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-semibold"
-                    style={{ background: "rgba(59,130,246,0.12)", color: "var(--yunque-primary)" }}
+                    style={{ background: "var(--yunque-accent-muted)", color: "var(--yunque-primary)" }}
                   >
                     {idx + 1}
                   </span>
@@ -753,9 +818,9 @@ export default function PackDetailClientPage() {
               怎么验证它有用
             </div>
           </div>
-          <div className="mb-3 rounded-md border px-3 py-2 text-xs leading-5" style={{ borderColor: "rgba(59,130,246,0.22)", background: "rgba(59,130,246,0.07)", color: "var(--yunque-text-secondary)" }}>
-            <span className="font-semibold" style={{ color: "var(--yunque-text)" }}>验收出口：</span>
-            回中心确认状态，进详情复查权限{openPath ? "，再打开入口复验。" : "；这个包没有独立入口，需从 Chat、任务、记忆或知识流程触发并观察结果。"}
+          <div className="mb-3 rounded-md border px-3 py-2 text-xs leading-5" style={{ borderColor: "var(--yunque-border-accent)", background: "var(--yunque-accent-soft)", color: "var(--yunque-text-secondary)" }}>
+            <span className="font-semibold" style={{ color: "var(--yunque-text)" }}>验收：</span>
+            中心看状态，详情复查权限{openPath ? "，再打开入口复验。" : "；没有独立入口时，从 Chat、任务、记忆或知识流程触发。"}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {verificationSteps.map((step, idx) => (
@@ -767,7 +832,7 @@ export default function PackDetailClientPage() {
                 <div className="flex items-center gap-2 mb-2">
                   <span
                     className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-semibold"
-                    style={{ background: "rgba(59,130,246,0.12)", color: "var(--yunque-primary)" }}
+                    style={{ background: "var(--yunque-accent-muted)", color: "var(--yunque-primary)" }}
                   >
                     {idx + 1}
                   </span>
@@ -813,6 +878,57 @@ export default function PackDetailClientPage() {
             </div>
           )}
         </Card>
+
+        <CollapsibleSection
+          title="Manifest 审计"
+          icon={manifestAudit.level === "blocked" ? (
+            <ShieldAlert size={16} style={{ color: "var(--yunque-danger)" }} />
+          ) : (
+            <ShieldCheck size={16} style={{ color: manifestAudit.level === "watch" ? "var(--yunque-warning)" : "var(--yunque-success)" }} />
+          )}
+          trailing={(
+            <Chip
+              size="sm"
+              style={{
+                background: manifestAudit.level === "blocked" ? "rgba(239,68,68,0.10)" : manifestAudit.level === "watch" ? "rgba(245,158,11,0.12)" : "rgba(34,197,94,0.10)",
+                color: manifestAudit.level === "blocked" ? "var(--yunque-danger)" : manifestAudit.level === "watch" ? "var(--yunque-warning)" : "var(--yunque-success)",
+              }}
+            >
+              {manifestAudit.label}
+            </Chip>
+          )}
+        >
+          <div className="text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
+            {manifestAudit.description}
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Chip size="sm" variant="soft">能力 {manifestAudit.summary.capabilities}</Chip>
+            <Chip size="sm" variant="soft">权限 {manifestAudit.summary.permissions}</Chip>
+            <Chip size="sm" variant="soft">routeSpecs {manifestAudit.summary.routeSpecs}</Chip>
+            <Chip size="sm" variant="soft">入口 {manifestAudit.summary.frontendEntries}</Chip>
+          </div>
+          {manifestAudit.issues.length > 0 && (
+            <div className="mt-3 grid gap-2 md:grid-cols-2">
+              {manifestAudit.issues.map((issue) => (
+                <div
+                  key={issue.key}
+                  className="rounded-md border p-3"
+                  style={{
+                    borderColor: issue.tone === "danger" ? "rgba(239,68,68,0.22)" : "rgba(245,158,11,0.22)",
+                    background: issue.tone === "danger" ? "rgba(239,68,68,0.07)" : "rgba(245,158,11,0.07)",
+                  }}
+                >
+                  <div className="text-xs font-semibold" style={{ color: issue.tone === "danger" ? "var(--yunque-danger)" : "var(--yunque-warning)" }}>
+                    {issue.label}
+                  </div>
+                  <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
+                    {issue.detail}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CollapsibleSection>
 
         {examples.length > 0 && (
           <Card className="section-card p-4">
@@ -972,7 +1088,7 @@ export default function PackDetailClientPage() {
                   key={cap}
                   size="sm"
                   className="font-mono"
-                  style={{ background: "rgba(59,130,246,0.08)", color: "var(--yunque-primary)" }}
+                  style={{ background: "var(--yunque-accent-soft)", color: "var(--yunque-primary)" }}
                 >
                   {cap}
                 </Chip>
@@ -991,13 +1107,13 @@ export default function PackDetailClientPage() {
             </div>
             <div className="flex flex-wrap gap-1.5">
               {surfaceLabels.map((label) => (
-                <Chip key={label} size="sm" style={{ background: "rgba(59,130,246,0.08)", color: "var(--yunque-primary)" }}>
+                <Chip key={label} size="sm" style={{ background: "var(--yunque-accent-soft)", color: "var(--yunque-primary)" }}>
                   {label}
                 </Chip>
               ))}
             </div>
             {featureFlags.isIframeBundle && (
-              <div className="mt-3 rounded-md p-3 text-xs" style={{ background: "rgba(59,130,246,0.08)", color: "var(--yunque-text-secondary)" }}>
+              <div className="mt-3 rounded-md p-3 text-xs" style={{ background: "var(--yunque-accent-soft)", color: "var(--yunque-text-secondary)" }}>
                 独立界面包运行在沙箱隔离环境中：不直接获得云雀 token，默认隔离页面能力，只能通过自身声明的后端路由与云雀通信，越权调用会被拒绝并记录。
               </div>
             )}
