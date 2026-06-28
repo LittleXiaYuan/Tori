@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Button, Card, Chip, Disclosure, Input, Label, Modal, Spinner, TextField } from "@heroui/react";
-import { Segment } from "@heroui-pro/react";
+import { Button, Card, Checkbox, Chip, Disclosure, Input, Label, Modal, Spinner, TextField } from "@heroui/react";
+import { Segment, ActionBar } from "@heroui-pro/react";
 import {
   ArrowRight,
   Boxes,
@@ -791,7 +791,7 @@ function renderPagination(
 export default function PacksPageOptimized() {
   const searchParams = useSearchParams();
   const navigationPrefs = useNavigationPreferences();
-  const { data, loading, refresh } = useApiData(async () => packsClient.installed(), { packs: [], count: 0 });
+  const { data, loading, refresh, setData } = useApiData(async () => packsClient.installed(), { packs: [], count: 0 });
   const { data: catalog, loading: catalogLoading, refresh: refreshCatalog } = useApiData(
     async () => packsClient.catalog(),
     { generated_at: "", sources: [], count: 0, installed: 0, enabled: 0, downloadable: 0, capabilities: 0, entries: [] },
@@ -820,6 +820,7 @@ export default function PacksPageOptimized() {
   const [readinessFilter, setReadinessFilter] = useState<ReadinessFilter>("all");
   const [sortMode, setSortMode] = useState<SortMode>("name");
   const [installedPage, setInstalledPage] = useState(1);
+  const [selectedPackIds, setSelectedPackIds] = useState<Set<string>>(new Set());
   const [releasePage, setReleasePage] = useState(1);
   const [privatePage, setPrivatePage] = useState(1);
   const [readinessQueuePage, setReadinessQueuePage] = useState(1);
@@ -1262,10 +1263,19 @@ export default function PacksPageOptimized() {
     packId: id,
   });
 
-  const run = async (label: string, op: () => Promise<unknown>, successMsg = "操作成功", notice?: CenterActionNotice) => {
+  const run = async (
+    label: string,
+    op: () => Promise<unknown>,
+    successMsg = "操作成功",
+    notice?: CenterActionNotice,
+    onResult?: (result: unknown) => void,
+  ) => {
     setBusy(label);
     try {
-      await op();
+      const result = await op();
+      // 乐观更新：用后端返回的新状态立刻刷新 UI，不必等 refreshAll，
+      // 否则用户点完启用/禁用要等几百毫秒~几秒列表才变，感觉像没生效。
+      onResult?.(result);
       if (notice) setActionNotice(notice);
       showToast(successMsg, "success");
       await refreshAll();
@@ -1316,11 +1326,55 @@ export default function PacksPageOptimized() {
   const studioReturnVerificationSteps = studioReturnManifest
     ? packVerificationSteps(studioReturnManifest).slice(0, 2)
     : [];
+  // 用 enable/disable 返回的新状态就地更新本地已安装列表，实现乐观刷新。
+  const patchPackStatus = (id: string, result: unknown) => {
+    const status = (result as { status?: string } | null)?.status;
+    if (!status) return;
+    setData((prev) => ({
+      ...prev,
+      packs: prev.packs.map((p) => (p.manifest?.id === id ? { ...p, status } : p)),
+    }));
+  };
   const enable = (id: string) => {
     const manifest = manifestById(id);
-    return run(`enable:${id}`, () => packsClient.enable(id), "已启用，可在命令菜单、扩展分组或本页入口打开", manifest ? noticeForEnabled(manifest) : undefined);
+    return run(`enable:${id}`, () => packsClient.enable(id), "已启用，可在命令菜单、扩展分组或本页入口打开", manifest ? noticeForEnabled(manifest) : undefined, (r) => patchPackStatus(id, r));
   };
-  const disable = (id: string) => run(`disable:${id}`, () => packsClient.disable(id), "已禁用", noticeForDisabled(id));
+  const disable = (id: string) => run(`disable:${id}`, () => packsClient.disable(id), "已禁用", noticeForDisabled(id), (r) => patchPackStatus(id, r));
+
+  // 批量启用/禁用：用后端批量接口一次处理选中的多个能力包。
+  const runBatch = async (label: string, op: (ids: string[]) => Promise<{ results: { id: string; ok: boolean; status?: string }[]; succeeded: number; total: number }>, verb: string) => {
+    const ids = [...selectedPackIds];
+    if (ids.length === 0) return;
+    setBusy(label);
+    try {
+      const res = await op(ids);
+      // 乐观更新：把成功项的新状态就地写入本地列表。
+      setData((prev) => ({
+        ...prev,
+        packs: prev.packs.map((p) => {
+          const hit = res.results.find((r) => r.ok && r.status && r.id === p.manifest?.id);
+          return hit ? { ...p, status: hit.status as string } : p;
+        }),
+      }));
+      showToast(`已${verb} ${res.succeeded}/${res.total} 个能力包`, res.succeeded === res.total ? "success" : "warning");
+      setSelectedPackIds(new Set());
+      await refreshAll();
+      window.dispatchEvent(new CustomEvent("yunque:packs-changed"));
+    } catch (e) {
+      showToast(formatPackInstallError(e, "批量操作失败"), "error");
+    } finally {
+      setBusy(null);
+    }
+  };
+  const batchEnable = () => runBatch("batch:enable", (ids) => packsClient.batchEnable(ids), "启用");
+  const batchDisable = () => runBatch("batch:disable", (ids) => packsClient.batchDisable(ids), "禁用");
+  const togglePackSelected = (id: string, selected: boolean) => {
+    setSelectedPackIds((prev) => {
+      const next = new Set(prev);
+      if (selected) next.add(id); else next.delete(id);
+      return next;
+    });
+  };
   const rollback = (id: string) => run(`rollback:${id}`, () => packsClient.rollback(id), "已回滚", noticeForRollback(id));
 
   const navItemsForPack = (pack: InstalledPack) => buildPackNavItems([pack]);
@@ -1424,7 +1478,7 @@ export default function PacksPageOptimized() {
   }
 
   return (
-    <div className="flex flex-col" style={{ height: "100vh", overflowY: "auto" }}>
+    <div className="flex flex-col min-h-0" style={{ height: "100%", overflowY: "auto" }}>
       <div className="p-5 border-b" style={{ borderColor: "var(--yunque-border)" }}>
         <PageHeader
           icon={<Boxes size={20} />}
@@ -2464,19 +2518,112 @@ export default function PacksPageOptimized() {
           </div>
         )}
       </div>
+
+      <ActionBar isOpen={selectedPackIds.size > 0} aria-label="批量操作能力包">
+        <ActionBar.Prefix>
+          <span className="text-sm" style={{ color: "var(--yunque-text)" }}>已选 {selectedPackIds.size} 个</span>
+        </ActionBar.Prefix>
+        <ActionBar.Content>
+          <Button size="sm" className="btn-accent" isDisabled={busy === "batch:enable"} onPress={batchEnable}>
+            <Power size={14} /> 批量启用
+          </Button>
+          <Button size="sm" variant="outline" isDisabled={busy === "batch:disable"} onPress={batchDisable}>
+            <PackageX size={14} /> 批量禁用
+          </Button>
+        </ActionBar.Content>
+        <ActionBar.Suffix>
+          <Button size="sm" variant="ghost" onPress={() => setSelectedPackIds(new Set())}>取消</Button>
+        </ActionBar.Suffix>
+      </ActionBar>
     </div>
   );
 
   function renderInstalledSection(title: string, sectionPacks: InstalledPack[], note?: string) {
     if (sectionPacks.length === 0) return null;
+    const allIds = sectionPacks.map((p) => p.manifest.id);
+    const selectedInSection = allIds.filter((id) => selectedPackIds.has(id));
+    const allSelected = selectedInSection.length === allIds.length && allIds.length > 0;
+    const someSelected = selectedInSection.length > 0 && !allSelected;
+    const toggleAll = (checked: boolean) => {
+      setSelectedPackIds((prev) => {
+        const next = new Set(prev);
+        if (checked) allIds.forEach((id) => next.add(id));
+        else allIds.forEach((id) => next.delete(id));
+        return next;
+      });
+    };
     return (
       <div>
-        <div className="flex items-center gap-2 mb-3">
+        <div className="flex items-center gap-3 mb-3">
+          <Checkbox isSelected={allSelected} isIndeterminate={someSelected} onChange={toggleAll} aria-label={`全选${title}`}>
+            <Checkbox.Control><Checkbox.Indicator /></Checkbox.Control>
+          </Checkbox>
           <h3 className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>{title} · {sectionPacks.length} 个</h3>
           {note && <Chip size="sm" variant="soft" color="warning">{note}</Chip>}
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {sectionPacks.map((pack) => renderPackCard(pack))}
+        {advancedVisible ? (
+          // 维护/高级模式：保留全功能卡片（展开详情、交付状态、入口、信任条等）。
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {sectionPacks.map((pack) => renderPackCard(pack))}
+          </div>
+        ) : (
+          // 普通模式：轻量行列表，降低对零基础用户的复杂度。
+          <div className="flex flex-col rounded-lg border overflow-hidden" style={{ borderColor: "var(--yunque-border)" }}>
+            {sectionPacks.map((pack) => renderPackRow(pack))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  function renderPackRow(pack: InstalledPack) {
+    const manifest = pack.manifest;
+    const tone = statusTone(pack.status);
+    const risk = riskProfileForPack(manifest);
+    const openPath = packSafeOpenPath(manifest);
+    const usability = packUsability(manifest);
+    const selected = selectedPackIds.has(manifest.id);
+    const enabled = pack.status === "enabled";
+    return (
+      <div
+        key={manifest.id}
+        data-pack-row={manifest.id}
+        className="pack-row flex items-center gap-3 px-4 py-3 border-b last:border-b-0 transition-colors"
+        style={{ borderColor: "var(--yunque-border)", background: selected ? "var(--yunque-accent-soft)" : "transparent" }}
+      >
+        <Checkbox isSelected={selected} onChange={(c) => togglePackSelected(manifest.id, c)} aria-label={`选择 ${manifest.name}`}>
+          <Checkbox.Control><Checkbox.Indicator /></Checkbox.Control>
+        </Checkbox>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Link href={`/packs/detail?id=${encodeURIComponent(manifest.id)}`} className="text-sm font-medium truncate hover:underline" style={{ color: "var(--yunque-text)" }}>{manifest.name}</Link>
+            <Chip size="sm" variant="soft" color={tone.chip}>{tone.label}</Chip>
+            {advancedVisible && risk.requiresAuthorization && (
+              <Chip size="sm" variant="soft" color="danger">需要授权</Chip>
+            )}
+          </div>
+          {manifest.description && (
+            <div className="mt-0.5 text-xs truncate" style={{ color: "var(--yunque-text-muted)" }}>{manifest.description}</div>
+          )}
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {enabled ? (
+            <Button size="sm" variant="outline" isDisabled={busy === `disable:${manifest.id}`} onPress={() => disable(manifest.id)}>
+              <PackageX size={14} /> 禁用
+            </Button>
+          ) : (
+            <Button size="sm" className="btn-accent" isDisabled={busy === `enable:${manifest.id}`} onPress={() => enable(manifest.id)}>
+              <Power size={14} /> 启用
+            </Button>
+          )}
+          {enabled && openPath && (
+            <Link href={openPath}>
+              <Button size="sm" variant="ghost"><ExternalLink size={14} /> {usability.primaryActionLabel || "打开"}</Button>
+            </Link>
+          )}
+          <Link href={`/packs/detail?id=${encodeURIComponent(manifest.id)}`}>
+            <Button size="sm" variant="ghost" className="px-3">详情 <ArrowRight size={14} /></Button>
+          </Link>
         </div>
       </div>
     );
@@ -2780,16 +2927,18 @@ export default function PacksPageOptimized() {
                 )}
               </div>
             </div>
-            <PackTrustStrip
-              source={sourceSummary}
-              showSourceFact={advancedVisible}
-              showSourceHint={advancedVisible}
-              runtime={tone.label}
-              runtimeTone={runtimeTone}
-              risk={risk}
-              delivery={delivery}
-              readiness={readiness}
-            />
+            {advancedVisible && (
+              <PackTrustStrip
+                source={sourceSummary}
+                showSourceFact={advancedVisible}
+                showSourceHint={advancedVisible}
+                runtime={tone.label}
+                runtimeTone={runtimeTone}
+                risk={risk}
+                delivery={delivery}
+                readiness={readiness}
+              />
+            )}
           </Card.Content>
         </Link>
 
