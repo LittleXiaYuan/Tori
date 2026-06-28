@@ -16,6 +16,21 @@ import (
 	iledger "yunque-agent/internal/ledger"
 )
 
+// isPlaceholderSecret reports whether an LLM API key is empty or an obvious
+// example/placeholder value that should not be treated as a usable credential.
+func isPlaceholderSecret(key string) bool {
+	k := strings.ToLower(strings.TrimSpace(key))
+	if k == "" {
+		return true
+	}
+	for _, p := range []string{"changeme", "placeholder", "your-key", "your_api_key", "your-api-key", "sk-xxx", "replace-me", "replace_me", "example"} {
+		if strings.Contains(k, p) {
+			return true
+		}
+	}
+	return false
+}
+
 // offlineEngineKey is the app-registry key under which the stateful 小羽
 // (RWKV-7) dream driver is stored. The CogniKernel ignition (init_soul.go)
 // pulls it from here to drive the background self-evolution loop.
@@ -127,6 +142,13 @@ func initLLM(app *agentrt.App) error {
 		app.Providers.SetPersistPath(appdir.File("providers.json"))
 		slog.Info("provider: using JSON file for persistence (Ledger unavailable)")
 	}
+	// Only enable the .env-derived "primary" provider when it is actually
+	// configured (non-empty + not a known placeholder). An unconfigured or
+	// placeholder primary used to register as enabled, so the "smart"
+	// auto-tier could pick it and fail every request with "密钥无效", even
+	// when the user had a working provider configured in the UI. Registering
+	// it disabled keeps it out of auto-selection until a real key is set.
+	primaryEnabled := !cfg.NeedsSetup() && !isPlaceholderSecret(cfg.LLMAPIKey)
 	_ = app.Providers.Register(llm.ProviderConfig{
 		ID:           "primary",
 		DisplayName:  "Primary (" + cfg.LLMModel + ")",
@@ -134,10 +156,13 @@ func initLLM(app *agentrt.App) error {
 		BaseURL:      cfg.LLMBaseURL,
 		APIKeys:      []string{cfg.LLMAPIKey},
 		Model:        cfg.LLMModel,
-		Enabled:      true,
+		Enabled:      primaryEnabled,
 		Tier:         "smart",
 		Capabilities: []llm.Capability{llm.CapChat, llm.CapTools},
 	})
+	if !primaryEnabled {
+		slog.Warn("primary provider registered disabled: LLM not configured or placeholder key in .env")
+	}
 
 	// Load extra providers from env + file in parallel (these won't overwrite Ledger ones since Register is idempotent by ID)
 	type providerLoadResult struct {
