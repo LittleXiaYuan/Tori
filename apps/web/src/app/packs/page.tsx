@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Button, Card, Checkbox, Chip, Disclosure, Input, Label, Modal, Spinner, TextField } from "@heroui/react";
@@ -143,6 +143,45 @@ const READINESS_FILTER_LABELS: Record<ReadinessFilter, string> = {
   needs_context: "需补说明",
   needs_entry: "需补入口",
 };
+// Display names for manifest metadata.group keys. Groups cluster related packs
+// into collapsible sections in the catalog so a 60-card flat list reads as a
+// handful of families. Unmapped keys fall back to the raw key via packGroupLabel.
+const PACK_GROUP_LABELS: Record<string, string> = {
+  "security-lab": "安全实验室",
+  "inner-world": "内在世界",
+  "automation-lab": "自动化实验",
+  automation: "自动化",
+  memory: "记忆",
+  cogni: "认知 Cogni",
+  work: "工作与任务",
+  extensions: "扩展与插件",
+  intelligence: "智能与知识",
+  knowledge: "知识",
+  integration: "集成",
+  governance: "治理",
+  collaboration: "协作",
+  runtime: "运行时",
+  "agent-runtime": "智能体运行时",
+  "control-plane": "控制面",
+  communication: "通讯",
+  chat: "聊天",
+  cognition: "认知",
+  perception: "感知",
+  skills: "技能",
+  developer: "开发者",
+  desktop: "桌面",
+  ops: "运维",
+  overview: "总览",
+};
+const PACK_GROUP_UNGROUPED = "__ungrouped__";
+function packGroupKey(manifest: PackManifest): string {
+  const g = manifest.metadata?.group;
+  return typeof g === "string" && g.trim() ? g.trim() : PACK_GROUP_UNGROUPED;
+}
+function packGroupLabel(key: string): string {
+  if (key === PACK_GROUP_UNGROUPED) return "其他";
+  return PACK_GROUP_LABELS[key] || key;
+}
 const SORT_MODE_LABELS: Record<SortMode, string> = {
   name: "按名称",
   kind: "按类型",
@@ -824,6 +863,17 @@ export default function PacksPageOptimized() {
   const [releasePage, setReleasePage] = useState(1);
   const [privatePage, setPrivatePage] = useState(1);
   const [readinessQueuePage, setReadinessQueuePage] = useState(1);
+  // Collapsed catalog groups (by group key). Default expanded; a key present here
+  // means the user folded that family away.
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const toggleGroupCollapsed = (key: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
   const searchFocus = searchParams.get("q")?.trim() || searchParams.get("packId")?.trim() || "";
   const maintenanceMode = searchParams.get("maintenance") === "1";
   const advancedVisible = showAdvanced || maintenanceMode;
@@ -1020,12 +1070,26 @@ export default function PacksPageOptimized() {
     const risk = riskProfileForPack(manifest);
     const readiness = packReadiness(manifest);
     if (normalizedQuery && !packSearchText(manifest).includes(normalizedQuery)) return false;
+    // Demo / reference packs (e.g. dlc-demo, the DLC mechanism's reference impl) opt
+    // out of the production catalog via metadata.catalogHidden. Still reachable when
+    // installed or in advanced/maintenance view —— 隐藏而非删除，后端与测试不受影响。
+    if (!advancedVisible && !options?.installedStatus && manifest.metadata?.catalogHidden === "true") return false;
     if (kindFilter !== "all") {
       if (kindFilter === "infrastructure") {
         if (usability.kind !== "infrastructure" && usability.kind !== "documented") return false;
       } else if (usability.kind !== kindFilter) {
         return false;
       }
+    } else if (!advancedVisible && !options?.installedStatus) {
+      // Default "all" view hides catalog packs with NO user-facing entry —— 没有任何可点
+      // 入口（primaryActionPath / menus / routes）的包是"后厨的锅碗瓢盆"：它们在使用中
+      // 被云雀自动调用（聊天时检索记忆、自动调度任务），用户不需要在能力包中心看到。
+      // 判据按"有无入口"而非 usability 标签——很多 infrastructure 包其实挂着 /chat、
+      // /knowledge、/settings 等入口（documents/files/graph/scheduler…），那些要保留。
+      // 仅对未安装的目录包生效：用户已安装的包永远保留（否则装了却找不到、无法停用）；
+      // 打开「显示高级」或维护模式（advancedVisible）也会显示全部。
+      const entryPath = usability.primaryActionPath || manifest.frontend?.menus?.[0]?.path || manifest.frontend?.routes?.[0]?.path;
+      if (!entryPath) return false;
     }
     if (riskFilter !== "all" && risk.level !== riskFilter) return false;
     if (sourceFilter !== "all" && options?.source !== sourceFilter) return false;
@@ -1043,7 +1107,7 @@ export default function PacksPageOptimized() {
       (pack) => pack.manifest,
       sortMode,
     ),
-    [packs, normalizedQuery, kindFilter, installFilter, riskFilter, sourceFilter, stabilityFilter, readinessFilter, sortMode],
+    [packs, normalizedQuery, kindFilter, installFilter, riskFilter, sourceFilter, stabilityFilter, readinessFilter, sortMode, advancedVisible],
   );
   const filteredReleaseEntries = useMemo(
     () => sortPacks(
@@ -1051,7 +1115,7 @@ export default function PacksPageOptimized() {
       (entry) => entry.manifest,
       sortMode,
     ),
-    [releaseEntries, normalizedQuery, kindFilter, installFilter, riskFilter, sourceFilter, stabilityFilter, readinessFilter, sortMode],
+    [releaseEntries, normalizedQuery, kindFilter, installFilter, riskFilter, sourceFilter, stabilityFilter, readinessFilter, sortMode, advancedVisible],
   );
   const filteredPrivateCatalogEntries = useMemo(
     () => sortPacks(
@@ -1059,7 +1123,7 @@ export default function PacksPageOptimized() {
       (entry) => entry.manifest,
       sortMode,
     ),
-    [privateCatalogEntries, normalizedQuery, kindFilter, installFilter, riskFilter, sourceFilter, stabilityFilter, readinessFilter, sortMode],
+    [privateCatalogEntries, normalizedQuery, kindFilter, installFilter, riskFilter, sourceFilter, stabilityFilter, readinessFilter, sortMode, advancedVisible],
   );
   const totalMatches = filteredInstalledPacks.length + filteredReleaseEntries.length + filteredPrivateCatalogEntries.length;
   const visibleKindStats = useMemo(() => {
@@ -2321,20 +2385,18 @@ export default function PacksPageOptimized() {
             </div>
           ) : filteredReleaseEntries.length > 0 ? (
             <div className="space-y-3">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {pagedReleaseEntries.map((entry) => renderInstallableCard(entry.manifest, {
-                  key: entry.package_url,
-                  source: entry.release_tag || sourceName(entry.release_url),
-                  sourceLabel: releaseSourceLabel(entry),
-                  sourceDetail: entry.package_url || entry.release_url,
-                  size: formatBytes(entry.size_bytes),
-                  action: catalogActionForEntry(entry),
-                  busyKey: `install:${entry.package_url}`,
-                  onInstall: () => installRelease(entry),
-                  packageUrl: typeof entry.package_url === "string" ? entry.package_url : undefined,
-                  sha256: typeof entry.sha256 === "string" ? entry.sha256 : undefined,
-                }))}
-              </div>
+              {renderGroupedInstallable(pagedReleaseEntries, (entry) => renderInstallableCard(entry.manifest, {
+                key: entry.package_url,
+                source: entry.release_tag || sourceName(entry.release_url),
+                sourceLabel: releaseSourceLabel(entry),
+                sourceDetail: entry.package_url || entry.release_url,
+                size: formatBytes(entry.size_bytes),
+                action: catalogActionForEntry(entry),
+                busyKey: `install:${entry.package_url}`,
+                onInstall: () => installRelease(entry),
+                packageUrl: typeof entry.package_url === "string" ? entry.package_url : undefined,
+                sha256: typeof entry.sha256 === "string" ? entry.sha256 : undefined,
+              }))}
               {renderPagination(
                 "官方源",
                 currentReleasePage,
@@ -2426,19 +2488,17 @@ export default function PacksPageOptimized() {
             </div>
           ) : filteredPrivateCatalogEntries.length > 0 ? (
             <div className="space-y-3">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {pagedPrivateCatalogEntries.map((entry) => renderInstallableCard(entry.manifest, {
-                  key: entry.manifest.id,
-                  source: [entry.source, entry.manifest_path, entry.manifest_url, entry.package_url].find((value): value is string => typeof value === "string"),
-                  sourceLabel: privateSourceLabel(entry),
-                  sourceDetail: [entry.package_url, entry.manifest_url, entry.manifest_path, entry.source].find((value): value is string => typeof value === "string"),
-                  action: catalogActionForEntry(entry),
-                  busyKey: `install:${entry.manifest.id}`,
-                  onInstall: () => installCatalogEntry(entry),
-                  packageUrl: typeof entry.package_url === "string" ? entry.package_url : undefined,
-                  sha256: typeof entry.sha256 === "string" ? entry.sha256 : undefined,
-                }))}
-              </div>
+              {renderGroupedInstallable(pagedPrivateCatalogEntries, (entry) => renderInstallableCard(entry.manifest, {
+                key: entry.manifest.id,
+                source: [entry.source, entry.manifest_path, entry.manifest_url, entry.package_url].find((value): value is string => typeof value === "string"),
+                sourceLabel: privateSourceLabel(entry),
+                sourceDetail: [entry.package_url, entry.manifest_url, entry.manifest_path, entry.source].find((value): value is string => typeof value === "string"),
+                action: catalogActionForEntry(entry),
+                busyKey: `install:${entry.manifest.id}`,
+                onInstall: () => installCatalogEntry(entry),
+                packageUrl: typeof entry.package_url === "string" ? entry.package_url : undefined,
+                sha256: typeof entry.sha256 === "string" ? entry.sha256 : undefined,
+              }))}
               {renderPagination(
                 "私有源",
                 currentPrivatePage,
@@ -2537,6 +2597,66 @@ export default function PacksPageOptimized() {
       </ActionBar>
     </div>
   );
+
+  // Groups installable entries by manifest.metadata.group and renders each family
+  // as a collapsible section, so the catalog reads as a handful of named groups
+  // instead of a 60-card flat grid. A single group (or only "其他") renders as a
+  // plain grid with no chrome. Operates on the current page's entries — pagination
+  // stays unchanged, grouping just organizes what's already on screen.
+  function renderGroupedInstallable<E extends { manifest: PackManifest }>(
+    entries: E[],
+    renderCard: (entry: E) => ReactNode,
+  ): ReactNode {
+    const order: string[] = [];
+    const byGroup = new Map<string, E[]>();
+    for (const entry of entries) {
+      const key = packGroupKey(entry.manifest);
+      if (!byGroup.has(key)) {
+        byGroup.set(key, []);
+        order.push(key);
+      }
+      byGroup.get(key)!.push(entry);
+    }
+    // Stable, readable order: named groups first (by label), ungrouped "其他" last.
+    order.sort((a, b) => {
+      if (a === PACK_GROUP_UNGROUPED) return 1;
+      if (b === PACK_GROUP_UNGROUPED) return -1;
+      return packGroupLabel(a).localeCompare(packGroupLabel(b), "zh-Hans-CN");
+    });
+    const meaningfulGroups = order.filter((k) => k !== PACK_GROUP_UNGROUPED);
+    // Nothing to organize: one family (or only ungrouped) → plain grid, no chrome.
+    if (meaningfulGroups.length <= 1) {
+      return (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {entries.map((entry) => renderCard(entry))}
+        </div>
+      );
+    }
+    return (
+      <div className="space-y-3">
+        {order.map((key) => {
+          const groupEntries = byGroup.get(key)!;
+          const collapsed = collapsedGroups.has(key);
+          return (
+            <Disclosure key={key} isExpanded={!collapsed} onExpandedChange={() => toggleGroupCollapsed(key)}>
+              <Disclosure.Heading>
+                <Button slot="trigger" size="sm" variant="ghost" className="w-full justify-start">
+                  <Disclosure.Indicator />
+                  <span className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>{packGroupLabel(key)}</span>
+                  <Chip size="sm" variant="soft">{groupEntries.length}</Chip>
+                </Button>
+              </Disclosure.Heading>
+              <Disclosure.Content>
+                <Disclosure.Body className="mt-2 grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {groupEntries.map((entry) => renderCard(entry))}
+                </Disclosure.Body>
+              </Disclosure.Content>
+            </Disclosure>
+          );
+        })}
+      </div>
+    );
+  }
 
   function renderInstalledSection(title: string, sectionPacks: InstalledPack[], note?: string) {
     if (sectionPacks.length === 0) return null;

@@ -51,6 +51,7 @@
     "rollback": true
   },
   "metadata": {
+    "catalogHidden": "true",
     "spec": "docs/spec/pack-frontend-dlc.md",
     "build": "runtime.sha256 is filled by scripts/release-pack when module.wasm is compiled via 'GOOS=wasip1 GOARCH=wasm go build -o module.wasm ./module'",
     "usability": "experimental",

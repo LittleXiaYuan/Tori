@@ -127,6 +127,8 @@
     "rollback": true
   },
   "metadata": {
+    "group": "security-lab",
+    "catalogHidden": "true",
     "blueprint": "doc/SBOM-DRIFT-DETECTION.md",
     "stage": "pack-shell-before-ci",
     "sync": "backend-registry-drives-frontend",

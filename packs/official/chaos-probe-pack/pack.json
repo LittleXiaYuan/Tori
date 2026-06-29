@@ -122,6 +122,8 @@
     "rollback": true
   },
   "metadata": {
+    "group": "security-lab",
+    "catalogHidden": "true",
     "blueprint": "doc/CHAOS-PROBE.md",
     "stage": "pack-shell-before-scheduler",
     "risk": "ops-governance",

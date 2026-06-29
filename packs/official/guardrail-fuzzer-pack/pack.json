@@ -115,6 +115,8 @@
     "rollback": true
   },
   "metadata": {
+    "group": "security-lab",
+    "catalogHidden": "true",
     "blueprint": "doc/GUARDRAIL-FUZZER.md",
     "stage": "pack-shell-before-ci-fuzz",
     "risk": "security-governance",

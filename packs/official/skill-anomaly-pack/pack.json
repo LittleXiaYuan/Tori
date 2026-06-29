@@ -118,6 +118,8 @@
     "rollback": true
   },
   "metadata": {
+    "group": "security-lab",
+    "catalogHidden": "true",
     "blueprint": "doc/SKILL-ANOMALY-DETECTION.md",
     "stage": "pack-shell-before-audit-hook",
     "sync": "backend-registry-drives-frontend",

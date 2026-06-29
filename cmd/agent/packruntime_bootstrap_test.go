@@ -790,8 +790,9 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 
 	ensureBuiltinPacks(registry)
 	// Count reflects the current auto-seeded packs/official/ set. Adjust if the
-	// builtin pack set changes (dlc-demo stays excluded by design).
-	if got := len(registry.List()); got != 65 {
+	// builtin pack set changes (dlc-demo stays excluded by design; security-lab
+	// is the presentation-layer aggregator over the four security/ops packs).
+	if got := len(registry.List()); got != 66 {
 		t.Fatalf("expected idempotent builtin install, got %d packs", got)
 	}
 }
