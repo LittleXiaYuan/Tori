@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"yunque-agent/internal/agentcore/embeddings"
+	agentcogni "yunque-agent/internal/agentcore/cogni"
 	"yunque-agent/internal/agentcore/llm"
 	"yunque-agent/internal/agentcore/planner"
 	agentrt "yunque-agent/internal/agentcore/runtime"
@@ -87,6 +88,63 @@ func (r plannerCogniRuntime) BuildContext(ctx context.Context, message, tenantID
 		}
 	}
 	return injectModeInstructions(strings.Join(parts, "\n\n"))
+}
+
+// Decide implements the v2 Cogni interface by calling all active Cognis' Analyze
+// methods and merging their decisions. This is the v2 entry point for intelligent
+// context routing and resource allocation.
+//
+// For now, only v1 Cognis are active (via compat adapter), so this returns a
+// minimal decision with just BehaviorText. Once v2 Cognis are implemented
+// (IntentCogni, RiskCogni, etc.), they'll participate in resource allocation.
+func (r plannerCogniRuntime) Decide(ctx context.Context, message, tenantID, channel string) agentcogni.CogniFinalDecision {
+	// Build the CogniRequest for v2 Analyze calls
+	req := agentcogni.CogniRequest{
+		Message:  message,
+		TenantID: tenantID,
+		Channel:  channel,
+		// TODO: populate ConversationHistory and Metadata when available
+	}
+
+	var cognis []agentcogni.CogniWithPriority
+
+	// Wrap v1 hook (if active) in compat adapter
+	if r.active() {
+		v1Adapter := agentcogni.NewV1CompatAdapter(r.hook)
+		decision := v1Adapter.Analyze(ctx, req)
+		cognis = append(cognis, agentcogni.CogniWithPriority{
+			Decision: decision,
+			Priority: v1Adapter.Priority(),
+		})
+	}
+
+	// Wrap beliefAdapter (if active) — it also produces behavioral text via BuildContext
+	// For now, treat it as a separate v1-style Cogni with its own compat adapter
+	if r.beliefAdapter != nil {
+		// beliefAdapter.BuildContext returns text, wrap it in a CogniDecision
+		beliefText := r.beliefAdapter.BuildContext(ctx, message, tenantID, channel, "")
+		if beliefText != "" {
+			cognis = append(cognis, agentcogni.CogniWithPriority{
+				Decision: agentcogni.CogniDecision{
+					BehaviorText: beliefText,
+				},
+				Priority: 0, // Same as v1 compat
+			})
+		}
+	}
+
+	// TODO: Add v2 Cognis here (IntentCogni, EmotionCogni, RiskCogni)
+	// Example:
+	// if r.intentCogni != nil {
+	//     decision := r.intentCogni.Analyze(ctx, req)
+	//     cognis = append(cognis, agentcogni.CogniWithPriority{
+	//         Decision: decision,
+	//         Priority: r.intentCogni.Priority(),
+	//     })
+	// }
+
+	// Merge all decisions
+	return agentcogni.MergeDecisions(cognis)
 }
 
 // injectModeInstructions scans the assembled cogni/belief context for static
