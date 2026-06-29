@@ -93,10 +93,6 @@ func (r plannerCogniRuntime) BuildContext(ctx context.Context, message, tenantID
 // Decide implements the v2 Cogni interface by calling all active Cognis' Analyze
 // methods and merging their decisions. This is the v2 entry point for intelligent
 // context routing and resource allocation.
-//
-// For now, only v1 Cognis are active (via compat adapter), so this returns a
-// minimal decision with just BehaviorText. Once v2 Cognis are implemented
-// (IntentCogni, RiskCogni, etc.), they'll participate in resource allocation.
 func (r plannerCogniRuntime) Decide(ctx context.Context, message, tenantID, channel string) agentcogni.CogniFinalDecision {
 	// Build the CogniRequest for v2 Analyze calls
 	req := agentcogni.CogniRequest{
@@ -108,18 +104,45 @@ func (r plannerCogniRuntime) Decide(ctx context.Context, message, tenantID, chan
 
 	var cognis []agentcogni.CogniWithPriority
 
+	// V2 Cognis: Intent, Emotion, Risk (highest priority, participates in resource allocation)
+
+	// IntentCogni: task classification -> tools/skills mapping
+	intentCogni := agentcogni.NewIntentCogni()
+	intentDecision := intentCogni.Analyze(ctx, req)
+	cognis = append(cognis, agentcogni.CogniWithPriority{
+		Decision: intentDecision,
+		Priority: intentCogni.Priority(), // 100
+	})
+
+	// RiskCogni: safety guardrails -> dangerous tool filtering
+	riskCogni := agentcogni.NewRiskCogni()
+	riskDecision := riskCogni.Analyze(ctx, req)
+	cognis = append(cognis, agentcogni.CogniWithPriority{
+		Decision: riskDecision,
+		Priority: riskCogni.Priority(), // 80
+	})
+
+	// EmotionCogni: emotional support mode -> disable tools for empathy
+	emotionCogni := agentcogni.NewEmotionCogni(nil) // nil = use heuristic detector
+	emotionDecision := emotionCogni.Analyze(ctx, req)
+	cognis = append(cognis, agentcogni.CogniWithPriority{
+		Decision: emotionDecision,
+		Priority: emotionCogni.Priority(), // 50
+	})
+
+	// V1 Cognis: wrapped via compat adapter (lowest priority, only contributes BehaviorText)
+
 	// Wrap v1 hook (if active) in compat adapter
 	if r.active() {
 		v1Adapter := agentcogni.NewV1CompatAdapter(r.hook)
 		decision := v1Adapter.Analyze(ctx, req)
 		cognis = append(cognis, agentcogni.CogniWithPriority{
 			Decision: decision,
-			Priority: v1Adapter.Priority(),
+			Priority: v1Adapter.Priority(), // 0
 		})
 	}
 
 	// Wrap beliefAdapter (if active) — it also produces behavioral text via BuildContext
-	// For now, treat it as a separate v1-style Cogni with its own compat adapter
 	if r.beliefAdapter != nil {
 		// beliefAdapter.BuildContext returns text, wrap it in a CogniDecision
 		beliefText := r.beliefAdapter.BuildContext(ctx, message, tenantID, channel, "")
@@ -133,17 +156,7 @@ func (r plannerCogniRuntime) Decide(ctx context.Context, message, tenantID, chan
 		}
 	}
 
-	// TODO: Add v2 Cognis here (IntentCogni, EmotionCogni, RiskCogni)
-	// Example:
-	// if r.intentCogni != nil {
-	//     decision := r.intentCogni.Analyze(ctx, req)
-	//     cognis = append(cognis, agentcogni.CogniWithPriority{
-	//         Decision: decision,
-	//         Priority: r.intentCogni.Priority(),
-	//     })
-	// }
-
-	// Merge all decisions
+	// Merge all decisions (priority order: Intent=100, Risk=80, Emotion=50, v1=0)
 	return agentcogni.MergeDecisions(cognis)
 }
 

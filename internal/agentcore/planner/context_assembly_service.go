@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"strings"
 
+	agentcogni "yunque-agent/internal/agentcore/cogni"
 	"yunque-agent/internal/agentcore/emotion"
 	"yunque-agent/internal/agentcore/llm"
 	"yunque-agent/internal/observe"
@@ -234,6 +235,21 @@ func (s *ContextAssemblyService) RecordCogniToolOutcome(message, tenantID, chann
 		return
 	}
 	s.cogniService.RecordToolOutcome(message, tenantID, channel, tool, success)
+}
+
+// CogniDecide calls the v2 Cogni runtime's Decide() method to get the merged
+// decision from all active Cognis (IntentCogni, RiskCogni, EmotionCogni, v1 compat).
+// Returns a CogniFinalDecision with intent, tools/skills needed, memory scope, and
+// behavioral guidance. This is the v2 entry point for intelligent resource allocation.
+func (s *ContextAssemblyService) CogniDecide(ctx context.Context, message, tenantID, channel string) agentcogni.CogniFinalDecision {
+	if s == nil || s.cogniService == nil || s.cogniService.runtime == nil {
+		// No cogni runtime wired, return empty decision
+		return agentcogni.CogniFinalDecision{}
+	}
+
+	// Call the v2 Decide() method on the cogni runtime
+	// (wired in cmd/agent/module_cogni.go as plannerCogniRuntime)
+	return s.cogniService.runtime.Decide(ctx, message, tenantID, channel)
 }
 
 func (s *ContextAssemblyService) ApplyCogniSkillFilter(message, tenantID, channel string, in []skills.Skill) []skills.Skill {

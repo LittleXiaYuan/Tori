@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	agentcogni "yunque-agent/internal/agentcore/cogni"
 	"yunque-agent/pkg/skills"
 )
 
@@ -48,6 +49,13 @@ type CogniTool struct {
 // Planner only passes request data through this interface and consumes the
 // rendered outputs.
 type CogniRuntime interface {
+	// Decide is the v2 Cogni entry point: calls all active Cognis' Analyze methods
+	// and merges their decisions into a unified CogniFinalDecision. Returns intent,
+	// tools/skills needed, memory scope, behavioral text, and state.
+	// This replaces the pattern of BuildContext + FilterSkills with a unified decision
+	// that can drive resource allocation (tool/skill filtering) before prompt assembly.
+	Decide(ctx context.Context, message, tenantID, channel string) agentcogni.CogniFinalDecision
+
 	// BuildContext assembles the unified cogni layer for the current turn.
 	// scope is the coarse conversation kind ("emotional", "technical", "")
 	// derived from IntentHint by prompt_builder.intentToScope. It drives the
@@ -55,6 +63,9 @@ type CogniRuntime interface {
 	// non-empty Scopes only activates when scope matches; empty scope = global
 	// beliefs only. This single BuildContext is the sole belief/cogni injection
 	// path — the former parallel belief-context func was removed.
+	//
+	// DEPRECATED in v2: use Decide() instead. BuildContext is kept for backward
+	// compatibility with v1 Cognis that don't participate in resource allocation.
 	BuildContext(ctx context.Context, message, tenantID, channel, scope string) string
 	FilterSkills(message, tenantID, channel string, in []skills.Skill) []skills.Skill
 	Trace(message, tenantID, channel string) (CogniTraceDetail, bool)

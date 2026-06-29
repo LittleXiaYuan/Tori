@@ -376,13 +376,28 @@ collect:
 	// here, so the prompt has one cogni layer instead of two parallel ones.
 	// scope is derived from IntentHint so the belief scope gate (#34) filters
 	// scoped beliefs: emotional boundary dormant in technical turns, etc.
+	//
+	// Step 3 (v2): Call Decide() to get merged CogniFinalDecision, use its
+	// BehaviorText as the primary cogni layer content. Tools/skills filtering
+	// will be wired separately (in React integration or Planner.Run).
 	if injectCogniEnabled && pb.contextAssembly != nil {
-		scope := intentToScope(req.IntentHint)
-		if cgCtx := pb.contextAssembly.CogniContext(ctx, req.LastMessage, req.TenantID, req.Channel, scope); cgCtx != "" {
+		// Get v2 Cogni decision (Intent + Risk + Emotion + v1 compat)
+		decision := pb.contextAssembly.CogniDecide(ctx, req.LastMessage, req.TenantID, req.Channel)
+
+		// Use the merged BehaviorText as the cogni layer content
+		cogniContent := decision.BehaviorText
+
+		// Fallback: if v2 produces no text, use the old v1 path
+		if cogniContent == "" {
+			scope := intentToScope(req.IntentHint)
+			cogniContent = pb.contextAssembly.CogniContext(ctx, req.LastMessage, req.TenantID, req.Channel, scope)
+		}
+
+		if cogniContent != "" {
 			layers = append(layers, ctxwindow.Layer{
 				Name:     "cogni",
 				Priority: ctxwindow.LayerPriorityRetrieval,
-				Content:  cgCtx,
+				Content:  cogniContent,
 			})
 		}
 	}
