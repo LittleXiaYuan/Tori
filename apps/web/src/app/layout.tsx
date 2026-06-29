@@ -32,7 +32,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className="flex min-h-screen text-foreground" suppressHydrationWarning>
-        <div id="bg-overlay" />
+        <div id="bg-overlay" suppressHydrationWarning />
         <a href="#main-content" className="skip-link" suppressHydrationWarning>跳到主要内容</a>
         <AppShell>{children}</AppShell>
       </body>
