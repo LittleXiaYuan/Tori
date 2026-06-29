@@ -11,7 +11,13 @@ import (
 
 // RunFunc is the function signature for running a planner request within a subagent.
 // It receives the subagent's isolated context and returns the reply.
-type RunFunc func(ctx context.Context, agentName string, input string, providerOverride string) (string, error)
+//
+// partial is any work the subagent completed before a timeout/cancel — e.g.
+// research already gathered, a half-generated document. When err is a timeout
+// (#33), the parent planner feeds partial into its own PartialPlanResultForRequest
+// so the user sees "已部分执行" instead of an empty failure. Empty partial
+// means the subagent produced nothing usable before the timeout.
+type RunFunc func(ctx context.Context, agentName string, input string, providerOverride string) (reply string, partial string, err error)
 
 // HandoffConfig defines a named subagent that can be delegated to.
 type HandoffConfig struct {
@@ -23,19 +29,27 @@ type HandoffConfig struct {
 }
 
 // HandoffResult is the result of a handoff execution.
+//
+// PartialResult carries any work the subagent completed before a timeout/cancel
+// (#33). Empty on success (Reply holds the full result) or when the subagent
+// produced nothing usable. On timeout, Reply is empty and PartialResult holds
+// the recoverable evidence so the parent planner can surface it via
+// PartialPlanResultForRequest instead of losing the subagent's progress.
 type HandoffResult struct {
-	AgentName string        `json:"agent_name"`
-	AgentID   string        `json:"agent_id"`
-	Reply     string        `json:"reply"`
-	Duration  time.Duration `json:"duration_ms"`
+	AgentName     string        `json:"agent_name"`
+	AgentID       string        `json:"agent_id"`
+	Reply         string        `json:"reply"`
+	PartialResult string        `json:"partial_result,omitempty"`
+	Duration      time.Duration `json:"duration_ms"`
 }
 
 // HandoffRegistry manages named subagent configurations and their execution.
 type HandoffRegistry struct {
-	mu      sync.RWMutex
-	configs map[string]*HandoffConfig // name → config
-	mgr     *Manager
-	runFn   RunFunc // injected planner.Run wrapper
+	mu              sync.RWMutex
+	configs         map[string]*HandoffConfig // name → config
+	mgr             *Manager
+	runFn           RunFunc // injected planner.Run wrapper
+	contextPreparer func(ctx context.Context, agentName string) string // shared session/project context injector
 }
 
 // NewHandoffRegistry creates a handoff registry backed by the given subagent manager.
@@ -51,6 +65,16 @@ func (hr *HandoffRegistry) SetRunFunc(fn RunFunc) {
 	hr.mu.Lock()
 	defer hr.mu.Unlock()
 	hr.runFn = fn
+}
+
+// SetContextPreparer injects a function that returns shared session/project
+// context prepended to every sub-agent's input. This solves the "blank-slate
+// executor" problem: sub-agents no longer need the parent to manually encode
+// who the user is, what project they're in, or what goal is being pursued.
+func (hr *HandoffRegistry) SetContextPreparer(fn func(ctx context.Context, agentName string) string) {
+	hr.mu.Lock()
+	defer hr.mu.Unlock()
+	hr.contextPreparer = fn
 }
 
 // Register adds a named subagent configuration.
@@ -130,13 +154,36 @@ func (hr *HandoffRegistry) Execute(ctx context.Context, parentID, agentName, inp
 		provider = parentProvider
 	}
 
+	// Prepend shared session/project context so the sub-agent doesn't start
+	// with a blank slate. The preparer is set by init_planner.go via
+	// SetContextPreparer and returns a compact context block that covers
+	// who the user is, the active project, and the current goal.
+	actualInput := input
+	hr.mu.RLock()
+	preparer := hr.contextPreparer
+	hr.mu.RUnlock()
+	if preparer != nil {
+		if sharedCtx := preparer(ctx, agentName); sharedCtx != "" {
+			actualInput = sharedCtx + "\n\n---\n\n" + input
+		}
+	}
+
 	t0 := time.Now()
-	reply, err := runFn(ctx, agentName, input, provider)
+	reply, partial, err := runFn(ctx, agentName, actualInput, provider)
 	dur := time.Since(t0)
 
 	if err != nil {
-		slog.Warn("handoff: agent failed", "agent", agentName, "err", err, "duration", dur)
-		return nil, fmt.Errorf("handoff agent %q execution failed: %w", agentName, err)
+		slog.Warn("handoff: agent failed", "agent", agentName, "err", err, "duration", dur, "has_partial", partial != "")
+		// #33: return the result with PartialResult populated so the parent
+		// planner can surface recoverable evidence on timeout instead of losing
+		// the subagent's progress. The error still propagates so the parent
+		// knows the handoff did not complete nominally.
+		return &HandoffResult{
+			AgentName:     agentName,
+			AgentID:       sa.ID,
+			PartialResult: partial,
+			Duration:      dur,
+		}, fmt.Errorf("handoff agent %q execution failed: %w", agentName, err)
 	}
 
 	slog.Info("handoff: agent completed", "agent", agentName, "duration", dur)

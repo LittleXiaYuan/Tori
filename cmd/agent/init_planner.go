@@ -264,7 +264,7 @@ func initPlanner(app *agentrt.App) error {
 		if success {
 			trustTracker.RecordSuccess(skillName)
 		} else {
-			trustTracker.RecordFailure(skillName, 1)
+			trustTracker.RecordFailure(skillName, skillFailSeverity(skillName))
 		}
 	})
 
@@ -454,4 +454,21 @@ func classifyIntent(msg string) string {
 
 	// Default: relaxed → prefer not to block
 	return "relaxed"
+}
+
+// skillFailSeverity maps a skill name to a failure severity for the Bayesian
+// trust tracker. Higher severity → larger score decrease.
+// Shell/exec failures (dangerous) weight more than soft read/search failures.
+func skillFailSeverity(skillName string) int {
+	lower := strings.ToLower(skillName)
+	switch {
+	case strings.Contains(lower, "shell") || strings.Contains(lower, "exec") ||
+		strings.Contains(lower, "run") || strings.Contains(lower, "cmd"):
+		return 3 // hard failure: shell commands have real side effects
+	case strings.Contains(lower, "write") || strings.Contains(lower, "delete") ||
+		strings.Contains(lower, "save") || strings.Contains(lower, "create"):
+		return 2 // medium: write operations
+	default:
+		return 1 // soft: reads, searches, lookups
+	}
 }

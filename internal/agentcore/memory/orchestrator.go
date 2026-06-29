@@ -552,13 +552,26 @@ func (o *Orchestrator) CompileContext(ctx context.Context, tenantID, currentQuer
 		if len(items) > 0 {
 			sb.WriteString("<recalled_memories>\n")
 			for _, item := range items {
-				sb.WriteString(fmt.Sprintf("- [%s] %s\n", item.Source, item.Content))
+			sb.WriteString(fmt.Sprintf("- [%s][%s] %s\n", recallTierLabel(item.Importance), item.Source, item.Content))
 			}
 			sb.WriteString("</recalled_memories>\n\n")
 		}
 	}
 
 	return sb.String()
+}
+
+// recallTierLabel maps Importance to a human-readable tier prefix so the LLM
+// can prioritize recalled memories by significance in the prompt.
+func recallTierLabel(imp Importance) string {
+	switch imp {
+	case ImportanceHigh:
+		return "核心"
+	case ImportanceMedium:
+		return "项目"
+	default:
+		return "情境"
+	}
 }
 
 // mergeRecallItems combines two recall slices, de-duplicating by content,

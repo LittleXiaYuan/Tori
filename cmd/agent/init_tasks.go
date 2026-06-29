@@ -424,6 +424,15 @@ func initSubagentHandoff(app *agentrt.App, gw *gateway.Gateway, p *planner.Plann
 		}
 		return result.Reply, "", nil
 	})
+	// SetContextPreparer: sub-agents inherit a shared context block so they
+	// don't start with a blank slate on every handoff. The preparer is called
+	// at dispatch time and prepended to the input string automatically.
+	handoffReg.SetContextPreparer(func(ctx context.Context, agentName string) string {
+		return "[子代理执行上下文 — 主代理自动注入]\n" +
+			"• 你是云雀 Agent 的子执行代理，正在处理来自主代理委派的专项任务\n" +
+			"• 专注完成分配的任务并返回结果，无需重复说明委派来源或解释协议\n" +
+			"• 如果任务描述不完整，根据上下文推断合理意图而不是直接报错\n"
+	})
 	handoffReg.Register(subagent.HandoffConfig{
 		Name:        "browser_exec",
 		Description: "浏览器执行代理：在独立上下文中执行所有浏览器操作（搜索、导航、点击、输入、发帖、登录、填表等）。将浏览器相关任务委派给此代理。",
@@ -456,8 +465,67 @@ func initSubagentHandoff(app *agentrt.App, gw *gateway.Gateway, p *planner.Plann
 		SystemNote:  "你是通用执行代理。你只能处理翻译、图片生成、邮件发送等轻量通用任务。遇到文件解析、代码执行、浏览器或联网研究，应说明需要交给对应专用代理，而不是自己尝试。",
 	})
 
+	// Shared-context injector: give every exec sub-agent a COMPACT view of who
+	// the user is and the active persona, without leaking the parent's full
+	// system prompt / conversation history back in. The isolation boundary is
+	// the point — this only re-adds the minimum "who am I working for" context
+	// that a blank-slate executor otherwise lacks, each source hard-bounded so
+	// the snippet stays a parameter, not another essay.
+	handoffReg.SetContextPreparer(buildHandoffContextPreparer(app))
+
 	p.SetHandoffRegistry(handoffReg)
 	gw.SetHandoffRegistry(handoffReg)
+}
+
+// runeClip truncates s to at most n runes, appending an ellipsis when cut, so a
+// long persona/memory block degrades into a compact summary instead of dragging
+// the parent's whole context into the isolated sub-agent.
+func runeClip(s string, n int) string {
+	s = strings.TrimSpace(s)
+	r := []rune(s)
+	if len(r) <= n {
+		return s
+	}
+	return strings.TrimSpace(string(r[:n])) + "…"
+}
+
+// buildHandoffContextPreparer returns a context preparer for sub-agent handoffs.
+// It composes a short shared-context header from two live sources the parent
+// already maintains: the active persona/identity chain and the per-user recalled
+// memory. Both are clipped so the combined block stays small (the executor was
+// isolated to escape context noise — this re-adds only the orienting minimum).
+// Returns "" when neither source yields content, so Execute skips injection.
+func buildHandoffContextPreparer(app *agentrt.App) func(ctx context.Context, agentName string) string {
+	var personaFn func() string
+	if pc, ok := app.Get(agentrt.CompPersonaChain); ok {
+		if chain, ok := pc.(*persona.PriorityChain); ok {
+			personaFn = chain.SystemPromptFunc()
+		}
+	}
+	orch := app.Orchestrator
+
+	return func(ctx context.Context, agentName string) string {
+		var b strings.Builder
+		if personaFn != nil {
+			if p := runeClip(personaFn(), 400); p != "" {
+				b.WriteString("## 身份与基调\n")
+				b.WriteString(p)
+				b.WriteString("\n\n")
+			}
+		}
+		if orch != nil {
+			// Recalled memory is keyed by user, not by the sub-task; pass an empty
+			// query so we get the stable user profile (who they are / preferences)
+			// rather than task-specific recall, which the sub-agent's own input
+			// already covers.
+			if m := runeClip(orch.CompileContext(ctx, "", ""), 600); m != "" {
+				b.WriteString("## 用户背景\n")
+				b.WriteString(m)
+				b.WriteString("\n")
+			}
+		}
+		return strings.TrimSpace(b.String())
+	}
 }
 
 func appLoRAScheduler(app *agentrt.App) *localbrain.LoRAScheduler {
@@ -690,7 +758,7 @@ func discoverBuiltinPackManifestPaths() []string {
 		if _, statErr := os.Stat(filepath.Join(dir, entry.Name(), "pack.json")); statErr != nil {
 			continue
 		}
-		paths = append(paths, "packs/official/"+entry.Name()+"/pack.json")
+		paths = append(paths, filepath.Join(dir, entry.Name(), "pack.json"))
 	}
 	sort.Strings(paths)
 	return paths
@@ -705,10 +773,16 @@ func discoverBuiltinPackManifestPaths() []string {
 // moved or renamed.
 func locateBuiltinPackDir() string {
 	rel := filepath.Join("packs", "official")
+	// CWD-relative candidates: covers `go run` (CWD=repo root) and
+	// `go test ./cmd/agent/...` (CWD=cmd/agent/, needs ../../).
 	candidates := []string{rel}
-	// Walk up from the executable's runtime location (up to 7 levels covers
-	// apps/desktop/src-tauri/target/debug/ → repo root in 5 hops).
-	if exe, err := os.Executable(); err == nil {
+	for i := 1; i <= 4; i++ {
+		candidates = append(candidates, filepath.Join(strings.Repeat("../", i)+rel))
+	}
+	// Exe-relative candidates: covers desktop sidecar and compiled binaries
+	// placed anywhere in the directory tree (walks up to 7 levels from the
+	// binary's location). Intentionally skips go-run binaries (temp dir).
+	if exe, err := os.Executable(); err == nil && !strings.Contains(filepath.ToSlash(exe), "/go-build") {
 		dir := filepath.Dir(exe)
 		for i := 0; i < 7; i++ {
 			candidates = append(candidates, filepath.Join(dir, rel))

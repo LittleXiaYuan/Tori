@@ -86,7 +86,46 @@ func (r plannerCogniRuntime) BuildContext(ctx context.Context, message, tenantID
 			parts = append(parts, b)
 		}
 	}
-	return strings.Join(parts, "\n\n")
+	return injectModeInstructions(strings.Join(parts, "\n\n"))
+}
+
+// injectModeInstructions scans the assembled cogni/belief context for static
+// Inner State declarations (mode/risk/tone) and appends concrete behavioral
+// guidance so these values actually change model output instead of being
+// decorative text. Mirrors what buildToneGuide does for user emotion.
+func injectModeInstructions(ctx string) string {
+	if ctx == "" {
+		return ctx
+	}
+	lower := strings.ToLower(ctx)
+	var instructions []string
+	// mode
+	switch {
+	case strings.Contains(lower, "mode: analytical") || strings.Contains(lower, "mode:analytical"):
+		instructions = append(instructions, "【行为模式：分析】优先结构化分析，数据驱动，减少情感化表述。")
+	case strings.Contains(lower, "mode: companion") || strings.Contains(lower, "mode:companion"):
+		instructions = append(instructions, "【行为模式：陪伴】保持温暖、耐心、有情感共鸣的表达，任务也可以轻松一点。")
+	case strings.Contains(lower, "mode: focused") || strings.Contains(lower, "mode:focused"):
+		instructions = append(instructions, "【行为模式：专注】回答简洁直接，省略铺垫，聚焦目标输出。")
+	}
+	// risk
+	switch {
+	case strings.Contains(lower, "risk: high") || strings.Contains(lower, "risk:high"):
+		instructions = append(instructions, "【风险：高】操作前主动确认，优先只读验证，遇到不确定立即暂停报告。")
+	case strings.Contains(lower, "risk: medium") || strings.Contains(lower, "risk:medium"):
+		instructions = append(instructions, "【风险：中】遇到不确定或破坏性操作前先确认。")
+	}
+	// tone
+	switch {
+	case strings.Contains(lower, "tone: precise") || strings.Contains(lower, "tone:precise"):
+		instructions = append(instructions, "【语调：精确】使用技术性精确语言，减少模糊词。")
+	case strings.Contains(lower, "tone: warm") || strings.Contains(lower, "tone:warm"):
+		instructions = append(instructions, "【语调：温暖】用温和、有温度的语言回应。")
+	}
+	if len(instructions) == 0 {
+		return ctx
+	}
+	return ctx + "\n\n" + strings.Join(instructions, "\n")
 }
 
 // cogniScopeFromChannel removed in Step 2: scope now derived upstream by
