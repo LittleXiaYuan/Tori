@@ -29,6 +29,15 @@ type CogniDecision struct {
 	// Empty slice means this Cogni has no opinion on skills (does not restrict).
 	SkillsNeeded []string
 
+	// DeniedTools lists tool-name globs this Cogni wants REMOVED from the surface,
+	// regardless of what other Cognis allow. Supports the same trailing-"*"
+	// wildcards as ToolsNeeded ("file_write", "shell_*"). This is a restrictive
+	// (deny) signal, applied as a final subtractive pass AFTER the additive
+	// ToolsNeeded/SkillsNeeded union — so a safety Cogni (RiskCogni) can strip
+	// destructive tools even when an intent Cogni broadly allowed "file_*".
+	// Denies from all Cognis accumulate (union): safety is conservative.
+	DeniedTools []string
+
 	// MemoryScope defines memory recall constraints for this task.
 	// Multiple Cognis' scopes are merged into the most permissive union
 	// (max limit, union of categories/keywords) so no Cogni blocks another's needs.
@@ -92,6 +101,11 @@ type CogniFinalDecision struct {
 
 	// SkillsNeeded is the union of all Cognis' skill requirements.
 	SkillsNeeded []string
+
+	// DeniedTools is the union of all Cognis' tool-deny globs, applied as a final
+	// subtractive pass after the ToolsNeeded/SkillsNeeded allow-list is resolved.
+	// A tool matching any glob here is removed even if an intent Cogni allowed it.
+	DeniedTools []string
 
 	// MemoryScope is the most permissive union of all Cognis' scopes:
 	//   - Limit = max of all limits

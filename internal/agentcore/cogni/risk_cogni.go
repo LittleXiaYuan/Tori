@@ -34,11 +34,13 @@ func (c *RiskCogni) Analyze(ctx context.Context, req CogniRequest) CogniDecision
 
 	switch risk {
 	case "high":
-		// High-risk operations: filter out dangerous tools, inject confirmation instruction
-		decision.ToolsNeeded = []string{
-			"file_read", "file_list", "glob", "grep", // Read-only file ops OK
-			"browser_search", "web_fetch",           // Web ops OK
-			// Exclude: file_write, file_delete, shell_*, git_reset, etc.
+		// High-risk operations: DENY destructive tools (deny-list survives the
+		// merge union, so IntentCogni's broad "file_*" allow can't reintroduce
+		// file_write/file_delete), and inject a confirmation instruction.
+		decision.DeniedTools = []string{
+			"file_write", "file_delete", "file_move", "file_edit",
+			"shell_*", "code_execute", "computer_use",
+			"git_reset", "git_push", "git_force_*",
 		}
 		decision.BehaviorText = "【风险等级：高】涉及删除、修改配置或执行命令的操作，必须在执行前向用户确认。"
 
@@ -78,7 +80,6 @@ func detectRisk(message string) string {
 		"重置", "reset", "revert",
 		"格式化", "format",
 		"停止", "kill", "terminate",
-		"修改配置", "change config", "edit config", // Specific: config changes are high risk
 		"执行命令", "run command", "shell", "bash",
 		"强制", "force", "--force", "-f",
 	}

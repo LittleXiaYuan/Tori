@@ -18,13 +18,14 @@ func TestRiskCogni_Analyze_High(t *testing.T) {
 		t.Errorf("expected risk=high, got %v", decision.State["risk"])
 	}
 
-	// Should filter to read-only tools
-	if !contains(decision.ToolsNeeded, "file_read") {
-		t.Errorf("expected file_read in allowed tools, got %v", decision.ToolsNeeded)
+	// High risk DENIES destructive tools (deny-list, not allow-list) so they're
+	// stripped even if an intent Cogni broadly allowed "file_*".
+	if !contains(decision.DeniedTools, "file_write") {
+		t.Errorf("expected file_write in denied tools, got %v", decision.DeniedTools)
 	}
-
-	// Should NOT include dangerous tools (they're excluded, not in the list)
-	// The whitelist approach means we don't have file_write/file_delete
+	if !contains(decision.DeniedTools, "file_delete") {
+		t.Errorf("expected file_delete in denied tools, got %v", decision.DeniedTools)
+	}
 
 	// Should inject confirmation instruction
 	if decision.BehaviorText == "" {
@@ -170,10 +171,15 @@ func TestRiskCogni_WithIntentCogni_Merge(t *testing.T) {
 		t.Errorf("expected intent from IntentCogni, got nil")
 	}
 
-	// Tools: union of IntentCogni's [file_*, code_*] and RiskCogni's [file_read, ...]
-	// Result should include both sets
-	if len(final.ToolsNeeded) == 0 {
-		t.Errorf("expected merged tools, got empty")
+	// Safety property: RiskCogni's deny-list survives the merge, so destructive
+	// tools are forbidden even though IntentCogni may have allowed "file_*". This
+	// is the regression the deny-list fix guards — a union of allow-lists used to
+	// let file_write slip back in.
+	if !contains(final.DeniedTools, "file_write") {
+		t.Errorf("expected file_write denied after merge, got %v", final.DeniedTools)
+	}
+	if !contains(final.DeniedTools, "file_delete") {
+		t.Errorf("expected file_delete denied after merge, got %v", final.DeniedTools)
 	}
 
 	// BehaviorText should include RiskCogni's warning (both have behavior text, merged)

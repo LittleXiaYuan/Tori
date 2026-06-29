@@ -43,6 +43,7 @@ func MergeDecisions(cognis []CogniWithPriority) CogniFinalDecision {
 
 	// Merge resources via union
 	tools := mergeTools(cognis)
+	denied := mergeDeniedTools(cognis)
 	skills := mergeSkills(cognis)
 	memory := mergeMemoryScope(cognis)
 
@@ -55,6 +56,7 @@ func MergeDecisions(cognis []CogniWithPriority) CogniFinalDecision {
 	return CogniFinalDecision{
 		Intent:       intent,
 		ToolsNeeded:  tools,
+		DeniedTools:  denied,
 		SkillsNeeded: skills,
 		MemoryScope:  memory,
 		BehaviorText: behavior,
@@ -99,6 +101,25 @@ func mergeTools(cognis []CogniWithPriority) []string {
 
 	for _, c := range cognis {
 		for _, tool := range c.Decision.ToolsNeeded {
+			if tool != "" && !seen[tool] {
+				seen[tool] = true
+				result = append(result, tool)
+			}
+		}
+	}
+
+	return result
+}
+
+// mergeDeniedTools unions all DeniedTools globs, deduplicating. Denies are
+// conservative: any Cogni can forbid a tool and the deny survives the merge,
+// so a low-priority safety Cogni is never overruled by a high-priority intent.
+func mergeDeniedTools(cognis []CogniWithPriority) []string {
+	seen := make(map[string]bool)
+	var result []string
+
+	for _, c := range cognis {
+		for _, tool := range c.Decision.DeniedTools {
 			if tool != "" && !seen[tool] {
 				seen[tool] = true
 				result = append(result, tool)

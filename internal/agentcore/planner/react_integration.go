@@ -43,23 +43,36 @@ func (p *Planner) runReAct(ctx context.Context, req PlanRequest) (*PlanResult, e
 	// Build the initial observation from the conversation
 	initialObs := p.buildInitialObservation(req)
 
-	// V2 Cogni: get resource allocation decision (Intent + Risk + Emotion)
-	// Filter tools/skills based on the merged decision before building tool description
+	// V2 Cogni: get resource allocation decision (Intent + Risk + Emotion) and
+	// narrow the tool surface to what the task actually needs. This is the token
+	// optimization: instead of describing all ~200 tools to the model, only the
+	// handful relevant to the detected intent are exposed.
+	//
+	// The user's explicit tool choice (req.AllowedSkills, e.g. the chat tool
+	// drawer) always wins — when present we skip Cogni narrowing so manual
+	// selection and Cogni stay composable rather than fighting each other.
 	allowedSkills := req.AllowedSkills
-	if contextAssembly != nil {
+	if contextAssembly != nil && len(req.AllowedSkills) == 0 {
 		lastMessage := ""
 		if len(req.Messages) > 0 {
 			lastMessage = req.Messages[len(req.Messages)-1].Content
 		}
 		decision := contextAssembly.CogniDecide(ctx, lastMessage, req.TenantID, req.SessionID)
 
-		// Apply skill filtering if decision specifies skills needed
-		if decision.SkillsNeeded != nil {
-			// SkillsNeeded is not nil → use it as the allowed list
-			allowedSkills = decision.SkillsNeeded
-			slog.Info("planner: cogni v2 filtered skills",
-				"original_count", len(req.AllowedSkills),
+		// SkillsNeeded carries category IDs ("research", "file") and ToolsNeeded
+		// carries tool-name wildcards ("file_*", "github_*"). Both must be
+		// expanded against the registry into concrete skill NAMES before they can
+		// act as an allow-list — the old code compared category labels to skill
+		// names directly, which matched nothing and silently emptied the toolset.
+		narrowed := p.expandCogniSkills(decision.SkillsNeeded, decision.ToolsNeeded, decision.DeniedTools)
+		if narrowed != nil {
+			allowedSkills = narrowed
+			slog.Info("planner: cogni v2 narrowed tool surface",
+				"original_count", p.registrySize(),
 				"filtered_count", len(allowedSkills),
+				"categories", decision.SkillsNeeded,
+				"tool_globs", decision.ToolsNeeded,
+				"denied", decision.DeniedTools,
 				"intent", func() string {
 					if decision.Intent != nil {
 						return decision.Intent.Type
@@ -68,8 +81,6 @@ func (p *Planner) runReAct(ctx context.Context, req PlanRequest) (*PlanResult, e
 				}(),
 			)
 		}
-		// Note: ToolsNeeded filtering not implemented yet (needs tool registry refactor)
-		// For now, skill filtering already covers most token savings
 	}
 
 	// Build available tools description for the LLM
@@ -309,6 +320,103 @@ func (p *Planner) buildToolsDescription(allowedSkills []string) string {
 		}
 	}
 	return b.String()
+}
+
+// registrySize returns the number of registered skills (for telemetry).
+func (p *Planner) registrySize() int {
+	if p.registry == nil {
+		return 0
+	}
+	return len(p.registry.All())
+}
+
+// expandCogniSkills converts a Cogni decision's skill CATEGORIES and tool-name
+// GLOBS into a concrete allow-list of skill names, resolved against the registry,
+// then removes any name matching a deny glob.
+//
+// SkillsNeeded carries category IDs ("research", "file", "browser", …) plus a
+// few intent labels that have no matching category ("code", "chat"); ToolsNeeded
+// carries tool-name wildcards ("file_*", "github_*"). A skill is allowed when:
+//   - its category is in `categories`, OR
+//   - its name matches a glob in `toolGlobs`, OR
+//   - it is uncategorized (general tools like code_execute / computer_use stay
+//     available so an intent never narrows them out).
+//
+// After the allow-list is built, `deniedGlobs` (from RiskCogni) subtracts any
+// matching tool — a final safety pass that an intent's broad allow cannot undo.
+//
+// Return semantics:
+//   - nil          → the decision expresses no opinion (allow inputs both nil and
+//     no denies): do NOT narrow; the caller keeps the full tool surface.
+//   - empty slice  → the decision explicitly wants no tools (e.g. EmotionCogni's
+//     empathy mode sets SkillsNeeded=[]): narrow to nothing.
+//   - non-empty    → the resolved set of allowed skill names.
+func (p *Planner) expandCogniSkills(categories, toolGlobs, deniedGlobs []string) []string {
+	// No opinion from any Cogni (no allow restriction, no deny) → leave untouched.
+	if categories == nil && toolGlobs == nil && len(deniedGlobs) == 0 {
+		return nil
+	}
+	if p.registry == nil {
+		return nil
+	}
+
+	catSet := make(map[string]bool, len(categories))
+	for _, c := range categories {
+		if c != "" {
+			catSet[c] = true
+		}
+	}
+
+	// When the only signal is a deny (no allow restriction), start from the full
+	// registry and just subtract — risk narrowing without an intent narrowing.
+	allowAll := categories == nil && toolGlobs == nil
+
+	allowed := make([]string, 0, 16)
+	for _, skill := range p.registry.All() {
+		name := skill.Name()
+		if matchesAnyGlob(name, deniedGlobs) {
+			continue // safety deny pass — never expose this tool
+		}
+		if allowAll {
+			allowed = append(allowed, name)
+			continue
+		}
+		cat := p.registry.CategoryOf(name)
+		switch {
+		case cat == "":
+			// Uncategorized general tools are always available.
+			allowed = append(allowed, name)
+		case catSet[cat]:
+			allowed = append(allowed, name)
+		case matchesAnyGlob(name, toolGlobs):
+			allowed = append(allowed, name)
+		}
+	}
+	// Guarantee non-nil so the caller treats this as "narrowed" (empty = none),
+	// distinct from the nil "no opinion" case handled above.
+	if allowed == nil {
+		allowed = []string{}
+	}
+	return allowed
+}
+
+// matchesAnyGlob reports whether name matches any of the patterns. Patterns
+// support a single trailing "*" wildcard ("file_*" matches "file_read"); a bare
+// pattern matches exactly. An empty pattern list never matches.
+func matchesAnyGlob(name string, patterns []string) bool {
+	for _, pat := range patterns {
+		if pat == "" {
+			continue
+		}
+		if strings.HasSuffix(pat, "*") {
+			if strings.HasPrefix(name, strings.TrimSuffix(pat, "*")) {
+				return true
+			}
+		} else if name == pat {
+			return true
+		}
+	}
+	return false
 }
 
 // buildReActMessages constructs the LLM prompt for the next ReAct step.
