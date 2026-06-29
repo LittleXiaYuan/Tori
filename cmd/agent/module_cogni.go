@@ -157,7 +157,34 @@ func (r plannerCogniRuntime) Decide(ctx context.Context, message, tenantID, chan
 	}
 
 	// Merge all decisions (priority order: Intent=100, Risk=80, Emotion=50, v1=0)
-	return agentcogni.MergeDecisions(cognis)
+	final := agentcogni.MergeDecisions(cognis)
+
+	// Telemetry: log activated Cognis and decision summary
+	slog.Info("cogni.Decide",
+		"tenant_id", tenantID,
+		"channel", channel,
+		"intent", func() string {
+			if final.Intent != nil {
+				return final.Intent.Type
+			}
+			return "unknown"
+		}(),
+		"intent_confidence", func() float64 {
+			if final.Intent != nil {
+				return final.Intent.Confidence
+			}
+			return 0.0
+		}(),
+		"tools_count", len(final.ToolsNeeded),
+		"skills_count", len(final.SkillsNeeded),
+		"memory_limit", final.MemoryScope.Limit,
+		"memory_categories", len(final.MemoryScope.Categories),
+		"behavior_text_len", len(final.BehaviorText),
+		"state_keys", len(final.State),
+		"cognis_active", len(cognis),
+	)
+
+	return final
 }
 
 // injectModeInstructions scans the assembled cogni/belief context for static
