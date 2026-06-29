@@ -43,9 +43,38 @@ func (p *Planner) runReAct(ctx context.Context, req PlanRequest) (*PlanResult, e
 	// Build the initial observation from the conversation
 	initialObs := p.buildInitialObservation(req)
 
+	// V2 Cogni: get resource allocation decision (Intent + Risk + Emotion)
+	// Filter tools/skills based on the merged decision before building tool description
+	allowedSkills := req.AllowedSkills
+	if contextAssembly != nil {
+		lastMessage := ""
+		if len(req.Messages) > 0 {
+			lastMessage = req.Messages[len(req.Messages)-1].Content
+		}
+		decision := contextAssembly.CogniDecide(ctx, lastMessage, req.TenantID, req.SessionID)
+
+		// Apply skill filtering if decision specifies skills needed
+		if decision.SkillsNeeded != nil {
+			// SkillsNeeded is not nil → use it as the allowed list
+			allowedSkills = decision.SkillsNeeded
+			slog.Info("planner: cogni v2 filtered skills",
+				"original_count", len(req.AllowedSkills),
+				"filtered_count", len(allowedSkills),
+				"intent", func() string {
+					if decision.Intent != nil {
+						return decision.Intent.Type
+					}
+					return "unknown"
+				}(),
+			)
+		}
+		// Note: ToolsNeeded filtering not implemented yet (needs tool registry refactor)
+		// For now, skill filtering already covers most token savings
+	}
+
 	// Build available tools description for the LLM
-	allowed := allowedSkillSet(req.AllowedSkills)
-	toolsDesc := p.buildToolsDescription(req.AllowedSkills)
+	allowed := allowedSkillSet(allowedSkills)
+	toolsDesc := p.buildToolsDescription(allowedSkills)
 
 	cfg := ldg.ReActConfig{
 		MaxSteps:        p.maxPlanSteps(),
@@ -127,6 +156,8 @@ func (p *Planner) runReAct(ctx context.Context, req PlanRequest) (*PlanResult, e
 					fmt.Sprintf("[%s] 未执行：不在本次允许工具内", skillName))
 				trEvt.Meta.Skill = skillName
 				trEvt.Meta.TenantID = req.TenantID
+				trEvt.Meta.SessionID = req.SessionID
+				trEvt.Meta.TaskID = req.TaskID
 				diagnostic := buildToolFailureDiagnostic("allowed tool surface: " + errMsg)
 				trEvt.Detail = observe.ToolResultDetail{
 					Skill:       skillName,
@@ -147,6 +178,8 @@ func (p *Planner) runReAct(ctx context.Context, req PlanRequest) (*PlanResult, e
 				fmt.Sprintf("正在调用 [%s]...", skillName))
 			tsEvt.Meta.Skill = skillName
 			tsEvt.Meta.TenantID = req.TenantID
+			tsEvt.Meta.SessionID = req.SessionID
+			tsEvt.Meta.TaskID = req.TaskID
 			tsEvt.Detail = observe.ToolStartDetail{Skill: skillName, Args: call.Args}
 			req.StepCallback(tsEvt)
 		}
@@ -191,6 +224,8 @@ func (p *Planner) runReAct(ctx context.Context, req PlanRequest) (*PlanResult, e
 			trEvt := observe.NewEvent(req.TraceID, observe.DomainPlanner, observe.EventToolResult, summary)
 			trEvt.Meta.Skill = skillName
 			trEvt.Meta.TenantID = req.TenantID
+			trEvt.Meta.SessionID = req.SessionID
+			trEvt.Meta.TaskID = req.TaskID
 			trEvt.Detail = detail
 			req.StepCallback(trEvt)
 		}
@@ -208,6 +243,7 @@ func (p *Planner) runReAct(ctx context.Context, req PlanRequest) (*PlanResult, e
 			thinkEvt := observe.NewEvent(req.TraceID, observe.DomainPlanner, observe.EventThinking,
 				fmt.Sprintf("思考 (步骤 %d, 置信度 %.0f%%): %s", step.StepNum, step.Confidence*100, truncate(step.Thought, 100)))
 			thinkEvt.Meta.TenantID = req.TenantID
+			thinkEvt.Meta.SessionID = req.SessionID
 			thinkEvt.Meta.TaskID = req.TaskID
 			req.StepCallback(thinkEvt)
 		}
