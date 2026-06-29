@@ -33,7 +33,7 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 
 	messages, ctxLayers := p.BuildMessages(ctx, req)
 	userMsg := extractUserMessage(req)
-	tools := p.buildFunctionDefs(userMsg, req.TenantID, req.ChannelType, req.DisableDelegation, req.AllowedSkills, contextAssembly, delegationRuntime, skillRuntime)
+	tools := p.buildFunctionDefs(ctx, userMsg, req.TenantID, req.ChannelType, req.DisableDelegation, req.AllowedSkills, contextAssembly, delegationRuntime, skillRuntime)
 
 	// Cogni MCP tool injection — additive tools contributed by the cognis that
 	// activate this turn (their connected MCP servers). Gated the same way as the
@@ -315,7 +315,7 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 // those names before any further filtering. This is driven by the Cherry
 // "tools" drawer: when a user explicitly checks a subset of skills, the
 // planner is expected to stay inside that subset.
-func (p *Planner) buildFunctionDefs(userMessage, tenantID, channelType string, disableDelegation bool, allowedSkills []string, contextAssembly *ContextAssemblyService, delegationRuntime *DelegationRuntimeService, skillRuntime *SkillRuntimeService) []llm.FunctionDef {
+func (p *Planner) buildFunctionDefs(ctx context.Context, userMessage, tenantID, channelType string, disableDelegation bool, allowedSkills []string, contextAssembly *ContextAssemblyService, delegationRuntime *DelegationRuntimeService, skillRuntime *SkillRuntimeService) []llm.FunctionDef {
 	allSkills := p.registry.All()
 	if len(allowedSkills) > 0 {
 		allow := allowedSkillSet(allowedSkills)
@@ -327,6 +327,20 @@ func (p *Planner) buildFunctionDefs(userMessage, tenantID, channelType string, d
 		}
 		allSkills = filtered
 		slog.Info("buildFunctionDefs: user-restricted skill set", "allowed", len(allowedSkills), "matched", len(allSkills))
+	}
+
+	// V2 Cogni safety deny-list — computed once for this turn and applied as a
+	// final subtractive pass on EVERY return path below (delegation, dynamic
+	// filter, authoritative cogni, ambient). RiskCogni emits DeniedTools for
+	// high-risk messages ("删除…", "rm -rf…"); those tools must never reach the
+	// model regardless of which branch built the tool list, and regardless of a
+	// user/cogni allow-list — safety is not bypassable. Unlike the ReAct path's
+	// expandCogniSkills (which also does intent NARROWING), NativeFC keeps its own
+	// mature intent ranking + cap below and only borrows the deny pass, so the two
+	// executors share the safety guarantee without fighting over narrowing policy.
+	var cogniDenied []string
+	if contextAssembly != nil {
+		cogniDenied = contextAssembly.CogniDecide(ctx, userMessage, tenantID, channelType).DeniedTools
 	}
 
 	// Filter out skills that aren't ready (missing config/dependencies)
@@ -401,6 +415,7 @@ func (p *Planner) buildFunctionDefs(userMessage, tenantID, channelType string, d
 		}
 
 		slog.Info("buildFunctionDefs", "mode", "delegation", "handoff_tools", len(defs), "total_skills", len(allSkills), "msg_prefix", truncate(userMessage, 50))
+		defs = applyCogniDeny(defs, cogniDenied)
 		sortFunctionDefsStable(defs)
 		return defs
 	}
@@ -436,6 +451,7 @@ func (p *Planner) buildFunctionDefs(userMessage, tenantID, channelType string, d
 					defs = append(defs, llm.FunctionDef{Name: name, Description: desc, Parameters: params})
 				}
 			}
+			defs = applyCogniDeny(defs, cogniDenied)
 			sortFunctionDefsStable(defs)
 			return defs
 		}
@@ -474,8 +490,33 @@ func (p *Planner) buildFunctionDefs(userMessage, tenantID, channelType string, d
 		}
 	}
 
+	defs = applyCogniDeny(defs, cogniDenied)
 	sortFunctionDefsStable(defs)
 	return defs
+}
+
+// applyCogniDeny removes any function definition whose name matches a deny glob
+// from the merged Cogni decision (RiskCogni's DeniedTools). It is the NativeFC
+// counterpart to the deny pass in expandCogniSkills, applied to the final
+// FunctionDef list so every build path shares the same safety guarantee. A nil
+// or empty deny list is a no-op. matchesAnyGlob is shared with react_integration.go.
+func applyCogniDeny(defs []llm.FunctionDef, deniedGlobs []string) []llm.FunctionDef {
+	if len(deniedGlobs) == 0 {
+		return defs
+	}
+	out := make([]llm.FunctionDef, 0, len(defs))
+	var removed []string
+	for _, d := range defs {
+		if matchesAnyGlob(d.Name, deniedGlobs) {
+			removed = append(removed, d.Name)
+			continue
+		}
+		out = append(out, d)
+	}
+	if len(removed) > 0 {
+		slog.Info("buildFunctionDefs: cogni risk deny applied", "removed", removed, "denied_globs", deniedGlobs)
+	}
+	return out
 }
 
 // functionDefFor returns the LLM FunctionDef for a skill, memoized per skill

@@ -1,9 +1,11 @@
 package planner
 
 import (
+	"context"
 	"sort"
 	"testing"
 
+	agentcogni "yunque-agent/internal/agentcore/cogni"
 	"yunque-agent/pkg/skills"
 )
 
@@ -117,4 +119,68 @@ func assertExcludesAll(t *testing.T, got []string, unwanted ...string) {
 			t.Errorf("expected %q to be excluded, got %v", u, got)
 		}
 	}
+}
+
+// denyRuntimeStub is a CogniRuntime whose Decide returns a fixed DeniedTools
+// list, isolating the NativeFC risk-deny pass in buildFunctionDefs.
+type denyRuntimeStub struct {
+	denied []string
+}
+
+func (s denyRuntimeStub) Decide(context.Context, string, string, string) agentcogni.CogniFinalDecision {
+	return agentcogni.CogniFinalDecision{DeniedTools: s.denied}
+}
+func (s denyRuntimeStub) BuildContext(context.Context, string, string, string, string) string {
+	return ""
+}
+func (s denyRuntimeStub) FilterSkills(_ string, _ string, _ string, in []skills.Skill) []skills.Skill {
+	return in
+}
+func (s denyRuntimeStub) Trace(string, string, string) (CogniTraceDetail, bool) {
+	return CogniTraceDetail{}, false
+}
+func (s denyRuntimeStub) Tools(context.Context, string, string, string) []CogniTool { return nil }
+func (s denyRuntimeStub) SurfaceAuthoritative(string, string, string) bool          { return false }
+func (s denyRuntimeStub) RecordToolOutcome(string, string, string, string, bool)    {}
+
+// TestBuildFunctionDefs_RiskDenyRemovesDestructiveTools proves the safety
+// property end-to-end on the NativeFC path: a RiskCogni deny-list strips the
+// matching tools from the FunctionDefs the model actually receives, on the
+// ambient build path, even though no user restriction was applied.
+func TestBuildFunctionDefs_RiskDenyRemovesDestructiveTools(t *testing.T) {
+	reg := buildExpandRegistry()
+	p := NewPlanner(nil, reg, 20)
+	p.SetCogniRuntime(denyRuntimeStub{denied: []string{"file_write", "file_delete", "computer_use"}})
+
+	defs := p.buildFunctionDefs(context.Background(), "帮我处理一下文件", "t", "web", false, nil,
+		p.ensureContextAssembly(), p.ensureDelegationRuntime(), p.ensureSkillRuntime())
+
+	names := make([]string, 0, len(defs))
+	for _, d := range defs {
+		names = append(names, d.Name)
+	}
+	assertExcludesAll(t, names, "file_write", "file_delete", "computer_use")
+	// A non-denied, non-destructive tool must survive the deny pass.
+	assertContainsAll(t, names, "file_read")
+}
+
+// TestBuildFunctionDefs_RiskDenyOverridesUserAllowList proves safety is not
+// bypassable: even when the user explicitly allow-lists a destructive tool via
+// AllowedSkills (the chat tool drawer), the risk deny still removes it.
+func TestBuildFunctionDefs_RiskDenyOverridesUserAllowList(t *testing.T) {
+	reg := buildExpandRegistry()
+	p := NewPlanner(nil, reg, 20)
+	p.SetCogniRuntime(denyRuntimeStub{denied: []string{"file_delete"}})
+
+	// User explicitly tried to allow file_delete + file_read.
+	defs := p.buildFunctionDefs(context.Background(), "删除这些文件", "t", "web", true,
+		[]string{"file_delete", "file_read"},
+		p.ensureContextAssembly(), p.ensureDelegationRuntime(), p.ensureSkillRuntime())
+
+	names := make([]string, 0, len(defs))
+	for _, d := range defs {
+		names = append(names, d.Name)
+	}
+	assertExcludesAll(t, names, "file_delete")
+	assertContainsAll(t, names, "file_read")
 }

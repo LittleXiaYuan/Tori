@@ -18,6 +18,8 @@ import (
 	"yunque-agent/internal/agentcore/subagent"
 	"yunque-agent/internal/observe"
 	"yunque-agent/pkg/skills"
+
+	agentcogni "yunque-agent/internal/agentcore/cogni"
 )
 
 type dummyPlannerSkill string
@@ -123,6 +125,9 @@ type surfaceAuthorityStub struct {
 func (s surfaceAuthorityStub) BuildContext(context.Context, string, string, string, string) string {
 	return ""
 }
+func (s surfaceAuthorityStub) Decide(context.Context, string, string, string) agentcogni.CogniFinalDecision {
+	return agentcogni.CogniFinalDecision{}
+}
 func (s surfaceAuthorityStub) FilterSkills(_ string, _ string, _ string, in []skills.Skill) []skills.Skill {
 	return in
 }
@@ -149,7 +154,7 @@ func TestBuildFunctionDefsCogniSurfaceAuthoritativeBypassesCap(t *testing.T) {
 
 	authP := NewPlanner(nil, reg, 5)
 	authP.SetCogniRuntime(surfaceAuthorityStub{authoritative: true})
-	authDefs := authP.buildFunctionDefs("hello", "t", "web", false, nil,
+	authDefs := authP.buildFunctionDefs(context.Background(), "hello", "t", "web", false, nil,
 		authP.ensureContextAssembly(), authP.ensureDelegationRuntime(), authP.ensureSkillRuntime())
 	if len(authDefs) != 8 {
 		t.Fatalf("authoritative surface should bypass cap and keep all 8 tools, got %d", len(authDefs))
@@ -157,7 +162,7 @@ func TestBuildFunctionDefsCogniSurfaceAuthoritativeBypassesCap(t *testing.T) {
 
 	ambientP := NewPlanner(nil, reg, 5)
 	ambientP.SetCogniRuntime(surfaceAuthorityStub{authoritative: false})
-	ambientDefs := ambientP.buildFunctionDefs("hello", "t", "web", false, nil,
+	ambientDefs := ambientP.buildFunctionDefs(context.Background(), "hello", "t", "web", false, nil,
 		ambientP.ensureContextAssembly(), ambientP.ensureDelegationRuntime(), ambientP.ensureSkillRuntime())
 	if len(ambientDefs) != 3 {
 		t.Fatalf("ambient path should apply env cap of 3, got %d", len(ambientDefs))
@@ -165,7 +170,7 @@ func TestBuildFunctionDefsCogniSurfaceAuthoritativeBypassesCap(t *testing.T) {
 
 	// Authoritative output is deterministic across different messages (stable
 	// prefix) — the prompt-cache precondition.
-	authDefs2 := authP.buildFunctionDefs("totally different message", "t", "web", false, nil,
+	authDefs2 := authP.buildFunctionDefs(context.Background(), "totally different message", "t", "web", false, nil,
 		authP.ensureContextAssembly(), authP.ensureDelegationRuntime(), authP.ensureSkillRuntime())
 	if toolSetHash(authDefs) != toolSetHash(authDefs2) {
 		t.Fatalf("authoritative tool set should be deterministic across messages: %s vs %s", toolSetHash(authDefs), toolSetHash(authDefs2))
@@ -667,7 +672,7 @@ func TestBuildFunctionDefsSubagentHonorsAllowedSkills(t *testing.T) {
 	})
 	p.SetHandoffRegistry(subagent.NewHandoffRegistry(subagent.NewManager()))
 
-	defs := p.buildFunctionDefs("读取 docx", "", "", true, []string{" file_open ", "file_search", ""}, p.ensureContextAssembly(), p.ensureDelegationRuntime(), p.ensureSkillRuntime())
+	defs := p.buildFunctionDefs(context.Background(), "读取 docx", "", "", true, []string{" file_open ", "file_search", ""}, p.ensureContextAssembly(), p.ensureDelegationRuntime(), p.ensureSkillRuntime())
 	got := map[string]bool{}
 	for _, d := range defs {
 		got[d.Name] = true
@@ -1033,8 +1038,8 @@ func TestTextHandoffFailureEmitsRecoverableEvent(t *testing.T) {
 		t.Fatalf("register handoff: %v", err)
 	}
 	hr.SetRunFunc(func(context.Context, string, string, string) (string, string, error) {
-	  return "", "", context.DeadlineExceeded
-	 })
+		return "", "", context.DeadlineExceeded
+	})
 	p.SetHandoffRegistry(hr)
 
 	var done observe.AgentEvent
