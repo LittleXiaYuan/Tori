@@ -17,15 +17,6 @@ type SkillIndexEntry struct {
 
 type SkillIndexFunc func() []SkillIndexEntry
 
-// BeliefContextFunc returns the assembled Cognition SDK context block for the
-// current turn — empty string when no pack activates.
-//
-// scope is the coarse conversation kind ("emotional", "technical", ""),
-// derived from IntentHint. It drives pkg/belief's scope gate: a belief with
-// non-empty Scopes only activates when scope matches; empty scope = global
-// beliefs only (scoped beliefs stay dormant until a matching scope is declared).
-type BeliefContextFunc func(ctx context.Context, message, tenantID, channel, scope string) string
-
 // RuntimeGradeFunc returns a runtime-grade context block that informs the LLM
 // about the current execution environment's trust and capability posture (#4).
 //
@@ -62,8 +53,8 @@ type CogniRuntime interface {
 	// derived from IntentHint by prompt_builder.intentToScope. It drives the
 	// merged belief scope gate (#34) inside the runtime: a belief with
 	// non-empty Scopes only activates when scope matches; empty scope = global
-	// beliefs only. Step 2 of cogni consolidation: this single BuildContext
-	// replaces the former parallel BeliefContextFunc injection path.
+	// beliefs only. This single BuildContext is the sole belief/cogni injection
+	// path — the former parallel belief-context func was removed.
 	BuildContext(ctx context.Context, message, tenantID, channel, scope string) string
 	FilterSkills(message, tenantID, channel string, in []skills.Skill) []skills.Skill
 	Trace(message, tenantID, channel string) (CogniTraceDetail, bool)

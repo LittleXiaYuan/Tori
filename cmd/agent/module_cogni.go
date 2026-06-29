@@ -37,12 +37,11 @@ type plannerCogniRuntime struct {
 	enabled func() bool
 	hook    *cogni.Hook
 	mcp     *cogni.MCPManager
-	// beliefAdapter (Step 1 of cogni consolidation) merges cognisdk Pack
-	// perception/belief into BuildContext output so the planner has ONE cogni
-	// layer instead of two parallel ones (cogni + belief). nil = cogni
-	// Declaration only (backward compatible). scope is derived upstream by
-	// prompt_builder's intentToScope and passed via BuildContext's scope param
-	// once Step 2 lands; for now the adapter uses its own scope derivation.
+	// beliefAdapter merges cognisdk Pack perception/belief into BuildContext
+	// output so the planner has ONE cogni layer instead of two parallel ones
+	// (cogni + belief). nil = cogni Declaration only (backward compatible).
+	// scope is derived upstream by prompt_builder.intentToScope and passed in
+	// through BuildContext's scope param, which drives the belief scope gate (#34).
 	beliefAdapter *cognisdk.HostAdapter
 }
 
@@ -51,7 +50,20 @@ func (r plannerCogniRuntime) active() bool {
 }
 
 func (r plannerCogniRuntime) request(message, tenantID, channel string) cogni.ContextRequest {
-	return cogni.ContextRequest{Message: message, TenantID: tenantID, Channel: channel}
+	req := cogni.ContextRequest{Message: message, TenantID: tenantID, Channel: channel}
+	// Step 3 of cogni consolidation: let cognisdk 先感知消息意图/风险，
+	// 把结果作为 hint 注入 cogni 的激活判定，消除两边各自猜意图的冗余。
+	// 各自激活逻辑保持独立，只是 cogni 现在能看到 cognisdk 的感知结果。
+	if r.beliefAdapter != nil {
+		res := r.beliefAdapter.Evaluate(context.Background(), cognisdk.Input{Message: message})
+		if res.Perception.Intent != "" || res.Perception.Risk != "" {
+			req.PerceptionHint = &cogni.PerceptionHint{
+				Intent: res.Perception.Intent,
+				Risk:   string(res.Perception.Risk),
+			}
+		}
+	}
+	return req
 }
 
 func (r plannerCogniRuntime) BuildContext(ctx context.Context, message, tenantID, channel, scope string) string {

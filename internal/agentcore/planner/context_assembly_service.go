@@ -26,7 +26,6 @@ type ContextAssemblyService struct {
 	strategyContext    func() string
 	strategyContextFor func(query string) string
 	cognitiveContext   CognitiveContextFunc
-	beliefContext      BeliefContextFunc
 	runtimeGrade       RuntimeGradeFunc // #4: trust gate tier + skill list + risk_level
 	cogniService       *CogniContextService
 	// packContext lets enabled capability packs (Tier 0 microkernel) inject
@@ -172,12 +171,6 @@ func (s *ContextAssemblyService) SetStrategyContextFor(fn func(query string) str
 func (s *ContextAssemblyService) SetCognitiveContext(fn CognitiveContextFunc) {
 	if s != nil {
 		s.cognitiveContext = fn
-	}
-}
-
-func (s *ContextAssemblyService) SetBeliefContext(fn BeliefContextFunc) {
-	if s != nil {
-		s.beliefContext = fn
 	}
 }
 

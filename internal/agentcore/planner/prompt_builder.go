@@ -108,15 +108,16 @@ var retrievalTimeout = func() time.Duration {
 //   - INJECT_REVERIE:  idle inner-thought journal
 //   - INJECT_GRAPH:    knowledge-graph entity relations
 // Non-personalized controls (usually kept constant ON):
-//   - INJECT_COGNI:    declarative Cogni registry context
-//   - INJECT_BELIEF:   Cognition SDK pack disposition/inner-state
+//   - INJECT_COGNI: declarative Cogni registry context, now also carries the
+//     merged Cognition SDK pack disposition/inner-state (see P3.6). The former
+//     INJECT_BELIEF gate was removed when belief injection folded into the
+//     unified cogni layer — belief on/off now follows INJECT_COGNI.
 var (
 	injectMemoryEnabled   = layerInjectionEnabled("INJECT_MEMORY")
 	injectStrategyEnabled = layerInjectionEnabled("INJECT_STRATEGY")
 	injectReverieEnabled  = layerInjectionEnabled("INJECT_REVERIE")
 	injectGraphEnabled    = layerInjectionEnabled("INJECT_GRAPH")
 	injectCogniEnabled    = layerInjectionEnabled("INJECT_COGNI")
-	injectBeliefEnabled   = layerInjectionEnabled("INJECT_BELIEF")
 )
 
 // cognitiveLayerEnabled is the MASTER switch for the whole cognitive layer
@@ -386,14 +387,11 @@ collect:
 		}
 	}
 
-	// P3.7: belief layer REMOVED in Step 2 of cogni consolidation. The belief
-	// context is now merged into P3.6's unified cogni layer via
+	// P3.7: belief layer REMOVED in Step 2 of cogni consolidation. Belief
+	// context now flows through P3.6's unified cogni layer via
 	// CogniRuntime.BuildContext (which internally combines pkg/cogni
-	// Declaration context + pkg/cognisdk Pack perception/belief). Keeping the
-	// injectBeliefEnabled gate would risk double-injecting belief, so the gate
-	// is now inert — the belief content flows only through P3.6. The
-	// BeliefContextFunc setter is retained for backward compat but no longer
-	// drives a separate prompt layer.
+	// Declaration context + pkg/cognisdk Pack perception/belief), gated by
+	// INJECT_COGNI. There is no longer a separate belief layer or gate.
 
 	// P3.8: Runtime grade — trust gate tier, available skill list, dynamic risk
 	// level (#4). This is the "runtime self-awareness" layer: tells the model

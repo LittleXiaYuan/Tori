@@ -187,10 +187,11 @@ func (p *Planner) SetCognitiveContext(fn CognitiveContextFunc) {
 	contextAssembly.SetCognitiveContext(fn)
 }
 
-// SetBeliefContext attaches the Cognition SDK dynamic context collector.
-func (p *Planner) SetBeliefContext(fn BeliefContextFunc) {
+// SetRuntimeGrade attaches the runtime-grade context source (#4): trust gate
+// tier, available skill list, and dynamic risk level.
+func (p *Planner) SetRuntimeGrade(fn RuntimeGradeFunc) {
 	contextAssembly := p.ensureContextAssembly()
-	contextAssembly.SetBeliefContext(fn)
+	contextAssembly.SetRuntimeGrade(fn)
 }
 
 // SetLedger attaches a Ledger instance for ReAct mode, reasoning traces, and self-evaluation.

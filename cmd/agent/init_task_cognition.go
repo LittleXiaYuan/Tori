@@ -132,14 +132,12 @@ func initCognitionWiring(
 	sdkPacks := append([]cognisdk.PackManifest{}, cognisdk.BuiltinPacks()...)
 	sdkPacks = append(sdkPacks, localPacks...)
 	beliefSDK := cognisdk.NewHostAdapter(cognisdk.Config{Packs: sdkPacks})
-	if p != nil {
-		p.SetBeliefContext(beliefSDK.BuildContext)
-		slog.Info("cognisdk: planner belief context wired", "builtin_packs", len(cognisdk.BuiltinPacks()), "local_packs", len(localPacks))
-	}
-	// Step 1 of cogni consolidation: expose the belief adapter so module_cogni
-	// can merge it into the unified plannerCogniRuntime (one cogni layer instead
-	// of cogni + belief two parallel layers).
+	// Cogni consolidation: belief no longer drives a separate planner layer.
+	// The adapter is exposed via app.Set below so module_cogni can merge it into
+	// the unified plannerCogniRuntime (one cogni layer that internally combines
+	// cogni Declaration context + cognisdk Pack perception/belief).
 	app.Set("cognisdk_belief_adapter", beliefSDK)
+	slog.Info("cognisdk: belief adapter exposed for unified cogni runtime", "builtin_packs", len(cognisdk.BuiltinPacks()), "local_packs", len(localPacks))
 
 	learningLoop.SetOnLesson(func(category, outcome, lesson, ctx string, tags []string) {
 		experienceStore.Add(reflectpkg.Experience{
