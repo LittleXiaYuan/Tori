@@ -3,6 +3,7 @@ package appdir
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 )
@@ -51,12 +52,36 @@ func resolve() string {
 	if env := os.Getenv("YUNQUE_DATA_DIR"); env != "" {
 		return filepath.Clean(env)
 	}
-
-	exe, err := os.Executable()
-	if err != nil || isGoRunBinary(exe) {
-		return filepath.Join(".", "data")
+	if std := osStandardDataDir(); std != "" {
+		return std
 	}
-	return filepath.Join(filepath.Dir(exe), "data")
+	return filepath.Join(".", "data")
+}
+
+// osStandardDataDir returns the OS-standard per-user data directory for
+// Yunque Agent. This is the same root Tauri uses for the desktop app, so all
+// launch modes (desktop, go run, compiled binary, Docker with explicit
+// YUNQUE_DATA_DIR) share one data store without manual configuration.
+//
+//   - Windows: %APPDATA%\com.yunque.agent\data
+//   - macOS:   ~/Library/Application Support/com.yunque.agent/data
+//   - Linux:   $XDG_DATA_HOME/com.yunque.agent/data  (fallback ~/.local/share)
+func osStandardDataDir() string {
+	if runtime.GOOS == "linux" {
+		base := os.Getenv("XDG_DATA_HOME")
+		if base == "" {
+			if home, err := os.UserHomeDir(); err == nil {
+				base = filepath.Join(home, ".local", "share")
+			}
+		}
+		if base != "" {
+			return filepath.Join(base, "com.yunque.agent", "data")
+		}
+	}
+	if cfgDir, err := os.UserConfigDir(); err == nil {
+		return filepath.Join(cfgDir, "com.yunque.agent", "data")
+	}
+	return ""
 }
 
 // isGoRunBinary reports whether the executable was produced by `go run`, whose
