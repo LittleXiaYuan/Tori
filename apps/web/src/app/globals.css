@@ -1,6 +1,6 @@
 @import "tailwindcss";
 @import "@heroui/styles";
-@import "@heroui-pro/react/css";
+/* @import "@heroui-pro/react/css"; — beta.6 包内无 css 产物，暂禁用 */
 @import "highlight.js/styles/github-dark-dimmed.css";
 
 /* 让 Tailwind 的 rounded-{sm,md,lg,xl} 工具类读取运行时可变的 --yunque-radius-*，
