@@ -123,25 +123,28 @@ func assertExcludesAll(t *testing.T, got []string, unwanted ...string) {
 
 // denyRuntimeStub is a CogniRuntime whose Decide returns a fixed DeniedTools
 // list, isolating the NativeFC risk-deny pass in buildFunctionDefs.
-type denyRuntimeStub struct {
-	denied []string
+// decisionRuntimeStub is a CogniRuntime that returns a fixed CogniFinalDecision,
+// isolating the NativeFC consumption of v2 decisions (DeniedTools narrowing +
+// SkillsNeeded intent narrowing) in buildFunctionDefs.
+type decisionRuntimeStub struct {
+	decision agentcogni.CogniFinalDecision
 }
 
-func (s denyRuntimeStub) Decide(context.Context, string, string, string) agentcogni.CogniFinalDecision {
-	return agentcogni.CogniFinalDecision{DeniedTools: s.denied}
+func (s decisionRuntimeStub) Decide(context.Context, string, string, string) agentcogni.CogniFinalDecision {
+	return s.decision
 }
-func (s denyRuntimeStub) BuildContext(context.Context, string, string, string, string) string {
+func (s decisionRuntimeStub) BuildContext(context.Context, string, string, string, string) string {
 	return ""
 }
-func (s denyRuntimeStub) FilterSkills(_ string, _ string, _ string, in []skills.Skill) []skills.Skill {
+func (s decisionRuntimeStub) FilterSkills(_ string, _ string, _ string, in []skills.Skill) []skills.Skill {
 	return in
 }
-func (s denyRuntimeStub) Trace(string, string, string) (CogniTraceDetail, bool) {
+func (s decisionRuntimeStub) Trace(string, string, string) (CogniTraceDetail, bool) {
 	return CogniTraceDetail{}, false
 }
-func (s denyRuntimeStub) Tools(context.Context, string, string, string) []CogniTool { return nil }
-func (s denyRuntimeStub) SurfaceAuthoritative(string, string, string) bool          { return false }
-func (s denyRuntimeStub) RecordToolOutcome(string, string, string, string, bool)    {}
+func (s decisionRuntimeStub) Tools(context.Context, string, string, string) []CogniTool { return nil }
+func (s decisionRuntimeStub) SurfaceAuthoritative(string, string, string) bool          { return false }
+func (s decisionRuntimeStub) RecordToolOutcome(string, string, string, string, bool)    {}
 
 // TestBuildFunctionDefs_RiskDenyRemovesDestructiveTools proves the safety
 // property end-to-end on the NativeFC path: a RiskCogni deny-list strips the
@@ -150,7 +153,9 @@ func (s denyRuntimeStub) RecordToolOutcome(string, string, string, string, bool)
 func TestBuildFunctionDefs_RiskDenyRemovesDestructiveTools(t *testing.T) {
 	reg := buildExpandRegistry()
 	p := NewPlanner(nil, reg, 20)
-	p.SetCogniRuntime(denyRuntimeStub{denied: []string{"file_write", "file_delete", "computer_use"}})
+	p.SetCogniRuntime(decisionRuntimeStub{decision: agentcogni.CogniFinalDecision{
+		DeniedTools: []string{"file_write", "file_delete", "computer_use"},
+	}})
 
 	defs := p.buildFunctionDefs(context.Background(), "帮我处理一下文件", "t", "web", false, nil,
 		p.ensureContextAssembly(), p.ensureDelegationRuntime(), p.ensureSkillRuntime())
@@ -170,7 +175,9 @@ func TestBuildFunctionDefs_RiskDenyRemovesDestructiveTools(t *testing.T) {
 func TestBuildFunctionDefs_RiskDenyOverridesUserAllowList(t *testing.T) {
 	reg := buildExpandRegistry()
 	p := NewPlanner(nil, reg, 20)
-	p.SetCogniRuntime(denyRuntimeStub{denied: []string{"file_delete"}})
+	p.SetCogniRuntime(decisionRuntimeStub{decision: agentcogni.CogniFinalDecision{
+		DeniedTools: []string{"file_delete"},
+	}})
 
 	// User explicitly tried to allow file_delete + file_read.
 	defs := p.buildFunctionDefs(context.Background(), "删除这些文件", "t", "web", true,
@@ -183,4 +190,72 @@ func TestBuildFunctionDefs_RiskDenyOverridesUserAllowList(t *testing.T) {
 	}
 	assertExcludesAll(t, names, "file_delete")
 	assertContainsAll(t, names, "file_read")
+}
+
+// TestBuildFunctionDefs_V2IntentNarrowsSurface proves "v2 定调": when IntentCogni
+// returns a non-nil SkillsNeeded, buildFunctionDefs restricts the tool surface to
+// the registry-resolved set for that intent (research category + uncategorized
+// general tools), instead of exposing the full registry.
+func TestBuildFunctionDefs_V2IntentNarrowsSurface(t *testing.T) {
+	reg := buildExpandRegistry()
+	p := NewPlanner(nil, reg, 20)
+	p.SetCogniRuntime(decisionRuntimeStub{decision: agentcogni.CogniFinalDecision{
+		SkillsNeeded: []string{"research"},
+	}})
+
+	defs := p.buildFunctionDefs(context.Background(), "帮我查点资料", "t", "web", false, nil,
+		p.ensureContextAssembly(), p.ensureDelegationRuntime(), p.ensureSkillRuntime())
+
+	names := make([]string, 0, len(defs))
+	for _, d := range defs {
+		names = append(names, d.Name)
+	}
+	// research category skills + uncategorized general tools survive…
+	assertContainsAll(t, names, "web_search", "deep_research", "code_execute", "computer_use")
+	// …but unrelated categories (file/browser) are narrowed away.
+	assertExcludesAll(t, names, "file_read", "file_write", "browser_navigate")
+}
+
+// TestBuildFunctionDefs_V2ChatIntentEmptiesSurface proves the strongest signal:
+// a chat intent (SkillsNeeded == []) narrows away every categorized skill, the
+// token win the native scorer can't express. Uncategorized general tools remain.
+func TestBuildFunctionDefs_V2ChatIntentEmptiesSurface(t *testing.T) {
+	reg := buildExpandRegistry()
+	p := NewPlanner(nil, reg, 20)
+	p.SetCogniRuntime(decisionRuntimeStub{decision: agentcogni.CogniFinalDecision{
+		SkillsNeeded: []string{}, // chat/empathy: no skills wanted
+	}})
+
+	defs := p.buildFunctionDefs(context.Background(), "今天心情不好，陪我聊聊", "t", "web", false, nil,
+		p.ensureContextAssembly(), p.ensureDelegationRuntime(), p.ensureSkillRuntime())
+
+	names := make([]string, 0, len(defs))
+	for _, d := range defs {
+		names = append(names, d.Name)
+	}
+	assertExcludesAll(t, names, "web_search", "file_read", "browser_navigate", "deep_research")
+}
+
+// TestBuildFunctionDefs_V2NoOpinionFallsBackToNative proves "原生兜底": when
+// IntentCogni returns SkillsNeeded == nil (complex/unknown intent), v2 does not
+// narrow and the full ready surface is exposed for the native scorer to rank. The
+// small registry (8 < 10) skips the native dynamic filter, so all 8 survive —
+// proving v2 did NOT narrow.
+func TestBuildFunctionDefs_V2NoOpinionFallsBackToNative(t *testing.T) {
+	reg := buildExpandRegistry()
+	p := NewPlanner(nil, reg, 20)
+	p.SetCogniRuntime(decisionRuntimeStub{decision: agentcogni.CogniFinalDecision{
+		SkillsNeeded: nil, // no opinion
+	}})
+
+	defs := p.buildFunctionDefs(context.Background(), "帮我规划一个复杂的多步任务", "t", "web", false, nil,
+		p.ensureContextAssembly(), p.ensureDelegationRuntime(), p.ensureSkillRuntime())
+
+	names := make([]string, 0, len(defs))
+	for _, d := range defs {
+		names = append(names, d.Name)
+	}
+	// Full registry surface preserved (no v2 narrowing): both file and research
+	// categories present.
+	assertContainsAll(t, names, "file_read", "file_write", "web_search", "browser_navigate", "code_execute")
 }

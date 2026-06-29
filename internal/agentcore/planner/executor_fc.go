@@ -329,18 +329,31 @@ func (p *Planner) buildFunctionDefs(ctx context.Context, userMessage, tenantID, 
 		slog.Info("buildFunctionDefs: user-restricted skill set", "allowed", len(allowedSkills), "matched", len(allSkills))
 	}
 
-	// V2 Cogni safety deny-list — computed once for this turn and applied as a
-	// final subtractive pass on EVERY return path below (delegation, dynamic
-	// filter, authoritative cogni, ambient). RiskCogni emits DeniedTools for
-	// high-risk messages ("删除…", "rm -rf…"); those tools must never reach the
-	// model regardless of which branch built the tool list, and regardless of a
-	// user/cogni allow-list — safety is not bypassable. Unlike the ReAct path's
-	// expandCogniSkills (which also does intent NARROWING), NativeFC keeps its own
-	// mature intent ranking + cap below and only borrows the deny pass, so the two
-	// executors share the safety guarantee without fighting over narrowing policy.
+	// V2 Cogni decision — computed once for this turn. Two outputs are consumed:
+	//
+	//   - DeniedTools: a safety deny-list applied as a final subtractive pass on
+	//     EVERY return path below (delegation, dynamic filter, authoritative cogni,
+	//     ambient). RiskCogni emits these for high-risk messages ("删除…", "rm -rf…");
+	//     they must never reach the model regardless of which branch built the tool
+	//     list, and regardless of a user/cogni allow-list — safety is not bypassable.
+	//
+	//   - SkillsNeeded: when IntentCogni has an opinion (non-nil — including the
+	//     explicit empty "chat → no tools" case), it DEFINES the narrowing for this
+	//     turn ("v2 定调"); the native per-message FilterByIntentScored is skipped.
+	//     When nil ("complex"/unknown intent → no opinion), the native scorer runs
+	//     unchanged ("原生兜底"). The two are near-identical category-narrowing
+	//     algorithms, so this picks one signal per turn instead of double-narrowing.
 	var cogniDenied []string
+	var cogniNarrowed []string // non-nil ⇒ v2 intent defines the surface this turn
 	if contextAssembly != nil {
-		cogniDenied = contextAssembly.CogniDecide(ctx, userMessage, tenantID, channelType).DeniedTools
+		decision := contextAssembly.CogniDecide(ctx, userMessage, tenantID, channelType)
+		cogniDenied = decision.DeniedTools
+		// Only let v2 drive narrowing on the ambient path: an explicit user
+		// allow-list or an authoritative cogni surface already own the set, and
+		// delegation mode exposes handoff tools instead of skills.
+		if decision.SkillsNeeded != nil && len(allowedSkills) == 0 {
+			cogniNarrowed = p.expandCogniSkills(decision.SkillsNeeded, decision.ToolsNeeded, decision.DeniedTools)
+		}
 	}
 
 	// Filter out skills that aren't ready (missing config/dependencies)
@@ -381,6 +394,27 @@ func (p *Planner) buildFunctionDefs(ctx context.Context, userMessage, tenantID, 
 	if !disableDelegation && len(allowedSkills) == 0 && !delegationRuntime.HasHandoffAgents(4) {
 		allSkills = contextAssembly.ApplyCogniSkillFilter(userMessage, tenantID, channelType, allSkills)
 		cogniAuthoritative = contextAssembly.CogniSurfaceAuthoritative(userMessage, tenantID, channelType)
+	}
+
+	// V2 intent narrowing ("v2 定调"): when IntentCogni expressed an opinion this
+	// turn (cogniNarrowed != nil) and no authoritative cogni surface already owns
+	// the set, restrict allSkills to the v2-resolved names and skip the native
+	// per-message FilterByIntentScored below. cogniNarrowed is the registry-resolved
+	// allow-list (empty slice ⇒ chat/empathy intent wants no skills). rank + cap
+	// still run afterwards, so a broad intent stays bounded by the env cap.
+	cogniIntentNarrowed := false
+	if cogniNarrowed != nil && !cogniAuthoritative {
+		allow := allowedSkillSet(cogniNarrowed)
+		narrowed := make([]skills.Skill, 0, len(cogniNarrowed))
+		for _, s := range allSkills {
+			if allow[s.Name()] {
+				narrowed = append(narrowed, s)
+			}
+		}
+		allSkills = narrowed
+		cogniIntentNarrowed = true
+		slog.Info("buildFunctionDefs: cogni v2 intent narrowed surface",
+			"resolved", len(cogniNarrowed), "matched", len(allSkills), "msg_prefix", truncate(userMessage, 50))
 	}
 
 	cats := p.registry.Categories()
@@ -424,8 +458,11 @@ func (p *Planner) buildFunctionDefs(ctx context.Context, userMessage, tenantID, 
 
 	// Fallback: direct mode (no delegation agents or fewer than 4)
 	// Strategy 1: Dynamic filtering by intent (threshold lowered from 25 to 10
-	// so intent-based narrowing kicks in earlier, reducing tool noise for LLMs)
-	if !cogniAuthoritative && userMessage != "" && len(allSkills) > 10 && len(cats) > 0 && len(allowedSkills) == 0 {
+	// so intent-based narrowing kicks in earlier, reducing tool noise for LLMs).
+	// Skipped when v2 IntentCogni already defined the surface this turn — the two
+	// are redundant category-narrowers, so v2's opinion wins and native does not
+	// re-narrow on top of it.
+	if !cogniAuthoritative && !cogniIntentNarrowed && userMessage != "" && len(allSkills) > 10 && len(cats) > 0 && len(allowedSkills) == 0 {
 		skillScorer := skillRuntime.ScorerWithRecent()
 		filtered := p.registry.FilterByIntentScored(userMessage, skillScorer)
 		if len(filtered) < len(allSkills) && len(filtered) > 0 {
