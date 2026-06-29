@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -17,6 +16,7 @@ import (
 	"yunque-agent/internal/agentcore/audit"
 	"yunque-agent/internal/agentcore/browserskill"
 	"yunque-agent/internal/agentcore/federation"
+	"yunque-agent/internal/agentcore/guardrails"
 	"yunque-agent/internal/agentcore/i18n"
 	"yunque-agent/internal/agentcore/knowledge"
 	"yunque-agent/internal/agentcore/llm"
@@ -368,7 +368,16 @@ func initSubagentHandoff(app *agentrt.App, gw *gateway.Gateway, p *planner.Plann
 	subMgr := subagent.NewManager()
 	gw.SetSubagentManager(subMgr)
 	handoffReg := subagent.NewHandoffRegistry(subMgr)
-	handoffReg.SetRunFunc(func(ctx context.Context, agentName, input, providerOverride string) (string, error) {
+	handoffReg.SetRunFunc(func(ctx context.Context, agentName, input, providerOverride string) (string, string, error) {
+		// #39: sanitize handoff input before it reaches the subagent planner.
+		// handoff input comes from LLM tool-call args (handoffInputFromArgs),
+		// which is attacker-controllable via prompt injection.
+		sanitized, err := guardrails.SanitizeHandoffInput(ctx, gw.Sanitizer(), agentName, input)
+		if err != nil {
+			return "", "", err
+		}
+		input = sanitized
+
 		override := providerOverride
 		if override == "" {
 			override = gw.ExecProvider()
@@ -402,9 +411,18 @@ func initSubagentHandoff(app *agentrt.App, gw *gateway.Gateway, p *planner.Plann
 		}
 		result, err := p.Run(ctx, req)
 		if err != nil {
-			return "", err
+			// #33: on timeout/cancel the planner may still return a partial
+			// PlanResult (PartialPlanResultForRequest) with whatever steps the
+			// subagent completed before the deadline. Surface that reply as
+			// `partial` so the parent planner can feed it into its own
+			// PartialPlanResultForRequest instead of losing the subagent's work.
+			partial := ""
+			if result != nil && result.Reply != "" {
+				partial = result.Reply
+			}
+			return "", partial, err
 		}
-		return result.Reply, nil
+		return result.Reply, "", nil
 	})
 	handoffReg.Register(subagent.HandoffConfig{
 		Name:        "browser_exec",
@@ -678,18 +696,28 @@ func discoverBuiltinPackManifestPaths() []string {
 	return paths
 }
 
-// locateBuiltinPackDir returns the first existing packs/official directory among
-// the same candidate roots used to resolve individual builtin manifests.
+// locateBuiltinPackDir returns the first existing packs/official directory.
+// It searches relative to the current working directory first (works for
+// `go run` and Docker), then walks up from the executable's location (works
+// for the desktop sidecar and compiled binaries placed anywhere in the tree).
+// runtime.Caller is intentionally NOT used — it bakes the compile-time source
+// path into the binary, causing ghost-path failures after the project is
+// moved or renamed.
 func locateBuiltinPackDir() string {
 	rel := filepath.Join("packs", "official")
-	candidates := []string{rel, filepath.Join("..", "..", rel)}
-	if _, file, _, ok := runtime.Caller(0); ok {
-		repoRoot := filepath.Clean(filepath.Join(filepath.Dir(file), "..", ".."))
-		candidates = append(candidates, filepath.Join(repoRoot, rel))
+	candidates := []string{rel}
+	// Walk up from the executable's runtime location (up to 7 levels covers
+	// apps/desktop/src-tauri/target/debug/ → repo root in 5 hops).
+	if exe, err := os.Executable(); err == nil {
+		dir := filepath.Dir(exe)
+		for i := 0; i < 7; i++ {
+			candidates = append(candidates, filepath.Join(dir, rel))
+			dir = filepath.Dir(dir)
+		}
 	}
 	for _, c := range candidates {
 		if info, err := os.Stat(c); err == nil && info.IsDir() {
-			return c
+			return filepath.Clean(c)
 		}
 	}
 	return ""
@@ -772,10 +800,13 @@ func loadBuiltinPackManifest(manifestPath string) (packruntime.Manifest, error) 
 }
 
 func builtinPackManifestCandidates(manifestPath string) []string {
-	candidates := []string{manifestPath, filepath.Join("..", "..", manifestPath)}
-	if _, file, _, ok := runtime.Caller(0); ok {
-		repoRoot := filepath.Clean(filepath.Join(filepath.Dir(file), "..", ".."))
-		candidates = append(candidates, filepath.Join(repoRoot, manifestPath))
+	candidates := []string{manifestPath}
+	if exe, err := os.Executable(); err == nil {
+		dir := filepath.Dir(exe)
+		for i := 0; i < 7; i++ {
+			candidates = append(candidates, filepath.Join(dir, manifestPath))
+			dir = filepath.Dir(dir)
+		}
 	}
 	return candidates
 }
