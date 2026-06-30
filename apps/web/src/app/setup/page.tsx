@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Card, Chip, Input, Label, ProgressBar, Spinner, TextField } from "@heroui/react";
+import { Button, Card, Chip, Input, Label, ProgressBar, Spinner, TextField, Tooltip } from "@heroui/react";
 import { api, getAuthHeaders } from "@/lib/api";
 import type { SetupEnvironment, SetupTemplate } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
@@ -353,7 +353,7 @@ export default function SetupPage() {
               />
               <ChoiceCard
                 icon={Key}
-                accent="#3b82f6"
+                accent="var(--yunque-accent)"
                 title={t("setup.choose.apikey.title")}
                 tag={t("setup.choose.apikey.tag")}
                 desc={t("setup.choose.apikey.desc")}
@@ -539,9 +539,12 @@ export default function SetupPage() {
               <Label>{t("setup.model.apiKey")}</Label>
               <div className="flex items-center gap-2">
                 <Input className="flex-1" type={showKey ? "text" : "password"} placeholder="sk-..." value={apiKey} onChange={(e) => setApiKey(e.target.value)} />
-                <Button isIconOnly variant="ghost" size="sm" aria-label="toggle-api-key" onPress={() => setShowKey((value) => !value)}>
-                  {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
-                </Button>
+                <Tooltip delay={0}>
+                  <Button isIconOnly variant="ghost" size="sm" aria-label="toggle-api-key" onPress={() => setShowKey((value) => !value)}>
+                    {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </Button>
+                  <Tooltip.Content>{showKey ? "隐藏密钥" : "显示密钥"}</Tooltip.Content>
+                </Tooltip>
               </div>
             </TextField>
 
@@ -597,7 +600,7 @@ export default function SetupPage() {
                     className="rounded-2xl border-2 p-4 text-left transition cursor-pointer"
                     style={{
                       borderColor: selected ? "var(--yunque-accent)" : "var(--yunque-border)",
-                      background: selected ? "rgba(0,111,238,0.08)" : "transparent",
+                      background: selected ? "var(--yunque-accent-soft)" : "transparent",
                     }}
                   >
                     <div className="mb-2 flex items-center gap-2">
@@ -610,7 +613,7 @@ export default function SetupPage() {
                     <p className="text-sm text-default-500">{template.description}</p>
                     <div className="mt-3 flex flex-wrap gap-1">
                       {template.skills.slice(0, 4).map((skill) => (
-                        <Chip key={skill} size="sm" style={{ background: "rgba(59,130,246,0.08)", color: "var(--yunque-text-secondary)" }}>
+                        <Chip key={skill} size="sm" style={{ background: "var(--yunque-accent-soft)", color: "var(--yunque-text-secondary)" }}>
                           {skill}
                         </Chip>
                       ))}

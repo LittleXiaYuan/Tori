@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Card, Checkbox, FieldError, Input, Label, Spinner, TextField } from "@heroui/react";
+import { Button, Card, Checkbox, FieldError, Input, Label, Spinner, TextField, Tooltip } from "@heroui/react";
 import { Eye, EyeOff, Shield, ExternalLink } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { formatErrorMessage } from "@/lib/error-utils";
@@ -134,7 +134,7 @@ export default function LoginPage() {
           width: 600,
           height: 600,
           borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(59,130,246,0.055) 0%, rgba(168,85,247,0.025) 42%, transparent 70%)",
+          background: "radial-gradient(circle, var(--yunque-accent-soft) 0%, rgba(168,85,247,0.025) 42%, transparent 70%)",
           filter: "blur(58px)",
         }}
       />
@@ -145,7 +145,7 @@ export default function LoginPage() {
               className="flex h-12 w-12 items-center justify-center rounded-xl"
               style={{
                 background: "linear-gradient(135deg, var(--yunque-accent), var(--yunque-success))",
-                boxShadow: "0 0 24px rgba(59,130,246,0.22)",
+                boxShadow: "0 0 24px var(--yunque-accent-glow)",
               }}
             >
               <Shield size={24} className="text-white" />
@@ -187,17 +187,20 @@ export default function LoginPage() {
               <Label>{t("auth.password")}</Label>
               <div className="relative">
                 <Input placeholder={t("auth.passwordPlaceholder")} />
-                <Button
-                  isIconOnly
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                  variant="ghost"
-                  size="sm"
-                  onPress={() => setShowPassword((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2"
-                  style={{ color: "var(--yunque-text-muted)" }}
-                >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                </Button>
+                <Tooltip delay={0}>
+                  <Button
+                    isIconOnly
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    variant="ghost"
+                    size="sm"
+                    onPress={() => setShowPassword((v) => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2"
+                    style={{ color: "var(--yunque-text-muted)" }}
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </Button>
+                  <Tooltip.Content>{showPassword ? "隐藏密码" : "显示密码"}</Tooltip.Content>
+                </Tooltip>
               </div>
             </TextField>
 

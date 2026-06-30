@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { Button, Input, ListBox, Label, Description, Spinner } from "@heroui/react";
+import { Button, Input, ListBox, Label, Description, Spinner, Tooltip } from "@heroui/react";
 import { api } from "@/lib/api";
 import { createBrowserIntentPackClient } from "@/lib/browser-intent-pack-client";
 import type { ConnectorView, ConnectorDef } from "@/lib/api-types";
@@ -47,7 +47,7 @@ function statusTone(status: ConnectorView["status"]) {
     case "connected":
       return { bg: "rgba(34,197,94,0.12)", border: "rgba(34,197,94,0.24)", text: "#22c55e", label: "Connected" };
     case "connecting":
-      return { bg: "rgba(59,130,246,0.12)", border: "rgba(59,130,246,0.24)", text: "#60a5fa", label: "Connecting" };
+      return { bg: "var(--yunque-accent-muted)", border: "var(--yunque-border-accent)", text: "var(--yunque-accent-strong)", label: "Connecting" };
     case "error":
       return { bg: "rgba(239,68,68,0.12)", border: "rgba(239,68,68,0.24)", text: "#f87171", label: "Needs attention" };
     default:
@@ -161,7 +161,7 @@ export function ConnectorPopover({ open, onClose, browserConnected }: Props) {
     <div className="fixed inset-0 z-[140]">
       <button
         type="button"
-        aria-label="Close connectors"
+        aria-label="关闭连接器面板"
         className="absolute inset-0 bg-black/55 backdrop-blur-sm"
         onClick={onClose}
       />
@@ -177,9 +177,12 @@ export function ConnectorPopover({ open, onClose, browserConnected }: Props) {
                 {t("connector.subtitle")}
               </p>
             </div>
-            <Button isIconOnly variant="ghost" aria-label="Close connectors" onPress={onClose}>
-              <X size={18} />
-            </Button>
+            <Tooltip delay={0}>
+              <Button isIconOnly variant="ghost" aria-label="关闭连接器面板" onPress={onClose}>
+                <X size={18} />
+              </Button>
+              <Tooltip.Content>关闭</Tooltip.Content>
+            </Tooltip>
           </div>
 
           <div className="min-h-0 flex-1 overflow-hidden p-0">
@@ -205,6 +208,7 @@ export function ConnectorPopover({ open, onClose, browserConnected }: Props) {
                   <button
                     type="button"
                     onClick={() => setSelectedId(null)}
+                    aria-current={selectedId === null ? "true" : undefined}
                     className="interactive-list-item mb-3 flex w-full items-center gap-3 rounded-[16px] border px-3 py-2.5 text-left transition-colors"
                     style={{
                       background: browserState ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.03)",

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { api, type WorkerInfo } from "@/lib/api";
-import { Card, Button, Spinner, Chip } from "@heroui/react";
+import { Card, Button, Spinner, Chip, Tooltip } from "@heroui/react";
 import {
   Cpu, RefreshCw, Trash2, Copy, Plus,
   CheckCircle2, AlertTriangle, Clock,
@@ -245,7 +245,10 @@ export default function WorkersPage() {
           <div className="w-full max-w-2xl mx-4 rounded-xl overflow-hidden" style={{ background: "var(--yunque-bg)", border: "1px solid var(--yunque-border)" }}>
             <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: "var(--yunque-border)" }}>
               <h2 className="text-lg font-bold" style={{ color: "var(--yunque-fg)" }}>连接 AI IDE</h2>
-              <Button size="sm" variant="ghost" isIconOnly onPress={() => setShowConfig(false)}>✕</Button>
+              <Tooltip delay={0}>
+                <Button size="sm" variant="ghost" isIconOnly aria-label="关闭" onPress={() => setShowConfig(false)}>✕</Button>
+                <Tooltip.Content>关闭</Tooltip.Content>
+              </Tooltip>
             </div>
 
             <div className="p-4">

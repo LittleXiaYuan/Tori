@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
   createCogniKernelPackClient,
@@ -19,21 +20,17 @@ import type {
   CogniWorkflowStep,
   CogniExperiment,
 } from "@/lib/api-types/cogni";
-import { Button, Card, Chip, Switch } from "@heroui/react";
+import { Button, Chip, Disclosure, DisclosureGroup, SearchField, Switch, Tooltip } from "@heroui/react";
+import { KPI, KPIGroup, Segment, ItemCard, ItemCardGroup, PromptInput } from "@heroui-pro/react";
 import {
   AlertTriangle,
   CheckCircle2,
-  ChevronDown,
   Download,
   FlaskConical,
-  Lightbulb,
   Link as LinkIcon,
   Play,
-  Power,
   RefreshCw,
-  Search,
   Share2,
-  ShieldCheck,
   Sparkles,
   Trash2,
   Upload,
@@ -41,17 +38,39 @@ import {
   Workflow,
 } from "lucide-react";
 import PageHeader from "@/components/page-header";
+import EmptyState from "@/components/empty-state";
+import { confirmAction } from "@/components/confirm-dialog";
 import { showToast } from "@/components/toast-provider";
 import { formatErrorMessage } from "@/lib/error-utils";
+import { fetcher } from "@/lib/api-core";
 import { createCognisClient } from "yunque-client/cognis";
+import { createSkillsClient, type SkillInfo, type SkillCategory } from "yunque-client/skills";
 import { createYunqueSDKClientOptions } from "@/lib/sdk-client";
 import { CherryModal } from "@/components/cherry/overlay";
+import { CapabilityDetailModal } from "@/components/capability-detail-modal";
+import { useRouter } from "next/navigation";
 
 type HealthMap = Record<string, CogniHealthMetrics>;
+type ConnectorHint = { id: string; name: string; status: string };
+type DetailTab = "overview" | "config" | "logs";
+type ChipColor = "success" | "warning" | "danger" | "default";
+
+// Intent keyword → suggested skill labels + connector IDs to surface.
+const INTENT_HINTS: Array<{ re: RegExp; skills: string[]; connectors: string[] }> = [
+  { re: /代码|编程|开发|审查|git|github/i, skills: ["代码分析"], connectors: ["github"] },
+  { re: /数据|分析|报表|图表|excel|表格/i, skills: ["数据处理", "图表生成"], connectors: [] },
+  { re: /文档|ppt|演示|word|markdown|周报/i, skills: ["文档生成"], connectors: ["google-drive", "notion"] },
+  { re: /邮件|email|mail/i, skills: [], connectors: ["gmail"] },
+  { re: /日历|会议|日程|提醒/i, skills: [], connectors: ["google-calendar"] },
+  { re: /搜索|查资料|网络|爬虫/i, skills: ["网络搜索"], connectors: [] },
+  { re: /客服|回复|聊天/i, skills: ["对话管理"], connectors: [] },
+];
 
 const cogniPack = createCogniKernelPackClient();
 // Only used for id-filtered export (per-assistant share); hits the same /v1/cognis API.
 const cognisClient = createCognisClient(createYunqueSDKClientOptions());
+// Real installed capabilities (skills include MCP tools + plugin skills, registered at boot).
+const skillsClient = createSkillsClient(createYunqueSDKClientOptions());
 
 const ASSISTANT_EXAMPLES = [
   "一个帮我整理每周工作周报、能查资料还能做成 PPT 的助手",
@@ -75,7 +94,7 @@ const BUILTIN_TEMPLATES: TemplateMetadata[] = [
   { id: "task-scheduler", display_name: "任务调度助手", description: "智能调度任务、管理优先级、自动执行", category: "效率" },
 ];
 
-const COGNI_DELIVERY_SECTIONS = [
+const COGNI_DELIVERY_SECTIONS: Array<{ title: string; tone: ChipColor; items: string[] }> = [
   {
     title: "现在可稳定交付",
     tone: "success",
@@ -99,27 +118,28 @@ const COGNI_USAGE_NOTES = [
   "如果某个能力包被禁用，Cogni 只能看到受限状态，不能绕过 Pack Runtime。",
 ];
 
-function healthColor(status: string): { bg: string; fg: string } {
+// Map runtime health status → semantic Chip color.
+function healthChipColor(status: string): ChipColor {
   switch (status) {
     case "healthy":
-      return { bg: "rgba(23,201,100,0.12)", fg: "#17c964" };
+      return "success";
     case "warn":
-      return { bg: "rgba(255,170,0,0.12)", fg: "#ffaa00" };
+      return "warning";
     case "unhealthy":
-      return { bg: "rgba(243,18,96,0.12)", fg: "#f31260" };
+      return "danger";
     default:
-      return { bg: "rgba(255,255,255,0.04)", fg: "var(--yunque-text-muted)" };
+      return "default";
   }
 }
 
-function severityColor(sev: string): { bg: string; fg: string } {
+function severityChipColor(sev: string): ChipColor {
   switch (sev) {
     case "critical":
-      return { bg: "rgba(243,18,96,0.15)", fg: "#f31260" };
+      return "danger";
     case "warn":
-      return { bg: "rgba(255,170,0,0.15)", fg: "#ffaa00" };
+      return "warning";
     default:
-      return { bg: "rgba(0,145,255,0.15)", fg: "#0091ff" };
+      return "default";
   }
 }
 
@@ -139,6 +159,7 @@ function avatarInitial(name: string): string {
 
 export default function CognisPage() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const [cognis, setCognis] = useState<CogniEntryStatus[]>([]);
   const [health, setHealth] = useState<HealthMap>({});
   const [alerts, setAlerts] = useState<CogniAlert[]>([]);
@@ -150,12 +171,20 @@ export default function CognisPage() {
   const [generateDesc, setGenerateDesc] = useState("");
   const [generating, setGenerating] = useState(false);
   const [generatePreview, setGeneratePreview] = useState<CogniDeclaration | null>(null);
-  const heroInputRef = useRef<HTMLTextAreaElement>(null);
 
+  // Bottom accordion sections (collapsed by default — page leads with assistants).
   const [showTemplates, setShowTemplates] = useState(false);
+  const [showDeliveryNotes, setShowDeliveryNotes] = useState(false);
+  const [showUsageNotes, setShowUsageNotes] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [runtimePackState, setRuntimePackState] = useState<CogniRuntimePackStateReport | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const [connectors, setConnectors] = useState<ConnectorHint[]>([]);
+  const connectorsFetched = useRef(false);
+
+  // Real installed capabilities (skills = built-in + plugin + MCP tools).
+  const [skills, setSkills] = useState<SkillInfo[]>([]);
+  const [skillCategories, setSkillCategories] = useState<SkillCategory[]>([]);
 
   // Share + import-preview modals (ported from the old market page).
   const [shareID, setShareID] = useState<string | null>(null);
@@ -163,16 +192,18 @@ export default function CognisPage() {
 
   // Detail drawer.
   const [detailID, setDetailID] = useState<string | null>(null);
-  const [detailTab, setDetailTab] = useState<"traces" | "workflows" | "experience" | "evolution">("traces");
+  const [detailTab, setDetailTab] = useState<DetailTab>("overview");
   const [detailTraces, setDetailTraces] = useState<CogniTrace[]>([]);
   const [detailWorkflows, setDetailWorkflows] = useState<CogniWorkflowDef[]>([]);
   const [detailExperience, setDetailExperience] = useState<CogniExperienceResponse | null>(null);
   const [detailEvolution, setDetailEvolution] = useState<CogniEvolutionResponse | null>(null);
+  const [detailDeclaration, setDetailDeclaration] = useState<CogniDeclaration | null>(null);
   const [confirmingPatternID, setConfirmingPatternID] = useState<string | null>(null);
 
   const focusHeroCreate = useCallback(() => {
-    heroInputRef.current?.focus();
-    heroInputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    const el = document.getElementById("cogni-hero");
+    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    el?.querySelector("textarea")?.focus();
   }, []);
 
   const load = useCallback(async () => {
@@ -187,6 +218,14 @@ export default function CognisPage() {
       ]);
       setAlerts(alertsRes.alerts || []);
       setRuntimePackState(runtimeStateRes);
+      // Real installed capabilities — non-critical, never blocks the page.
+      skillsClient
+        .list()
+        .then((res) => {
+          setSkills(res.skills || []);
+          setSkillCategories(res.categories || []);
+        })
+        .catch(() => { /* skills are a hint surface; ignore failures */ });
     } catch {
       // The /v1/cognis routes are gated by the cogni-kernel pack; a failure here
       // almost always means the pack is disabled. Degrade gracefully instead of
@@ -227,6 +266,56 @@ export default function CognisPage() {
       ),
     [cognis, filter],
   );
+
+  // Lazy-fetch connectors once on first description keystroke.
+  const loadConnectors = useCallback(async () => {
+    if (connectorsFetched.current) return;
+    connectorsFetched.current = true;
+    try {
+      const res = await fetcher<{ connectors: ConnectorHint[] }>("/api/connectors");
+      setConnectors(res.connectors || []);
+    } catch { /* non-critical */ }
+  }, []);
+
+  // Recommend REAL installed skills that relate to the description, plus
+  // connector hints. Skill matching is bidirectional substring (Chinese has no
+  // word boundaries): a skill is suggested when its name/category overlaps the
+  // description, or an INTENT_HINTS keyword for that intent fires.
+  const recommendations = useMemo(() => {
+    const desc = generateDesc.trim();
+    if (!desc) return null;
+    const lower = desc.toLowerCase();
+
+    // Connector hints still come from INTENT_HINTS (connectors aren't skills).
+    const connectorIds = new Set<string>();
+    const hintCategories = new Set<string>();
+    for (const hint of INTENT_HINTS) {
+      if (hint.re.test(desc)) {
+        hint.connectors.forEach((c) => connectorIds.add(c));
+        hint.skills.forEach((s) => hintCategories.add(s.toLowerCase()));
+      }
+    }
+
+    // Match real skills: name/category overlaps the description (either way),
+    // or the skill's category matches an intent keyword we detected.
+    const matchedSkills = skills
+      .filter((sk) => {
+        const name = (sk.name || "").toLowerCase();
+        const cat = (sk.category || "").toLowerCase();
+        if (!name && !cat) return false;
+        const nameHit = name.length > 1 && (lower.includes(name) || name.includes(lower));
+        const catHit = cat.length > 1 && (lower.includes(cat) || hintCategories.has(cat));
+        return nameHit || catHit;
+      })
+      .slice(0, 6);
+
+    const matchedConnectors = [...connectorIds]
+      .map((cid) => connectors.find((c) => c.id === cid || c.name.toLowerCase().includes(cid)))
+      .filter((c): c is ConnectorHint => !!c);
+
+    if (matchedSkills.length === 0 && matchedConnectors.length === 0) return null;
+    return { skills: matchedSkills, connectors: matchedConnectors };
+  }, [generateDesc, skills, connectors]);
 
   const generateCogni = async () => {
     if (!generateDesc.trim()) return;
@@ -271,7 +360,13 @@ export default function CognisPage() {
   };
 
   const remove = async (id: string) => {
-    if (!confirm(`确定删除 Cogni「${id}」？此操作不可撤销。`)) return;
+    const confirmed = await confirmAction({
+      title: "删除 Cogni",
+      body: `确定删除 Cogni「${id}」？此操作不可撤销。`,
+      confirmLabel: "删除",
+      tone: "danger",
+    });
+    if (!confirmed) return;
     setBusy(`remove:${id}`);
     try {
       await cogniPack.remove(id);
@@ -340,19 +435,31 @@ export default function CognisPage() {
     }
   };
 
+  const downloadAllCognis = async () => {
+    try {
+      await cogniPack.exportBundle();
+      showToast("已导出全部 Cogni", "success");
+    } catch (e) {
+      showToast(formatErrorMessage(e, "导出 Cogni 失败"), "error");
+    }
+  };
+
   const openDetail = async (id: string) => {
     setDetailID(id);
-    setDetailTab("traces");
-    const [traces, workflows, experience, evolution] = await Promise.all([
+    setDetailTab("overview");
+    setDetailDeclaration(null);
+    const [traces, workflows, experience, evolution, decl] = await Promise.all([
       cogniPack.tracesByID(id, 20).catch(() => ({ traces: [] as CogniTrace[] })),
       cogniPack.workflows(id).catch(() => ({ workflows: [] as CogniWorkflowDef[] })),
       cogniPack.experience(id).catch(() => null),
       cogniPack.evolution(id).catch(() => null),
+      cogniPack.get(id).catch(() => null),
     ]);
     setDetailTraces(traces.traces || []);
     setDetailWorkflows(workflows.workflows || []);
     setDetailExperience(experience);
     setDetailEvolution(evolution);
+    setDetailDeclaration(decl?.declaration ?? null);
   };
 
   const confirmExperiencePattern = async (patternID: string) => {
@@ -369,284 +476,241 @@ export default function CognisPage() {
     }
   };
 
-  const experienceSummary = detailExperience?.summary;
-  const experienceStats = experienceSummary?.stats ?? detailExperience?.stats ?? {};
-  const topTools = experienceSummary?.top_tools ?? detailExperience?.tool_memory?.slice(0, 5) ?? [];
-  const topFacts = experienceSummary?.top_facts ?? detailExperience?.domain_facts?.slice(0, 5) ?? [];
+  const experienceStats = detailExperience?.summary?.stats ?? detailExperience?.stats ?? {};
   const pendingPatterns =
-    experienceSummary?.pending_patterns ?? detailExperience?.patterns?.filter((p) => !p.confirmed).slice(0, 5) ?? [];
+    detailExperience?.summary?.pending_patterns ??
+    detailExperience?.patterns?.filter((p) => !p.confirmed).slice(0, 5) ??
+    [];
+
+  const enabledCount = useMemo(() => cognis.filter((c) => c.enabled).length, [cognis]);
+  const detailEntry = detailID ? cognis.find((c) => c.id === detailID) : undefined;
 
   return (
-    <div className="page-root flex flex-col gap-5 animate-fade-in-up">
+    <div className="page-root mx-auto max-w-6xl space-y-6 animate-fade-in-up">
       <PageHeader
         icon={<Sparkles size={20} aria-hidden="true" />}
         title="Cogni"
         description="用大白话描述你想要的 Cogni，云雀自动配好技能、触发方式和人设。"
         onRefresh={load}
         actions={
-          <Button size="sm" className="btn-accent" onPress={focusHeroCreate}>
+          <Button size="sm" className="btn-accent" onPress={focusHeroCreate} isDisabled={packOff}>
             <Wand2 size={12} aria-hidden="true" /> 新建 Cogni
           </Button>
         }
       />
 
+      {/* Stats row */}
+      <KPIGroup className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <KPI>
+          <KPI.Header>
+            <KPI.Icon><Sparkles size={16} /></KPI.Icon>
+            <KPI.Title>Cogni 总数</KPI.Title>
+          </KPI.Header>
+          <KPI.Content>
+            <KPI.Value value={cognis.length} maximumFractionDigits={0} />
+          </KPI.Content>
+        </KPI>
+        <KPI>
+          <KPI.Header>
+            <KPI.Icon status="success"><CheckCircle2 size={16} /></KPI.Icon>
+            <KPI.Title>已启用</KPI.Title>
+          </KPI.Header>
+          <KPI.Content>
+            <KPI.Value value={enabledCount} maximumFractionDigits={0} />
+          </KPI.Content>
+        </KPI>
+        <KPI>
+          <KPI.Header>
+            <KPI.Icon><Wand2 size={16} /></KPI.Icon>
+            <KPI.Title>可用能力</KPI.Title>
+          </KPI.Header>
+          <KPI.Content>
+            <KPI.Value value={skills.length} maximumFractionDigits={0} />
+          </KPI.Content>
+        </KPI>
+        <KPI>
+          <KPI.Header>
+            <KPI.Icon status={alerts.length > 0 ? "danger" : undefined}><AlertTriangle size={16} /></KPI.Icon>
+            <KPI.Title>活跃告警</KPI.Title>
+          </KPI.Header>
+          <KPI.Content>
+            <KPI.Value value={alerts.length} maximumFractionDigits={0} />
+          </KPI.Content>
+        </KPI>
+      </KPIGroup>
 
-      <Card className="section-card p-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="max-w-2xl">
-            <h2 className="text-base font-semibold" style={{ color: "var(--yunque-text)" }}>
-              Cogni 的正式交付口径
-            </h2>
-            <p className="mt-2 text-sm leading-6" style={{ color: "var(--yunque-text-secondary)" }}>
-              Cogni 现在适合交付为「模型能力组织层」：它兼容 Skill、MCP 和能力包，把可用工具、经验、记忆与触发方式整理成更省上下文的声明。它不是能力包商店，也不是无边界的电脑控制。
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Chip size="sm" color="success">可交付</Chip>
-            <Chip size="sm" color="warning">需观察</Chip>
-            <Chip size="sm" color="danger">不夸大</Chip>
-          </div>
-        </div>
-        <div className="mt-4 grid gap-3 lg:grid-cols-3">
-          {COGNI_DELIVERY_SECTIONS.map((section) => (
-            <section
-              key={section.title}
-              className="rounded-lg p-3"
-              aria-labelledby={`cogni-delivery-${section.tone}`}
-              style={{ background: "var(--yunque-bg-hover)", border: "1px solid var(--yunque-border)" }}
-            >
-              <h3 id={`cogni-delivery-${section.tone}`} className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>
-                {section.title}
-              </h3>
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
-                {section.items.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </section>
-          ))}
-        </div>
-        <div className="mt-4 rounded-lg p-3" style={{ background: "rgba(255,255,255,0.025)", border: "1px solid var(--yunque-border)" }}>
-          <h3 className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>
-            云雀如何使用它
-          </h3>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
-            {COGNI_USAGE_NOTES.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
-        </div>
-      </Card>
-
+      {/* Pack-disabled banner */}
       {packOff && (
-        <Card className="section-card p-4 border-l-4" style={{ borderLeftColor: "#ffaa00" }}>
+        <div className="section-card rounded-xl p-4">
           <div className="flex items-center gap-2 text-sm" style={{ color: "var(--yunque-text)" }}>
-            <AlertTriangle size={15} style={{ color: "#ffaa00" }} aria-hidden="true" />
+            <AlertTriangle size={15} style={{ color: "var(--yunque-warning)" }} aria-hidden="true" />
             Cogni 功能由「Cogni 内核」能力包提供，当前未启用。
           </div>
           <p className="text-xs mt-1" style={{ color: "var(--yunque-text-muted)" }}>
             前往「能力包」启用 <span translate="no">yunque.pack.cogni-kernel</span> 后即可创建和管理 Cogni。
           </p>
-          <div className="mt-3">
-            <Button size="sm" variant="ghost" onPress={() => (window.location.href = "/packs")}>
-              去启用
-            </Button>
-          </div>
-        </Card>
+          <Link href="/packs" className="mt-3 inline-block">
+            <Button size="sm" variant="outline">去启用</Button>
+          </Link>
+        </div>
       )}
 
-      {/* Hero — natural-language assistant creation */}
-      <Card className="section-card p-5" style={{ borderTop: "2px solid var(--yunque-accent)" }}>
+      {/* Hero — natural-language Cogni creation */}
+      <div id="cogni-hero" className="section-card rounded-xl p-5">
         <div className="flex items-center gap-2 mb-1" style={{ color: "var(--yunque-text)" }}>
           <Wand2 size={16} style={{ color: "var(--yunque-accent)" }} aria-hidden="true" />
           <span className="text-base font-medium">描述你想要的 Cogni，云雀帮你造一个</span>
         </div>
-        <p className="text-xs mb-3" style={{ color: "var(--yunque-text-muted)" }}>
+        <p className="text-xs mb-4" style={{ color: "var(--yunque-text-muted)" }}>
           一句话说清它要做什么 —— 云雀会自动配好该用的技能、激活关键词和说话风格，创建后立即可用。
         </p>
-        <label htmlFor="assistant-desc" className="sr-only">
-          描述你想要的 Cogni
-        </label>
-        <textarea
-          id="assistant-desc"
-          ref={heroInputRef}
+        <PromptInput
           value={generateDesc}
-          onChange={(e) => setGenerateDesc(e.target.value)}
-          placeholder="例如：一个帮我整理周报、能查资料还能做成 PPT 的助手…"
-          rows={3}
-          disabled={packOff}
-          className="w-full p-3 text-sm rounded-lg"
-          style={{
-            background: "rgba(255,255,255,0.04)",
-            border: "1px solid rgba(255,255,255,0.08)",
-            color: "var(--yunque-text)",
-            resize: "vertical",
-          }}
-        />
-        <div className="flex flex-wrap items-center gap-1.5 mt-2">
-          <span className="text-[11px] flex items-center gap-1" style={{ color: "var(--yunque-text-muted)" }}>
-            <Lightbulb size={11} aria-hidden="true" /> 试试：
-          </span>
+          onValueChange={(v) => { setGenerateDesc(v); loadConnectors(); }}
+          onSubmit={generateCogni}
+          status={generating ? "submitted" : "ready"}
+          isDisabled={packOff}
+        >
+          <PromptInput.Shell>
+            <PromptInput.Content>
+              <PromptInput.TextArea
+                placeholder="例如：一个帮我整理周报、能查资料还能做成 PPT 的助手…"
+                aria-label="描述你想要的 Cogni"
+              />
+            </PromptInput.Content>
+            <PromptInput.Toolbar>
+              <PromptInput.ToolbarStart>
+                <span className="text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
+                  {generating ? "云雀正在造 Cogni…" : "回车创建"}
+                </span>
+              </PromptInput.ToolbarStart>
+              <PromptInput.ToolbarEnd>
+                <PromptInput.Send aria-label="创建 Cogni">
+                  <Sparkles className="size-4" aria-hidden="true" />
+                </PromptInput.Send>
+              </PromptInput.ToolbarEnd>
+            </PromptInput.Toolbar>
+          </PromptInput.Shell>
+        </PromptInput>
+
+        {/* Example starters + live recommendations */}
+        <div className="mt-3 flex flex-wrap items-center gap-1.5">
           {ASSISTANT_EXAMPLES.map((ex) => (
-            <button
+            <Chip
               key={ex}
-              type="button"
-              onClick={() => setGenerateDesc(ex)}
-              className="text-[11px] px-2 py-1 rounded-full transition-colors hover:opacity-80 focus-visible:ring-2"
-              style={{
-                background: "rgba(255,255,255,0.04)",
-                border: "1px solid rgba(255,255,255,0.08)",
-                color: "var(--yunque-text-muted)",
-              }}
+              size="sm"
+              color="default"
+              className="cursor-pointer"
+              onClick={() => { setGenerateDesc(ex); loadConnectors(); }}
             >
-              {ex.length > 16 ? ex.slice(0, 16) + "…" : ex}
-            </button>
+              {ex.length > 18 ? ex.slice(0, 18) + "…" : ex}
+            </Chip>
           ))}
         </div>
-        <div className="flex justify-end mt-3">
-          <Button
-            size="sm"
-            className="btn-accent"
-            onPress={generateCogni}
-            isPending={generating}
-            isDisabled={packOff || !generateDesc.trim()}
-          >
-            <Sparkles size={12} aria-hidden="true" /> {generating ? "云雀正在造 Cogni…" : "创建 Cogni"}
-          </Button>
-        </div>
+
+        {/* Real capability hint — the skills/MCP tools this agent actually has */}
+        {skills.length > 0 && (
+          <div className="mt-3 rounded-lg p-3" style={{ background: "var(--yunque-bg-muted)" }}>
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <span className="text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
+                你现在有 <span style={{ color: "var(--yunque-text)" }}>{skills.length}</span> 项能力（含技能、插件与已连接的 MCP 工具），云雀会按需挑选：
+              </span>
+              <Link href="/skills" className="text-[11px] underline shrink-0" style={{ color: "var(--yunque-text-muted)" }}>
+                管理能力
+              </Link>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {(skillCategories.length > 0
+                ? skillCategories.map((c) => c.name)
+                : Array.from(new Set(skills.map((s) => s.category).filter(Boolean) as string[]))
+              ).slice(0, 10).map((cat) => (
+                <Chip key={cat} size="sm" color="default">{cat}</Chip>
+              ))}
+            </div>
+          </div>
+        )}
+        {recommendations && (
+          <div className="mt-3 flex flex-wrap items-center gap-1.5">
+            <span className="text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
+              将用到你的能力：
+            </span>
+            {recommendations.skills.map((s) => (
+              <Chip key={s.name} size="sm" color="success" title={s.description}>
+                {s.name}
+              </Chip>
+            ))}
+            {recommendations.connectors.map((c) => (
+              <Chip key={c.id} size="sm" color={c.status === "connected" ? "success" : "warning"}>
+                {c.name}
+                {c.status !== "connected" && (
+                  <Link href="/knowledge" className="ml-1 underline text-[10px]">配置</Link>
+                )}
+              </Chip>
+            ))}
+          </div>
+        )}
         {generatePreview && (
-          <div
-            className="mt-4 p-3 rounded-lg"
-            style={{ background: "rgba(23,201,100,0.08)", border: "1px solid rgba(23,201,100,0.2)" }}
-          >
+          <div className="mt-4 p-3 rounded-lg" style={{ background: "var(--yunque-bg-muted)" }}>
             <div className="flex items-center gap-2 mb-1">
-              <CheckCircle2 size={14} style={{ color: "#17c964" }} aria-hidden="true" />
+              <CheckCircle2 size={14} style={{ color: "var(--yunque-success)" }} aria-hidden="true" />
               <span className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>
                 已为你创建：{generatePreview.display_name ?? generatePreview.id}
               </span>
             </div>
             {generatePreview.description && (
-              <p className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>
-                {generatePreview.description}
-              </p>
+              <p className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>{generatePreview.description}</p>
             )}
-          </div>
-        )}
-      </Card>
-
-      {/* Templates — quick start from a builtin assistant */}
-      <div>
-        <button
-          type="button"
-          onClick={() => setShowTemplates((v) => !v)}
-          className="flex items-center gap-1.5 text-sm mb-2"
-          style={{ color: "var(--yunque-text)" }}
-        >
-          <ChevronDown
-            size={14}
-            aria-hidden="true"
-            style={{ transform: showTemplates ? "none" : "rotate(-90deg)", transition: "transform .15s" }}
-          />
-          从模板快速创建
-        </button>
-        {showTemplates && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {BUILTIN_TEMPLATES.map((t) => {
-              const installed = installedIDs.has(t.id);
-              return (
-                <Card key={t.id} className="section-card p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="font-medium text-sm" style={{ color: "var(--yunque-text)" }}>
-                        {t.display_name}
-                      </div>
-                      <div className="text-xs mt-1" style={{ color: "var(--yunque-text-muted)" }}>
-                        {t.description}
-                      </div>
-                      <Chip size="sm" className="mt-2" style={{ background: "rgba(0,145,255,0.1)", color: "#0091ff" }}>
-                        {t.category}
-                      </Chip>
-                    </div>
-                    {installed ? (
-                      <Chip size="sm" style={{ background: "rgba(23,201,100,0.12)", color: "#17c964" }}>
-                        已添加
-                      </Chip>
-                    ) : (
-                      <Button
-                        size="sm"
-                        className="btn-accent shrink-0"
-                        isDisabled={packOff || busy === `install:${t.id}`}
-                        onPress={() => installTemplate(t.id)}
-                      >
-                        <Download size={13} aria-hidden="true" /> 添加
-                      </Button>
-                    )}
-                  </div>
-                </Card>
-              );
-            })}
           </div>
         )}
       </div>
 
       {/* Alerts banner */}
       {alerts.length > 0 && (
-        <Card className="section-card p-4 border-l-4" style={{ borderLeftColor: "#f31260" }} role="alert" aria-live="polite">
+        <div className="section-card rounded-xl p-4" role="alert" aria-live="polite">
           <div className="flex items-center gap-2 mb-2">
-            <AlertTriangle size={14} style={{ color: "#f31260" }} aria-hidden="true" />
+            <AlertTriangle size={14} style={{ color: "var(--yunque-danger)" }} aria-hidden="true" />
             <span className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>
               {alerts.length} 条活跃告警
             </span>
           </div>
           <div className="space-y-1.5">
-            {alerts.slice(0, 5).map((a) => {
-              const sc = severityColor(a.severity);
-              return (
-                <div key={`${a.cogni_id}|${a.kind}`} className="flex items-start gap-3 text-sm">
-                  <Chip size="sm" style={{ background: sc.bg, color: sc.fg }}>
-                    {a.severity.toUpperCase()}
-                  </Chip>
-                  <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }} translate="no">
-                    {a.cogni_id}
-                  </span>
-                  <span style={{ color: "var(--yunque-text)" }}>{a.message}</span>
-                </div>
-              );
-            })}
+            {alerts.slice(0, 5).map((a) => (
+              <div key={`${a.cogni_id}|${a.kind}`} className="flex items-start gap-3 text-sm">
+                <Chip size="sm" color={severityChipColor(a.severity)}>{a.severity.toUpperCase()}</Chip>
+                <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }} translate="no">{a.cogni_id}</span>
+                <span style={{ color: "var(--yunque-text)" }}>{a.message}</span>
+              </div>
+            ))}
           </div>
-        </Card>
+        </div>
       )}
 
       {/* Toolbar: search + import/export */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative flex-1 min-w-[200px] max-w-md">
-          <Search
-            size={14}
-            className="absolute left-3 top-1/2 -translate-y-1/2"
-            style={{ color: "var(--yunque-text-muted)" }}
-            aria-hidden="true"
-          />
-          <input
-            type="text"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            placeholder="搜索 Cogni…"
-            aria-label="搜索 Cogni"
-            spellCheck={false}
-            className="w-full pl-9 pr-3 py-1.5 text-sm rounded-md"
-            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "var(--yunque-text)" }}
-          />
-        </div>
-        <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>
-          {filteredCognis.length} / {cognis.length}
-        </span>
+        <SearchField className="flex-1 max-w-sm" value={filter} onChange={setFilter} aria-label="搜索 Cogni">
+          <SearchField.Group>
+            <SearchField.SearchIcon />
+            <SearchField.Input placeholder="搜索 Cogni…" />
+          </SearchField.Group>
+        </SearchField>
+        {filter && (
+          <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+            {filteredCognis.length} / {cognis.length}
+          </span>
+        )}
         <div className="flex-1" />
-        <Button size="sm" variant="ghost" onPress={() => cogniPack.exportBundle()} isDisabled={packOff}>
-          <Download size={13} aria-hidden="true" /> 导出全部
-        </Button>
-        <Button size="sm" variant="ghost" onPress={() => fileInput.current?.click()} isDisabled={packOff}>
-          <Upload size={13} aria-hidden="true" /> 导入
-        </Button>
+        <Tooltip delay={0}>
+          <Button size="sm" variant="ghost" isIconOnly onPress={downloadAllCognis} isDisabled={packOff} aria-label="导出全部">
+            <Download size={13} aria-hidden="true" />
+          </Button>
+          <Tooltip.Content>导出全部</Tooltip.Content>
+        </Tooltip>
+        <Tooltip delay={0}>
+          <Button size="sm" variant="ghost" isIconOnly onPress={() => fileInput.current?.click()} isDisabled={packOff} aria-label="导入">
+            <Upload size={13} aria-hidden="true" />
+          </Button>
+          <Tooltip.Content>导入</Tooltip.Content>
+        </Tooltip>
         <input
           ref={fileInput}
           type="file"
@@ -660,65 +724,70 @@ export default function CognisPage() {
         />
       </div>
 
-      {/* Assistant list */}
+      {/* Cogni list */}
       {loading ? (
-        <Card className="section-card p-10 text-center text-sm" style={{ color: "var(--yunque-text-muted)" }}>
+        <div className="section-card rounded-xl p-10 text-center text-sm" style={{ color: "var(--yunque-text-muted)" }}>
           加载中…
-        </Card>
+        </div>
       ) : filteredCognis.length === 0 ? (
-        <Card className="section-card p-10 text-center text-sm" style={{ color: "var(--yunque-text-muted)" }}>
-          {packOff ? "启用「Cogni 内核」能力包后即可创建 Cogni。" : "还没有 Cogni —— 在上面用一句话描述你想要的，云雀帮你造一个。"}
-        </Card>
+        <EmptyState
+          icon={<Sparkles size={28} aria-hidden="true" />}
+          title={packOff ? "Cogni 内核未启用" : "还没有 Cogni"}
+          description={
+            packOff
+              ? "启用「Cogni 内核」能力包后即可创建 Cogni。"
+              : "在上面用一句话描述你想要的，云雀帮你造一个。"
+          }
+          actionLabel={packOff ? undefined : "新建 Cogni"}
+          onAction={packOff ? undefined : focusHeroCreate}
+        />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <ItemCardGroup layout="grid" columns={2}>
           {filteredCognis.map((c) => {
             const hm = health[c.id];
-            const hc = healthColor(hm?.status ?? "idle");
             return (
-              <Card
+              <ItemCard
                 key={c.id}
                 role="button"
                 tabIndex={0}
                 aria-label={`查看 Cogni ${c.display_name ?? c.id} 详情`}
-                className="section-card p-4 cursor-pointer focus-visible:ring-2"
-                style={{ touchAction: "manipulation" }}
+                className="cursor-pointer"
                 onClick={() => openDetail(c.id)}
-                onKeyDown={(e) => {
+                onKeyDown={(e: React.KeyboardEvent) => {
                   if (e.key === "Enter" || e.key === " ") {
                     e.preventDefault();
                     openDetail(c.id);
                   }
                 }}
               >
-                <div className="flex items-start justify-between gap-3 mb-2">
-                  <div className="flex items-start gap-3 min-w-0 flex-1">
-                    <div
-                      className="flex items-center justify-center rounded-xl shrink-0 font-semibold select-none"
-                      style={{ width: 42, height: 42, background: avatarGradient(c.id), color: "#fff", fontSize: 17 }}
-                      aria-hidden="true"
-                    >
-                      {avatarInitial(c.display_name ?? c.id)}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-medium truncate" style={{ color: "var(--yunque-text)" }}>
-                          {c.display_name ?? c.id}
-                        </span>
-                        {c.always_on && (
-                          <Chip size="sm" style={{ background: "rgba(0,145,255,0.12)", color: "#0091ff" }}>
-                            常驻
-                          </Chip>
-                        )}
-                      </div>
-                      {c.description && (
-                        <div className="text-sm mt-1 line-clamp-2" style={{ color: "var(--yunque-text-muted)" }}>
-                          {c.description}
-                        </div>
-                      )}
-                    </div>
+                <ItemCard.Icon>
+                  <div
+                    className="flex items-center justify-center rounded-xl font-semibold select-none"
+                    style={{ width: 40, height: 40, background: avatarGradient(c.id), color: "#fff", fontSize: 16 }}
+                    aria-hidden="true"
+                  >
+                    {avatarInitial(c.display_name ?? c.id)}
                   </div>
+                </ItemCard.Icon>
+                <ItemCard.Content>
+                  <ItemCard.Title>
+                    <span className="inline-flex items-center gap-2">
+                      {c.display_name ?? c.id}
+                      {c.always_on && <Chip size="sm" color="default">常驻</Chip>}
+                    </span>
+                  </ItemCard.Title>
+                  {c.description && (
+                    <ItemCard.Description className="line-clamp-2">{c.description}</ItemCard.Description>
+                  )}
+                  {c.load_error && (
+                    <span className="text-xs" style={{ color: "var(--yunque-danger)" }}>
+                      {formatErrorMessage(c.load_error, "加载失败")}
+                    </span>
+                  )}
+                </ItemCard.Content>
+                <ItemCard.Action>
                   <div className="flex flex-col items-end gap-2" onClick={(e) => e.stopPropagation()}>
-                    <Chip size="sm" style={{ background: hc.bg, color: hc.fg }}>
+                    <Chip size="sm" color={healthChipColor(hm?.status ?? "idle")}>
                       {hm ? `${hm.status} · ${hm.score}` : "未激活"}
                     </Chip>
                     <Switch isSelected={c.enabled} onChange={(v) => toggle(c.id, v)} size="sm" aria-label={`启用 ${c.id}`}>
@@ -726,84 +795,179 @@ export default function CognisPage() {
                         <Switch.Thumb />
                       </Switch.Control>
                     </Switch>
+                    <div className="flex items-center gap-1">
+                      <Tooltip delay={0}>
+                        <Button size="sm" variant="ghost" isIconOnly onPress={() => setShareID(c.id)} aria-label={`分享 ${c.id}`}>
+                          <Share2 size={12} aria-hidden="true" />
+                        </Button>
+                        <Tooltip.Content>分享</Tooltip.Content>
+                      </Tooltip>
+                      <Tooltip delay={0}>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          isIconOnly
+                          isDisabled={busy === `remove:${c.id}`}
+                          onPress={() => remove(c.id)}
+                          aria-label={`删除 ${c.id}`}
+                        >
+                          <Trash2 size={12} style={{ color: "var(--yunque-danger)" }} aria-hidden="true" />
+                        </Button>
+                        <Tooltip.Content>删除</Tooltip.Content>
+                      </Tooltip>
+                    </div>
                   </div>
-                </div>
-
-                {c.load_error && (
-                  <div className="mt-2 text-xs p-2 rounded" style={{ background: "rgba(243,18,96,0.1)", color: "#f31260" }}>
-                    {formatErrorMessage(c.load_error, "加载失败")}
-                  </div>
-                )}
-
-                <div className="mt-2 flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
-                  <Button size="sm" variant="ghost" onPress={() => setShareID(c.id)} aria-label={`分享 ${c.id}`}>
-                    <Share2 size={12} aria-hidden="true" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    isIconOnly
-                    isDisabled={busy === `remove:${c.id}`}
-                    onPress={() => remove(c.id)}
-                    aria-label={`删除 ${c.id}`}
-                  >
-                    <Trash2 size={12} style={{ color: "#f31260" }} aria-hidden="true" />
-                  </Button>
-                </div>
-              </Card>
+                </ItemCard.Action>
+              </ItemCard>
             );
           })}
-        </div>
+        </ItemCardGroup>
       )}
 
-      {/* Developer diagnostics — folded so the page leads with assistants */}
-      <div className="mt-2">
-        <button
-          type="button"
-          onClick={() => setAdvancedOpen((v) => !v)}
-          className="flex items-center gap-1.5 text-xs"
-          style={{ color: "var(--yunque-text-muted)" }}
-        >
-          <ChevronDown
-            size={13}
-            aria-hidden="true"
-            style={{ transform: advancedOpen ? "none" : "rotate(-90deg)", transition: "transform .15s" }}
-          />
-          开发者诊断（Cogni 运行态）
-        </button>
-        {advancedOpen && runtimePackState && (
-          <Card
-            className="section-card p-4 border-l-4 mt-2"
-            style={{ borderLeftColor: runtimePackState.runtime_loop_running ? "#17c964" : "#ffaa00" }}
-          >
-            <div className="flex flex-wrap items-center gap-2">
-              <ShieldCheck size={14} style={{ color: "var(--yunque-text-muted)" }} aria-hidden="true" />
-              <span className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>
-                运行态 Gate
-              </span>
-              <Chip size="sm" translate="no">{runtimePackState.pack_status || "unknown"}</Chip>
-              <Chip
-                size="sm"
-                style={{
-                  background: runtimePackState.runtime_loop_running ? "rgba(23,201,100,0.12)" : "rgba(255,170,0,0.12)",
-                  color: runtimePackState.runtime_loop_running ? "#17c964" : "#ffaa00",
-                }}
-              >
-                loop {runtimePackState.runtime_loop_running ? "running" : "stopped"}
-              </Chip>
+      {/* ── Bottom disclosure sections ─────────────────────────────── */}
+
+      {/* Templates */}
+      <Disclosure isExpanded={showTemplates} onExpandedChange={setShowTemplates}>
+        <Disclosure.Heading>
+          <Button slot="trigger" variant="ghost" size="sm" className="px-1">
+            从模板快速创建
+            <Disclosure.Indicator />
+          </Button>
+        </Disclosure.Heading>
+        <Disclosure.Content>
+          <Disclosure.Body className="pt-2">
+            <ItemCardGroup layout="grid" columns={2}>
+              {BUILTIN_TEMPLATES.map((t) => {
+                const installed = installedIDs.has(t.id);
+                return (
+                  <ItemCard key={t.id} variant="outline">
+                    <ItemCard.Content>
+                      <ItemCard.Title>{t.display_name}</ItemCard.Title>
+                      <ItemCard.Description>{t.description}</ItemCard.Description>
+                      <Chip size="sm" color="default" className="mt-2 w-fit">{t.category}</Chip>
+                    </ItemCard.Content>
+                    <ItemCard.Action>
+                      {installed ? (
+                        <Chip size="sm" color="success">已添加</Chip>
+                      ) : (
+                        <Button
+                          size="sm"
+                          className="btn-accent shrink-0"
+                          isDisabled={packOff || busy === `install:${t.id}`}
+                          onPress={() => installTemplate(t.id)}
+                        >
+                          <Download size={13} aria-hidden="true" /> 添加
+                        </Button>
+                      )}
+                    </ItemCard.Action>
+                  </ItemCard>
+                );
+              })}
+            </ItemCardGroup>
+          </Disclosure.Body>
+        </Disclosure.Content>
+      </Disclosure>
+
+      {/* Delivery notes */}
+      <Disclosure isExpanded={showDeliveryNotes} onExpandedChange={setShowDeliveryNotes}>
+        <Disclosure.Heading>
+          <Button slot="trigger" variant="ghost" size="sm" className="px-1">
+            Cogni 的正式交付口径
+            <Disclosure.Indicator />
+          </Button>
+        </Disclosure.Heading>
+        <Disclosure.Content>
+          <Disclosure.Body className="section-card rounded-xl p-4 mt-2">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <p className="text-sm leading-6 max-w-2xl" style={{ color: "var(--yunque-text-secondary)" }}>
+                Cogni 现在适合交付为「模型能力组织层」：它兼容 Skill、MCP 和能力包，把可用工具、经验、记忆与触发方式整理成更省上下文的声明。它不是能力包商店，也不是无边界的电脑控制。
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Chip size="sm" color="success">可交付</Chip>
+                <Chip size="sm" color="warning">需观察</Chip>
+                <Chip size="sm" color="danger">不夸大</Chip>
+              </div>
             </div>
-            <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] mt-2" style={{ color: "var(--yunque-text-muted)" }}>
-              <span translate="no">active_bus_cognis {runtimePackState.active_bus_cognis}</span>
-              <span translate="no">experience_store_count {runtimePackState.experience_store_count}</span>
+            <div className="mt-4 grid gap-3 lg:grid-cols-3">
+              {COGNI_DELIVERY_SECTIONS.map((section) => (
+                <section
+                  key={section.title}
+                  className="rounded-lg p-3"
+                  aria-labelledby={`cogni-delivery-${section.tone}`}
+                  style={{ background: "var(--yunque-bg-muted)" }}
+                >
+                  <div className="flex items-center gap-2">
+                    <Chip size="sm" color={section.tone}>·</Chip>
+                    <h3 id={`cogni-delivery-${section.tone}`} className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>
+                      {section.title}
+                    </h3>
+                  </div>
+                  <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
+                    {section.items.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </section>
+              ))}
             </div>
-            <div className="mt-3">
-              <Button size="sm" variant="ghost" onPress={load}>
-                <RefreshCw size={11} aria-hidden="true" /> 刷新
-              </Button>
-            </div>
-          </Card>
-        )}
-      </div>
+          </Disclosure.Body>
+        </Disclosure.Content>
+      </Disclosure>
+
+      {/* Usage notes */}
+      <Disclosure isExpanded={showUsageNotes} onExpandedChange={setShowUsageNotes}>
+        <Disclosure.Heading>
+          <Button slot="trigger" variant="ghost" size="sm" className="px-1">
+            云雀如何使用它
+            <Disclosure.Indicator />
+          </Button>
+        </Disclosure.Heading>
+        <Disclosure.Content>
+          <Disclosure.Body className="section-card rounded-xl p-4 mt-2">
+            <ul className="list-disc space-y-1 pl-5 text-sm leading-6" style={{ color: "var(--yunque-text-secondary)" }}>
+              {COGNI_USAGE_NOTES.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </Disclosure.Body>
+        </Disclosure.Content>
+      </Disclosure>
+
+      {/* Developer diagnostics */}
+      <Disclosure isExpanded={advancedOpen} onExpandedChange={setAdvancedOpen}>
+        <Disclosure.Heading>
+          <Button slot="trigger" variant="ghost" size="sm" className="px-1 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+            开发者诊断（Cogni 运行态）
+            <Disclosure.Indicator />
+          </Button>
+        </Disclosure.Heading>
+        <Disclosure.Content>
+          <Disclosure.Body className="pt-2">
+            {runtimePackState ? (
+              <div className="section-card rounded-xl p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>运行态 Gate</span>
+                  <Chip size="sm" color="default" translate="no">{runtimePackState.pack_status || "unknown"}</Chip>
+                  <Chip size="sm" color={runtimePackState.runtime_loop_running ? "success" : "warning"}>
+                    loop {runtimePackState.runtime_loop_running ? "running" : "stopped"}
+                  </Chip>
+                </div>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] mt-2" style={{ color: "var(--yunque-text-muted)" }}>
+                  <span translate="no">active_bus_cognis {runtimePackState.active_bus_cognis}</span>
+                  <span translate="no">experience_store_count {runtimePackState.experience_store_count}</span>
+                </div>
+                <div className="mt-3">
+                  <Button size="sm" variant="ghost" onPress={load}>
+                    <RefreshCw size={11} aria-hidden="true" /> 刷新
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="text-sm py-2" style={{ color: "var(--yunque-text-muted)" }}>暂无运行态数据</div>
+            )}
+          </Disclosure.Body>
+        </Disclosure.Content>
+      </Disclosure>
 
       {/* Share modal */}
       <CherryModal
@@ -819,9 +983,7 @@ export default function CognisPage() {
         }
       >
         <div className="space-y-3">
-          <div className="text-sm" style={{ color: "var(--yunque-text-secondary)" }}>
-            选择分享方式：
-          </div>
+          <div className="text-sm" style={{ color: "var(--yunque-text-secondary)" }}>选择分享方式：</div>
           <Button className="w-full justify-start" variant="outline" onPress={copyShareLink}>
             <LinkIcon size={16} aria-hidden="true" />
             <span className="flex-1 text-left">复制分享链接</span>
@@ -843,12 +1005,10 @@ export default function CognisPage() {
       >
         {importPreview && (
           <div className="space-y-3">
-            <div className="text-sm" style={{ color: "var(--yunque-text-secondary)" }}>
-              将要导入以下 Cogni：
-            </div>
+            <div className="text-sm" style={{ color: "var(--yunque-text-secondary)" }}>将要导入以下 Cogni：</div>
             <div className="space-y-2 max-h-96 overflow-y-auto" style={{ overscrollBehavior: "contain" }}>
               {((importPreview.cognis as Array<Record<string, unknown>>) ?? []).map((cogni, index) => (
-                <Card key={index} className="section-card p-3">
+                <div key={index} className="section-card rounded-xl p-3">
                   <div className="font-semibold text-sm" style={{ color: "var(--yunque-text)" }}>
                     {String(cogni.display_name ?? cogni.id ?? "未命名")}
                   </div>
@@ -857,13 +1017,11 @@ export default function CognisPage() {
                       {String(cogni.description)}
                     </div>
                   ) : null}
-                </Card>
+                </div>
               ))}
             </div>
             <div className="flex justify-end gap-2 pt-3 border-t" style={{ borderColor: "var(--yunque-border)" }}>
-              <Button size="sm" variant="ghost" onPress={() => setImportPreview(null)}>
-                取消
-              </Button>
+              <Button size="sm" variant="ghost" onPress={() => setImportPreview(null)}>取消</Button>
               <Button size="sm" className="btn-accent" onPress={importFromPreview}>
                 <CheckCircle2 size={14} aria-hidden="true" /> 确认导入
               </Button>
@@ -872,288 +1030,71 @@ export default function CognisPage() {
         )}
       </CherryModal>
 
-      {/* Detail drawer */}
-      {detailID && (
-        <div
-          className="fixed inset-0 z-50 flex justify-end"
-          style={{ background: "rgba(0,0,0,0.5)" }}
-          role="dialog"
-          aria-modal="true"
-          aria-label={`Cogni ${detailID} 详情`}
-          onClick={() => setDetailID(null)}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") setDetailID(null);
-          }}
-        >
-          <Card
-            className="h-full overflow-y-auto p-5 section-card"
-            style={{ width: "min(560px, 100%)", overscrollBehavior: "contain" }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className="font-medium text-sm" style={{ color: "var(--yunque-text)" }} translate="no">
-                {detailID}
-              </div>
-              <Button size="sm" variant="ghost" onPress={() => setDetailID(null)}>
-                关闭
-              </Button>
-            </div>
-
-            <div className="flex gap-1 mb-4 border-b" style={{ borderColor: "rgba(255,255,255,0.08)" }} role="tablist">
-              {(["traces", "workflows", "experience", "evolution"] as const).map((tab) => (
-                <button
-                  key={tab}
-                  type="button"
-                  role="tab"
-                  aria-selected={detailTab === tab}
-                  onClick={() => setDetailTab(tab)}
-                  className="px-3 py-1.5 text-xs font-medium rounded-t-md transition-colors"
-                  style={{
-                    color: detailTab === tab ? "var(--yunque-text)" : "var(--yunque-text-muted)",
-                    background: detailTab === tab ? "rgba(255,255,255,0.06)" : "transparent",
-                    borderBottom: detailTab === tab ? "2px solid var(--yunque-accent)" : "2px solid transparent",
-                  }}
-                >
-                  {tab === "traces" && "活动记录"}
-                  {tab === "workflows" && "工作流"}
-                  {tab === "experience" && "经验"}
-                  {tab === "evolution" && "进化"}
-                </button>
-              ))}
-            </div>
-
-            {detailTab === "traces" && (
-              <>
-                <div className="text-xs mb-2" style={{ color: "var(--yunque-text-muted)" }}>
-                  最近活动 ({detailTraces.length})
-                </div>
-                {detailTraces.length === 0 ? (
-                  <div className="text-sm py-6 text-center" style={{ color: "var(--yunque-text-muted)" }}>
-                    暂无记录 —— 该 Cogni 还没参与过对话
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {detailTraces.map((t, i) => {
-                      const own = t.activations?.find((a) => a.id === detailID);
-                      const activated = !!own?.activated;
-                      return (
-                        <div key={i} className="p-3 rounded-lg text-xs" style={{ background: "rgba(255,255,255,0.03)" }}>
-                          <div className="flex items-center gap-2 mb-1">
-                            <Chip
-                              size="sm"
-                              style={{
-                                background: activated ? "rgba(23,201,100,0.12)" : "rgba(255,255,255,0.04)",
-                                color: activated ? "#17c964" : "var(--yunque-text-muted)",
-                              }}
-                            >
-                              {activated ? "已激活" : "未激活"}
-                            </Chip>
-                            <span style={{ color: "var(--yunque-text-muted)" }}>
-                              {new Date(t.timestamp).toLocaleTimeString()}
-                            </span>
-                          </div>
-                          {own?.reasons && own.reasons.length > 0 && (
-                            <div style={{ color: "var(--yunque-text-muted)" }}>{own.reasons.join("; ")}</div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </>
-            )}
-
-            {detailTab === "workflows" && (
-              <>
-                <div className="text-xs mb-2" style={{ color: "var(--yunque-text-muted)" }}>
-                  <Workflow size={12} className="inline mr-1" aria-hidden="true" />
-                  工作流 ({detailWorkflows.length})
-                </div>
-                {detailWorkflows.length === 0 ? (
-                  <div className="text-sm py-6 text-center" style={{ color: "var(--yunque-text-muted)" }}>
-                    该 Cogni 未定义工作流
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {detailWorkflows.map((wf) => (
-                      <div key={wf.name} className="p-3 rounded-lg" style={{ background: "rgba(255,255,255,0.03)" }}>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>
-                            {wf.name}
-                          </span>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onPress={async () => {
-                              try {
-                                const r = await cogniPack.runWorkflow(detailID!, wf.name);
-                                showToast(r.success ? `工作流完成：${r.workflow_name}` : `工作流失败：${r.error}`, r.success ? "success" : "error");
-                              } catch (e) {
-                                showToast(formatErrorMessage(e, "执行失败"), "error");
-                              }
-                            }}
-                          >
-                            <Play size={10} aria-hidden="true" /> 执行
-                          </Button>
-                        </div>
-                        {wf.description && (
-                          <div className="text-xs mb-2" style={{ color: "var(--yunque-text-muted)" }}>
-                            {wf.description}
-                          </div>
-                        )}
-                        <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>
-                          {wf.steps?.length || 0} 个步骤
-                          {wf.steps?.map((s: CogniWorkflowStep, i: number) => (
-                            <span key={i}> · {s.skill}</span>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </>
-            )}
-
-            {detailTab === "experience" && (
-              <>
-                <div className="text-xs mb-2" style={{ color: "var(--yunque-text-muted)" }}>
-                  经验累积
-                </div>
-                {!detailExperience?.enabled ? (
-                  <div className="text-sm py-6 text-center" style={{ color: "var(--yunque-text-muted)" }}>
-                    该 Cogni 未启用经验引擎
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-2 gap-2">
-                      {Object.entries(experienceStats).map(([k, v]) => (
-                        <div key={k} className="p-2 rounded-lg text-center" style={{ background: "rgba(255,255,255,0.03)" }}>
-                          <div className="text-lg font-medium" style={{ color: "var(--yunque-text)" }}>
-                            {String(v)}
-                          </div>
-                          <div className="text-[10px]" style={{ color: "var(--yunque-text-muted)" }}>
-                            {k.replace(/_/g, " ")}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    {topTools.length > 0 && (
-                      <div>
-                        <div className="text-xs mb-1 font-medium" style={{ color: "var(--yunque-text)" }}>
-                          高频工具经验
-                        </div>
-                        {topTools.map((tool, i) => (
-                          <div key={`${tool.tool}-${i}`} className="text-xs p-2 rounded mb-1" style={{ background: "rgba(34,211,238,0.08)", color: "var(--yunque-text-muted)" }}>
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="font-medium" style={{ color: "var(--yunque-text)" }}>
-                                {tool.tool || "unknown tool"}
-                              </span>
-                              <span>复用 {tool.used_count ?? 0}</span>
-                            </div>
-                            {tool.learned && <div>{tool.learned}</div>}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {topFacts.length > 0 && (
-                      <div>
-                        <div className="text-xs mb-1 font-medium" style={{ color: "var(--yunque-text)" }}>
-                          高频领域事实
-                        </div>
-                        {topFacts.map((fact, i) => (
-                          <div key={`${fact.fact}-${i}`} className="text-xs p-2 rounded mb-1" style={{ background: "rgba(167,139,250,0.08)", color: "var(--yunque-text-muted)" }}>
-                            <div style={{ color: "var(--yunque-text)" }}>{fact.fact}</div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {pendingPatterns.length > 0 && (
-                      <div>
-                        <div className="text-xs mb-1 font-medium" style={{ color: "var(--yunque-text)" }}>
-                          待确认模式
-                        </div>
-                        {pendingPatterns.map((p: CogniExperiencePattern, i: number) => (
-                          <div key={p.id || i} className="text-xs p-2 rounded mb-1" style={{ background: "rgba(255,170,0,0.08)", color: "var(--yunque-text-muted)" }}>
-                            <div className="flex items-start justify-between gap-2">
-                              <span>
-                                {p.trigger} → {p.response}
-                              </span>
-                              {p.id && (
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  isPending={confirmingPatternID === p.id}
-                                  isDisabled={!!confirmingPatternID && confirmingPatternID !== p.id}
-                                  onPress={() => p.id && confirmExperiencePattern(p.id)}
-                                >
-                                  {confirmingPatternID === p.id ? "确认中" : "确认"}
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </>
-            )}
-
-            {detailTab === "evolution" && (
-              <>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>
-                    <FlaskConical size={12} className="inline mr-1" aria-hidden="true" />
-                    技能进化
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onPress={async () => {
-                      try {
-                        await cogniPack.triggerEvolution(detailID!);
-                        showToast("进化已启动", "success");
-                      } catch (e) {
-                        showToast(formatErrorMessage(e, "启动失败"), "error");
-                      }
-                    }}
-                  >
-                    <FlaskConical size={10} aria-hidden="true" /> 触发进化
-                  </Button>
-                </div>
-                {!detailEvolution?.experiments || detailEvolution.experiments.length === 0 ? (
-                  <div className="text-sm py-6 text-center" style={{ color: "var(--yunque-text-muted)" }}>
-                    尚无进化实验记录
-                  </div>
-                ) : (
-                  <div className="space-y-2 mt-2">
-                    {detailEvolution.experiments.map((exp: CogniExperiment) => (
-                      <div key={exp.id} className="p-3 rounded-lg text-xs" style={{ background: "rgba(255,255,255,0.03)" }}>
-                        <div className="flex items-center gap-2 mb-1">
-                          <Chip
-                            size="sm"
-                            style={{
-                              background: exp.status === "kept" ? "rgba(23,201,100,0.12)" : "rgba(243,18,96,0.12)",
-                              color: exp.status === "kept" ? "#17c964" : "#f31260",
-                            }}
-                          >
-                            {exp.status === "kept" ? "保留" : "回滚"}
-                          </Chip>
-                          <span style={{ color: exp.delta >= 0 ? "#17c964" : "#f31260" }}>
-                            {exp.delta >= 0 ? "+" : ""}
-                            {exp.delta.toFixed(1)}%
-                          </span>
-                        </div>
-                        <div style={{ color: "var(--yunque-text-muted)" }}>{exp.change}</div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </>
-            )}
-          </Card>
-        </div>
-      )}
+      {/* Detail modal — unified capability detail component */}
+      <CapabilityDetailModal
+        id={detailID}
+        displayName={detailEntry?.display_name}
+        type="cogni"
+        onClose={() => setDetailID(null)}
+        declaration={detailDeclaration}
+        health={detailID ? health[detailID] : null}
+        trace={detailTraces.length > 0 ? { sessions: detailTraces } : null}
+        experience={detailExperience}
+        evolution={detailEvolution}
+        onConfirmPattern={async (patternId: string) => {
+          if (!detailID) return;
+          try {
+            await cogniPack.confirmExperiencePattern(detailID, patternId);
+            showToast("模式已确认", "success");
+            const exp = await cogniPack.experience(detailID);
+            setDetailExperience(exp);
+          } catch (e) {
+            showToast(formatErrorMessage(e, "确认模式失败"), "error");
+          }
+        }}
+        onRunWorkflow={async (workflowName: string) => {
+          if (!detailID) return { success: false, error: "No cogni selected" };
+          try {
+            const r = await cogniPack.runWorkflow(detailID, workflowName);
+            showToast(
+              r.success ? `工作流完成：${r.workflow_name}` : `工作流失败：${r.error}`,
+              r.success ? "success" : "error"
+            );
+            return r;
+          } catch (e) {
+            showToast(formatErrorMessage(e, "执行失败"), "error");
+            return { success: false, error: String(e) };
+          }
+        }}
+        onTriggerEvolution={async () => {
+          if (!detailID) return;
+          try {
+            await cogniPack.triggerEvolution(detailID);
+            showToast("进化触发成功", "success");
+            const evo = await cogniPack.evolution(detailID);
+            setDetailEvolution(evo);
+          } catch (e) {
+            showToast(formatErrorMessage(e, "触发进化失败"), "error");
+          }
+        }}
+        onStartChat={() => {
+          router.push(`/chat?cogni=${encodeURIComponent(detailID!)}`);
+          setDetailID(null);
+        }}
+        skillOptions={skills}
+        onSaveConfig={async (decl) => {
+          if (!detailID) return;
+          try {
+            await cogniPack.update(detailID, decl);
+            showToast("配置已保存", "success");
+            const fresh = await cogniPack.get(detailID).catch(() => null);
+            setDetailDeclaration(fresh?.declaration ?? decl);
+            await load();
+          } catch (e) {
+            showToast(formatErrorMessage(e, "保存失败"), "error");
+          }
+        }}
+      />
     </div>
   );
 }

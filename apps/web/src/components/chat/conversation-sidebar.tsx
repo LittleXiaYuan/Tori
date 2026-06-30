@@ -1,11 +1,9 @@
-import { Button } from "@heroui/react";
+import { Button, Tooltip } from "@heroui/react";
 import {
   Archive,
   ArchiveRestore,
-  Code2,
   Edit3,
   MessageCircle,
-  PenLine,
   Pin,
   PinOff,
   Plus,
@@ -86,7 +84,6 @@ export function ConversationSidebar({
   onDelete,
 }: ConversationSidebarProps) {
   const { t } = useI18n();
-  const writingMode = chatMode === "chat";
 
   return (
     <div
@@ -97,38 +94,18 @@ export function ConversationSidebar({
         WebkitBackdropFilter: "blur(var(--yunque-glass-blur)) saturate(var(--yunque-glass-saturate))",
       }}
     >
-      {/* Mode toggle — DeepSeek-style pill switch */}
-      <div className="conv-sidebar__modes px-2.5 pt-3 pb-1">
-        <div className="conv-sidebar__mode-track" role="tablist" aria-label={t("convo.modeAria")}>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={!writingMode}
-            className="conv-sidebar__mode-btn"
-            data-active={!writingMode || undefined}
-            onClick={() => onModeChange("agent")}
-          >
-            <Code2 size={14} /> {t("convo.tab.agent")}
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={writingMode}
-            className="conv-sidebar__mode-btn"
-            data-active={writingMode || undefined}
-            onClick={() => onModeChange("chat")}
-          >
-            <PenLine size={14} /> {t("convo.tab.writing")}
-          </button>
-        </div>
-      </div>
-
       {/* Sidebar Header */}
-      <div className="p-2.5 space-y-2">
+      <div className="p-3 space-y-2.5">
         <Button
-          className="w-full justify-start gap-2 rounded-[14px] text-[13px] btn-accent"
+          className="w-full justify-start gap-2 rounded-[14px] text-[13px]"
           size="sm"
+          variant="ghost"
           onPress={onNew}
+          style={{
+            background: "var(--yunque-bg-muted)",
+            color: "var(--yunque-text)",
+            border: "1px solid var(--yunque-border)",
+          }}
         >
           <Plus size={14} /> {t("convo.new")}
         </Button>
@@ -147,57 +124,36 @@ export function ConversationSidebar({
         </div>
       </div>
 
-      {/* Active / archived filter — accent pill, distinct from mode toggle above */}
-      <div className="px-2.5 pb-2">
-        <div className="conv-sidebar__filter-track" role="tablist" aria-label={t("convo.filterAria")}>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={!conv.showArchived}
-            className="conv-sidebar__filter-btn"
-            data-active={!conv.showArchived || undefined}
-            onClick={() => dispatch({ type: "SET_ARCHIVED", show: false })}
-          >
-            <MessageCircle size={13} /> {t("convo.active")}
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={conv.showArchived}
-            className="conv-sidebar__filter-btn"
-            data-active={conv.showArchived || undefined}
-            onClick={() => dispatch({ type: "SET_ARCHIVED", show: true })}
-          >
-            <Archive size={13} /> {t("convo.archived")}
-          </button>
-        </div>
-      </div>
+      {/* 对话/写作模式切换已统一到输入框的「选择模型」弹窗（Agent/Fast/Chat），
+          此处不再重复展示，避免与列表过滤混淆。 */}
 
       {/* Conversation List */}
       <div
         className="flex-1 overflow-y-auto px-2 pb-2"
         style={{ overscrollBehavior: "contain", WebkitOverflowScrolling: "touch" }}
       >
-        <div
-          className="px-2 py-2 text-[11px] font-semibold"
-          style={{ color: "var(--yunque-text-muted)" }}
-        >
-          {conv.showArchived ? t("convo.archived") : t("convo.recent")} · {conversations.length}
+        <div className="conv-sidebar__list-head">
+          <span>
+            {conv.showArchived ? t("convo.archived") : t("convo.recent")} · {conversations.length}
+          </span>
+          <Tooltip delay={0}>
+            <Button
+              isIconOnly
+              aria-label={conv.showArchived ? t("convo.active") : t("convo.archived")}
+              variant="ghost"
+              size="sm"
+              className="conv-sidebar__archive-toggle"
+              onPress={() => dispatch({ type: "SET_ARCHIVED", show: !conv.showArchived })}
+            >
+              {conv.showArchived ? <MessageCircle size={13} /> : <Archive size={13} />}
+            </Button>
+            <Tooltip.Content>{conv.showArchived ? t("convo.active") : t("convo.archived")}</Tooltip.Content>
+          </Tooltip>
         </div>
         <div className="chat-thread-list space-y-1">
           {conversations.map((c) => (
-            <div
+            <article
               key={c.id}
-              role="button"
-              tabIndex={0}
-              onClick={() => {
-                if (conv.renameId !== c.id) onSwitch(c.id);
-              }}
-              onKeyDown={(e) => {
-                if ((e.key === "Enter" || e.key === " ") && conv.renameId !== c.id) {
-                  e.preventDefault(); onSwitch(c.id);
-                }
-              }}
               className="conv-item chat-thread-item w-full text-left px-3 py-2.5 rounded-[16px] group relative"
               data-active={conv.activeId === c.id || undefined}
               style={{
@@ -212,6 +168,7 @@ export function ConversationSidebar({
                 <Pin
                   size={10}
                   className="absolute right-2 top-2"
+                  aria-hidden="true"
                   style={{ color: "var(--yunque-accent)", opacity: 0.6 }}
                 />
               )}
@@ -227,11 +184,13 @@ export function ConversationSidebar({
                   }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
-                      if (conv.renameText.trim())
-                        onManage(c.id, { name: conv.renameText.trim() });
+                      e.preventDefault();
+                      e.currentTarget.blur();
+                    }
+                    if (e.key === "Escape") {
+                      e.preventDefault();
                       dispatch({ type: "CANCEL_RENAME" });
                     }
-                    if (e.key === "Escape") dispatch({ type: "CANCEL_RENAME" });
                   }}
                   className="text-xs font-medium bg-transparent outline-none w-full px-1 py-0.5 rounded"
                   style={{
@@ -242,84 +201,91 @@ export function ConversationSidebar({
                   onClick={(e) => e.stopPropagation()}
                 />
               ) : (
-                <div className="text-[12px] font-medium truncate pr-4">{convDisplayTitle(c, t("convo.untitled"))}</div>
-              )}
-              <div
-                className="mt-0.5 truncate text-[10px]"
-                style={{ color: "var(--yunque-text-muted)" }}
-              >
-                {(c.summary || "").trim() || t("convo.noSummary")}
-              </div>
-              <div className="mt-1.5 flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[10px]" style={{ color: "var(--yunque-text-muted)" }}>
-                    {new Date(c.updated_at).toLocaleDateString([], {
-                      month: "numeric",
-                      day: "numeric",
-                    })}
+                <button
+                  type="button"
+                  className="conv-thread-main w-full text-left"
+                  aria-current={conv.activeId === c.id ? "true" : undefined}
+                  onClick={() => onSwitch(c.id)}
+                >
+                  <span className="block text-[12px] font-medium truncate pr-4">{convDisplayTitle(c, t("convo.untitled"))}</span>
+                  <span
+                    className="mt-0.5 block truncate text-[10px]"
+                    style={{ color: "var(--yunque-text-muted)" }}
+                  >
+                    {(c.summary || "").trim() || t("convo.noSummary")}
                   </span>
-                  {c.pinned && (
-                    <span
-                      className="rounded-full px-2 py-0.5 text-[10px]"
-                      style={{
-                        background: "rgba(59,130,246,0.1)",
-                        color: "var(--yunque-accent)",
-                      }}
-                    >
-                      {t("convo.pinned")}
-                    </span>
-                  )}
-                </div>
+                </button>
+              )}
+              <div className="mt-1.5 flex items-center justify-between">
+                <span className="text-[10px]" style={{ color: "var(--yunque-text-muted)" }}>
+                  {new Date(c.updated_at).toLocaleDateString([], {
+                    month: "numeric",
+                    day: "numeric",
+                  })}
+                  {c.pinned ? ` · ${t("convo.pinned")}` : ""}
+                </span>
                 <div className="chat-thread-actions flex items-center gap-0.5">
-                  <Button
-                    isIconOnly
-                    aria-label={t("convo.rename")}
-                    variant="ghost"
-                    size="sm"
-                    onPress={() =>
-                      dispatch({ type: "START_RENAME", id: c.id, text: c.name || c.id })
-                    }
-                  >
-                    <Edit3 size={11} style={{ color: "var(--yunque-text-muted)" }} />
-                  </Button>
-                  <Button
-                    isIconOnly
-                    aria-label={c.pinned ? t("convo.unpin") : t("convo.pin")}
-                    variant="ghost"
-                    size="sm"
-                    onPress={() => onManage(c.id, { pinned: !c.pinned })}
-                  >
-                    {c.pinned ? (
-                      <PinOff size={11} style={{ color: "var(--yunque-accent)" }} />
-                    ) : (
-                      <Pin size={11} style={{ color: "var(--yunque-text-muted)" }} />
-                    )}
-                  </Button>
-                  <Button
-                    isIconOnly
-                    aria-label={conv.showArchived ? t("convo.restore") : t("convo.archive")}
-                    variant="ghost"
-                    size="sm"
-                    onPress={() => onManage(c.id, { archive: !conv.showArchived })}
-                  >
-                    {conv.showArchived ? (
-                      <ArchiveRestore size={11} style={{ color: "var(--yunque-text-muted)" }} />
-                    ) : (
-                      <Archive size={11} style={{ color: "var(--yunque-text-muted)" }} />
-                    )}
-                  </Button>
-                  <Button
-                    isIconOnly
-                    aria-label={t("convo.delete")}
-                    variant="ghost"
-                    size="sm"
-                    onPress={() => onDelete(c.id)}
-                  >
-                    <Trash2 size={11} style={{ color: "#ef4444" }} />
-                  </Button>
+                  <Tooltip delay={0}>
+                    <Button
+                      isIconOnly
+                      aria-label={t("convo.rename")}
+                      variant="ghost"
+                      size="sm"
+                      onPress={() =>
+                        dispatch({ type: "START_RENAME", id: c.id, text: c.name || c.id })
+                      }
+                    >
+                      <Edit3 size={11} style={{ color: "var(--yunque-text-muted)" }} />
+                    </Button>
+                    <Tooltip.Content>{t("convo.rename")}</Tooltip.Content>
+                  </Tooltip>
+                  <Tooltip delay={0}>
+                    <Button
+                      isIconOnly
+                      aria-label={c.pinned ? t("convo.unpin") : t("convo.pin")}
+                      variant="ghost"
+                      size="sm"
+                      onPress={() => onManage(c.id, { pinned: !c.pinned })}
+                    >
+                      {c.pinned ? (
+                        <PinOff size={11} style={{ color: "var(--yunque-accent)" }} />
+                      ) : (
+                        <Pin size={11} style={{ color: "var(--yunque-text-muted)" }} />
+                      )}
+                    </Button>
+                    <Tooltip.Content>{c.pinned ? t("convo.unpin") : t("convo.pin")}</Tooltip.Content>
+                  </Tooltip>
+                  <Tooltip delay={0}>
+                    <Button
+                      isIconOnly
+                      aria-label={conv.showArchived ? t("convo.restore") : t("convo.archive")}
+                      variant="ghost"
+                      size="sm"
+                      onPress={() => onManage(c.id, { archive: !conv.showArchived })}
+                    >
+                      {conv.showArchived ? (
+                        <ArchiveRestore size={11} style={{ color: "var(--yunque-text-muted)" }} />
+                      ) : (
+                        <Archive size={11} style={{ color: "var(--yunque-text-muted)" }} />
+                      )}
+                    </Button>
+                    <Tooltip.Content>{conv.showArchived ? t("convo.restore") : t("convo.archive")}</Tooltip.Content>
+                  </Tooltip>
+                  <Tooltip delay={0}>
+                    <Button
+                      isIconOnly
+                      aria-label={t("convo.delete")}
+                      variant="ghost"
+                      size="sm"
+                      onPress={() => onDelete(c.id)}
+                    >
+                      <Trash2 size={11} style={{ color: "#ef4444" }} />
+                    </Button>
+                    <Tooltip.Content>{t("convo.delete")}</Tooltip.Content>
+                  </Tooltip>
                 </div>
               </div>
-            </div>
+            </article>
           ))}
           {conversations.length === 0 && (
             <div

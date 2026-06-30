@@ -5,6 +5,7 @@ import { Card, Button, Spinner, Chip, Tooltip, Tabs, ProgressBar, Switch, TextFi
 import { api, type EmotionHistoryEntry, type HeartbeatLog, type PersonaMemoryBlock, type MemorySearchResult } from "@/lib/api";
 import { Brain, Heart, Clock, RefreshCw, Layers, Zap, Settings2, Search, Plus, Trash2, Archive } from "lucide-react";
 import { showToast } from "@/components/toast-provider";
+import { confirmAction } from "@/components/confirm-dialog";
 import EmptyState from "@/components/empty-state";
 import PageHeader from "@/components/page-header";
 
@@ -25,6 +26,9 @@ export default function MemoryPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [addContent, setAddContent] = useState("");
   const [adding, setAdding] = useState(false);
+  const [editingBlock, setEditingBlock] = useState<PersonaMemoryBlock | null>(null);
+  const [editContent, setEditContent] = useState("");
+  const [savingBlock, setSavingBlock] = useState<string | null>(null);
   // Compact
   const [compacting, setCompacting] = useState(false);
 
@@ -86,6 +90,59 @@ export default function MemoryPage() {
     setCompacting(false);
   };
 
+  const startEditBlock = (block: PersonaMemoryBlock) => {
+    setEditingBlock(block);
+    setEditContent(block.content || "");
+  };
+
+  const cancelEditBlock = () => {
+    setEditingBlock(null);
+    setEditContent("");
+  };
+
+  const handleSaveBlock = async () => {
+    if (!editingBlock) return;
+    const content = editContent.trim();
+    if (!content) {
+      showToast("记忆内容不能为空；如果要移除，请使用删除。", "warning");
+      return;
+    }
+    setSavingBlock(editingBlock.id);
+    try {
+      await api.updateMemoryPersona({ id: editingBlock.id, label: editingBlock.label, content });
+      showToast("记忆块已更新", "success");
+      cancelEditBlock();
+      await load();
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "保存失败", "error");
+    }
+    setSavingBlock(null);
+  };
+
+  const handleDeleteBlock = async (block: PersonaMemoryBlock) => {
+    if (block.read_only) {
+      showToast("这个记忆块是只读的，不能删除。", "warning");
+      return;
+    }
+    const confirmed = await confirmAction({
+      title: "删除记忆块",
+      body: `确定要删除「${block.label || block.id}」吗？此操作不可恢复。`,
+      confirmLabel: "删除",
+      tone: "danger",
+    });
+    if (!confirmed) return;
+    setSavingBlock(block.id);
+    try {
+      await api.updateMemoryPersona({ id: block.id, label: block.label, content: "" });
+      showToast("记忆块已删除", "success");
+      if (editingBlock?.id === block.id) cancelEditBlock();
+      await load();
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "删除失败", "error");
+    }
+    setSavingBlock(null);
+  };
+
   const emotionEmoji: Record<string, string> = {
     joy: "😊", sadness: "😢", anger: "😠",
     fear: "😰", disgust: "🤢", surprise: "😮",
@@ -105,19 +162,19 @@ export default function MemoryPage() {
         </div>
         <div className="flex gap-2">
           <Tooltip delay={0}>
-            <Button isIconOnly variant="ghost" size="sm" onPress={() => setShowAdd(!showAdd)}>
+            <Button isIconOnly aria-label="添加记忆" variant="ghost" size="sm" onPress={() => setShowAdd(!showAdd)}>
               <Plus size={14} />
             </Button>
             <Tooltip.Content>{"添加记忆"}</Tooltip.Content>
           </Tooltip>
           <Tooltip delay={0}>
-            <Button isIconOnly variant="ghost" size="sm" isPending={compacting} onPress={handleCompact}>
+            <Button isIconOnly aria-label="整理记忆" variant="ghost" size="sm" isPending={compacting} onPress={handleCompact}>
               <Archive size={14} />
             </Button>
             <Tooltip.Content>{"整理记忆"}</Tooltip.Content>
           </Tooltip>
           <Tooltip delay={0}>
-            <Button isIconOnly variant="ghost" size="sm" onPress={() => { setLoading(true); load(); }}>
+            <Button isIconOnly aria-label="刷新记忆" variant="ghost" size="sm" onPress={() => { setLoading(true); load(); }}>
               <RefreshCw size={14} />
             </Button>
             <Tooltip.Content>{"刷新"}</Tooltip.Content>
@@ -144,7 +201,7 @@ export default function MemoryPage() {
       <div className="flex items-center gap-2">
         <div className="flex-1">
           <TextField value={searchQuery} onChange={setSearchQuery}>
-            <Input placeholder={"搜索记忆..."} onKeyDown={(e: React.KeyboardEvent) => e.key === "Enter" && handleSearch()} />
+            <Input aria-label="搜索记忆" placeholder={"搜索记忆..."} onKeyDown={(e: React.KeyboardEvent) => e.key === "Enter" && handleSearch()} />
           </TextField>
         </div>
         <Button size="sm" isPending={searching} onPress={handleSearch} className="btn-accent">
@@ -225,11 +282,46 @@ export default function MemoryPage() {
             <div className="space-y-3 stagger-children">
               {memoryBlocks.map((b, i) => (
                 <div key={i} className="p-4 rounded-lg hover-lift" style={{ background: "rgba(255,255,255,0.02)" }}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Chip size="sm" style={{ background: "rgba(167,139,250,0.1)", color: "#a78bfa", fontSize: 10 }}>{b.label || `Block ${i + 1}`}</Chip>
-                    {b.version && <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>v{b.version}</span>}
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Chip size="sm" style={{ background: "rgba(167,139,250,0.1)", color: "#a78bfa", fontSize: 10 }}>{b.label || `Block ${i + 1}`}</Chip>
+                      {b.version && <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>v{b.version}</span>}
+                      {b.read_only && <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>只读</span>}
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button size="sm" variant="ghost" onPress={() => startEditBlock(b)} isDisabled={b.read_only}>
+                        编辑
+                      </Button>
+                      <Tooltip delay={0}>
+                        <Button
+                          isIconOnly
+                          aria-label={`删除记忆块 ${b.label || i + 1}`}
+                          size="sm"
+                          variant="ghost"
+                          isPending={savingBlock === b.id}
+                          isDisabled={b.read_only}
+                          onPress={() => handleDeleteBlock(b)}
+                        >
+                          <Trash2 size={13} style={{ color: "#ef4444" }} />
+                        </Button>
+                        <Tooltip.Content>删除</Tooltip.Content>
+                      </Tooltip>
+                    </div>
                   </div>
-                  <div className="text-sm whitespace-pre-wrap" style={{ color: "var(--yunque-text)" }}>{b.content}</div>
+                  {editingBlock?.id === b.id ? (
+                    <div className="space-y-3">
+                      <TextField value={editContent} onChange={setEditContent}>
+                        <Label>编辑记忆内容</Label>
+                        <TextArea rows={5} />
+                      </TextField>
+                      <div className="flex justify-end gap-2">
+                        <Button size="sm" variant="ghost" onPress={cancelEditBlock}>取消</Button>
+                        <Button size="sm" className="btn-accent" isPending={savingBlock === b.id} onPress={handleSaveBlock}>保存</Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-sm whitespace-pre-wrap" style={{ color: "var(--yunque-text)" }}>{b.content}</div>
+                  )}
                 </div>
               ))}
             </div>

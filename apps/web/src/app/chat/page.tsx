@@ -2,33 +2,21 @@
 
 import { useState, useReducer, useRef, useCallback, useEffect, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Button, Avatar, Spinner, Tooltip, Chip, Dropdown, Label, Popover } from "@heroui/react";
+import { Button, Tooltip, Dropdown, Header, Label } from "@heroui/react";
 import {
-  Plus, MessageCircle, Zap, BookOpen, ScanFace, Package,
-  Brain, Gauge, Sparkles, Check, Search, Library, ChevronDown, Cpu,
-  Trash2, Volume2, Pin, Archive,
-  PanelRightOpen, PanelRightClose, VolumeX, ArchiveRestore, Edit3, Heart,
-  PinOff, MoreHorizontal, Monitor, AlertTriangle,
-  ArrowRight, Blocks, Maximize2, Minimize2,
+  Plus, MessageCircle, Zap,
+  Brain, Gauge, Sparkles, Heart,
+  Monitor, Maximize2, MoreHorizontal,
 } from "lucide-react";
-import { api, type ConversationInfo, type EmotionResult, type NotifyChannel, type StickerSuggestion, type PresetInfo, type SkillInfo } from "@/lib/api";
+import { api, type ConversationInfo, type NotifyChannel } from "@/lib/api";
 import { createBrowserIntentPackClient } from "@/lib/browser-intent-pack-client";
-import type { SkillSuggestion as SkillGrowthSuggestion } from "@/lib/api-types";
-import MarkdownRenderer from "@/components/markdown-renderer";
-import { ExecutionTrace, type AgentEvent } from "@/components/execution-trace";
+import type { AgentEvent } from "@/components/execution-trace";
 import { ComputerPanel } from "@/components/computer-panel";
 import { TaskProgressPanel } from "@/components/task-progress-panel";
-// ConnectorPopover now used via ChatInputArea
-import { BrowserConnectCard, type BrowserRequirement } from "@/components/browser-connect-card";
-import { SkillGrowthPanel } from "@/components/skill-growth-panel";
-// SlashCommandMenu now used via ChatInputArea
-import { EmotionBadge, StickerView, SkillTags, AgentActions, type AgentAction } from "@/components/chat-extras";
+import type { AgentAction } from "@/components/chat-extras";
 import { showToast } from "@/components/toast-provider";
-import { ModelSelectorPopup, type ModelOption } from "@/components/model-selector-popup";
 import { useBrowserBridge } from "@/lib/use-browser-bridge";
-import { openExternal } from "@/lib/safe-url";
-import { browserActionLabel, browserActionPhase } from "@/lib/browser-action-labels";
-import type { ChatSharePayload, Suggestion, SandboxInfo, Message } from "@/lib/chat-types";
+import type { ChatSharePayload, SandboxInfo, Message } from "@/lib/chat-types";
 import {
   newId,
   browserTraceSummary,
@@ -69,6 +57,7 @@ import { workspacePathsFromProjects } from "@/lib/chat-workspace";
 import { PlannerRecoveryShelf } from "@/components/chat/planner-recovery-shelf";
 import { formatErrorMessage } from "@/lib/error-utils";
 import { providerModelLabel } from "@/lib/provider-ui";
+import { ModelSelectorPopup, type ModelOption } from "@/components/model-selector-popup";
 
 const browserIntentClient = createBrowserIntentPackClient();
 
@@ -91,7 +80,6 @@ export default function ChatPage() {
   const {
     currentModel, currentModelId, availableModels,
     setupNeeded, presets, activePreset,
-    airiAvailable,
     setCurrentModel, setCurrentModelId,
     handleSwitchPreset,
   } = useChatInit();
@@ -109,20 +97,13 @@ export default function ChatPage() {
   const [activeSlashCommand, setActiveSlashCommand] = useState<string | null>(null);
   const [thinkingEnabled, setThinkingEnabled] = useState<boolean | null>(null);
   const [chatMode, setChatMode] = useState<"agent" | "fast" | "chat">("agent");
-  const [airiMode, setAiriMode] = useState(false);
   const [suggestedTab, setSuggestedTab] = useState<"terminal" | "browser" | "editor" | "thinking" | undefined>(undefined);
-  const [computerWidth, setComputerWidth] = useState(340);
-  const resizingRef = useRef(false);
   const [resourceSnapshot, setResourceSnapshot] = useState<ResourceSnapshot | null>(null);
   const [prevResourceSnapshot, setPrevResourceSnapshot] = useState<ResourceSnapshot | null>(null);
   const [workspacePaths, setWorkspacePaths] = useState<string[]>([]);
   const [plannerRecoveryRefreshSignal, setPlannerRecoveryRefreshSignal] = useState<number | undefined>(undefined);
   const sendStartRef = useRef<number>(0);
   const refreshPlannerRecovery = useCallback(() => setPlannerRecoveryRefreshSignal(Date.now()), []);
-
-  useEffect(() => {
-    if (showComputer) setShowSidebar(false);
-  }, [showComputer]);
 
   const [browserTraceEvents, setBrowserTraceEvents] = useState<AgentEvent[]>([]);
   const [resumePromptForBrowser, setResumePromptForBrowser] = useState<string | null>(null);
@@ -131,6 +112,7 @@ export default function ChatPage() {
   const inputShellRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const computerPanelRef = useRef<HTMLDivElement>(null);
 
   const { ttsPlaying, isRecording, playTTS, startRecording, stopRecording } =
     useChatRecording(chatD, inputRef);
@@ -150,7 +132,30 @@ export default function ChatPage() {
     }
   }, [conv.showArchived]);
 
+  const handleModelSelect = useCallback(async (m: ModelOption) => {
+    setCurrentModel(providerModelLabel(m));
+    setCurrentModelId(m.id);
+    try {
+      await api.setExecProvider(m.id);
+      if (conv.activeId) {
+        await api.providerSessionOverride(m.id, conv.activeId).catch(() => {});
+      }
+    } catch (e) {
+      showToast(formatErrorMessage(e, t("chat.toast.modelSwitchFailed")), "error");
+    }
+  }, [conv.activeId, setCurrentModel, setCurrentModelId, t]);
+
   useEffect(() => { loadConversations(); }, [loadConversations]);
+
+  useEffect(() => {
+    if (!showComputer) return;
+    computerPanelRef.current?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setShowComputer(false);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [showComputer]);
 
   useEffect(() => {
     let cancelled = false;
@@ -173,13 +178,9 @@ export default function ChatPage() {
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const showComputerRef = useRef(showComputer);
-  showComputerRef.current = showComputer;
-
   const pushBrowserTrace = useCallback((event: AgentEvent) => {
     setBrowserTraceEvents((prev) => [...prev.slice(-7), event]);
     chatD({ type: "ADD_LIVE_TRACE", event });
-    if (!showComputerRef.current) setShowComputer(true);
     setSuggestedTab("browser");
   }, []);
 
@@ -218,7 +219,7 @@ export default function ChatPage() {
       chatD({ type: "ADD_LIVE_TRACE", event: evt });
     }, []),
     onShouldOpenComputer: useCallback(() => {
-      if (!showComputerRef.current) setShowComputer(true);
+      setSuggestedTab("thinking");
     }, []),
   });
 
@@ -433,7 +434,6 @@ export default function ChatPage() {
         session_id: conv.activeId,
         ...(thinkingEnabled !== null ? { thinking: thinkingEnabled } : {}),
         ...(chatMode !== "agent" ? { mode: chatMode } : {}),
-        ...(airiMode ? { airi_mode: true } : {}),
       };
       if (cherryWebSearch) bodyObj.web_search = true;
       if (cherryToolIds) bodyObj.tool_ids = cherryToolIds;
@@ -513,18 +513,6 @@ export default function ChatPage() {
           if (doneData.sandbox && doneData.sandbox.sandbox_id) {
             updates.sandbox = doneData.sandbox as SandboxInfo;
           }
-          if (doneData.airi_synced) {
-            updates.airiSynced = true;
-            const actMatch = (doneData.reply || "").match(/<\|ACT\s+(\{[^|]*\})\s*\|>/);
-            if (actMatch) {
-              try {
-                const act = JSON.parse(actMatch[1]);
-                updates.airiEmotion = act?.emotion?.name || "neutral";
-              } catch { updates.airiEmotion = "neutral"; }
-            }
-            const cleaned = (doneData.reply || "").replace(/<\|ACT\s+\{[^|]*\}\s*\|>\n?/g, "").trim();
-            if (cleaned) updates.content = cleaned;
-          }
           // Reconcile the live-streamed body with the authoritative final reply.
           // During true token streaming the raw answer (including any trailing
           // NEXT-move markers) is shown live; on done we settle to the clean
@@ -537,7 +525,6 @@ export default function ChatPage() {
             setLastArtifact(mapBrowserSummary(doneData.browser_summary));
           }
           if (doneData.browser_requirement) {
-            setShowComputer(true);
             setSuggestedTab("browser");
           }
           const usage = doneData.usage as { prompt_tokens?: number; completion_tokens?: number } | undefined;
@@ -574,7 +561,6 @@ export default function ChatPage() {
           } else {
             chatD({ type: "APPEND_LAST_TRACE", event: parsed });
             if (parsed.type === "tool_start" || parsed.type === "tool_end" || parsed.type === "thinking") {
-              if (!showComputer) setShowComputer(true);
               const domain = parsed.domain || "";
               const skillName = detail?.skill || parsed.summary || "";
               if (domain === "browser" || /browser|screenshot|navigate/.test(skillName)) {
@@ -623,7 +609,7 @@ export default function ChatPage() {
         }, 3000);
       }
     }
-  }, [chat.input, chat.loading, chat.messages, thinkingLevel, conv.activeId, loadConversations, pushBrowserTrace, setBridgeNotice, setLastArtifact, syncBridgeState]);
+  }, [chat.input, chat.loading, chat.messages, thinkingEnabled, thinkingLevel, conv.activeId, loadConversations, pushBrowserTrace, setBridgeNotice, setLastArtifact, syncBridgeState]);
 
   useEffect(() => {
     if (pendingRetryRef.current && !chat.loading) {
@@ -758,7 +744,6 @@ export default function ChatPage() {
     () => conv.list.find((c) => c.id === conv.activeId),
     [conv.list, conv.activeId],
   );
-  const activeConversationTitle = conversationTitle(activeConversation, t("chat.workspaceTitle"));
 
 
   const shortcutHandlers = useMemo(() => ({
@@ -810,19 +795,16 @@ export default function ChatPage() {
     document.addEventListener("yunque:quick-send", handler);
 
     let unlistenTauri: (() => void) | undefined;
-    const tauri = (window as unknown as { __TAURI__?: { event?: { listen: (name: string, cb: (e: { payload: string }) => void) => Promise<() => void> } } }).__TAURI__;
-    if (tauri?.event?.listen) {
-      tauri.event
-        .listen("yunque:quick-send", (e) => {
-          if (typeof e.payload === "string" && e.payload) sendMessage(e.payload);
-        })
-        .then((un) => {
-          unlistenTauri = un;
-        })
-        .catch((err) => {
-          console.warn("[chat] tauri listen yunque:quick-send failed", err);
-        });
-    }
+    void import("@tauri-apps/api/event")
+      .then(({ listen }) => listen<string>("yunque:quick-send", (e) => {
+        if (typeof e.payload === "string" && e.payload) sendMessage(e.payload);
+      }))
+      .then((un) => {
+        unlistenTauri = un;
+      })
+      .catch((err) => {
+        console.warn("[chat] tauri listen yunque:quick-send failed", err);
+      });
 
     return () => {
       document.removeEventListener("yunque:quick-send", handler);
@@ -863,7 +845,6 @@ export default function ChatPage() {
       availableModels={availableModels}
       currentModel={currentModel || t("composer.selectModel")}
       currentModelId={currentModelId}
-      airiAvailable={airiAvailable}
       thinkingLevel={thinkingLevel}
       isRecording={isRecording}
       inputRef={inputRef}
@@ -881,23 +862,8 @@ export default function ChatPage() {
       onStop={stopGeneration}
       onRemoveFile={(id, preview) => { if (preview) URL.revokeObjectURL(preview); setPendingFiles(prev => prev.filter((item) => item.id !== id)); }}
       onConnectorsToggle={setShowConnectors}
-      onModelSelect={async (m) => {
-        setCurrentModel(providerModelLabel(m));
-        setCurrentModelId(m.id);
-        try {
-          await api.setExecProvider(m.id);
-          if (conv.activeId) {
-            await api.providerSessionOverride(m.id, conv.activeId).catch(() => {});
-          }
-        } catch (e) {
-          showToast(formatErrorMessage(e, t("chat.toast.modelSwitchFailed")), "error");
-        }
-      }}
-      onModeChange={(mode) => {
-        setChatMode(mode);
-        if (mode === "chat" && airiAvailable) setAiriMode(true);
-        else setAiriMode(false);
-      }}
+      onModelSelect={handleModelSelect}
+      onModeChange={setChatMode}
       onThinkingChange={(lvl) => {
         setThinkingLevel(lvl);
         setThinkingEnabled(lvl === "deep" ? true : lvl === "none" ? false : null);
@@ -933,8 +899,6 @@ export default function ChatPage() {
           chatMode={chatMode}
           onModeChange={(mode) => {
             setChatMode(mode);
-            if (mode === "chat" && airiAvailable) setAiriMode(true);
-            else setAiriMode(false);
           }}
           onNew={newConversation}
           onSwitch={switchConversation}
@@ -944,16 +908,22 @@ export default function ChatPage() {
       </div>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Top Bar */}
+      <section
+        className="flex-1 flex flex-col min-w-0"
+        aria-labelledby="chat-current-title"
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+      >
+        {/* Top Bar — Gemini-style: empty, just a sidebar toggle and a more menu */}
         <header
-          className="chat-topbar flex items-center justify-between shrink-0 px-4 py-2.5 xl:px-5"
+          className="chat-topbar flex items-center justify-between shrink-0 px-3 py-2 xl:px-4"
           style={{
             borderBottom: "1px solid transparent",
             background: "transparent",
           }}
         >
-          <div className="chat-topbar__left flex items-center gap-3 min-w-0">
+          <div className="chat-topbar__left flex items-center gap-2 min-w-0">
             <button
               onClick={() => setShowSidebar(!showSidebar)}
               className="chat-topbar__icon-btn p-1.5 rounded-lg transition-colors"
@@ -962,94 +932,64 @@ export default function ChatPage() {
             >
               <MessageCircle size={16} />
             </button>
-            <div className="chat-topbar__title-wrap">
-              <div className="chat-topbar__title-row">
-                <span className="chat-topbar__title">{activeConversationTitle}</span>
-                <ChevronDown size={13} aria-hidden className="chat-topbar__chevron" />
-                <Button
-                  isIconOnly
-                  variant="ghost"
-                  size="sm"
-                  className="chat-topbar__new h-7 w-7 rounded-full"
-                  aria-label={t("convo.new")}
-                  onPress={newConversation}
-                >
-                  <Plus size={14} />
-                </Button>
-              </div>
-              <div className="chat-topbar__subtitle">{t("chat.desktopWorkspace")}</div>
-            </div>
           </div>
 
           <div className="flex items-center gap-1.5">
-            {chatMode !== "chat" && presets.length > 0 && (
-              <Dropdown>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 gap-1.5 rounded-full px-2.5 text-[11px] font-medium"
-                  style={{ background: "rgba(255,255,255,0.04)", color: "var(--yunque-text-secondary)" }}
-                >
-                  <Heart size={12} />
-                  {presets.find(p => p.id === activePreset)?.name || "Preset"}
-                  <ChevronDown size={12} style={{ color: "var(--yunque-text-muted)" }} />
-                </Button>
-                <Dropdown.Popover className="min-w-[160px]">
-                  <Dropdown.Menu onAction={(key) => handleSwitchPreset(key as string)}>
-                    {presets.map((p) => (
-                      <Dropdown.Item key={p.id} id={p.id} textValue={p.name}>
-                        <Label>{p.name}{p.id === activePreset ? t("chat.presetCurrent") : ""}</Label>
-                      </Dropdown.Item>
-                    ))}
-                  </Dropdown.Menu>
-                </Dropdown.Popover>
-              </Dropdown>
-            )}
-
-            {chat.streaming && (
-              <Chip className="animate-pulse-dot hidden lg:inline-flex" size="sm" style={{ background: "rgba(0,111,238,0.1)", color: "var(--yunque-accent)" }}>
-                <Sparkles size={11} className="mr-1" /> {t("chat.streaming")}
-              </Chip>
-            )}
-
-            {chatMode !== "chat" && (
+            <Dropdown>
               <Tooltip delay={0}>
-                <Button
-                  isIconOnly variant="ghost" size="sm" className="chat-tool-btn h-8 w-8 rounded-full"
-                  onPress={() => setShowComputer(!showComputer)}
-                  aria-label={showComputer ? t("chat.computer.hide") : t("chat.computer.show")}
-                  style={{ color: showComputer ? "var(--yunque-accent)" : "var(--yunque-text-muted)" }}
-                >
-                  <Monitor size={15} />
-                </Button>
-                <Tooltip.Content>{showComputer ? t("chat.computer.hide") : t("chat.computer.show")}</Tooltip.Content>
+              <Button
+                isIconOnly
+                variant="ghost"
+                size="sm"
+                className="chat-tool-btn h-8 w-8 rounded-full"
+                aria-label={t("chat.more")}
+                style={{ color: "var(--yunque-text-muted)" }}
+              >
+                <MoreHorizontal size={16} />
+              </Button>
+              <Tooltip.Content>{t("chat.more")}</Tooltip.Content>
               </Tooltip>
-            )}
-
-            <Tooltip delay={0}>
-              <Button
-                isIconOnly variant="ghost" size="sm" className="chat-tool-btn h-8 w-8 rounded-full"
-                onPress={() => router.push("/missions")}
-                aria-label={t("chat.toTasks")}
-                style={{ color: "var(--yunque-text-muted)" }}
-              >
-                <Zap size={15} />
-              </Button>
-              <Tooltip.Content>{t("chat.toTasks")}</Tooltip.Content>
-            </Tooltip>
-
-            <Tooltip delay={0}>
-              <Button
-                isIconOnly variant="ghost" size="sm" className="chat-tool-btn h-8 w-8 rounded-full"
-                onPress={() => shortcutHandlers.zen_mode()}
-                aria-label={t("chat.zen")}
-                style={{ color: "var(--yunque-text-muted)" }}
-              >
-                <Maximize2 size={14} />
-              </Button>
-              <Tooltip.Content>{t("chat.zen")} (Ctrl+\)</Tooltip.Content>
-            </Tooltip>
-
+              <Dropdown.Popover className="min-w-[220px]">
+                <Dropdown.Menu
+                  onAction={(key) => {
+                    const action = String(key);
+                    if (action === "tasks") router.push("/missions");
+                    if (action === "computer") setShowComputer((v) => !v);
+                    if (action === "zen") shortcutHandlers.zen_mode();
+                    if (action === "new") newConversation();
+                    if (action.startsWith("preset:")) handleSwitchPreset(action.slice("preset:".length));
+                  }}
+                >
+                  <Dropdown.Item id="new" textValue={t("convo.new")}>
+                    <Label className="flex items-center gap-2"><Plus size={14} />{t("convo.new")}</Label>
+                  </Dropdown.Item>
+                  <Dropdown.Item id="tasks" textValue={t("chat.toTasks")}>
+                    <Label className="flex items-center gap-2"><Zap size={14} />{t("chat.toTasks")}</Label>
+                  </Dropdown.Item>
+                  {chatMode !== "chat" && (
+                    <Dropdown.Item id="computer" textValue={showComputer ? t("chat.computer.hide") : t("chat.computer.show")}>
+                      <Label className="flex items-center gap-2"><Monitor size={14} />{showComputer ? t("chat.computer.hide") : t("chat.computer.show")}</Label>
+                    </Dropdown.Item>
+                  )}
+                  <Dropdown.Item id="zen" textValue={t("chat.zen")}>
+                    <Label className="flex items-center gap-2"><Maximize2 size={14} />{t("chat.zen")}</Label>
+                  </Dropdown.Item>
+                  {chatMode !== "chat" && presets.length > 0 && (
+                    <Dropdown.Section>
+                      <Header>{t("chat.presets")}</Header>
+                      {presets.map((p) => (
+                        <Dropdown.Item key={`preset:${p.id}`} id={`preset:${p.id}`} textValue={p.name}>
+                          <Label className="flex items-center gap-2">
+                            <Heart size={14} />
+                            {p.name}{p.id === activePreset ? t("chat.presetCurrent") : ""}
+                          </Label>
+                        </Dropdown.Item>
+                      ))}
+                    </Dropdown.Section>
+                  )}
+                </Dropdown.Menu>
+              </Dropdown.Popover>
+            </Dropdown>
           </div>
         </header>
 
@@ -1093,69 +1033,53 @@ export default function ChatPage() {
         ) : (
           <>
             <div ref={scrollRef} className="flex-1 overflow-y-auto chat-scroll-area px-5 py-4 xl:px-6">
-              <ChatMessageList
-                messages={chat.messages}
-                streaming={chat.streaming}
-                chatMode={chatMode}
-                currentModel={currentModel}
-                copiedIdx={copiedIdx}
-                ttsPlaying={ttsPlaying}
-                bridgeState={bridgeState}
-                resumePromptForBrowser={resumePromptForBrowser}
-                onCopy={handleCopy}
-                onPlayTTS={playTTS}
-                onEdit={editMessage}
-                onRollback={rollbackToMessage}
-                onRetry={retryMessage}
-                onAction={handleAction}
-                onSlashSelect={handleSlashSelect}
-                onSend={sendMessage}
-                onShare={handleShare}
-                onBrowserRefresh={() => {
-                  syncBridgeState();
-                  browserIntentClient.extensionStatus()
-                    .then((status) => setBridgeNotice({ tone: status.connected ? "success" : "info", text: status.connected ? t("chat.bridge.ready") : t("chat.bridge.offline") }))
-                    .catch(() => setBridgeNotice({ tone: "error", text: t("chat.bridge.refreshFailed") }));
-                }}
-                onBrowserContinue={(prompt) => {
-                  setResumePromptForBrowser(prompt);
-                  continueBlockedBrowserTask(prompt);
-                }}
-              />
+              <div className="chat-content-column mx-auto w-full max-w-4xl">
+                <ChatMessageList
+                  messages={chat.messages}
+                  streaming={chat.streaming}
+                  chatMode={chatMode}
+                  currentModel={currentModel}
+                  copiedIdx={copiedIdx}
+                  ttsPlaying={ttsPlaying}
+                  bridgeState={bridgeState}
+                  resumePromptForBrowser={resumePromptForBrowser}
+                  onCopy={handleCopy}
+                  onPlayTTS={playTTS}
+                  onEdit={editMessage}
+                  onRollback={rollbackToMessage}
+                  onRetry={retryMessage}
+                  onAction={handleAction}
+                  onSlashSelect={handleSlashSelect}
+                  onSend={sendMessage}
+                  onShare={handleShare}
+                  onBrowserRefresh={() => {
+                    syncBridgeState();
+                    browserIntentClient.extensionStatus()
+                      .then((status) => setBridgeNotice({ tone: status.connected ? "success" : "info", text: status.connected ? t("chat.bridge.ready") : t("chat.bridge.offline") }))
+                      .catch(() => setBridgeNotice({ tone: "error", text: t("chat.bridge.refreshFailed") }));
+                  }}
+                  onBrowserContinue={(prompt) => {
+                    setResumePromptForBrowser(prompt);
+                    continueBlockedBrowserTask(prompt);
+                  }}
+                />
+              </div>
             </div>
             {composer}
           </>
         )}
-      </div>
+      </section>
 
-      {/* Computer Panel — Telegram-style side panel within the window */}
+      {/* Computer Panel — user-opened overlay, never steals chat width. */}
       {showComputer && (
-        <>
+        <div className="computer-panel-backdrop" onClick={() => setShowComputer(false)}>
           <div
-            className="w-[3px] shrink-0 cursor-col-resize hover:bg-blue-500/30 active:bg-blue-500/50 transition-colors"
-            style={{ background: "var(--yunque-border)" }}
-            onMouseDown={(e) => {
-              e.preventDefault();
-              resizingRef.current = true;
-              const startX = e.clientX;
-              const startW = computerWidth;
-              const onMove = (ev: MouseEvent) => {
-                if (!resizingRef.current) return;
-                const maxW = Math.min(600, Math.floor(window.innerWidth * 0.4));
-                setComputerWidth(Math.max(260, Math.min(maxW, startW + (startX - ev.clientX))));
-              };
-              const onUp = () => { resizingRef.current = false; document.removeEventListener("mousemove", onMove); document.removeEventListener("mouseup", onUp); };
-              document.addEventListener("mousemove", onMove);
-              document.addEventListener("mouseup", onUp);
-            }}
-          />
-          <div
-            className="flex flex-col h-full shrink-0 overflow-hidden animate-slide-in-right"
-            style={{
-              width: computerWidth,
-              background: "var(--yunque-sidebar)",
-              borderLeft: "1px solid var(--yunque-border)",
-            }}
+            ref={computerPanelRef}
+            role="dialog"
+            aria-label={t("chat.computer.show")}
+            tabIndex={-1}
+            className="computer-panel-overlay flex flex-col overflow-hidden animate-slide-in-right"
+            onClick={(event) => event.stopPropagation()}
           >
             <div className="shrink-0 p-3 space-y-2">
               <TaskResourceMeter snapshot={resourceSnapshot} prevSnapshot={prevResourceSnapshot} isLive={chat.streaming} />
@@ -1163,7 +1087,7 @@ export default function ChatPage() {
             </div>
             <ComputerPanel className="min-h-0 flex-1" traceEvents={chat.liveTraceEvents} isLive onClose={() => setShowComputer(false)} suggestedTab={suggestedTab} />
           </div>
-        </>
+        </div>
       )}
     </div>
   );

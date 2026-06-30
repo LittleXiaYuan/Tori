@@ -2,18 +2,19 @@
 
 import { Suspense, useEffect, useState, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Card, Button, Spinner, Chip, Tooltip, Tabs, ProgressBar, Table, Input } from "@heroui/react";
+import { Card, Button, Spinner, Chip, Tooltip, Tabs, ProgressBar, Table, Input, Link } from "@heroui/react";
 import EmptyState from "@/components/empty-state";
 import { api, type TaskInfo, type TaskWorkingMemory, type CostTaskSummary, type CostUsageEvent } from "@/lib/api";
 import {
   ArrowLeft, CheckCircle2, Clock, XCircle, RefreshCw, Play, Pause, PlayCircle,
   Lock, Send, MessageSquare, FileText, DollarSign, GitBranch, Info,
-  AlertTriangle, Trash2, Zap, Loader2,
+  AlertTriangle, Trash2, Zap, Loader2, ChevronRight,
 } from "lucide-react";
 import { showToast } from "@/components/toast-provider";
 import { STATUS_COLORS, fmtTime, dur } from "@/lib/constants";
 import { usePolling } from "@/lib/use-polling";
 import { formatErrorMessage } from "@/lib/error-utils";
+import { taskRecoveryTarget } from "@/lib/task-recovery-target";
 
 const stepStatusIcon: Record<string, React.ReactNode> = {
   pending: <Clock size={14} className="text-gray-400" />,
@@ -51,8 +52,69 @@ function clippedDisplayText(text?: string, limit = 800): string {
   return clean.length > limit ? `${clean.slice(0, limit)}…` : clean;
 }
 
+function normalizeTaskDetailTab(tab?: string | null): string {
+  switch (tab) {
+    case "execution":
+    case "thread":
+    case "artifacts":
+    case "cost":
+      return tab;
+    default:
+      return "overview";
+  }
+}
+
 /* ── Overview Panel ── */
-function OverviewPanel({ task, wm }: { task: TaskInfo; wm: TaskWorkingMemory | null }) {
+function TaskRecoveryHintCard({ task }: { task: TaskInfo }) {
+  const hint = task.recovery_hint;
+  if (!hint) return null;
+  const action = hint.primary_action;
+  const target = taskRecoveryTarget(task);
+  const toneColor = hint.severity === "danger" ? "#ef4444" : hint.severity === "success" ? "#22c55e" : "#f59e0b";
+  const summary = displayRecoveryText(hint.summary);
+  const detail = displayRecoveryText(hint.detail);
+
+  return (
+    <Card
+      aria-label="任务恢复入口"
+      className="section-card p-4"
+      style={{ borderColor: `${toneColor}55`, background: `${toneColor}12` }}
+    >
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
+            <AlertTriangle aria-hidden size={14} style={{ color: toneColor }} />
+            恢复入口
+          </div>
+          <div className="mt-1 text-sm leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
+            {summary}
+          </div>
+          {detail && (
+            <div className="mt-1 line-clamp-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+              {detail}
+            </div>
+          )}
+        </div>
+        {target ? (
+          <Link
+            className="inline-flex shrink-0 items-center gap-1 rounded-md border px-3 py-1.5 text-xs font-semibold no-underline"
+            href={target.href}
+            style={{ borderColor: `${toneColor}66`, color: toneColor }}
+          >
+            {target.label}
+            <ChevronRight aria-hidden size={13} />
+          </Link>
+        ) : action?.label ? (
+          <Chip size="sm" variant="soft" style={{ background: `${toneColor}18`, color: toneColor }}>
+            {action.label}
+          </Chip>
+        ) : null}
+      </div>
+    </Card>
+  );
+}
+
+export function OverviewPanel({ task, wm }: { task: TaskInfo; wm: TaskWorkingMemory | null }) {
   const steps = task.steps || [];
   const doneSteps = steps.filter((s) => s.status === "done").length;
 
@@ -105,6 +167,8 @@ function OverviewPanel({ task, wm }: { task: TaskInfo; wm: TaskWorkingMemory | n
         </Card>
       )}
 
+      <TaskRecoveryHintCard task={task} />
+
       {wm && wm.Goal && (
         <Card className="section-card p-4">
           <div className="flex items-center gap-2 mb-3">
@@ -153,7 +217,7 @@ export function ExecutionPanel({ task }: { task: TaskInfo }) {
             <div className="flex-shrink-0 w-10 flex items-start justify-center pt-4 z-10">
               <div className="w-6 h-6 rounded-full flex items-center justify-center"
                 style={{
-                  background: step.status === "done" ? "#22c55e20" : step.status === "failed" ? "#ef444420" : step.status === "running" ? "#3b82f620" : "var(--yunque-card)",
+                  background: step.status === "done" ? "#22c55e20" : step.status === "failed" ? "#ef444420" : step.status === "running" ? "var(--yunque-accent-muted)" : "var(--yunque-card)",
                   border: "2px solid var(--yunque-border)",
                 }}>
                 {stepStatusIcon[step.status] || stepStatusIcon.pending}
@@ -166,7 +230,7 @@ export function ExecutionPanel({ task }: { task: TaskInfo }) {
                   <Chip size="sm" style={{ background: `${STATUS_COLORS[step.status === "done" ? "completed" : step.status] || "#9ca3af"}20`, color: STATUS_COLORS[step.status === "done" ? "completed" : step.status] || "#9ca3af" }}>
                     {step.status}
                   </Chip>
-                  {step.skill_name && <Chip size="sm" variant="soft" style={{ background: "rgba(0,111,238,0.15)", color: "var(--yunque-accent)" }}>{step.skill_name}</Chip>}
+                  {step.skill_name && <Chip size="sm" variant="soft" style={{ background: "var(--yunque-accent-muted)", color: "var(--yunque-accent-strong)" }}>{step.skill_name}</Chip>}
                 </div>
                 <div className="flex items-center gap-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
                   {step.retry_count ? <span className="text-amber-400">retry ×{step.retry_count}</span> : null}
@@ -275,9 +339,9 @@ function ThreadTab({ taskId }: { taskId: string }) {
           </>
         )}
         <div className="flex gap-1">
-          {!isClosed && !isPaused && <Button size="sm" variant="ghost" isIconOnly aria-label="暂停" onPress={() => changeState("paused")}><Pause size={12} className="text-amber-400" /></Button>}
-          {isPaused && <Button size="sm" variant="ghost" isIconOnly aria-label="继续" onPress={() => changeState("open")}><PlayCircle size={12} className="text-green-400" /></Button>}
-          {!isClosed && <Button size="sm" variant="ghost" isIconOnly aria-label="关闭" onPress={() => changeState("closed")}><Lock size={12} /></Button>}
+          {!isClosed && !isPaused && <Tooltip delay={0}><Button size="sm" variant="ghost" isIconOnly aria-label="暂停" onPress={() => changeState("paused")}><Pause size={12} className="text-amber-400" /></Button><Tooltip.Content>暂停</Tooltip.Content></Tooltip>}
+          {isPaused && <Tooltip delay={0}><Button size="sm" variant="ghost" isIconOnly aria-label="继续" onPress={() => changeState("open")}><PlayCircle size={12} className="text-green-400" /></Button><Tooltip.Content>继续</Tooltip.Content></Tooltip>}
+          {!isClosed && <Tooltip delay={0}><Button size="sm" variant="ghost" isIconOnly aria-label="关闭" onPress={() => changeState("closed")}><Lock size={12} /></Button><Tooltip.Content>关闭</Tooltip.Content></Tooltip>}
         </div>
       </div>
 
@@ -303,10 +367,13 @@ function ThreadTab({ taskId }: { taskId: string }) {
               placeholder={isPaused ? "线程已暂停" : "输入消息…"} disabled={isPaused}
               value={input} onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && send()} />
-            <Button size="sm" isIconOnly aria-label="发送" isDisabled={!input.trim() || sending || isPaused} onPress={send}
-              className="btn-accent">
-              {sending ? <Spinner size="sm" /> : <Send size={14} />}
-            </Button>
+            <Tooltip delay={0}>
+              <Button size="sm" isIconOnly aria-label="发送" isDisabled={!input.trim() || sending || isPaused} onPress={send}
+                className="btn-accent">
+                {sending ? <Spinner size="sm" /> : <Send size={14} />}
+              </Button>
+              <Tooltip.Content>发送</Tooltip.Content>
+            </Tooltip>
           </div>
         )}
       </div>
@@ -454,12 +521,13 @@ function TaskDetailContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const taskId = searchParams.get("id") || "";
+  const tabParam = searchParams.get("tab") || "";
 
   const [task, setTask] = useState<TaskInfo | null>(null);
   const [wm, setWm] = useState<TaskWorkingMemory | null>(null);
   const [cost, setCost] = useState<CostTaskSummary | null>(null);
   const [costTimeline, setCostTimeline] = useState<CostUsageEvent[]>([]);
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState(() => normalizeTaskDetailTab(tabParam));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -481,6 +549,9 @@ function TaskDetailContent() {
   }, [taskId]);
 
   useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => {
+    if (tabParam) setActiveTab(normalizeTaskDetailTab(tabParam));
+  }, [tabParam]);
   usePolling(refresh, 5000);
 
   const handleRun = async () => { if (!task) return; try { await api.taskRun(task.id); setTimeout(refresh, 500); } catch (e) { showToast(e instanceof Error ? e.message : "运行失败", "error"); } };
@@ -488,7 +559,7 @@ function TaskDetailContent() {
   const handlePause = async () => { if (!task) return; try { await api.taskPause(task.id); setTimeout(refresh, 500); } catch (e) { showToast(e instanceof Error ? e.message : "暂停失败", "error"); } };
   const handleResume = async () => { if (!task) return; try { await api.taskResume(task.id); setTimeout(refresh, 500); } catch (e) { showToast(e instanceof Error ? e.message : "恢复失败", "error"); } };
   const handleRestart = async () => { if (!task) return; try { await api.taskRestart(task.id); setTimeout(refresh, 500); } catch (e) { showToast(e instanceof Error ? e.message : "重启失败", "error"); } };
-  const handleDelete = async () => { if (!task) return; try { await api.taskDelete(task.id); router.push("/task-run"); } catch (e) { showToast(e instanceof Error ? e.message : "删除失败", "error"); } };
+  const handleDelete = async () => { if (!task) return; try { await api.taskDelete(task.id); router.push("/missions"); } catch (e) { showToast(e instanceof Error ? e.message : "删除失败", "error"); } };
 
   if (loading) return <div className="flex items-center justify-center h-[60vh]"><Spinner size="lg" /></div>;
 
@@ -497,7 +568,7 @@ function TaskDetailContent() {
       <div className="text-center py-16" style={{ color: "var(--yunque-text-muted)" }}>
         <AlertTriangle size={48} className="mx-auto mb-3 opacity-30" />
         <p>{error || "任务未找到"}</p>
-        <Button className="mt-4" onPress={() => router.push("/task-run")}>返回任务列表</Button>
+        <Button className="mt-4" onPress={() => router.push("/missions")}>返回任务列表</Button>
       </div>
     );
   }
@@ -506,7 +577,7 @@ function TaskDetailContent() {
     <div className="page-root space-y-6 animate-fade-in-up">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Button isIconOnly aria-label="返回" variant="ghost" size="sm" onPress={() => router.push("/task-run")}><ArrowLeft size={18} /></Button>
+        <Tooltip delay={0}><Button isIconOnly aria-label="返回任务中心" variant="ghost" size="sm" onPress={() => router.push("/missions")}><ArrowLeft size={18} /></Button><Tooltip.Content>返回</Tooltip.Content></Tooltip>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3">
             <h1 className="text-xl font-bold truncate" style={{ color: "var(--yunque-text)" }}>{task.title}</h1>
@@ -517,7 +588,7 @@ function TaskDetailContent() {
           <div className="text-xs mt-0.5" style={{ color: "var(--yunque-text-muted)" }}>ID: {task.id} · {fmtTime(task.created_at)}</div>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
-          <Tooltip delay={0}><Button isIconOnly variant="ghost" size="sm" onPress={refresh}><RefreshCw size={16} /></Button><Tooltip.Content>刷新</Tooltip.Content></Tooltip>
+          <Tooltip delay={0}><Button isIconOnly aria-label="刷新任务详情" variant="ghost" size="sm" onPress={refresh}><RefreshCw size={16} /></Button><Tooltip.Content>刷新</Tooltip.Content></Tooltip>
           {task.status === "pending" && <Button size="sm" onPress={handleRun} style={{ background: "#22c55e", color: "#fff" }}><Play size={14} /> 运行</Button>}
           {(task.status === "running" || task.status === "planning") && (
             <>
@@ -526,7 +597,7 @@ function TaskDetailContent() {
             </>
           )}
           {(task.status === "paused" || task.status === "interrupted" || task.status === "failed") && (
-            <Button size="sm" onPress={handleResume} style={{ background: "#3b82f6", color: "#fff" }}><PlayCircle size={14} /> 恢复</Button>
+            <Button size="sm" onPress={handleResume} style={{ background: "var(--yunque-accent)", color: "#fff" }}><PlayCircle size={14} /> 恢复</Button>
           )}
           {["completed", "failed", "cancelled", "paused", "interrupted"].includes(task.status) && (
             <Button size="sm" onPress={handleRestart} style={{ background: "#6366f1", color: "#fff" }}><RefreshCw size={14} /> 重启</Button>

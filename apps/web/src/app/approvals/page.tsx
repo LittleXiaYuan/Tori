@@ -99,7 +99,7 @@ export default function ApprovalsPage() {
             <Shield size={14} /> {showRules ? "审批列表" : "自动规则"}
           </Button>
           <Tooltip delay={0}>
-            <Button isIconOnly variant="ghost" size="sm" onPress={() => { refresh(); refreshRules(); }}>
+            <Button isIconOnly aria-label="刷新审批与规则" variant="ghost" size="sm" onPress={() => { refresh(); refreshRules(); }}>
               <RefreshCw size={16} />
             </Button>
             <Tooltip.Content>刷新</Tooltip.Content>
@@ -112,7 +112,8 @@ export default function ApprovalsPage() {
           {/* Filter pills */}
           <div className="flex items-center gap-2">
             {["pending", "approved", "denied", ""].map(f => (
-              <button key={f || "all"} onClick={() => setFilter(f)}
+              <button key={f || "all"} type="button" onClick={() => setFilter(f)}
+                aria-current={filter === f ? "true" : undefined}
                 className="filter-pill filter-pill-subtle" data-active={filter === f}>
                 {f ? STATUS_LABELS[f] || f : "全部"}
               </button>
@@ -169,7 +170,7 @@ export default function ApprovalsPage() {
                           </Button>
                           <Button size="sm" isPending={deciding === item.id}
                             onPress={() => handleDecide(item.id, "allow_always")}
-                            style={{ background: "rgba(59,130,246,0.12)", color: "#3b82f6" }}>
+                            style={{ background: "var(--yunque-accent-muted)", color: "var(--yunque-accent-strong)" }}>
                             <Check size={14} /> 始终允许
                           </Button>
                           <Button size="sm" isPending={deciding === item.id}
@@ -196,13 +197,15 @@ export default function ApprovalsPage() {
                 className="flex-1 text-sm px-3 py-1.5 rounded-lg border"
                 style={{ background: "var(--yunque-bg-hover)", borderColor: "var(--yunque-border)", color: "var(--yunque-text)" }}
                 placeholder="工具模式 (如: fs.read, process.*, *)"
+                aria-label="自动规则工具模式"
                 value={rulePattern}
                 onChange={e => setRulePattern(e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter") handleCreateRule(); }}
               />
               <div className="flex gap-1">
                 {(["allow", "deny"] as const).map(a => (
-                  <button key={a} onClick={() => setRuleAction(a)}
+                  <button key={a} type="button" onClick={() => setRuleAction(a)}
+                    aria-current={ruleAction === a ? "true" : undefined}
                     className="filter-pill filter-pill-subtle" data-active={ruleAction === a}>
                     {a === "allow" ? "允许" : "拒绝"}
                   </button>
@@ -238,9 +241,12 @@ export default function ApprovalsPage() {
                       <span className="text-[10px]" style={{ color: "var(--yunque-text-muted)" }}>
                         {new Date(rule.created_at).toLocaleDateString()}
                       </span>
-                      <Button isIconOnly size="sm" variant="ghost" onPress={() => handleDeleteRule(rule.id)}>
-                        <Trash2 size={14} style={{ color: "#ef4444" }} />
-                      </Button>
+                      <Tooltip delay={0}>
+                        <Button isIconOnly aria-label={`删除自动规则 ${rule.pattern}`} size="sm" variant="ghost" onPress={() => handleDeleteRule(rule.id)}>
+                          <Trash2 size={14} style={{ color: "#ef4444" }} />
+                        </Button>
+                        <Tooltip.Content>删除</Tooltip.Content>
+                      </Tooltip>
                     </div>
                   </div>
                 </Card>

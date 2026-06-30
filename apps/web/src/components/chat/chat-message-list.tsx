@@ -731,9 +731,12 @@ export function ChatMessageList({
         }}
       >
         <Popover.Trigger>
-          <Button isIconOnly aria-label={`预览 ${file.name || file.path}`} variant="ghost" size="sm">
-            <Eye size={11} />
-          </Button>
+          <Tooltip delay={0}>
+            <Button isIconOnly aria-label={`预览 ${file.name || file.path}`} variant="ghost" size="sm">
+              <Eye size={11} />
+            </Button>
+            <Tooltip.Content>预览</Tooltip.Content>
+          </Tooltip>
         </Popover.Trigger>
         <Popover.Content placement="bottom end" offset={6}>
           <Popover.Dialog className="w-[420px] max-w-[calc(100vw-32px)] p-3" style={{ background: "var(--yunque-card)", border: "1px solid var(--yunque-border)", borderRadius: 16 }}>
@@ -802,9 +805,12 @@ export function ChatMessageList({
       >
         <Popover.Trigger>
           {compact ? (
-            <Button isIconOnly aria-label="同步到协作应用" variant="ghost" size="sm">
-              <Share2 size={11} />
-            </Button>
+            <Tooltip delay={0}>
+              <Button isIconOnly aria-label="同步到协作应用" variant="ghost" size="sm">
+                <Share2 size={11} />
+              </Button>
+              <Tooltip.Content>同步到协作应用</Tooltip.Content>
+            </Tooltip>
           ) : (
             <button
               type="button"
@@ -879,9 +885,12 @@ export function ChatMessageList({
     return (
       <Popover>
         <Popover.Trigger>
-          <Button isIconOnly aria-label="更多消息操作" variant="ghost" size="sm">
-            <MoreHorizontal size={11} />
-          </Button>
+          <Tooltip delay={0}>
+            <Button isIconOnly aria-label="更多消息操作" variant="ghost" size="sm">
+              <MoreHorizontal size={11} />
+            </Button>
+            <Tooltip.Content>更多</Tooltip.Content>
+          </Tooltip>
         </Popover.Trigger>
         <Popover.Content placement="bottom end" offset={6}>
           <Popover.Dialog className="w-[220px] p-2" style={{ background: "var(--yunque-card)", border: "1px solid var(--yunque-border)", borderRadius: 14 }}>
@@ -1157,12 +1166,18 @@ export function ChatMessageList({
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
                             {renderFilePreview(`preview:${msg.id}:${i}`, f)}
-                            <Button isIconOnly aria-label={`继续处理 ${f.name || f.path}`} variant="ghost" size="sm" onPress={() => onSend(continueFilePrompt(f))}>
-                              <Wand2 size={11} />
-                            </Button>
-                            <Button isIconOnly aria-label={`派给 AI IDE ${f.name || f.path}`} variant="ghost" size="sm" onPress={() => onSend(dispatchToAIIDEPrompt(msg, f))}>
-                              <Cpu size={11} />
-                            </Button>
+                            <Tooltip delay={0}>
+                              <Button isIconOnly aria-label={`继续处理 ${f.name || f.path}`} variant="ghost" size="sm" onPress={() => onSend(continueFilePrompt(f))}>
+                                <Wand2 size={11} />
+                              </Button>
+                              <Tooltip.Content>继续处理</Tooltip.Content>
+                            </Tooltip>
+                            <Tooltip delay={0}>
+                              <Button isIconOnly aria-label={`派给 AI IDE ${f.name || f.path}`} variant="ghost" size="sm" onPress={() => onSend(dispatchToAIIDEPrompt(msg, f))}>
+                                <Cpu size={11} />
+                              </Button>
+                              <Tooltip.Content>派给 AI IDE</Tooltip.Content>
+                            </Tooltip>
                             {renderShareMenu(`file:${msg.id}:${i}`, msg, shareFilePayload(msg, f), true)}
                             <a
                               href={`/api/files/download?path=${encodeURIComponent(f.path)}`}

@@ -31,6 +31,7 @@ function ScenarioIcon({ icon }: { icon: string }) {
   return <>{fallback[icon] || <Search size={18} />}</>;
 }
 import { showToast } from "@/components/toast-provider";
+import { confirmAction } from "@/components/confirm-dialog";
 import { BrowserSessionCard } from "@/components/browser-session-card";
 import { useBrowserBridge } from "@/lib/use-browser-bridge";
 import { openExternal } from "@/lib/safe-url";
@@ -198,13 +199,23 @@ export default function BrowserIntentPackPage() {
   };
 
   const runScenario = async (scenarioId: string) => {
+    const scenario = scenarios.find((item) => item.id === scenarioId);
     if (publishMode === "review" && directPublishScenarioIds.has(scenarioId)) {
       showToast("已切换为审核模式：请在工作流页生成可编辑流程，删除/禁用发布节点后再运行。", "warning");
       return;
     }
+    if (publishMode === "direct" && directPublishScenarioIds.has(scenarioId)) {
+      const confirmed = await confirmAction({
+        title: "确认直发内容？",
+        body: `将运行「${scenario?.name || scenarioId}」，可能在已登录的平台账号中填写并发布内容。请确认素材、账号和平台合规提示都已检查。`,
+        confirmLabel: "确认直发",
+        cancelLabel: "取消",
+        tone: "danger",
+      });
+      if (!confirmed) return;
+    }
     setRunningScenario(scenarioId);
     const ts = new Date().toLocaleTimeString();
-    const scenario = scenarios.find((item) => item.id === scenarioId);
     setActionLog((prev) => [`[${ts}] Run scenario: ${scenario?.name || scenarioId}`, ...prev].slice(0, 50));
     try {
       const res = await browserIntentClient.runScenario(scenarioId);
@@ -254,8 +265,8 @@ export default function BrowserIntentPackPage() {
           <Chip
             size="sm"
             style={{
-              background: extConnected ? "rgba(59,130,246,0.1)" : "rgba(156,163,175,0.1)",
-              color: extConnected ? "#3b82f6" : "#9ca3af",
+              background: extConnected ? "var(--yunque-accent-muted)" : "rgba(156,163,175,0.1)",
+              color: extConnected ? "var(--yunque-accent-strong)" : "#9ca3af",
               fontSize: "var(--text-2xs)",
             }}
           >
@@ -269,7 +280,7 @@ export default function BrowserIntentPackPage() {
             </Switch>
             <span className="text-[10px]" style={{ color: "var(--yunque-text-muted)" }}>{t("browserPage.autoRefresh")}</span>
             {autoRefresh && (
-              <Select selectedKey={String(refreshInterval)} onSelectionChange={(k) => setRefreshInterval(Number(k))} className="w-[56px]" aria-label="Auto refresh">
+              <Select selectedKey={String(refreshInterval)} onSelectionChange={(k) => setRefreshInterval(Number(k))} className="w-[56px]" aria-label="自动刷新间隔">
                 <Select.Trigger className="h-5 min-h-0 px-1 text-[10px]"><Select.Value /><Select.Indicator /></Select.Trigger>
                 <Select.Popover>
                   <ListBox>
@@ -280,13 +291,13 @@ export default function BrowserIntentPackPage() {
             )}
           </div>
           <Tooltip delay={0}>
-            <Button isIconOnly variant="ghost" size="sm" onPress={takeScreenshot} isPending={screenshotLoading}>
+            <Button isIconOnly aria-label={t("browserPage.captureScreenshot")} variant="ghost" size="sm" onPress={takeScreenshot} isPending={screenshotLoading}>
               <Camera size={16} />
             </Button>
             <Tooltip.Content>{t("browserPage.captureScreenshot")}</Tooltip.Content>
           </Tooltip>
           <Tooltip delay={0}>
-            <Button isIconOnly variant="ghost" size="sm" onPress={() => {
+            <Button isIconOnly aria-label={t("browserPage.refreshStatus")} variant="ghost" size="sm" onPress={() => {
               browserIntentClient.status().then(setBrowserStatus).catch(() => {});
               takeScreenshot();
             }}>
@@ -299,10 +310,10 @@ export default function BrowserIntentPackPage() {
 
       {!extConnected && (
         <Card className="overflow-hidden p-0">
-          <div className="p-4" style={{ background: "linear-gradient(135deg, rgba(59,130,246,0.08), rgba(139,92,246,0.08))" }}>
+          <div className="p-4" style={{ background: "linear-gradient(135deg, var(--yunque-accent-soft), rgba(139,92,246,0.08))" }}>
             <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: "rgba(59,130,246,0.15)" }}>
-                <Download size={20} style={{ color: "#3b82f6" }} />
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: "var(--yunque-accent-muted)" }}>
+                <Download size={20} style={{ color: "var(--yunque-accent-strong)" }} />
               </div>
               <div className="flex-1">
                 <h3 className="mb-1 text-sm font-semibold">{t("browserPage.install.title")}</h3>
@@ -311,19 +322,19 @@ export default function BrowserIntentPackPage() {
                 </p>
                 <div className="space-y-2 text-xs" style={{ color: "var(--yunque-text-secondary)" }}>
                   <div className="flex items-start gap-2">
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold" style={{ background: "rgba(59,130,246,0.15)", color: "#3b82f6" }}>1</span>
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold" style={{ background: "var(--yunque-accent-muted)", color: "var(--yunque-accent-strong)" }}>1</span>
                     <span>{t("browserPage.install.step1")} <code className="rounded px-1 py-0.5 text-[11px]" style={{ background: "var(--yunque-bg-muted)" }}>chrome://extensions</code></span>
                   </div>
                   <div className="flex items-start gap-2">
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold" style={{ background: "rgba(59,130,246,0.15)", color: "#3b82f6" }}>2</span>
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold" style={{ background: "var(--yunque-accent-muted)", color: "var(--yunque-accent-strong)" }}>2</span>
                     <span>{t("browserPage.install.step2a")} <strong>{t("browserPage.install.step2b")}</strong>{t("browserPage.install.step2c")} <strong>{t("browserPage.install.step2d")}</strong>{t("browserPage.install.step2e")} <code className="rounded px-1 py-0.5 text-[11px]" style={{ background: "var(--yunque-bg-muted)" }}>yunque-agent/apps/browser-extension</code></span>
                   </div>
                   <div className="flex items-start gap-2">
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold" style={{ background: "rgba(59,130,246,0.15)", color: "#3b82f6" }}>3</span>
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold" style={{ background: "var(--yunque-accent-muted)", color: "var(--yunque-accent-strong)" }}>3</span>
                     <span>{t("browserPage.install.step3a")} <strong>{t("browserPage.install.step3b")}</strong></span>
                   </div>
                   <div className="flex items-start gap-2">
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold" style={{ background: "rgba(59,130,246,0.15)", color: "#3b82f6" }}>4</span>
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold" style={{ background: "var(--yunque-accent-muted)", color: "var(--yunque-accent-strong)" }}>4</span>
                     <span>{t("browserPage.install.step4a")} <strong>{t("browserPage.install.step4b")}</strong> <code className="rounded px-1 py-0.5 text-[11px]" style={{ background: "var(--yunque-bg-muted)" }}>ws://localhost:9090/ws/browser</code>{t("browserPage.install.step4c")}</span>
                   </div>
                   <div className="flex items-start gap-2">
@@ -369,7 +380,7 @@ export default function BrowserIntentPackPage() {
               {capabilityCards.map((item) => (
                 <div key={item.title} className="rounded-lg p-3" style={{ background: "var(--yunque-bg-hover)", border: "1px solid var(--yunque-border)" }}>
                   <div className="mb-2 flex items-center gap-2 text-sm font-medium" style={{ color: "var(--yunque-text)" }}>
-                    <span className="flex h-7 w-7 items-center justify-center rounded-md" style={{ background: "rgba(59,130,246,0.10)", color: "#60a5fa" }}>{item.icon}</span>
+                    <span className="flex h-7 w-7 items-center justify-center rounded-md" style={{ background: "var(--yunque-accent-soft)", color: "var(--yunque-accent-strong)" }}>{item.icon}</span>
                     {item.title}
                   </div>
                   <div className="text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>{item.desc}</div>
@@ -405,7 +416,7 @@ export default function BrowserIntentPackPage() {
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {["打开创作页", "填写标题/正文", "发布前截图", "点击发布", "发布后留痕"].map((item, idx) => (
-                    <Chip key={item} size="sm" style={{ background: idx === 3 ? "rgba(239,68,68,0.10)" : "rgba(59,130,246,0.09)", color: idx === 3 ? "#ef4444" : "#60a5fa", fontSize: "var(--text-2xs)" }}>
+                    <Chip key={item} size="sm" style={{ background: idx === 3 ? "rgba(239,68,68,0.10)" : "var(--yunque-accent-soft)", color: idx === 3 ? "#ef4444" : "var(--yunque-accent-strong)", fontSize: "var(--text-2xs)" }}>
                       {idx + 1}. {item}
                     </Chip>
                   ))}
@@ -446,7 +457,7 @@ export default function BrowserIntentPackPage() {
             <Tabs.Tab id="ocr"><Tabs.Separator />{t("browserPage.tab.ocr")}<Tabs.Indicator /></Tabs.Tab>
             <Tabs.Tab id="opp"><Tabs.Separator />{t("browserPage.tab.opp")}{oppItems.length > 0 && <Chip size="sm" style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444", fontSize: "var(--text-2xs)" }}>{oppItems.length}</Chip>}<Tabs.Indicator /></Tabs.Tab>
             <Tabs.Tab id="intent"><Tabs.Separator /><FileText size={12} className="mr-1 inline" />动作计划<Chip size="sm" style={{ background: "rgba(245,158,11,0.1)", color: "#f59e0b", fontSize: "var(--text-2xs)" }}>PLAN</Chip><Tabs.Indicator /></Tabs.Tab>
-            <Tabs.Tab id="log"><Tabs.Separator />{t("browserPage.tab.actionLog")}{actionLog.length > 0 && <Chip size="sm" style={{ background: "rgba(59,130,246,0.1)", color: "#3b82f6", fontSize: "var(--text-2xs)" }}>{actionLog.length}</Chip>}<Tabs.Indicator /></Tabs.Tab>
+            <Tabs.Tab id="log"><Tabs.Separator />{t("browserPage.tab.actionLog")}{actionLog.length > 0 && <Chip size="sm" style={{ background: "var(--yunque-accent-muted)", color: "var(--yunque-accent-strong)", fontSize: "var(--text-2xs)" }}>{actionLog.length}</Chip>}<Tabs.Indicator /></Tabs.Tab>
             <Tabs.Tab id="scenarios"><Tabs.Separator /><Zap size={12} className="mr-1 inline" />{t("browserPage.tab.scenarios")}{scenarios.length > 0 && <Chip size="sm" style={{ background: "rgba(139,92,246,0.1)", color: "#8b5cf6", fontSize: "var(--text-2xs)" }}>{scenarios.length}</Chip>}<Tabs.Indicator /></Tabs.Tab>
             <Tabs.Tab id="desktop"><Tabs.Separator /><Cloud size={12} className="mr-1 inline" />云电脑{desktopSandbox && <Chip size="sm" style={{ background: "rgba(34,197,94,0.1)", color: "#22c55e", fontSize: "var(--text-2xs)" }}>LIVE</Chip>}<Tabs.Indicator /></Tabs.Tab>
             <Tabs.Tab id="config"><Tabs.Separator />{t("browserPage.tab.config")}<Tabs.Indicator /></Tabs.Tab>
@@ -572,7 +583,7 @@ export default function BrowserIntentPackPage() {
                       <div key={action.index} className="rounded-lg p-3" style={{ background: "var(--yunque-bg-hover)" }}>
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-xs font-semibold">{action.index + 1}. {action.intent}</span>
-                          <Chip size="sm" style={{ background: "rgba(59,130,246,0.1)", color: "#3b82f6", fontSize: "var(--text-2xs)" }}>{action.executor_action}</Chip>
+                          <Chip size="sm" style={{ background: "var(--yunque-accent-muted)", color: "var(--yunque-accent-strong)", fontSize: "var(--text-2xs)" }}>{action.executor_action}</Chip>
                         </div>
                         {action.target_url && <div className="mt-2 truncate text-[11px] font-mono" style={{ color: "var(--yunque-text-muted)" }}>{action.target_url}</div>}
                         {action.selector && <div className="mt-1 truncate text-[11px] font-mono" style={{ color: "var(--yunque-text-muted)" }}>{action.selector}</div>}
@@ -611,7 +622,7 @@ export default function BrowserIntentPackPage() {
                   <div className="mb-2 text-sm font-medium" style={{ color: "var(--yunque-text)" }}>产物与阻塞原因</div>
                   <div className="flex flex-wrap gap-2">
                     {browserActPlan.artifacts.map((artifact) => (
-                      <Chip key={artifact} size="sm" style={{ background: "rgba(59,130,246,0.1)", color: "#3b82f6", fontSize: "var(--text-2xs)" }}>{artifact}</Chip>
+                      <Chip key={artifact} size="sm" style={{ background: "var(--yunque-accent-muted)", color: "var(--yunque-accent-strong)", fontSize: "var(--text-2xs)" }}>{artifact}</Chip>
                     ))}
                     {browserActPlan.blocked_by.map((blocker) => (
                       <Chip key={blocker} size="sm" style={{ background: "rgba(245,158,11,0.1)", color: "#f59e0b", fontSize: "var(--text-2xs)" }}>{blocker}</Chip>
@@ -678,9 +689,12 @@ export default function BrowserIntentPackPage() {
                         <div className="mt-0.5 text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>{scenario.steps.length} {t("browserPage.steps")}</div>
                       </div>
                     </div>
-                    <Button size="sm" isIconOnly isPending={runningScenario === scenario.id} isDisabled={!extConnected || !!runningScenario || (publishMode === "review" && directPublishScenarioIds.has(scenario.id))} onPress={() => runScenario(scenario.id)} className="btn-accent">
-                      <Play size={14} />
-                    </Button>
+                    <Tooltip delay={0}>
+                      <Button size="sm" isIconOnly aria-label={`运行场景 ${scenario.name}`} isPending={runningScenario === scenario.id} isDisabled={!extConnected || !!runningScenario || (publishMode === "review" && directPublishScenarioIds.has(scenario.id))} onPress={() => runScenario(scenario.id)} className="btn-accent">
+                        <Play size={14} />
+                      </Button>
+                      <Tooltip.Content>运行</Tooltip.Content>
+                    </Tooltip>
                   </div>
                   <div className="text-xs" style={{ color: "var(--yunque-text-secondary)" }}>{scenario.description}</div>
                 </Card>
@@ -704,6 +718,14 @@ export default function BrowserIntentPackPage() {
                     <Cloud size={12} className="mr-1 inline" /> {desktopSandbox.id}
                   </Chip>
                   <Button size="sm" variant="outline" onPress={async () => {
+                    const confirmed = await confirmAction({
+                      title: "停止云电脑？",
+                      body: `将销毁当前云电脑 ${desktopSandbox.id}，未保存的浏览器现场和临时状态可能丢失。`,
+                      confirmLabel: "停止云电脑",
+                      cancelLabel: "取消",
+                      tone: "danger",
+                    });
+                    if (!confirmed) return;
                     setDesktopLoading(true);
                     try {
                       await browserIntentClient.desktopDestroy();
@@ -714,7 +736,7 @@ export default function BrowserIntentPackPage() {
                   }} isPending={desktopLoading} style={{ color: "#ef4444", borderColor: "rgba(239,68,68,0.3)" }}>
                     <CloudOff size={14} className="mr-1" /> 停止
                   </Button>
-                  <Button size="sm" variant="ghost" onPress={async () => {
+                  <Button size="sm" variant="ghost" aria-label="刷新云电脑状态" onPress={async () => {
                     try {
                       const r = await browserIntentClient.desktopStatus();
                       if (r.running && r.sandbox) setDesktopSandbox(r.sandbox);
@@ -753,7 +775,7 @@ export default function BrowserIntentPackPage() {
                 </div>
                 <div
                   className="flex flex-col items-center justify-center rounded-lg py-16"
-                  style={{ background: "linear-gradient(135deg, rgba(59,130,246,0.06), rgba(139,92,246,0.06))", border: "1px dashed var(--yunque-border)" }}
+                  style={{ background: "linear-gradient(135deg, var(--yunque-accent-soft), rgba(139,92,246,0.06))", border: "1px dashed var(--yunque-border)" }}
                 >
                   <Monitor size={48} className="mb-4" style={{ color: "var(--yunque-accent)" }} />
                   <div className="mb-2 text-sm font-medium" style={{ color: "var(--yunque-text)" }}>XFCE 桌面已就绪</div>

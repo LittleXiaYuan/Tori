@@ -358,6 +358,7 @@ export function ChatInputArea(props: ChatInputAreaProps) {
                 onSelect={onModelSelect}
               />
               <Dropdown>
+                <Tooltip delay={0}>
                 <Button
                   isIconOnly
                   variant="ghost"
@@ -368,6 +369,8 @@ export function ChatInputArea(props: ChatInputAreaProps) {
                 >
                   <Plus size={16} />
                 </Button>
+                <Tooltip.Content>{t("composer.add")}</Tooltip.Content>
+                </Tooltip>
                 <Dropdown.Popover className="min-w-[220px]">
                   <Dropdown.Menu
                     onAction={(key) => {
@@ -393,6 +396,7 @@ export function ChatInputArea(props: ChatInputAreaProps) {
                 </Dropdown.Popover>
               </Dropdown>
 
+              <Tooltip delay={0}>
               <Button
                 isIconOnly
                 variant="ghost"
@@ -404,8 +408,11 @@ export function ChatInputArea(props: ChatInputAreaProps) {
               >
                 {isRecording ? <StopCircle size={16} /> : <Mic size={16} />}
               </Button>
+              <Tooltip.Content>{isRecording ? t("composer.stopRec") : t("composer.voice")}</Tooltip.Content>
+              </Tooltip>
 
               {loading ? (
+                <Tooltip delay={0}>
                 <Button
                   isIconOnly
                   aria-label={t("composer.stop")}
@@ -416,7 +423,10 @@ export function ChatInputArea(props: ChatInputAreaProps) {
                 >
                   <StopCircle size={14} />
                 </Button>
+                <Tooltip.Content>{t("composer.stop")}</Tooltip.Content>
+                </Tooltip>
               ) : (
+                <Tooltip delay={0}>
                 <Button
                   isIconOnly
                   aria-label={t("composer.send")}
@@ -431,6 +441,8 @@ export function ChatInputArea(props: ChatInputAreaProps) {
                 >
                   <Send size={14} />
                 </Button>
+                <Tooltip.Content>{t("composer.send")}</Tooltip.Content>
+                </Tooltip>
               )}
             </div>
           </div>
