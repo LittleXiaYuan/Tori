@@ -29,7 +29,16 @@ func NewIntentCogni() *IntentCogni {
 // Analyze implements HookV2 by detecting the task intent and returning
 // the matching tools, skills, and memory scope.
 func (c *IntentCogni) Analyze(ctx context.Context, req CogniRequest) CogniDecision {
-	intent := detectIntent(req.Message)
+	// Use LocalBrain's pre-computed IntentHint when available — it has access to
+	// ScorerWithRecent (recent-usage bias) and multi-turn context, making it more
+	// accurate than keyword-only detectIntent. Fall back to keyword detection when
+	// no hint is provided (e.g. ReAct path without LocalBrain, or tests).
+	intent := ""
+	if hint, ok := req.Metadata["intent_hint"].(string); ok && hint != "" {
+		intent = hint
+	} else {
+		intent = detectIntent(req.Message)
+	}
 
 	switch intent {
 	case "search":
@@ -107,7 +116,7 @@ func (c *IntentCogni) Analyze(ctx context.Context, req CogniRequest) CogniDecisi
 			ToolsNeeded:  nil, // nil means no restriction (all tools available)
 			SkillsNeeded: nil,
 			MemoryScope: MemoryScope{
-				Limit:      20, // Default limit
+				Limit:      20,         // Default limit
 				Categories: []string{}, // No category filter
 			},
 			BehaviorText: "",
@@ -129,8 +138,11 @@ func (c *IntentCogni) Priority() int {
 func detectIntent(message string) string {
 	lower := strings.ToLower(message)
 
-	// Code intent (check before search to avoid "审查" being caught by "查")
-	if containsAny(lower, []string{"代码", "code", "pr", "pull request", "commit", "git", "github", "gitlab", "仓库", "repository", "repo", "审查", "review"}) {
+	// Code intent (check before search to avoid "审查" being caught by "查").
+	// Source-file extensions (".go", ".py", ...) are code signals too, so a
+	// message like "读取 main.go 文件" is classified as code, not a generic file op.
+	if containsAny(lower, []string{"代码", "code", "pr", "pull request", "commit", "git", "github", "gitlab", "仓库", "repository", "repo", "审查", "review",
+		".go", ".py", ".js", ".ts", ".java", ".rs", ".cpp", ".rb"}) {
 		return "code"
 	}
 

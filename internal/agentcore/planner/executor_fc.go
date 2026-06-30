@@ -33,7 +33,7 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 
 	messages, ctxLayers := p.BuildMessages(ctx, req)
 	userMsg := extractUserMessage(req)
-	tools := p.buildFunctionDefs(ctx, userMsg, req.TenantID, req.ChannelType, req.DisableDelegation, req.AllowedSkills, contextAssembly, delegationRuntime, skillRuntime)
+	tools := p.buildFunctionDefs(ctx, userMsg, req.TenantID, req.ChannelType, req.IntentHint, req.DisableDelegation, req.AllowedSkills, contextAssembly, delegationRuntime, skillRuntime)
 
 	// Cogni MCP tool injection — additive tools contributed by the cognis that
 	// activate this turn (their connected MCP servers). Gated the same way as the
@@ -315,7 +315,7 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 // those names before any further filtering. This is driven by the Cherry
 // "tools" drawer: when a user explicitly checks a subset of skills, the
 // planner is expected to stay inside that subset.
-func (p *Planner) buildFunctionDefs(ctx context.Context, userMessage, tenantID, channelType string, disableDelegation bool, allowedSkills []string, contextAssembly *ContextAssemblyService, delegationRuntime *DelegationRuntimeService, skillRuntime *SkillRuntimeService) []llm.FunctionDef {
+func (p *Planner) buildFunctionDefs(ctx context.Context, userMessage, tenantID, channelType, intentHint string, disableDelegation bool, allowedSkills []string, contextAssembly *ContextAssemblyService, delegationRuntime *DelegationRuntimeService, skillRuntime *SkillRuntimeService) []llm.FunctionDef {
 	allSkills := p.registry.All()
 	if len(allowedSkills) > 0 {
 		allow := allowedSkillSet(allowedSkills)
@@ -346,7 +346,7 @@ func (p *Planner) buildFunctionDefs(ctx context.Context, userMessage, tenantID, 
 	var cogniDenied []string
 	var cogniNarrowed []string // non-nil ⇒ v2 intent defines the surface this turn
 	if contextAssembly != nil {
-		decision := contextAssembly.CogniDecide(ctx, userMessage, tenantID, channelType)
+		decision := contextAssembly.CogniDecide(ctx, userMessage, tenantID, channelType, intentHint)
 		cogniDenied = decision.DeniedTools
 		// Only let v2 drive narrowing on the ambient path: an explicit user
 		// allow-list or an authoritative cogni surface already own the set, and

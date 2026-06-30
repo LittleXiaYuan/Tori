@@ -6,6 +6,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	agentcogni "yunque-agent/internal/agentcore/cogni"
 	"yunque-agent/internal/agentcore/llm"
 	"yunque-agent/internal/observe"
 	"yunque-agent/pkg/skills"
@@ -14,6 +15,12 @@ import (
 type stubCogniRuntime struct {
 	context string
 	trace   CogniTraceDetail
+}
+
+// Decide satisfies the v2 CogniRuntime entry point. The stub returns an empty
+// decision; tests exercise the legacy BuildContext/FilterSkills/Trace path.
+func (s stubCogniRuntime) Decide(_ context.Context, _, _, _, _ string) agentcogni.CogniFinalDecision {
+	return agentcogni.CogniFinalDecision{}
 }
 
 func (s stubCogniRuntime) BuildContext(_ context.Context, message, _, _, _ string) string {

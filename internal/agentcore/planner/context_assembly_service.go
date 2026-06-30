@@ -239,9 +239,8 @@ func (s *ContextAssemblyService) RecordCogniToolOutcome(message, tenantID, chann
 
 // CogniDecide calls the v2 Cogni runtime's Decide() method to get the merged
 // decision from all active Cognis (IntentCogni, RiskCogni, EmotionCogni, v1 compat).
-// Returns a CogniFinalDecision with intent, tools/skills needed, memory scope, and
-// behavioral guidance. This is the v2 entry point for intelligent resource allocation.
-func (s *ContextAssemblyService) CogniDecide(ctx context.Context, message, tenantID, channel string) agentcogni.CogniFinalDecision {
+// intentHint is the pre-computed LocalBrain intent category; empty means no hint.
+func (s *ContextAssemblyService) CogniDecide(ctx context.Context, message, tenantID, channel, intentHint string) agentcogni.CogniFinalDecision {
 	if s == nil || s.cogniService == nil || s.cogniService.runtime == nil {
 		// No cogni runtime wired, return empty decision
 		return agentcogni.CogniFinalDecision{}
@@ -249,7 +248,7 @@ func (s *ContextAssemblyService) CogniDecide(ctx context.Context, message, tenan
 
 	// Call the v2 Decide() method on the cogni runtime
 	// (wired in cmd/agent/module_cogni.go as plannerCogniRuntime)
-	return s.cogniService.runtime.Decide(ctx, message, tenantID, channel)
+	return s.cogniService.runtime.Decide(ctx, message, tenantID, channel, intentHint)
 }
 
 func (s *ContextAssemblyService) ApplyCogniSkillFilter(message, tenantID, channel string, in []skills.Skill) []skills.Skill {

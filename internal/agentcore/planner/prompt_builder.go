@@ -382,7 +382,7 @@ collect:
 	// will be wired separately (in React integration or Planner.Run).
 	if injectCogniEnabled && pb.contextAssembly != nil {
 		// Get v2 Cogni decision (Intent + Risk + Emotion + v1 compat)
-		decision := pb.contextAssembly.CogniDecide(ctx, req.LastMessage, req.TenantID, req.Channel)
+		decision := pb.contextAssembly.CogniDecide(ctx, req.LastMessage, req.TenantID, req.Channel, req.IntentHint)
 
 		// Use the merged BehaviorText as the cogni layer content
 		cogniContent := decision.BehaviorText

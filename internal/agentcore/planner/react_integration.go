@@ -57,7 +57,7 @@ func (p *Planner) runReAct(ctx context.Context, req PlanRequest) (*PlanResult, e
 		if len(req.Messages) > 0 {
 			lastMessage = req.Messages[len(req.Messages)-1].Content
 		}
-		decision := contextAssembly.CogniDecide(ctx, lastMessage, req.TenantID, req.SessionID)
+		decision := contextAssembly.CogniDecide(ctx, lastMessage, req.TenantID, req.SessionID, req.IntentHint)
 
 		// SkillsNeeded carries category IDs ("research", "file") and ToolsNeeded
 		// carries tool-name wildcards ("file_*", "github_*"). Both must be

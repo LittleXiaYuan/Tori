@@ -93,13 +93,19 @@ func (r plannerCogniRuntime) BuildContext(ctx context.Context, message, tenantID
 // Decide implements the v2 Cogni interface by calling all active Cognis' Analyze
 // methods and merging their decisions. This is the v2 entry point for intelligent
 // context routing and resource allocation.
-func (r plannerCogniRuntime) Decide(ctx context.Context, message, tenantID, channel string) agentcogni.CogniFinalDecision {
-	// Build the CogniRequest for v2 Analyze calls
+func (r plannerCogniRuntime) Decide(ctx context.Context, message, tenantID, channel, intentHint string) agentcogni.CogniFinalDecision {
+	// Build the CogniRequest for v2 Analyze calls.
+	// intentHint from LocalBrain (pre-computed by applyRuntimeClassification) is
+	// threaded in so IntentCogni can defer to it instead of re-running keyword
+	// detection — it's the same signal, but LocalBrain's version has access to
+	// ScorerWithRecent (recent-usage bias) and multi-turn context.
 	req := agentcogni.CogniRequest{
 		Message:  message,
 		TenantID: tenantID,
 		Channel:  channel,
-		// TODO: populate ConversationHistory and Metadata when available
+		Metadata: map[string]any{
+			"intent_hint": intentHint, // "" = no upstream hint; IntentCogni falls back to detectIntent
+		},
 	}
 
 	var cognis []agentcogni.CogniWithPriority

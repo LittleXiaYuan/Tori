@@ -130,7 +130,7 @@ type decisionRuntimeStub struct {
 	decision agentcogni.CogniFinalDecision
 }
 
-func (s decisionRuntimeStub) Decide(context.Context, string, string, string) agentcogni.CogniFinalDecision {
+func (s decisionRuntimeStub) Decide(context.Context, string, string, string, string) agentcogni.CogniFinalDecision {
 	return s.decision
 }
 func (s decisionRuntimeStub) BuildContext(context.Context, string, string, string, string) string {
@@ -157,7 +157,7 @@ func TestBuildFunctionDefs_RiskDenyRemovesDestructiveTools(t *testing.T) {
 		DeniedTools: []string{"file_write", "file_delete", "computer_use"},
 	}})
 
-	defs := p.buildFunctionDefs(context.Background(), "帮我处理一下文件", "t", "web", false, nil,
+	defs := p.buildFunctionDefs(context.Background(), "帮我处理一下文件", "t", "web", "", false, nil,
 		p.ensureContextAssembly(), p.ensureDelegationRuntime(), p.ensureSkillRuntime())
 
 	names := make([]string, 0, len(defs))
@@ -180,7 +180,7 @@ func TestBuildFunctionDefs_RiskDenyOverridesUserAllowList(t *testing.T) {
 	}})
 
 	// User explicitly tried to allow file_delete + file_read.
-	defs := p.buildFunctionDefs(context.Background(), "删除这些文件", "t", "web", true,
+	defs := p.buildFunctionDefs(context.Background(), "删除这些文件", "t", "web", "", true,
 		[]string{"file_delete", "file_read"},
 		p.ensureContextAssembly(), p.ensureDelegationRuntime(), p.ensureSkillRuntime())
 
@@ -203,7 +203,7 @@ func TestBuildFunctionDefs_V2IntentNarrowsSurface(t *testing.T) {
 		SkillsNeeded: []string{"research"},
 	}})
 
-	defs := p.buildFunctionDefs(context.Background(), "帮我查点资料", "t", "web", false, nil,
+	defs := p.buildFunctionDefs(context.Background(), "帮我查点资料", "t", "web", "", false, nil,
 		p.ensureContextAssembly(), p.ensureDelegationRuntime(), p.ensureSkillRuntime())
 
 	names := make([]string, 0, len(defs))
@@ -226,7 +226,7 @@ func TestBuildFunctionDefs_V2ChatIntentEmptiesSurface(t *testing.T) {
 		SkillsNeeded: []string{}, // chat/empathy: no skills wanted
 	}})
 
-	defs := p.buildFunctionDefs(context.Background(), "今天心情不好，陪我聊聊", "t", "web", false, nil,
+	defs := p.buildFunctionDefs(context.Background(), "今天心情不好，陪我聊聊", "t", "web", "", false, nil,
 		p.ensureContextAssembly(), p.ensureDelegationRuntime(), p.ensureSkillRuntime())
 
 	names := make([]string, 0, len(defs))
@@ -248,7 +248,7 @@ func TestBuildFunctionDefs_V2NoOpinionFallsBackToNative(t *testing.T) {
 		SkillsNeeded: nil, // no opinion
 	}})
 
-	defs := p.buildFunctionDefs(context.Background(), "帮我规划一个复杂的多步任务", "t", "web", false, nil,
+	defs := p.buildFunctionDefs(context.Background(), "帮我规划一个复杂的多步任务", "t", "web", "", false, nil,
 		p.ensureContextAssembly(), p.ensureDelegationRuntime(), p.ensureSkillRuntime())
 
 	names := make([]string, 0, len(defs))

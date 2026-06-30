@@ -61,7 +61,7 @@ type pinnedSurfaceRuntime struct {
 func (p pinnedSurfaceRuntime) BuildContext(context.Context, string, string, string, string) string {
 	return ""
 }
-func (p pinnedSurfaceRuntime) Decide(context.Context, string, string, string) agentcogni.CogniFinalDecision {
+func (p pinnedSurfaceRuntime) Decide(context.Context, string, string, string, string) agentcogni.CogniFinalDecision {
 	return agentcogni.CogniFinalDecision{}
 }
 func (p pinnedSurfaceRuntime) FilterSkills(_ string, _ string, _ string, in []skills.Skill) []skills.Skill {
@@ -138,7 +138,7 @@ func TestTokenABCogniOnVsOff(t *testing.T) {
 	measure := func(p *Planner, label string) agg {
 		a := agg{distinct: map[string]int{}}
 		for i, msg := range session {
-			defs := p.buildFunctionDefs(context.Background(), msg, "tenant", "web", false, nil,
+			defs := p.buildFunctionDefs(context.Background(), msg, "tenant", "web", "", false, nil,
 				p.ensureContextAssembly(), p.ensureDelegationRuntime(), p.ensureSkillRuntime())
 			b, _ := json.Marshal(defs)
 			tok := len(b) / 4 // rough but consistent across both arms

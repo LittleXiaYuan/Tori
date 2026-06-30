@@ -52,9 +52,10 @@ type CogniRuntime interface {
 	// Decide is the v2 Cogni entry point: calls all active Cognis' Analyze methods
 	// and merges their decisions into a unified CogniFinalDecision. Returns intent,
 	// tools/skills needed, memory scope, behavioral text, and state.
-	// This replaces the pattern of BuildContext + FilterSkills with a unified decision
-	// that can drive resource allocation (tool/skill filtering) before prompt assembly.
-	Decide(ctx context.Context, message, tenantID, channel string) agentcogni.CogniFinalDecision
+	// intentHint is the LocalBrain intent category (code/chat/search/file/browser/complex)
+	// pre-computed by applyRuntimeClassification; empty string means no upstream hint,
+	// fall back to IntentCogni's own keyword detection.
+	Decide(ctx context.Context, message, tenantID, channel, intentHint string) agentcogni.CogniFinalDecision
 
 	// BuildContext assembles the unified cogni layer for the current turn.
 	// scope is the coarse conversation kind ("emotional", "technical", "")

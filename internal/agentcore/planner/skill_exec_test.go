@@ -18,6 +18,8 @@ import (
 	"yunque-agent/internal/agentcore/plan"
 	"yunque-agent/internal/observe"
 	"yunque-agent/pkg/skills"
+
+	agentcogni "yunque-agent/internal/agentcore/cogni"
 )
 
 func setupPlannerTestLedger(t *testing.T) *ledger.Ledger {
@@ -561,7 +563,12 @@ type mcpToolRuntime struct {
 	tool CogniTool
 }
 
-func (m mcpToolRuntime) BuildContext(context.Context, string, string, string, string) string { return "" }
+func (m mcpToolRuntime) BuildContext(context.Context, string, string, string, string) string {
+	return ""
+}
+func (m mcpToolRuntime) Decide(context.Context, string, string, string, string) agentcogni.CogniFinalDecision {
+	return agentcogni.CogniFinalDecision{}
+}
 func (m mcpToolRuntime) FilterSkills(_ string, _ string, _ string, in []skills.Skill) []skills.Skill {
 	return in
 }

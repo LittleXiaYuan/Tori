@@ -14,6 +14,8 @@ import (
 	"yunque-agent/internal/agentcore/llm"
 	"yunque-agent/internal/agentcore/session"
 	"yunque-agent/pkg/skills"
+
+	agentcogni "yunque-agent/internal/agentcore/cogni"
 )
 
 // ── Action Types ─────────────────────────────────────────────
@@ -484,6 +486,9 @@ func TestBuildMessages_WithBeliefContext(t *testing.T) {
 // the unified cogni layer carries belief content into the prompt after Step 2.
 type beliefStubRuntime struct{}
 
+func (beliefStubRuntime) Decide(_ context.Context, _, _, _, _ string) agentcogni.CogniFinalDecision {
+	return agentcogni.CogniFinalDecision{}
+}
 func (beliefStubRuntime) BuildContext(_ context.Context, message, tenantID, channel, scope string) string {
 	return "belief-context-data:" + message + ":" + tenantID + ":" + channel + ":" + scope
 }
