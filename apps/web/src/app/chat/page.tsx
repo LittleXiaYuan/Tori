@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 import { api, type ConversationInfo, type NotifyChannel } from "@/lib/api";
 import { createBrowserIntentPackClient } from "@/lib/browser-intent-pack-client";
+import { createCogniKernelPackClient } from "@/lib/cogni-kernel-pack-client";
+import { type SlashCogniOption } from "@/components/slash-command-menu";
 import type { AgentEvent } from "@/components/execution-trace";
 import { ComputerPanel } from "@/components/computer-panel";
 import { TaskProgressPanel } from "@/components/task-progress-panel";
@@ -60,6 +62,7 @@ import { providerModelLabel } from "@/lib/provider-ui";
 import { ModelSelectorPopup, type ModelOption } from "@/components/model-selector-popup";
 
 const browserIntentClient = createBrowserIntentPackClient();
+const cogniPackClient = createCogniKernelPackClient();
 
 function conversationTitle(c: ConversationInfo | undefined, fallback: string): string {
   const name = (c?.name || "").trim();
@@ -95,6 +98,13 @@ export default function ChatPage() {
   const [showSlashMenu, setShowSlashMenu] = useState(false);
   const [slashQuery, setSlashQuery] = useState("");
   const [activeSlashCommand, setActiveSlashCommand] = useState<string | null>(null);
+  // Cogni pinning: enabled cognis offered in the slash menu, plus the one the
+  // user pinned for the turn (sent as `cogni` so the backend force-activates it).
+  const [cogniOptions, setCogniOptions] = useState<SlashCogniOption[]>([]);
+  const [activeCogni, setActiveCogni] = useState<SlashCogniOption | null>(null);
+  const cogniFetchedRef = useRef(false);
+  const cogniOptionsRef = useRef<SlashCogniOption[]>([]);
+  const activeCogniRef = useRef<SlashCogniOption | null>(null);
   const [thinkingEnabled, setThinkingEnabled] = useState<boolean | null>(null);
   const [chatMode, setChatMode] = useState<"agent" | "fast" | "chat">("agent");
   const [suggestedTab, setSuggestedTab] = useState<"terminal" | "browser" | "editor" | "thinking" | undefined>(undefined);
@@ -438,6 +448,7 @@ export default function ChatPage() {
       if (cherryWebSearch) bodyObj.web_search = true;
       if (cherryToolIds) bodyObj.tool_ids = cherryToolIds;
       if (workspacePaths.length > 0) bodyObj.workspace_paths = workspacePaths;
+      if (activeCogniRef.current) bodyObj.cogni = activeCogniRef.current.id;
       const contextAttachments = buildHiddenContextAttachments(pendingFiles);
       const allAttachments = [...(cherryOpts?.attachments || []), ...contextAttachments];
       if (allAttachments.length > 0) {
@@ -634,6 +645,28 @@ export default function ChatPage() {
 
   const stopGeneration = () => abortRef.current?.abort();
 
+  // Keep a ref of the pinned cogni so sendMessage can read it without widening
+  // its (large) dependency list.
+  useEffect(() => { activeCogniRef.current = activeCogni; }, [activeCogni]);
+
+  // Lazily fetch enabled cognis the first time they're needed (slash menu open
+  // or a ?cogni= deep link). Degrades to no cogni category if the pack is off.
+  const loadCognis = useCallback(async (): Promise<SlashCogniOption[]> => {
+    if (cogniFetchedRef.current) return cogniOptionsRef.current;
+    cogniFetchedRef.current = true;
+    try {
+      const res = await cogniPackClient.list();
+      const opts: SlashCogniOption[] = (res.cognis || [])
+        .filter((c) => c.enabled)
+        .map((c) => ({ id: c.id, name: c.display_name || c.id, description: c.description }));
+      cogniOptionsRef.current = opts;
+      setCogniOptions(opts);
+      return opts;
+    } catch {
+      return [];
+    }
+  }, []);
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (showSlashMenu) return; // slash menu handles its own keys
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
@@ -646,6 +679,7 @@ export default function ChatPage() {
     setShowSlashMenu(slashState.visible);
     setSlashQuery(slashState.query);
     setActiveSlashCommand(getActiveSlashCommand(val));
+    if (slashState.visible) void loadCognis();
   };
 
   const handleSlashSelect = (commandText: string) => {
@@ -659,6 +693,19 @@ export default function ChatPage() {
       inputRef.current?.setSelectionRange(len, len);
     });
   };
+
+  // Pin a cogni from the slash menu: clears the leading "/" text and shows the
+  // active-cogni pill; the next send carries `cogni` so the backend uses it.
+  const handleSelectCogni = (id: string, name: string) => {
+    setActiveCogni({ id, name });
+    setShowSlashMenu(false);
+    setSlashQuery("");
+    setActiveSlashCommand(null);
+    chatD({ type: "SET_INPUT", value: "" });
+    requestAnimationFrame(() => inputRef.current?.focus());
+  };
+
+  const handleClearCogni = () => setActiveCogni(null);
 
   const handleCopy = (id: string, content: string) => {
     navigator.clipboard.writeText(content);
@@ -779,6 +826,17 @@ export default function ChatPage() {
     }
   }, [searchParams, sendMessage]);
 
+  // Deep link from the Cogni page ("发起对话" → /chat?cogni=<id>): pin it so the
+  // turn is force-routed to that cogni.
+  useEffect(() => {
+    const pinned = searchParams.get("cogni");
+    if (!pinned) return;
+    void loadCognis().then((opts) => {
+      const match = opts.find((o) => o.id === pinned);
+      setActiveCogni(match ?? { id: pinned, name: pinned });
+    });
+  }, [searchParams, loadCognis]);
+
   useEffect(() => {
     // Quick-send arrives through two channels:
     //   1. In-app SelectionPopup (`app-shell.tsx`) still dispatches a DOM
@@ -840,6 +898,8 @@ export default function ChatPage() {
       showSlashMenu={showSlashMenu}
       slashQuery={slashQuery}
       activeSlashCommand={activeSlashCommand}
+      cognis={cogniOptions}
+      activeCogni={activeCogni}
       showConnectors={showConnectors}
       bridgeConnected={Boolean(bridgeState?.connected)}
       availableModels={availableModels}
@@ -854,6 +914,8 @@ export default function ChatPage() {
       onKeyDown={handleKeyDown}
       onSlashSelect={handleSlashSelect}
       onSlashClose={() => setShowSlashMenu(false)}
+      onSelectCogni={handleSelectCogni}
+      onClearCogni={handleClearCogni}
       onFileUpload={handleFileUpload}
       onDrop={handleDrop}
       onDragOver={handleDragOver}

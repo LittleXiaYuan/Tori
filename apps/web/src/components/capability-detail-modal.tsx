@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button, Chip, Disclosure, Input, Label, NumberField, Slider, Switch, TextArea, TextField } from "@heroui/react";
 import { NumberValue, Segment } from "@heroui-pro/react";
-import { Play, FlaskConical, Save, X } from "lucide-react";
+import { ChevronDown, Play, FlaskConical, Save, X } from "lucide-react";
 import { CherryModal } from "@/components/cherry/overlay";
 import type {
   CogniDeclaration,
@@ -144,8 +144,11 @@ export function CapabilityDetailModal({
 
   const [form, setForm] = useState<CogniConfigForm | null>(null);
   const [keywordDraft, setKeywordDraft] = useState("");
+  const [surfaceQuery, setSurfaceQuery] = useState("");
   const [savingConfig, setSavingConfig] = useState(false);
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showToolSurface, setShowToolSurface] = useState(false);
+  const [showMoreSettings, setShowMoreSettings] = useState(false);
+  const [expandedToolCats, setExpandedToolCats] = useState<Record<string, boolean>>({});
   const [showRawDecl, setShowRawDecl] = useState(false);
 
   const canEditConfig = type === "cogni" && !!onSaveConfig;
@@ -155,7 +158,10 @@ export function CapabilityDetailModal({
   useEffect(() => {
     setForm(declaration ? declarationToForm(declaration) : null);
     setKeywordDraft("");
-    setShowAdvanced(false);
+    setSurfaceQuery("");
+    setShowToolSurface(false);
+    setShowMoreSettings(false);
+    setExpandedToolCats({});
     setShowRawDecl(false);
   }, [declaration]);
 
@@ -194,6 +200,21 @@ export function CapabilityDetailModal({
         : [...form.surfaceOnly, name],
     });
   }
+
+  function toggleToolCat(cat: string) {
+    setExpandedToolCats((prev) => ({ ...prev, [cat]: !prev[cat] }));
+  }
+
+  // Group the installed-skill catalog by category so the (often 60+) tool list
+  // renders as collapsible buckets instead of one overwhelming flat wall.
+  const toolGroups = useMemo(() => {
+    const groups: Record<string, CogniSkillOption[]> = {};
+    for (const s of skillOptions ?? []) {
+      const cat = s.category?.trim() || "其他";
+      (groups[cat] ??= []).push(s);
+    }
+    return groups;
+  }, [skillOptions]);
 
   async function saveConfig() {
     if (!declaration || !form || !onSaveConfig) return;
@@ -431,7 +452,8 @@ export function CapabilityDetailModal({
             </div>
           ) : canEditConfig && form ? (
             <>
-              {/* Basics */}
+              {/* Essentials — always visible: who it is, what it does, how it
+                  behaves, and when it activates. Everything else is collapsed. */}
               <div className="space-y-3">
                 <TextField value={form.displayName} onChange={(v) => updateForm({ displayName: v })} aria-label="显示名称">
                   <Label className="text-xs font-medium" style={{ color: "var(--yunque-text-muted)" }}>显示名称</Label>
@@ -448,11 +470,17 @@ export function CapabilityDetailModal({
                     fullWidth
                   />
                 </div>
-              </div>
-
-              {/* Activation */}
-              <div className="space-y-3">
-                <div className="text-xs font-semibold" style={{ color: "var(--yunque-text)" }}>激活条件</div>
+                <div>
+                  <Label className="text-xs font-medium block mb-1" style={{ color: "var(--yunque-text-muted)" }}>行为指导（写给智能体的话）</Label>
+                  <TextArea
+                    aria-label="行为指导"
+                    value={form.behavior}
+                    onChange={(e) => updateForm({ behavior: e.target.value })}
+                    rows={4}
+                    placeholder="例如：你负责审查代码质量、安全风险和测试缺口，回答要给出可执行的修改建议。"
+                    fullWidth
+                  />
+                </div>
                 <div>
                   <Label className="text-xs font-medium block mb-1.5" style={{ color: "var(--yunque-text-muted)" }}>触发关键词</Label>
                   <div className="flex flex-wrap gap-1 mb-2">
@@ -481,122 +509,228 @@ export function CapabilityDetailModal({
                     </TextField>
                     <Button type="submit" size="sm" variant="outline">添加</Button>
                   </form>
-                </div>
-
-                <Slider
-                  value={Math.round(form.minScore * 100)}
-                  onChange={(v) => updateForm({ minScore: (Array.isArray(v) ? v[0] : v) / 100 })}
-                  minValue={0}
-                  maxValue={100}
-                  step={5}
-                  className="w-full"
-                >
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs font-medium" style={{ color: "var(--yunque-text-muted)" }}>最低匹配分</Label>
-                    <Slider.Output className="text-xs tabular-nums" style={{ color: "var(--yunque-text-muted)" }} />
-                  </div>
-                  <Slider.Track className="h-1.5 rounded-full mt-1" style={{ background: "var(--yunque-bg-muted)" }}>
-                    <Slider.Fill className="rounded-full" style={{ background: "var(--yunque-accent)" }} />
-                    <Slider.Thumb className="size-4 rounded-full border-2" style={{ borderColor: "var(--yunque-surface-1)", background: "var(--yunque-accent)" }} />
-                  </Slider.Track>
-                </Slider>
-                <p className="text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>分数越高越严格，越不容易被触发；开启「常驻」后此项忽略。</p>
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>常驻激活</div>
-                    <div className="text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>无视关键词，始终参与（适合人设、护栏类）。</div>
-                  </div>
-                  <Switch isSelected={form.alwaysOn} onChange={(v) => updateForm({ alwaysOn: v })} size="sm" aria-label="常驻激活">
-                    <Switch.Control><Switch.Thumb /></Switch.Control>
-                  </Switch>
+                  <p className="text-[11px] mt-1" style={{ color: "var(--yunque-text-muted)" }}>命中关键词才会激活；想让它一直参与，到「更多设置」里开启常驻。</p>
                 </div>
               </div>
 
-              {/* Tool surface */}
-              <div className="space-y-2">
-                <div className="text-xs font-semibold" style={{ color: "var(--yunque-text)" }}>能力范围</div>
-                <p className="text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>勾选它激活时该用哪些工具；不选则默认可用全部。</p>
-                {skillOptions && skillOptions.length > 0 ? (
-                  <div className="flex flex-wrap gap-1.5 max-h-44 overflow-y-auto" style={{ overscrollBehavior: "contain" }}>
-                    {skillOptions.map((s) => {
-                      const selected = form.surfaceOnly.includes(s.name);
-                      return (
-                        <Chip
-                          key={s.name}
-                          size="sm"
-                          color={selected ? "success" : "default"}
-                          className="cursor-pointer"
-                          onClick={() => toggleSurface(s.name)}
-                          title={s.description}
-                        >
-                          {s.name}
-                        </Chip>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>未检测到可用技能；可在「能力」页安装后再来勾选。</div>
-                )}
-                {form.surfaceOnly.length > 0 && (
-                  <div className="text-[11px] tabular-nums" style={{ color: "var(--yunque-text-muted)" }}>已选 {form.surfaceOnly.length} 项</div>
-                )}
-              </div>
-
-              {/* Context & behavior */}
-              <div className="space-y-3">
-                <div className="text-xs font-semibold" style={{ color: "var(--yunque-text)" }}>上下文与行为</div>
-                <div>
-                  <Label className="text-xs font-medium block mb-1" style={{ color: "var(--yunque-text-muted)" }}>行为指导（写给智能体的话）</Label>
-                  <TextArea
-                    aria-label="行为指导"
-                    value={form.behavior}
-                    onChange={(e) => updateForm({ behavior: e.target.value })}
-                    rows={4}
-                    placeholder="例如：你负责审查代码质量、安全风险和测试缺口，回答要给出可执行的修改建议。"
-                    fullWidth
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>注入相关记忆</div>
-                    <div className="text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>激活时自动带上与当前对话相关的记忆。</div>
-                  </div>
-                  <Switch isSelected={form.injectMemory} onChange={(v) => updateForm({ injectMemory: v })} size="sm" aria-label="注入相关记忆">
-                    <Switch.Control><Switch.Thumb /></Switch.Control>
-                  </Switch>
-                </div>
-                {form.injectMemory && (
-                  <Slider
-                    value={form.memoryTopK}
-                    onChange={(v) => updateForm({ memoryTopK: Array.isArray(v) ? v[0] : v })}
-                    minValue={1}
-                    maxValue={20}
-                    step={1}
-                    className="w-full"
-                  >
-                    <div className="flex items-center justify-between">
-                      <Label className="text-xs font-medium" style={{ color: "var(--yunque-text-muted)" }}>注入条数</Label>
-                      <Slider.Output className="text-xs tabular-nums" style={{ color: "var(--yunque-text-muted)" }} />
-                    </div>
-                    <Slider.Track className="h-1.5 rounded-full mt-1" style={{ background: "var(--yunque-bg-muted)" }}>
-                      <Slider.Fill className="rounded-full" style={{ background: "var(--yunque-accent)" }} />
-                      <Slider.Thumb className="size-4 rounded-full border-2" style={{ borderColor: "var(--yunque-surface-1)", background: "var(--yunque-accent)" }} />
-                    </Slider.Track>
-                  </Slider>
-                )}
-              </div>
-
-              {/* Advanced */}
-              <Disclosure isExpanded={showAdvanced} onExpandedChange={setShowAdvanced}>
+              {/* Tool surface — collapsed by default; most cogni leave this on
+                  "all tools". Expand to restrict; tools group by category. */}
+              <Disclosure isExpanded={showToolSurface} onExpandedChange={setShowToolSurface}>
                 <Disclosure.Heading>
-                  <Button slot="trigger" variant="ghost" size="sm" className="px-1 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
-                    高级
+                  <Button slot="trigger" variant="ghost" size="sm" className="px-1">
+                    <span className="text-xs font-semibold" style={{ color: "var(--yunque-text)" }}>能力范围</span>
+                    <span className="ml-1.5 text-[11px] tabular-nums" style={{ color: "var(--yunque-text-muted)" }}>
+                      {form.surfaceOnly.length > 0 ? `已选 ${form.surfaceOnly.length} 项` : "默认全部"}
+                    </span>
                     <Disclosure.Indicator />
                   </Button>
                 </Disclosure.Heading>
                 <Disclosure.Content>
-                  <Disclosure.Body className="pt-2">
+                  <Disclosure.Body className="space-y-2 pt-2">
+                    <p className="text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>勾选它激活时该用哪些工具；不选则默认可用全部。</p>
+
+                    {/* Selected tools — shown separately so you can review/remove without
+                        scrolling the full catalog. Iterates surfaceOnly directly so it also
+                        surfaces tools that aren't in the installed-skills list. */}
+                    {form.surfaceOnly.length > 0 && (
+                      <div className="rounded-lg p-2" style={{ background: "var(--yunque-bg-muted)" }}>
+                        <div className="text-[11px] mb-1.5 tabular-nums" style={{ color: "var(--yunque-text-muted)" }}>已选 {form.surfaceOnly.length} 项</div>
+                        <div className="flex flex-wrap gap-1">
+                          {form.surfaceOnly.map((name) => (
+                            <Chip key={name} size="sm" color="success">
+                              <span className="inline-flex items-center gap-1">
+                                {name}
+                                <button
+                                  type="button"
+                                  onClick={() => toggleSurface(name)}
+                                  aria-label={`移除 ${name}`}
+                                  className="opacity-70 hover:opacity-100"
+                                >
+                                  <X size={11} aria-hidden="true" />
+                                </button>
+                              </span>
+                            </Chip>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {skillOptions && skillOptions.length > 0 ? (
+                      <>
+                        <TextField value={surfaceQuery} onChange={setSurfaceQuery} aria-label="搜索工具">
+                          <Input placeholder="搜索工具名或描述…" />
+                        </TextField>
+                        {(() => {
+                          const q = surfaceQuery.trim().toLowerCase();
+                          // While searching, show a flat result list across all categories.
+                          if (q) {
+                            const matches = skillOptions.filter(
+                              (s) => s.name.toLowerCase().includes(q) || (s.description ?? "").toLowerCase().includes(q),
+                            );
+                            if (matches.length === 0) {
+                              return (
+                                <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+                                  没有匹配「{surfaceQuery}」的工具。
+                                </div>
+                              );
+                            }
+                            return (
+                              <div className="flex flex-wrap gap-1.5 max-h-44 overflow-y-auto" style={{ overscrollBehavior: "contain" }}>
+                                {matches.map((s) => {
+                                  const selected = form.surfaceOnly.includes(s.name);
+                                  return (
+                                    <Chip
+                                      key={s.name}
+                                      size="sm"
+                                      color={selected ? "success" : "default"}
+                                      className="cursor-pointer"
+                                      onClick={() => toggleSurface(s.name)}
+                                      title={s.description}
+                                    >
+                                      {s.name}
+                                    </Chip>
+                                  );
+                                })}
+                              </div>
+                            );
+                          }
+                          // Idle: collapsible category buckets keep the long catalog scannable.
+                          const cats = Object.keys(toolGroups).sort((a, b) => a.localeCompare(b, "zh"));
+                          return (
+                            <div className="space-y-1 max-h-60 overflow-y-auto" style={{ overscrollBehavior: "contain" }}>
+                              {cats.map((cat) => {
+                                const tools = toolGroups[cat];
+                                const selectedInCat = tools.filter((t) => form.surfaceOnly.includes(t.name)).length;
+                                const open = !!expandedToolCats[cat];
+                                return (
+                                  <div key={cat} className="rounded-lg" style={{ background: "var(--yunque-bg-muted)" }}>
+                                    <button
+                                      type="button"
+                                      onClick={() => toggleToolCat(cat)}
+                                      aria-expanded={open}
+                                      className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left"
+                                    >
+                                      <ChevronDown
+                                        size={13}
+                                        aria-hidden="true"
+                                        style={{
+                                          transform: open ? "rotate(0deg)" : "rotate(-90deg)",
+                                          transition: "transform .15s",
+                                          color: "var(--yunque-text-muted)",
+                                        }}
+                                      />
+                                      <span className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>{cat}</span>
+                                      <span className="ml-auto text-[11px] tabular-nums" style={{ color: "var(--yunque-text-muted)" }}>
+                                        {selectedInCat > 0 ? `${selectedInCat}/${tools.length}` : tools.length}
+                                      </span>
+                                    </button>
+                                    {open && (
+                                      <div className="flex flex-wrap gap-1.5 px-2.5 pb-2">
+                                        {tools.map((s) => {
+                                          const selected = form.surfaceOnly.includes(s.name);
+                                          return (
+                                            <Chip
+                                              key={s.name}
+                                              size="sm"
+                                              color={selected ? "success" : "default"}
+                                              className="cursor-pointer"
+                                              onClick={() => toggleSurface(s.name)}
+                                              title={s.description}
+                                            >
+                                              {s.name}
+                                            </Chip>
+                                          );
+                                        })}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        })()}
+                      </>
+                    ) : (
+                      <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>未检测到可用技能；可在「能力」页安装后再来勾选。</div>
+                    )}
+                  </Disclosure.Body>
+                </Disclosure.Content>
+              </Disclosure>
+
+              {/* More settings — activation tuning, memory injection and priority,
+                  collapsed so the form leads with the essentials above. */}
+              <Disclosure isExpanded={showMoreSettings} onExpandedChange={setShowMoreSettings}>
+                <Disclosure.Heading>
+                  <Button slot="trigger" variant="ghost" size="sm" className="px-1">
+                    <span className="text-xs font-semibold" style={{ color: "var(--yunque-text)" }}>更多设置</span>
+                    <span className="ml-1.5 text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>匹配分 · 常驻 · 注入记忆 · 优先级</span>
+                    <Disclosure.Indicator />
+                  </Button>
+                </Disclosure.Heading>
+                <Disclosure.Content>
+                  <Disclosure.Body className="space-y-4 pt-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>常驻激活</div>
+                        <div className="text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>无视关键词，始终参与（适合人设、护栏类）。</div>
+                      </div>
+                      <Switch isSelected={form.alwaysOn} onChange={(v) => updateForm({ alwaysOn: v })} size="sm" aria-label="常驻激活">
+                        <Switch.Control><Switch.Thumb /></Switch.Control>
+                      </Switch>
+                    </div>
+
+                    {!form.alwaysOn && (
+                      <div>
+                        <Slider
+                          value={Math.round(form.minScore * 100)}
+                          onChange={(v) => updateForm({ minScore: (Array.isArray(v) ? v[0] : v) / 100 })}
+                          minValue={0}
+                          maxValue={100}
+                          step={5}
+                          className="w-full"
+                        >
+                          <div className="flex items-center justify-between">
+                            <Label className="text-xs font-medium" style={{ color: "var(--yunque-text-muted)" }}>最低匹配分</Label>
+                            <Slider.Output className="text-xs tabular-nums" style={{ color: "var(--yunque-text-muted)" }} />
+                          </div>
+                          <Slider.Track className="h-1.5 rounded-full mt-1" style={{ background: "var(--yunque-bg-muted)" }}>
+                            <Slider.Fill className="rounded-full" style={{ background: "var(--yunque-accent)" }} />
+                            <Slider.Thumb className="size-4 rounded-full border-2" style={{ borderColor: "var(--yunque-surface-1)", background: "var(--yunque-accent)" }} />
+                          </Slider.Track>
+                        </Slider>
+                        <p className="text-[11px] mt-1" style={{ color: "var(--yunque-text-muted)" }}>分数越高越严格，越不容易被触发。</p>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>注入相关记忆</div>
+                        <div className="text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>激活时自动带上与当前对话相关的记忆。</div>
+                      </div>
+                      <Switch isSelected={form.injectMemory} onChange={(v) => updateForm({ injectMemory: v })} size="sm" aria-label="注入相关记忆">
+                        <Switch.Control><Switch.Thumb /></Switch.Control>
+                      </Switch>
+                    </div>
+                    {form.injectMemory && (
+                      <Slider
+                        value={form.memoryTopK}
+                        onChange={(v) => updateForm({ memoryTopK: Array.isArray(v) ? v[0] : v })}
+                        minValue={1}
+                        maxValue={20}
+                        step={1}
+                        className="w-full"
+                      >
+                        <div className="flex items-center justify-between">
+                          <Label className="text-xs font-medium" style={{ color: "var(--yunque-text-muted)" }}>注入条数</Label>
+                          <Slider.Output className="text-xs tabular-nums" style={{ color: "var(--yunque-text-muted)" }} />
+                        </div>
+                        <Slider.Track className="h-1.5 rounded-full mt-1" style={{ background: "var(--yunque-bg-muted)" }}>
+                          <Slider.Fill className="rounded-full" style={{ background: "var(--yunque-accent)" }} />
+                          <Slider.Thumb className="size-4 rounded-full border-2" style={{ borderColor: "var(--yunque-surface-1)", background: "var(--yunque-accent)" }} />
+                        </Slider.Track>
+                      </Slider>
+                    )}
+
                     <NumberField
                       value={form.priority > 0 ? form.priority : undefined}
                       onChange={(v) => updateForm({ priority: v ?? 0 })}

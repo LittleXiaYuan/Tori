@@ -2,8 +2,15 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Kbd } from "@heroui/react";
-import { BookOpen, Brain, Calendar, Camera, Code, FileDown, FileText, GitBranch, Globe, Keyboard, Layers, ListOrdered, Mail, MessageSquare, MousePointer, Search, Sparkles, Terminal, Library } from "lucide-react";
+import { BookOpen, Bot, Brain, Calendar, Camera, Code, FileDown, FileText, GitBranch, Globe, Keyboard, Layers, ListOrdered, Mail, MessageSquare, MousePointer, Search, Sparkles, Terminal, Library } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
+
+/** A user Cogni offered in the slash menu so it can be pinned for the turn. */
+export interface SlashCogniOption {
+  id: string;
+  name: string;
+  description?: string;
+}
 
 interface SlashCommand {
   id: string;
@@ -46,26 +53,79 @@ interface Props {
   onSelect: (commandText: string) => void;
   onClose: () => void;
   anchorRef: React.RefObject<HTMLElement | null>;
+  /** Enabled Cognis surfaced as a top "智能体" category (optional). */
+  cognis?: SlashCogniOption[];
+  /** Called when a Cogni row is chosen so the caller can pin it for the turn. */
+  onSelectCogni?: (id: string, name: string) => void;
+}
+
+// One unified, keyboard-navigable row covering both pinnable Cognis and the
+// static command palette, so arrow/enter selection spans the whole menu.
+interface MenuRow {
+  key: string;
+  kind: "cogni" | "command";
+  category: string; // i18n key, e.g. "slash.cat.cogni"
+  icon: React.ElementType;
+  title: string;
+  trailing: string; // mono command text for commands; empty for cognis
+  cogniId?: string;
+  command?: string;
 }
 
 // Compact single-column slash menu (Manus-style). Floats above the composer.
 // Hover/keyboard-selected row shows a thin description line; the previous
 // two-column preview + "usage" card has been removed (it was loud and
 // repeated information already in the row).
-export function SlashCommandMenu({ query, visible, onSelect, onClose, anchorRef }: Props) {
+export function SlashCommandMenu({ query, visible, onSelect, onClose, anchorRef, cognis, onSelectCogni }: Props) {
   const { t } = useI18n();
   const [selectedIdx, setSelectedIdx] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const filtered = useMemo(() => {
+  const filtered = useMemo<MenuRow[]>(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return commands;
-    return commands.filter((command) =>
-      [command.id, command.command, t(command.title), t(command.description), t(command.category)]
-        .filter(Boolean)
-        .some((value) => value.toLowerCase().includes(q))
-    );
-  }, [query, t]);
+    const cogniRows: MenuRow[] = (cognis ?? [])
+      .filter(
+        (c) =>
+          !q ||
+          c.name.toLowerCase().includes(q) ||
+          (c.description ?? "").toLowerCase().includes(q),
+      )
+      .map((c) => ({
+        key: `cogni:${c.id}`,
+        kind: "cogni",
+        category: "slash.cat.cogni",
+        icon: Bot,
+        title: c.name,
+        trailing: "",
+        cogniId: c.id,
+      }));
+    const commandRows: MenuRow[] = commands
+      .filter(
+        (command) =>
+          !q ||
+          [command.id, command.command, t(command.title), t(command.description), t(command.category)]
+            .filter(Boolean)
+            .some((value) => value.toLowerCase().includes(q)),
+      )
+      .map((cmd) => ({
+        key: `cmd:${cmd.id}`,
+        kind: "command",
+        category: cmd.category,
+        icon: cmd.icon,
+        title: t(cmd.title),
+        trailing: cmd.command,
+        command: cmd.command,
+      }));
+    return [...cogniRows, ...commandRows];
+  }, [query, t, cognis]);
+
+  const selectRow = (row: MenuRow) => {
+    if (row.kind === "cogni" && row.cogniId) {
+      onSelectCogni?.(row.cogniId, row.title);
+    } else if (row.command) {
+      onSelect(`${row.command} `);
+    }
+  };
 
   useEffect(() => {
     setSelectedIdx(0);
@@ -83,7 +143,7 @@ export function SlashCommandMenu({ query, visible, onSelect, onClose, anchorRef 
       } else if (event.key === "Enter" || event.key === "Tab") {
         event.preventDefault();
         const item = filtered[selectedIdx];
-        if (item) onSelect(`${item.command} `);
+        if (item) selectRow(item);
       } else if (event.key === "Escape") {
         event.preventDefault();
         onClose();
@@ -91,7 +151,7 @@ export function SlashCommandMenu({ query, visible, onSelect, onClose, anchorRef 
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [visible, filtered, selectedIdx, onSelect, onClose]);
+  }, [visible, filtered, selectedIdx, onSelect, onSelectCogni, onClose]);
 
   useEffect(() => {
     if (!visible) return;
@@ -132,19 +192,19 @@ export function SlashCommandMenu({ query, visible, onSelect, onClose, anchorRef 
         role="listbox"
         aria-label={t("slash.title")}
       >
-        {filtered.map((cmd, idx) => {
-          const Icon = cmd.icon;
+        {filtered.map((row, idx) => {
+          const Icon = row.icon;
           const active = idx === selectedIdx;
-          const showCategoryHeader = !isFiltering && cmd.category !== lastCategory;
-          lastCategory = cmd.category;
+          const showCategoryHeader = !isFiltering && row.category !== lastCategory;
+          lastCategory = row.category;
           return (
-            <div key={cmd.id}>
+            <div key={row.key}>
               {showCategoryHeader && (
                 <div
                   className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-[0.08em]"
                   style={{ color: "var(--yunque-text-muted)" }}
                 >
-                  {t(cmd.category)}
+                  {t(row.category)}
                 </div>
               )}
               <button
@@ -159,7 +219,7 @@ export function SlashCommandMenu({ query, visible, onSelect, onClose, anchorRef 
                   color: active ? "var(--yunque-text)" : "var(--yunque-text-secondary)",
                 }}
                 onMouseEnter={() => setSelectedIdx(idx)}
-                onClick={() => onSelect(`${cmd.command} `)}
+                onClick={() => selectRow(row)}
               >
                 <Icon
                   size={14}
@@ -172,14 +232,16 @@ export function SlashCommandMenu({ query, visible, onSelect, onClose, anchorRef 
                   className="text-[13px] font-medium truncate"
                   style={{ color: active ? "var(--yunque-text)" : "var(--yunque-text)" }}
                 >
-                  {t(cmd.title)}
+                  {row.title}
                 </span>
-                <span
-                  className="ml-auto text-[11px] font-mono truncate"
-                  style={{ color: "var(--yunque-text-muted)" }}
-                >
-                  {cmd.command}
-                </span>
+                {row.trailing && (
+                  <span
+                    className="ml-auto text-[11px] font-mono truncate"
+                    style={{ color: "var(--yunque-text-muted)" }}
+                  >
+                    {row.trailing}
+                  </span>
+                )}
               </button>
             </div>
           );

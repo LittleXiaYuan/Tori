@@ -420,6 +420,28 @@ type ContextRequest struct {
 	// PriorHandover is the set of handover tags emitted by Cognis that ran
 	// earlier in the same turn (typically empty for single-turn requests).
 	PriorHandover []string
+	// PerceptionHint carries the cognisdk Pack perception result (intent/risk
+	// classification) so Declaration ActivationRules can reference it. Step 3
+	// of cogni consolidation: cogni and cognisdk各自激活逻辑保持独立，但
+	// cognisdk 的感知结果作为 hint 注入 cogni，消除冗余意图检测、避免两边
+	// 猜出的 intent 打架。nil = cognisdk 未感知（向后兼容）。
+	PerceptionHint *PerceptionHint
+
+	// ForceIDs lists Cogni IDs the caller wants activated for this turn
+	// regardless of keyword/semantic score — the chat composer's `/智能体`
+	// pick force-routes a turn to a specific Cogni. Forced entries bypass
+	// scoring, exclusivity, arbitration and budget gates (the user asked for
+	// them explicitly); unknown / disabled IDs are ignored. Empty = normal
+	// score-driven activation only.
+	ForceIDs []string
+}
+
+// PerceptionHint is the cognisdk perception result piped into cogni activation.
+// It's the「用户意图/风险」分类，和 cogni 的多模态 PerceptionSignal（semantic/
+// file_watcher/schedule）是不同层概念——前者是消息意图，后者是环境信号。
+type PerceptionHint struct {
+	Intent string // "general" / "work_task" / "seek_reassurance" 等
+	Risk   string // "low" / "medium" / "high" / "dependency"
 }
 
 // turnState is the shared evaluation snapshot for a single request fingerprint.
@@ -468,11 +490,12 @@ func (h *Hook) evaluate(req ContextRequest) *turnState {
 	}
 
 	session := Session{
-		Message:       req.Message,
-		TenantID:      req.TenantID,
-		Channel:       req.Channel,
-		Tags:          req.Tags,
-		PriorHandover: req.PriorHandover,
+		Message:        req.Message,
+		TenantID:       req.TenantID,
+		Channel:        req.Channel,
+		Tags:           req.Tags,
+		PriorHandover:  req.PriorHandover,
+		PerceptionHint: req.PerceptionHint,
 	}
 
 	st := h.turnCache.getOrInit(req, func() *turnState {
@@ -493,6 +516,11 @@ func (h *Hook) evaluate(req ContextRequest) *turnState {
 		final = Arbitrate(final, h.arbitrationCfg())
 		// Economics enforcement: over-budget cognis don't engage this turn.
 		final = h.applyBudgetGuard(raw, final)
+
+		// Forced activation (chat `/智能体` pick): append any explicitly forced
+		// cognis last, after every score/exclusivity/arbitration/budget gate, so
+		// the user's explicit choice always engages. No-op when ForceIDs is empty.
+		final = forceActivations(decls, final, req.ForceIDs)
 
 		ts := &turnState{
 			created:     time.Now(),
@@ -532,6 +560,44 @@ func (h *Hook) flushTrace(st *turnState) {
 	out := st.trace
 	st.mu.Unlock()
 	store.Record(out)
+}
+
+// forceActivations appends explicitly-forced cognis to the activated set. A
+// forced id that already activated naturally is left as-is; one that exists in
+// the active registry but did not activate is appended with a sentinel score so
+// downstream rendering (context, tools, surface) treats it as engaged. Unknown
+// or disabled ids (absent from decls) are silently skipped.
+func forceActivations(decls []*Declaration, final []Activation, forceIDs []string) []Activation {
+	if len(forceIDs) == 0 {
+		return final
+	}
+	active := make(map[string]bool, len(final))
+	for _, a := range final {
+		if a.Declaration != nil {
+			active[a.Declaration.ID] = true
+		}
+	}
+	byID := make(map[string]*Declaration, len(decls))
+	for _, d := range decls {
+		byID[d.ID] = d
+	}
+	for _, id := range forceIDs {
+		if id == "" || active[id] {
+			continue
+		}
+		d, ok := byID[id]
+		if !ok {
+			continue
+		}
+		final = append(final, Activation{
+			Declaration: d,
+			Activated:   true,
+			Score:       1.0,
+			Reasons:     []string{"forced: 用户在对话中指定该智能体"},
+		})
+		active[id] = true
+	}
+	return final
 }
 
 // buildTraceActivations records every evaluated cogni — including the ones

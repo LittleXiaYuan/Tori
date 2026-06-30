@@ -17,6 +17,7 @@ type PlanRequest struct {
 	TeacherID         string
 	StudentID         string
 	TenantID          string
+	SessionID         string          // conversation/session correlation ID for trace replay and recovery grouping
 	ModelOverride     string          // pool key (e.g. "fast","smart","expert") — EXPLICIT caller override; suppresses LocalBrain classification
 	RoutedTier        string          // pool key chosen by the gateway smart router / thinking level — AUTOMATIC routing hint; lower precedence than ModelOverride and does NOT suppress classification (so the tool-free fast path can still fire)
 	IntentHint        string          // LocalBrain intent category (chat/code/search/tool/complex), set by applyRuntimeClassification; drives retrieval skipping and adaptive context budgets
@@ -37,6 +38,7 @@ type PlanRequest struct {
 	ClientOverride    *llm.Client     // if set, bypass pool and use this client directly (session-level provider override)
 	AllowedSkills     []string        // if non-empty, buildFunctionDefs restricts to exactly these skill names (user-picked tool whitelist)
 	WorkspacePaths    []string        // extra host dirs the conversation opened; merged into read-only file skills' allowed roots
+	ForceCogniIDs     []string        // chat `/智能体` pick: force-activate these Cognis this turn (behavior + tool surface + MCP tools), bypassing keyword scoring
 }
 
 // EffectiveModelTier resolves the pool key to use for model selection: an
@@ -89,6 +91,28 @@ func WithStepCallback(ctx context.Context, cb StepCallback) context.Context {
 func StepCallbackFromCtx(ctx context.Context) StepCallback {
 	cb, _ := ctx.Value(ctxKeyStepCB{}).(StepCallback)
 	return cb
+}
+
+type ctxKeyForcedCognis struct{}
+
+// WithForcedCognis attaches the user's forced-cogni pick to the context so the
+// declarative Cogni runtime (wired in cmd/agent) can force-activate them this
+// turn regardless of keyword score. No-op for an empty list.
+func WithForcedCognis(ctx context.Context, ids []string) context.Context {
+	if len(ids) == 0 {
+		return ctx
+	}
+	return context.WithValue(ctx, ctxKeyForcedCognis{}, ids)
+}
+
+// ForcedCognisFromCtx retrieves the forced-cogni IDs attached to the context,
+// or nil when none were pinned.
+func ForcedCognisFromCtx(ctx context.Context) []string {
+	if ctx == nil {
+		return nil
+	}
+	ids, _ := ctx.Value(ctxKeyForcedCognis{}).([]string)
+	return ids
 }
 
 // StepStatus tracks the state of a plan step.

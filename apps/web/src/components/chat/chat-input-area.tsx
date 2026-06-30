@@ -12,8 +12,10 @@ import {
   Sparkles,
   Monitor,
   Plus,
+  Bot,
+  X,
 } from "lucide-react";
-import { SlashCommandMenu } from "@/components/slash-command-menu";
+import { SlashCommandMenu, type SlashCogniOption } from "@/components/slash-command-menu";
 import { ConnectorPopover } from "@/components/connector-popover";
 import { ModelSelectorPopup, type ModelOption } from "@/components/model-selector-popup";
 import { AdvancedOptionsPopup } from "@/components/chat/advanced-options-popup";
@@ -33,6 +35,8 @@ export interface ChatInputAreaProps {
   showSlashMenu: boolean;
   slashQuery: string;
   activeSlashCommand: string | null;
+  cognis?: SlashCogniOption[];
+  activeCogni?: SlashCogniOption | null;
   showConnectors: boolean;
   bridgeConnected: boolean;
   availableModels: ModelOption[];
@@ -47,6 +51,8 @@ export interface ChatInputAreaProps {
   onKeyDown: (e: React.KeyboardEvent) => void;
   onSlashSelect: (cmd: string) => void;
   onSlashClose: () => void;
+  onSelectCogni?: (id: string, name: string) => void;
+  onClearCogni?: () => void;
   onFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onDrop: (e: React.DragEvent) => void;
   onDragOver: (e: React.DragEvent) => void;
@@ -85,6 +91,8 @@ export function ChatInputArea(props: ChatInputAreaProps) {
     showSlashMenu,
     slashQuery,
     activeSlashCommand,
+    cognis,
+    activeCogni,
     showConnectors,
     bridgeConnected,
     availableModels,
@@ -99,6 +107,8 @@ export function ChatInputArea(props: ChatInputAreaProps) {
     onKeyDown,
     onSlashSelect,
     onSlashClose,
+    onSelectCogni,
+    onClearCogni,
     onFileUpload,
     onDrop,
     onDragOver,
@@ -280,7 +290,32 @@ export function ChatInputArea(props: ChatInputAreaProps) {
               onSelect={onSlashSelect}
               onClose={onSlashClose}
               anchorRef={inputShellRef}
+              cognis={cognis}
+              onSelectCogni={onSelectCogni}
             />
+            {activeCogni && (
+              <div className="mb-1 flex flex-wrap items-center gap-1.5">
+                <span
+                  className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px]"
+                  style={{
+                    background: "var(--yunque-bg-muted)",
+                    border: "1px solid var(--yunque-border)",
+                    color: "var(--yunque-text)",
+                  }}
+                >
+                  <Bot size={12} style={{ color: "var(--yunque-accent)" }} aria-hidden="true" />
+                  <span className="truncate max-w-[200px]">{activeCogni.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => onClearCogni?.()}
+                    aria-label={`取消指定智能体 ${activeCogni.name}`}
+                    className="opacity-60 hover:opacity-100"
+                  >
+                    <X size={12} aria-hidden="true" />
+                  </button>
+                </span>
+              </div>
+            )}
           </div>
 
           <textarea

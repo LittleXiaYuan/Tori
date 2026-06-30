@@ -107,11 +107,11 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 		Platform       string        `json:"platform,omitempty"`
 		Thinking       *bool         `json:"thinking,omitempty"`
 		Mode           string        `json:"mode,omitempty"`
-		AiriMode       bool          `json:"airi_mode,omitempty"`
 		WebSearch      bool          `json:"web_search,omitempty"`      // Cherry 🌐 drawer: force-enable web search
 		ToolIDs        []string      `json:"tool_ids,omitempty"`        // Cherry 🔨 drawer: restrict to explicit skill subset
 		Attachments    []Attachment  `json:"attachments,omitempty"`     // Cherry 📎 drawer: inline per-turn files
 		WorkspacePaths []string      `json:"workspace_paths,omitempty"` // Cursor-style opened folders, read-only for this turn
+		Cogni          string        `json:"cogni,omitempty"`           // Slash `/智能体` pick: force-activate this Cogni for the turn
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		sendEvent("error", `{"code":"BAD_REQUEST","message":"invalid body"}`)
@@ -275,6 +275,7 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	msgs = g.augmentMessagesForIntent(msgs, tid)
+
 	intent := requestIntent{}
 	if len(req.Messages) > 0 {
 		intent = g.detectRequestIntent(req.Messages[len(req.Messages)-1].Content, tid)
@@ -410,6 +411,7 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 	planReq := planner.PlanRequest{
 		Messages:          msgs,
 		TenantID:          tid,
+		SessionID:         req.SessionID,
 		RoutedTier:        routedTier,
 		ClientOverride:    sessionClient,
 		TaskID:            req.TaskID,
@@ -419,6 +421,7 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 		DisableDelegation: chatMode,
 		AllowedSkills:     req.ToolIDs,
 		WorkspacePaths:    req.WorkspacePaths,
+		ForceCogniIDs:     cogniIDList(req.Cogni),
 		StepCallback: func(event observe.AgentEvent) {
 			streamEvent := friendlyAgentEventForStream(event)
 			data, _ := json.Marshal(streamEvent)
@@ -584,17 +587,6 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 		doneData["suggestions"] = suggestions
 	}
 
-	// Airi mode: push reply to desktop pet
-	if req.AiriMode && reply != "" {
-		type airiPusher interface{ PushToAiri(string) }
-		if rawPlugin, ok := g.pluginReg.Get("airi"); ok {
-			if ap, ok := rawPlugin.(airiPusher); ok {
-				ap.PushToAiri(reply)
-				doneData["airi_synced"] = true
-			}
-		}
-	}
-
 	doneBytes, _ := json.Marshal(doneData)
 	sendEvent("done", string(doneBytes))
 
@@ -726,6 +718,16 @@ func buildHiddenAttachmentContextMessage(context string) string {
 		return ""
 	}
 	return hiddenAttachmentContextMarker + "\n这段内容供后续追问时继续读取附件使用，不应直接展示给用户。\n\n" + context
+}
+
+// cogniIDList normalizes the chat composer's single forced-cogni pick into the
+// slice PlanRequest.ForceCogniIDs expects. Empty input yields nil so the planner
+// treats the turn as ordinary score-driven activation.
+func cogniIDList(id string) []string {
+	if strings.TrimSpace(id) == "" {
+		return nil
+	}
+	return []string{id}
 }
 
 func hiddenAttachmentContextMessages(msgs []llm.Message) []llm.Message {

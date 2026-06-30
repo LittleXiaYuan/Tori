@@ -68,6 +68,11 @@ type CogniRequest struct {
 	// Metadata holds additional context from the planner (intent hint from
 	// LocalBrain, trust tier, session state, etc.). Keys are runtime-specific.
 	Metadata map[string]any
+
+	// ForceCogniIDs lists Cogni IDs the user pinned for this turn (chat
+	// `/智能体` pick). They are force-activated regardless of score so their
+	// behavior, tool surface and MCP tools engage. Empty = score-driven only.
+	ForceCogniIDs []string
 }
 
 // HistoryMessage represents one turn in the conversation history.

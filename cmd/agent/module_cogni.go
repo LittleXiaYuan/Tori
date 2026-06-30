@@ -67,6 +67,15 @@ func (r plannerCogniRuntime) request(message, tenantID, channel string) cogni.Co
 	return req
 }
 
+// requestWithForce builds the per-turn ContextRequest and carries the user's
+// forced-cogni pick (chat `/智能体`) read from the planner-supplied context, so
+// BuildContext / Tools force-activate that Cogni regardless of keyword score.
+func (r plannerCogniRuntime) requestWithForce(ctx context.Context, message, tenantID, channel string) cogni.ContextRequest {
+	req := r.request(message, tenantID, channel)
+	req.ForceIDs = planner.ForcedCognisFromCtx(ctx)
+	return req
+}
+
 func (r plannerCogniRuntime) BuildContext(ctx context.Context, message, tenantID, channel, scope string) string {
 	if !r.active() && r.beliefAdapter == nil {
 		return ""
@@ -76,7 +85,7 @@ func (r plannerCogniRuntime) BuildContext(ctx context.Context, message, tenantID
 	// cogni layer instead of two parallel ones. Either side may be empty.
 	var parts []string
 	if r.active() {
-		if c := r.hook.BuildContext(r.request(message, tenantID, channel)); c != "" {
+		if c := r.hook.BuildContext(r.requestWithForce(ctx, message, tenantID, channel)); c != "" {
 			parts = append(parts, c)
 		}
 	}
@@ -106,6 +115,9 @@ func (r plannerCogniRuntime) Decide(ctx context.Context, message, tenantID, chan
 		Metadata: map[string]any{
 			"intent_hint": intentHint, // "" = no upstream hint; IntentCogni falls back to detectIntent
 		},
+		// Force-route this turn to the user's pinned Cogni (chat `/智能体`); the
+		// v1 compat adapter forwards this into the Hook so its behavior engages.
+		ForceCogniIDs: planner.ForcedCognisFromCtx(ctx),
 	}
 
 	var cognis []agentcogni.CogniWithPriority
@@ -261,7 +273,7 @@ func (r plannerCogniRuntime) Tools(ctx context.Context, message, tenantID, chann
 	if !r.active() || r.mcp == nil {
 		return nil
 	}
-	acts := r.hook.Activate(r.request(message, tenantID, channel))
+	acts := r.hook.Activate(r.requestWithForce(ctx, message, tenantID, channel))
 	if len(acts) == 0 {
 		return nil
 	}

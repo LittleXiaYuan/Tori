@@ -48,6 +48,9 @@ func (a *V1CompatAdapter) Analyze(ctx context.Context, req CogniRequest) CogniDe
 		Message:  req.Message,
 		TenantID: req.TenantID,
 		Channel:  req.Channel,
+		// Carry the user's forced-cogni pick so the v1 Hook activates it
+		// regardless of keyword score (chat `/智能体` force-routing).
+		ForceIDs: req.ForceCogniIDs,
 		// v1 may expect other fields (intent hint, etc.) — wire as needed
 	}
 
