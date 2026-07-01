@@ -19,9 +19,28 @@ type Session struct {
 	Pinned     bool          `json:"pinned,omitempty"`
 	ArchivedAt *time.Time    `json:"archived_at,omitempty"`
 	Messages   []llm.Message `json:"messages"`
+	Files      []SessionFile `json:"files,omitempty"`
 	CreatedAt  time.Time     `json:"created_at"`
 	UpdatedAt  time.Time     `json:"updated_at"`
 }
+
+// SessionFile is a file the user uploaded or a skill generated earlier in
+// this conversation. Tracking it here — in memory, alongside the message
+// history — lets later turns reference it (e.g. "edit the doc you just made")
+// without the user re-uploading or re-typing the path.
+type SessionFile struct {
+	Path    string    `json:"path"`
+	Name    string    `json:"name"`
+	Kind    string    `json:"kind"` // "uploaded" | "generated"
+	Skill   string    `json:"skill,omitempty"`
+	Size    int64     `json:"size,omitempty"`
+	AddedAt time.Time `json:"added_at"`
+}
+
+// maxSessionFiles caps how many distinct files are remembered per session,
+// evicting the oldest once the limit is exceeded. Prevents unbounded growth
+// in long-running conversations that generate many files.
+const maxSessionFiles = 40
 
 // Repo is the optional persistence backend for sessions.
 type Repo interface {
@@ -185,15 +204,15 @@ func (s *Store) Append(sessionID string, msgs ...llm.Message) {
 		persistMsgs := make([]llm.Message, len(msgs))
 		copy(persistMsgs, msgs)
 		sid := sessionID
-	safego.Go("session-persist", func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		for _, m := range persistMsgs {
-			if err := s.repo.Append(ctx, sid, m.Role, m.Content); err != nil {
-				slog.Error("session repo Append", "err", err)
+		safego.Go("session-persist", func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			for _, m := range persistMsgs {
+				if err := s.repo.Append(ctx, sid, m.Role, m.Content); err != nil {
+					slog.Error("session repo Append", "err", err)
+				}
 			}
-		}
-	})
+		})
 	}
 
 	// Trim: keep system message + last N messages
@@ -211,6 +230,55 @@ func (s *Store) Append(sessionID string, msgs ...llm.Message) {
 			}
 		}
 	}
+}
+
+// AddFiles registers files uploaded or generated during a session, keyed by
+// path (re-adding an existing path refreshes its entry — e.g. a doc that was
+// edited again — rather than duplicating it). Does nothing for an unknown
+// session (mirrors Append's no-op-if-missing behavior).
+func (s *Store) AddFiles(sessionID string, files ...SessionFile) {
+	if len(files) == 0 {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	sess, ok := s.sessions[sessionID]
+	if !ok {
+		return
+	}
+	for _, f := range files {
+		if f.Path == "" {
+			continue
+		}
+		replaced := false
+		for i, existing := range sess.Files {
+			if existing.Path == f.Path {
+				sess.Files[i] = f
+				replaced = true
+				break
+			}
+		}
+		if !replaced {
+			sess.Files = append(sess.Files, f)
+		}
+	}
+	if excess := len(sess.Files) - maxSessionFiles; excess > 0 {
+		sess.Files = sess.Files[excess:]
+	}
+	sess.UpdatedAt = time.Now()
+}
+
+// Files returns a copy of the files registered against a session.
+func (s *Store) Files(sessionID string) []SessionFile {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	sess, ok := s.sessions[sessionID]
+	if !ok {
+		return nil
+	}
+	out := make([]SessionFile, len(sess.Files))
+	copy(out, sess.Files)
+	return out
 }
 
 // Get returns a session's messages, rehydrating from the file repo if needed.

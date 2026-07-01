@@ -2,6 +2,7 @@ package planner
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -42,6 +43,10 @@ func (p *Planner) BuildMessages(ctx context.Context, req PlanRequest) ([]llm.Mes
 		msgs = append(msgs, llm.Message{Role: "system", Content: workspaceContext})
 		includedLayers = append(includedLayers, "workspace")
 	}
+	if sessionFilesContext := buildSessionFilesContextMessage(req.SessionFiles); sessionFilesContext != "" {
+		msgs = append(msgs, llm.Message{Role: "system", Content: sessionFilesContext})
+		includedLayers = append(includedLayers, "session_files")
+	}
 
 	msgs = append(msgs, promptRuntime.PrepareConversationMessages(req.Messages, time.Now())...)
 	msgs = contextWindowRuntime.FitMessagesForRequest(ctx, msgs, modelRuntime.ClientForRequest(req))
@@ -75,6 +80,41 @@ func buildWorkspaceContextMessage(paths []string) string {
 		b.WriteString("- ")
 		b.WriteString(path)
 		b.WriteString("\n")
+		written++
+	}
+	if written == 0 {
+		return ""
+	}
+	return b.String()
+}
+
+// buildSessionFilesContextMessage renders the files uploaded or generated
+// earlier in this conversation, so the model can reuse them by path instead
+// of asking the user to re-upload (e.g. pass path straight into docx_edit /
+// pptx_edit / xlsx_edit / image_generate as an argument).
+func buildSessionFilesContextMessage(files []SessionFileRef) string {
+	if len(files) == 0 {
+		return ""
+	}
+	const maxFiles = 12
+	var b strings.Builder
+	b.WriteString("[本次对话已有文件]\n")
+	b.WriteString("以下文件是用户在本次对话中上传的，或你此前调用工具生成的，均可直接复用。用户说“继续处理”“改一下”“基于刚才那个文件/图片”时，优先使用这里的 path 作为工具参数，不要要求用户重新上传或重新生成。\n")
+	written := 0
+	for _, f := range files {
+		if written >= maxFiles {
+			b.WriteString("- ...\n")
+			break
+		}
+		name := strings.TrimSpace(f.Name)
+		if name == "" {
+			name = f.Path
+		}
+		kindLabel := "用户上传"
+		if f.Kind == "generated" {
+			kindLabel = "已生成"
+		}
+		b.WriteString(fmt.Sprintf("- %s（%s，path=%s）\n", name, kindLabel, f.Path))
 		written++
 	}
 	if written == 0 {

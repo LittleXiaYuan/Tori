@@ -210,6 +210,7 @@ func (g *Gateway) ExecuteChatPipeline(ctx context.Context, req *ChatRequest) (*C
 		TaskContext:    taskContext,
 		TraceID:        traceSpan.TraceID,
 		WorkspacePaths: req.WorkspacePaths,
+		SessionFiles:   g.sessionFilesForRequest(req.SessionID),
 	}
 
 	if slashResp, handled, slashErr := g.tryHandleSlashCommand(ctx, planReq); handled {
@@ -238,6 +239,7 @@ func (g *Gateway) ExecuteChatPipeline(ctx context.Context, req *ChatRequest) (*C
 		return nil, fmt.Errorf("planner: %w", err)
 	}
 	g.recordRouterOutcome(routedTier, routedModelID, start, nil, result.Reply, traceSpan)
+	g.registerSessionFiles(req.SessionID, req.WorkspacePaths, result)
 
 	// ── 12. Post-processing ──
 	estTokensIn := estimateMsgTokens(msgs)

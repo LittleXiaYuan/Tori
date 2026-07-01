@@ -421,6 +421,7 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 		DisableDelegation: chatMode,
 		AllowedSkills:     req.ToolIDs,
 		WorkspacePaths:    req.WorkspacePaths,
+		SessionFiles:      g.sessionFilesForRequest(req.SessionID),
 		ForceCogniIDs:     cogniIDList(req.Cogni),
 		StepCallback: func(event observe.AgentEvent) {
 			streamEvent := friendlyAgentEventForStream(event)
@@ -494,6 +495,7 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	g.recordRouterOutcome(routedTier, routedModelID, start, nil, result.Reply, traceSpan)
+	g.registerSessionFiles(req.SessionID, req.WorkspacePaths, result)
 
 	// Cache plan result for save_as_workflow skill
 	if len(result.Plan) > 0 && g.lastPlanCache != nil {
