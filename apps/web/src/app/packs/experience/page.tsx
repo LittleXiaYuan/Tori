@@ -7,6 +7,7 @@ import { History, ThumbsUp, User, Trophy, AlertTriangle, Send, ClipboardList } f
 import PageHeader from "@/components/page-header";
 import { formatErrorMessage } from "@/lib/error-utils";
 import { chatPromptHref, taskDetailHref } from "@/lib/pack-action-links";
+import { PackAbout, PackSectionTitle, PackStepsGrid, type PackBoundaryItem, type PackStep } from "@/components/packs/pack-page-kit";
 import {
   createExperiencePackClient,
   type Recommendation,
@@ -16,45 +17,24 @@ import {
 
 const experience = createExperiencePackClient();
 
-const userFacingSteps = [
-  {
-    title: "1. 看推荐能力",
-    body: "根据近期反馈，挑出当前最值得继续使用的技能或能力。",
-  },
-  {
-    title: "2. 检查偏好画像",
-    body: "查看云雀学到的偏好、标签和需要避免的类别。",
-  },
-  {
-    title: "3. 复盘任务自评",
-    body: "把任务评分和建议交回 Chat，沉淀成下一次可复用经验。",
-  },
+const userFacingSteps: PackStep[] = [
+  { key: "recs", label: "看推荐能力", detail: "根据近期反馈，挑出当前最值得继续使用的技能或能力。" },
+  { key: "prefs", label: "检查偏好画像", detail: "查看云雀学到的偏好、标签和需要避免的类别。" },
+  { key: "review", label: "复盘任务自评", detail: "把任务评分和建议交回 Chat，沉淀成下一次可复用经验。" },
 ];
 
-const boundaryItems = [
-  "不会替你自动修改偏好画像。",
-  "不会自动启用或禁用技能。",
-  "不会把低置信度推荐当成必须执行的决定。",
-  "不会隐藏任务自评中的失败原因。",
+const boundaryItems: PackBoundaryItem[] = [
+  { key: "profile", label: "不改偏好画像", detail: "不会替你自动修改偏好画像。" },
+  { key: "skills", label: "不动技能开关", detail: "不会自动启用或禁用技能。" },
+  { key: "lowconf", label: "不当硬决定", detail: "不会把低置信度推荐当成必须执行的决定。" },
+  { key: "hide", label: "不隐藏失败", detail: "不会隐藏任务自评中的失败原因。" },
 ];
 
-const workflowLoopItems = [
-  {
-    title: "1. 看推荐",
-    body: "先确认云雀建议继续使用哪些能力，以及理由是否可信。",
-  },
-  {
-    title: "2. 规划下一步",
-    body: "把推荐或自评带回 Chat，生成下一次任务计划。",
-  },
-  {
-    title: "3. 验证偏好",
-    body: "在任务结果里确认偏好画像是否真的改善了输出。",
-  },
-  {
-    title: "4. 继续沉淀",
-    body: "把有效经验留在记忆里；不准的地方回到工坊补说明或入口。",
-  },
+const workflowLoopItems: PackStep[] = [
+  { key: "recs", label: "看推荐", detail: "先确认云雀建议继续使用哪些能力，以及理由是否可信。" },
+  { key: "plan", label: "规划下一步", detail: "把推荐或自评带回 Chat，生成下一次任务计划。" },
+  { key: "verify", label: "验证偏好", detail: "在任务结果里确认偏好画像是否真的改善了输出。" },
+  { key: "settle", label: "继续沉淀", detail: "把有效经验留在记忆里；不准的地方回到工坊补说明或入口。" },
 ];
 
 function useRecommendationPrompt(item: Recommendation): string {
@@ -99,12 +79,12 @@ function ColumnHeader({
 }) {
   return (
     <div className="flex items-center gap-2 mb-3">
-      <span style={{ color: "var(--yunque-accent)" }}>{icon}</span>
-      <span className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
+      <span className="text-accent">{icon}</span>
+      <span className="text-sm font-semibold text-foreground">
         {title}
       </span>
       {hint ? (
-        <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+        <span className="text-xs text-muted">
           {hint}
         </span>
       ) : null}
@@ -114,10 +94,7 @@ function ColumnHeader({
 
 function EmptyState({ text }: { text: string }) {
   return (
-    <div
-      className="text-xs px-3 py-6 text-center rounded-md"
-      style={{ color: "var(--yunque-text-muted)", background: "rgba(255,255,255,0.02)" }}
-    >
+    <div className="text-xs px-3 py-6 text-center rounded-xl text-muted bg-surface-secondary">
       {text}
     </div>
   );
@@ -128,7 +105,7 @@ function RecommendationsColumn({ items, loading }: { items: Recommendation[]; lo
     <Card className="section-card p-4">
       <ColumnHeader icon={<ThumbsUp size={16} />} title="推荐" hint="当前最值得用的技能" />
       {loading ? (
-        <div className="flex items-center gap-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+        <div className="flex items-center gap-2 text-xs text-muted">
           <Spinner size="sm" /> 加载中…
         </div>
       ) : items.length === 0 ? (
@@ -141,19 +118,18 @@ function RecommendationsColumn({ items, loading }: { items: Recommendation[]; lo
             return (
               <div
                 key={r.item_id}
-                className="rounded-md px-3 py-2 text-sm"
-                style={{ background: "rgba(255,255,255,0.02)", border: "1px solid var(--yunque-border)" }}
+                className="rounded-xl px-3 py-2 text-sm bg-surface-secondary border border-border"
               >
                 <div className="flex items-center gap-2 mb-1">
                   <Chip size="sm" color={color}>
                     {pct}%
                   </Chip>
-                  <span style={{ color: "var(--yunque-text)" }}>{r.item_id}</span>
-                  <span className="text-xs ml-auto" style={{ color: "var(--yunque-text-muted)" }}>
+                  <span className="text-foreground">{r.item_id}</span>
+                  <span className="text-xs ml-auto text-muted">
                     {r.reason}
                   </span>
                 </div>
-                <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+                <div className="text-xs text-muted">
                   置信度 {(r.confidence * 100).toFixed(0)}%
                 </div>
                 <div className="mt-2">
@@ -190,7 +166,7 @@ function PreferencesColumn({
     <Card className="section-card p-4">
       <ColumnHeader icon={<User size={16} />} title="偏好" hint={`累计 ${interactions} 次反馈`} />
       {loading ? (
-        <div className="flex items-center gap-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+        <div className="flex items-center gap-2 text-xs text-muted">
           <Spinner size="sm" /> 加载中…
         </div>
       ) : total === 0 ? (
@@ -219,7 +195,7 @@ function PreferenceList({
 }) {
   return (
     <div>
-      <div className="text-xs mb-1" style={{ color: "var(--yunque-text-muted)" }}>
+      <div className="text-xs mb-1 text-muted">
         {title} · {items.length}
       </div>
       <div className="flex flex-wrap gap-1.5">
@@ -238,7 +214,7 @@ function EvaluationsColumn({ items, loading }: { items: EvaluationEntry[]; loadi
     <Card className="section-card p-4">
       <ColumnHeader icon={<Trophy size={16} />} title="自评" hint="任务完成后的评分" />
       {loading ? (
-        <div className="flex items-center gap-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+        <div className="flex items-center gap-2 text-xs text-muted">
           <Spinner size="sm" /> 加载中…
         </div>
       ) : items.length === 0 ? (
@@ -251,8 +227,7 @@ function EvaluationsColumn({ items, loading }: { items: EvaluationEntry[]; loadi
             return (
               <div
                 key={e.id}
-                className="rounded-md px-3 py-2 text-sm"
-                style={{ background: "rgba(255,255,255,0.02)", border: "1px solid var(--yunque-border)" }}
+                className="rounded-xl px-3 py-2 text-sm bg-surface-secondary border border-border"
               >
                 <div className="flex items-center gap-2 mb-1">
                   <Chip size="sm" color={color}>
@@ -260,17 +235,17 @@ function EvaluationsColumn({ items, loading }: { items: EvaluationEntry[]; loadi
                   </Chip>
                   <Chip size="sm">达成 {(e.goal_achieved * 100).toFixed(0)}%</Chip>
                   <Chip size="sm">效率 {(e.efficiency * 100).toFixed(0)}%</Chip>
-                  <span className="text-xs ml-auto" style={{ color: "var(--yunque-text-muted)" }}>
+                  <span className="text-xs ml-auto text-muted">
                     {formatTimestamp(e.created_at)}
                   </span>
                 </div>
                 {e.reasoning ? (
-                  <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+                  <div className="text-xs text-muted">
                     {e.reasoning}
                   </div>
                 ) : null}
                 {e.suggestions && e.suggestions.length > 0 ? (
-                  <ul className="text-xs mt-1 list-disc list-inside" style={{ color: "var(--yunque-text-muted)" }}>
+                  <ul className="text-xs mt-1 list-disc list-inside text-muted">
                     {e.suggestions.map((s, i) => (
                       <li key={i}>{s}</li>
                     ))}
@@ -339,49 +314,30 @@ export default function ExperiencePackPage() {
     <div className="page-root space-y-6 animate-fade-in-up">
       <PageHeader icon={<History size={20} />} title="经验" />
 
-      <Card className="section-card overflow-hidden p-0">
-        <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="p-5">
-            <div className="flex flex-wrap items-center gap-2">
-              <Chip size="sm" style={{ background: "rgba(34,197,94,0.10)", color: "var(--yunque-success)" }}>可直接使用</Chip>
-              <Chip size="sm" variant="soft">推荐下一步</Chip>
-              <Chip size="sm" variant="soft">可回到 Chat</Chip>
-            </div>
-            <div className="mt-3 text-base font-semibold" style={{ color: "var(--yunque-text)" }}>
-              这个能力包现在适合做什么
-            </div>
-            <div className="mt-2 max-w-3xl text-sm leading-6" style={{ color: "var(--yunque-text-secondary)" }}>
-              它用于把云雀完成任务后的反馈、偏好和自评分数变成可查看的经验面板。当前可以查看推荐能力、偏好画像和任务自评，并把任一条推荐或自评带回 Chat 继续规划下一步。
-            </div>
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
-              {userFacingSteps.map((item) => (
-                <div key={item.title} className="rounded-lg p-3" style={{ background: "var(--yunque-bg-hover)", border: "1px solid var(--yunque-border)" }}>
-                  <div className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>{item.title}</div>
-                  <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>{item.body}</div>
-                </div>
-              ))}
-            </div>
+      <PackAbout
+        chips={<>
+          <Chip size="sm" color="success">可直接使用</Chip>
+          <Chip size="sm" variant="soft">推荐下一步</Chip>
+          <Chip size="sm" variant="soft">可回到 Chat</Chip>
+        </>}
+        description="它用于把云雀完成任务后的反馈、偏好和自评分数变成可查看的经验面板。当前可以查看推荐能力、偏好画像和任务自评，并把任一条推荐或自评带回 Chat 继续规划下一步。"
+        boundaries={boundaryItems}
+      />
+
+      <Card variant="default">
+        <Card.Content className="flex flex-col gap-4">
+          <PackStepsGrid steps={userFacingSteps} columns={3} />
+          <div className="text-sm leading-6 text-muted">
+            Agent 会根据你的反馈累积经验：动态推荐最值得使用的技能、维护对你的偏好画像，并对每次任务做自我评分。
           </div>
-          <div className="p-5" style={{ background: "rgba(245,158,11,0.08)", borderLeft: "1px solid var(--yunque-border)" }}>
-            <div className="mb-3 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>当前不会做什么</div>
-            <div className="space-y-2 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
-              {boundaryItems.map((item) => <div key={item}>{item}</div>)}
-            </div>
-          </div>
-        </div>
+        </Card.Content>
       </Card>
 
-      <Card className="section-card p-4 text-sm" style={{ color: "var(--yunque-text-muted)" }}>
-        Agent 会根据你的反馈累积经验：动态推荐最值得使用的技能、维护对你的偏好画像，并对每次任务做自我评分。
-      </Card>
-
-      <Card className="section-card p-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>从经验到下一次交付</div>
-            <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
-              经验页不是分数墙；它要帮助你把推荐、偏好和自评变成下一次更稳的任务方案。
-            </div>
+      <Card variant="default">
+        <Card.Header className="flex-row flex-wrap items-start justify-between gap-3">
+          <div className="flex flex-col gap-1">
+            <PackSectionTitle icon={<Trophy size={15} />} tone="accent">从经验到下一次交付</PackSectionTitle>
+            <span className="text-xs leading-5 text-muted">经验页不是分数墙；它要帮助你把推荐、偏好和自评变成下一次更稳的任务方案。</span>
           </div>
           <div className="flex flex-wrap gap-2">
             <Link href={chatPromptHref("请根据经验页里的推荐、偏好和最近任务自评，帮我规划下一次任务，并说明哪些经验应该继续保留。")}>
@@ -395,30 +351,22 @@ export default function ExperiencePackPage() {
               </Button>
             </Link>
           </div>
-        </div>
-        <div className="mt-3 grid gap-2 md:grid-cols-4">
-          {workflowLoopItems.map((item) => (
-            <div key={item.title} className="rounded-md border p-3" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-surface)" }}>
-              <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>{item.title}</div>
-              <div className="mt-2 text-[11px] leading-5" style={{ color: "var(--yunque-text-muted)" }}>{item.body}</div>
-            </div>
-          ))}
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2 text-xs">
-          <Link href="/memory"><Button size="sm" variant="ghost">查看记忆画像</Button></Link>
-          <Link href="/trace"><Button size="sm" variant="ghost">核对执行轨迹</Button></Link>
-          <Link href="/packs/studio?packId=yunque.pack.experience"><Button size="sm" variant="ghost">让小羽继续改</Button></Link>
-        </div>
+        </Card.Header>
+        <Card.Content className="flex flex-col gap-3">
+          <PackStepsGrid steps={workflowLoopItems} columns={4} />
+          <div className="flex flex-wrap gap-2">
+            <Link href="/memory"><Button size="sm" variant="ghost">查看记忆画像</Button></Link>
+            <Link href="/trace"><Button size="sm" variant="ghost">核对执行轨迹</Button></Link>
+            <Link href="/packs/studio?packId=yunque.pack.experience"><Button size="sm" variant="ghost">让小羽继续改</Button></Link>
+          </div>
+        </Card.Content>
       </Card>
 
       {error ? (
-        <Card className="p-4" style={{ background: "rgba(239,68,68,0.05)" }}>
-          <div className="flex items-center gap-2">
-            <AlertTriangle size={16} style={{ color: "var(--yunque-danger)" }} />
-            <span className="text-sm" style={{ color: "var(--yunque-danger)" }}>
-              {error}
-            </span>
-          </div>
+        <Card variant="secondary">
+          <Card.Content className="flex items-center gap-2 text-sm text-danger">
+            <AlertTriangle size={16} /> {error}
+          </Card.Content>
         </Card>
       ) : null}
 

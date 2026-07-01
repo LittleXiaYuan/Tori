@@ -109,7 +109,6 @@ const checks = [
   ["Files SDK manifest", "sdk/scripts/check-files-sdk-manifest.mjs"],
   ["Browser SDK manifest", "sdk/scripts/check-browser-sdk-manifest.mjs"],
   ["Plugin API SDK manifest", "sdk/scripts/check-plugin-api-sdk-manifest.mjs"],
-  ["Airi SDK manifest", "sdk/scripts/check-airi-sdk-manifest.mjs"],
   ["Agent Kit SDK manifest", "sdk/scripts/check-agent-kit-sdk-manifest.mjs"],
 ];
 

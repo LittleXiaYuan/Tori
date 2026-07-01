@@ -372,6 +372,12 @@ func TestStepRetryExhausted(t *testing.T) {
 	if got.Steps[0].RetryCount != DefaultMaxRetries {
 		t.Fatalf("expected %d retries, got %d", DefaultMaxRetries, got.Steps[0].RetryCount)
 	}
+	if got.RecoveryHint == nil {
+		t.Fatal("expected runner to store recovery hint")
+	}
+	if got.RecoveryHint.Source != "runner:step" {
+		t.Fatalf("recovery source=%q, want runner:step", got.RecoveryHint.Source)
+	}
 }
 
 func TestTaskCancel(t *testing.T) {
@@ -455,6 +461,12 @@ func TestRecoverInterrupted(t *testing.T) {
 	got1, _ := s2.Get(t1.ID)
 	if got1.Status != StatusInterrupted {
 		t.Fatalf("expected interrupted, got %s", got1.Status)
+	}
+	if got1.RecoveryHint == nil {
+		t.Fatal("recovered interrupted task should have recovery hint")
+	}
+	if got1.RecoveryHint.Source != "store:recover_interrupted" {
+		t.Fatalf("recovery source=%q, want store:recover_interrupted", got1.RecoveryHint.Source)
 	}
 	if got1.Steps[0].Status != StepPending {
 		t.Fatalf("running step should be reset to pending, got %s", got1.Steps[0].Status)
@@ -570,6 +582,9 @@ func TestTaskResumeFromFailed(t *testing.T) {
 	if got.Status != StatusFailed {
 		t.Fatalf("expected failed, got %s", got.Status)
 	}
+	if got.RecoveryHint == nil || got.RecoveryHint.Source != "runner:step" {
+		t.Fatalf("expected runner failure hint, got %#v", got.RecoveryHint)
+	}
 
 	// Resume should succeed (counter is now past 3 so next call succeeds)
 	err = runner.Resume(context.Background(), tk.ID)
@@ -580,6 +595,9 @@ func TestTaskResumeFromFailed(t *testing.T) {
 	got, _ = s.Get(tk.ID)
 	if got.Status != StatusCompleted {
 		t.Fatalf("expected completed after resume, got %s", got.Status)
+	}
+	if got.RecoveryHint != nil {
+		t.Fatalf("resume should clear stale recovery hint, got %#v", got.RecoveryHint)
 	}
 }
 

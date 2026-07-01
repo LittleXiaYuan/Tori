@@ -62,6 +62,7 @@ describe("ExecutionTrace detail cards", () => {
     expect(screen.getByText("1/2")).toBeInTheDocument();
     expect(screen.getByText("失败原因：boom")).toBeInTheDocument();
     expect(screen.getByText("执行失败步骤")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "详情页" })).toHaveAttribute("href", "/planner-checkpoint?plan_id=plan-1");
   });
 
   it("renders model fallback detail naturally", () => {
@@ -212,6 +213,11 @@ describe("ExecutionTrace detail cards", () => {
       failure_pattern: "模型或子任务响应不稳定",
       recommendation: "先返回阶段结果或切为后台任务；继续时降低任务粒度，暂不重复使用 transfer_to_file_exec。",
       recoverable: true,
+      primary_target: {
+        category: "provider",
+        label: "检查模型供应商",
+        href: "/settings/providers?tab=providers",
+      },
       tried: ["file_open: read README"],
       ruled_out: [
         "transfer_to_file_exec: context deadline exceeded",
@@ -230,6 +236,7 @@ describe("ExecutionTrace detail cards", () => {
     expect(screen.getByText(/推荐策略：先返回阶段结果或切为后台任务/)).toBeInTheDocument();
     expect(screen.getByText(/响应暂时超时，已保留现场/)).toBeInTheDocument();
     expect(screen.getByText(/所有可用模型通道暂时失败，已保留现场/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "检查模型供应商" })).toHaveAttribute("href", "/settings/providers?tab=providers");
     expect(screen.queryByText(/context deadline exceeded|all fallback|EOF/)).toBeNull();
 
     fireEvent.click(screen.getByText("换策略继续"));
@@ -240,6 +247,83 @@ describe("ExecutionTrace detail cards", () => {
     expect(onRecoveryPrompt.mock.calls[0][0]).toContain("响应暂时超时，已保留现场");
     expect(onRecoveryPrompt.mock.calls[0][0]).not.toContain("context deadline exceeded");
     expect(onRecoveryPrompt.mock.calls[0][0]).not.toContain("EOF");
+  });
+
+  it("renders repeated failure skill recovery targets", () => {
+    render(<ExecutionTrace events={[evt("evt-skill-recovery", "检测到连续失败，正在切换执行策略", {
+      failed_count: 2,
+      failed_tools: ["document_writer"],
+      failure_pattern: "所需技能不可用",
+      recommendation: "先安装、启用或替换技能，再继续执行失败步骤。",
+      recoverable: true,
+      primary_target: {
+        category: "skill",
+        label: "检查技能",
+        href: "/skills",
+      },
+      ruled_out: [
+        "document_writer: unknown skill: document_writer",
+      ],
+      next_step: "安装、启用或替换技能后重试失败步骤。",
+    })]} />);
+
+    expandTrace();
+    fireEvent.click(screen.getByText("检测到连续失败，正在切换执行策略"));
+
+    expect(screen.getByText("失败模式：所需技能不可用")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "检查技能" })).toHaveAttribute("href", "/skills");
+    expect(screen.queryByText(/unknown skill/)).toBeNull();
+  });
+
+  it("anchors dependency recovery targets with a plan id to the dependency view", () => {
+    render(<ExecutionTrace events={[evt("evt-dependency-recovery", "检测到连续失败，正在切换执行策略", {
+      plan_id: "plan-dependency",
+      failed_count: 2,
+      failed_tools: ["等待前置步骤"],
+      failure_pattern: "规划依赖未满足",
+      recommendation: "回到最早未完成的前置步骤，先补齐依赖，再执行后续步骤。",
+      recoverable: true,
+      primary_target: {
+        category: "dependency",
+        label: "查看依赖关系",
+        action: "inspect_dependencies",
+      },
+      ruled_out: [
+        "等待前置步骤: dependency step 2 尚未完成",
+      ],
+      next_step: "先检查依赖关系，再重试失败步骤。",
+    })]} />);
+
+    expandTrace();
+    fireEvent.click(screen.getByText("检测到连续失败，正在切换执行策略"));
+
+    expect(screen.getByText("失败模式：规划依赖未满足")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "查看依赖关系" })).toHaveAttribute(
+      "href",
+      "/planner-checkpoint?plan_id=plan-dependency#dependency-view",
+    );
+  });
+
+  it("anchors approval recovery targets without href to the approvals page", () => {
+    render(<ExecutionTrace events={[evt("evt-approval-recovery", "检测到连续失败，正在切换执行策略", {
+      failed_count: 1,
+      completed_count: 1,
+      failure_pattern: "需要用户确认或更高信任",
+      recommendation: "暂停自动推进，向用户说明需要确认的动作，确认后再继续。",
+      recoverable: true,
+      primary_target: {
+        category: "approval",
+        label: "处理审批",
+        action: "handle_approval",
+      },
+      next_step: "先处理审批，再重试失败步骤。",
+    })]} />);
+
+    expandTrace();
+    fireEvent.click(screen.getByText("检测到连续失败，正在切换执行策略"));
+
+    expect(screen.getByText(/需要更高信任或确认/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "处理审批" })).toHaveAttribute("href", "/approvals");
   });
 
   it("renders partial planner result detail with recovery actions", () => {

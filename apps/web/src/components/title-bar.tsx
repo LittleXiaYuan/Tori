@@ -16,14 +16,6 @@ function tauriInvoke(cmd: string, args?: Record<string, unknown>): Promise<unkno
 
 export function WindowControls() {
   const [maximized, setMaximized] = useState(false);
-  const [hovered, setHovered] = useState(false);
-  const [isMac, setIsMac] = useState(false);
-
-  useEffect(() => {
-    if (typeof navigator !== "undefined") {
-      setIsMac(navigator.platform?.startsWith("Mac") || navigator.userAgent?.includes("Mac"));
-    }
-  }, []);
 
   useEffect(() => {
     tauriInvoke("plugin:window|is_maximized")
@@ -66,22 +58,16 @@ export function WindowControls() {
     fireAction("toggleMax", () => tauriInvoke("plugin:window|toggle_maximize"));
   }, [fireAction]);
 
-  if (isMac) return null;
-
   return (
-    <div
-      className="window-controls"
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
-      <button className="ctl ctl-close" aria-label="关闭" onMouseDown={close} onClick={close}>
-        {hovered && <CloseSvg />}
-      </button>
+    <div className="window-controls">
       <button className="ctl ctl-minimize" aria-label="最小化" onMouseDown={minimize} onClick={minimize}>
-        {hovered && <MinimizeSvg />}
+        <MinimizeSvg />
       </button>
       <button className="ctl ctl-maximize" aria-label={maximized ? "还原" : "最大化"} onMouseDown={toggleMax} onClick={toggleMax}>
-        {hovered && (maximized ? <RestoreSvg /> : <MaximizeSvg />)}
+        {maximized ? <RestoreSvg /> : <MaximizeSvg />}
+      </button>
+      <button className="ctl ctl-close" aria-label="关闭" onMouseDown={close} onClick={close}>
+        <CloseSvg />
       </button>
     </div>
   );

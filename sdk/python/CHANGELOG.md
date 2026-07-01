@@ -85,5 +85,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Search SDK for web search
 - Modes SDK for persona modes
 - Interactions SDK for emotion, instructions, and reactions
-- Airi Bridge SDK for Airi desktop pet integration
 - Breaker SDK for circuit breaker reset

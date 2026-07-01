@@ -90,7 +90,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Reflect client with experiences and strategies
 - Tools client for server-side tool process control
 - Sandbox client for sandbox runtime operations
-- Airi client for Airi desktop pet bridge
 - Auth client for authentication and token exchange
 - Backup client for backup and restore operations
 

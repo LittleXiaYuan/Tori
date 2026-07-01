@@ -5,7 +5,7 @@
   "description": "本地桌面壳控制能力：切换控制台显示状态，并管理开机自启动。",
   "requiresCore": ">=0.1.0",
   "optional": true,
-  "defaultState": "enabled",
+  "defaultState": "disabled",
   "backend": {
     "capabilities": [
       "desktop.console.read",

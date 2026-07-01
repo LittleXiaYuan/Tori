@@ -104,6 +104,10 @@ describe("PackDetailClientPage", () => {
     expect(screen.getByText(/让 Needs Context Pack 更像一个用户能直接理解和使用的能力包/)).toBeInTheDocument();
     expect(screen.getByText("体检缺口")).toBeInTheDocument();
     expect(screen.getByText("使用示例")).toBeInTheDocument();
+    expect(screen.getAllByText("Manifest 审计").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/阻塞验收/).length).toBeGreaterThan(0);
+    expect(screen.getByText("入口可能 404")).toBeInTheDocument();
+    expect(screen.getByText(/这些 \/packs 子路由没有静态页面：\/packs\/needs-context/)).toBeInTheDocument();
     expect(screen.getByText("来源与包")).toBeInTheDocument();
     expect(screen.getByText("本机已安装记录；可在工坊先做只读检查，再准备工作区。")).toBeInTheDocument();
     expect(screen.getByText("验收路径")).toBeInTheDocument();
@@ -113,8 +117,9 @@ describe("PackDetailClientPage", () => {
     expect(screen.getByText("它不会做")).toBeInTheDocument();
     expect(screen.getByText("怎么验收")).toBeInTheDocument();
     expect(screen.getByText("不合适时")).toBeInTheDocument();
-    expect(screen.getByText("验收出口：")).toBeInTheDocument();
-    expect(screen.getByText(/回中心确认状态，进详情复查权限；这个包没有独立入口/)).toBeInTheDocument();
+    expect(screen.getByText("验收：")).toBeInTheDocument();
+    expect(screen.getByText(/中心看状态，详情复查权限；没有独立入口时/)).toBeInTheDocument();
+    expect(screen.queryByText("验收出口：")).not.toBeInTheDocument();
     expect(screen.getByText("确认来源")).toBeInTheDocument();
     expect(screen.getByText(/来源：本机已安装记录/)).toBeInTheDocument();
     expect(screen.getByText("能力边界")).toBeInTheDocument();

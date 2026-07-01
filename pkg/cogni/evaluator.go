@@ -31,6 +31,12 @@ type Session struct {
 	// Perception carries runtime multi-modal signals for advanced activation.
 	Perception *PerceptionSignal
 
+	// PerceptionHint carries the cognisdk Pack perception result (intent/risk)
+	// so Declaration ActivationRules can reference it. Populated from
+	// ContextRequest.PerceptionHint by Hook.evaluate. Step 3 of cogni
+	// consolidation: cognisdk 猜到的用户意图/风险，cogni 激活时可参考。
+	PerceptionHint *PerceptionHint
+
 	// MessageVec is the precomputed embedding of Message, set by the Hook when an
 	// embedder is wired (SetEmbedder). It enables semantic activation without the
 	// Evaluator performing any I/O. Empty = semantic scoring is skipped.
@@ -241,6 +247,26 @@ func (e *Evaluator) evaluateOne(d *Declaration, s Session) Activation {
 		pScore, pReasons := evaluatePerception(d.Activation.Perception, s, s.Perception)
 		score += pScore
 		act.Reasons = append(act.Reasons, pReasons...)
+	}
+
+	// Intent-based activation (Step 3 of cogni consolidation): cognisdk's
+	// perception intent feeds cogni activation. Inert when no PerceptionHint
+	// wired — backward compatible with keyword/regex-only Cognis.
+	if len(d.Activation.IntentMatch) > 0 && s.PerceptionHint != nil {
+		intent := s.PerceptionHint.Intent
+		if intent != "" {
+			iw := d.Activation.IntentWeight
+			if iw == 0 {
+				iw = 0.4
+			}
+			for _, want := range d.Activation.IntentMatch {
+				if want == intent {
+					score += iw
+					act.Reasons = append(act.Reasons, "intent: "+intent)
+					break
+				}
+			}
+		}
 	}
 
 	// Semantic activation: cosine(message, cogni examples). Only contributes when

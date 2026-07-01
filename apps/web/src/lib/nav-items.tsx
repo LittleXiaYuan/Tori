@@ -6,11 +6,11 @@
  */
 import type React from "react";
 import {
-  MessageCircle, Zap, BookOpen, ScanFace, Package, Settings,
-  MailWarning, Puzzle, Brain, BrainCircuit,
-  Shield, ShieldCheck, BarChart3, Globe, Blocks,
-  Terminal, Cpu, LayoutDashboard, Wrench, SmilePlus, HeartPulse,
-  Lightbulb, Share2, Bot, FolderGit2, Boxes, Users, Workflow,
+  MessageCircle, Zap, BookOpen, Package, Settings,
+  Puzzle, Brain, BrainCircuit,
+  Shield, ShieldCheck, Globe, Blocks,
+  LayoutDashboard, Wrench,
+  Lightbulb, Bot, Boxes,
 } from "lucide-react";
 import type { ProfileMode } from "@/lib/profile-mode";
 
@@ -40,6 +40,9 @@ export interface NavItem {
   packId?: string;
   icon: React.ReactNode;
   keywords?: string;
+  /** Optional family label (from a pack's metadata.group) used to sub-group
+   *  pack items inside the flyout's advanced section. Core nav items omit it. */
+  familyLabel?: string;
 }
 
 /** Pack that owns the control-plane / Pro 运维 surfaces (Phase A2 manifest). */
@@ -64,73 +67,56 @@ export const MCP_DISPATCH_PACK_ID = "yunque.pack.mcp-dispatch";
 export const DEFAULT_ENABLED_PACK_IDS = new Set<string>([
   MEMORY_PACK_ID,
   KNOWLEDGE_PACK_ID,
-  COGNI_CONSOLE_PACK_ID,
   WORKSPACE_PACK_ID,
-  "yunque.pack.inner-life",
-  "yunque.pack.night-school",
-  "yunque.pack.experience",
-  "yunque.pack.world-model",
-  "yunque.pack.micro-agent",
+  // inner-world aggregator ships enabled so the consolidated 内在世界 surface
+  // (inner-life / world-model / experience / cognitive-canary) renders without flash.
+  "yunque.pack.inner-world",
 ]);
 
 export const DEFAULT_NAV_ITEM_IDS = new Set<string>([
-  "nav-dashboard",
   "nav-chat",
-  "nav-missions",
-  "nav-knowledge",
-  "nav-memory",
-  "nav-packs",
-  "nav-cognis",
   "nav-settings",
 ]);
 
 export const NAV_ITEMS: NavItem[] = [
   // 概览 - 核心功能（easy 模式可见）
-  { id: "nav-dashboard", href: "/dashboard", label: "工作台", group: "概览", layer: "core", defaultVisible: true, packId: WORKSPACE_PACK_ID, icon: <LayoutDashboard size={16} />, keywords: "dashboard home 主页 仪表盘 overview workspace 工作台 场景" },
+  { id: "nav-dashboard", href: "/dashboard", label: "工作台", group: "概览", layer: "core", packId: WORKSPACE_PACK_ID, icon: <LayoutDashboard size={16} />, keywords: "dashboard home 主页 仪表盘 overview workspace 工作台 场景" },
   { id: "nav-chat", href: "/chat", label: "对话", group: "概览", layer: "core", defaultVisible: true, icon: <MessageCircle size={16} />, keywords: "chat 聊天 会话 行动 产物" },
 
   // 工作 - 核心功能
-  { id: "nav-missions", href: "/missions", label: "任务中心", group: "工作", layer: "core", defaultVisible: true, icon: <Zap size={16} />, keywords: "missions tasks 任务 反馈 验收" },
+  { id: "nav-missions", href: "/missions", label: "任务中心", group: "工作", layer: "core", icon: <Zap size={16} />, keywords: "missions tasks 任务 反馈 验收" },
 
   // 工作 - 辅助功能（full 模式）
-  { id: "nav-task-run", href: "/task-run", label: "执行视图", group: "工作", layer: "core", packId: WORK_PACK_ID, icon: <Terminal size={16} />, keywords: "task run 执行 运行" },
-  { id: "nav-projects", href: "/projects", label: "项目", group: "工作", layer: "core", packId: WORK_PACK_ID, icon: <FolderGit2 size={16} />, keywords: "projects 项目 repo workspace" },
   { id: "nav-workflows", href: "/workflows", label: "工作流", group: "工作", layer: "lab", packId: WORK_PACK_ID, icon: <Blocks size={16} />, keywords: "workflow 工作流 流程 lab 实验" },
-  { id: "nav-workers", href: "/workers", label: "外部 Worker", group: "工作", layer: "pack", packId: MCP_DISPATCH_PACK_ID, icon: <Cpu size={16} />, keywords: "workers worker AI IDE MCP 外部执行器 协作 分派" },
 
   // 智能 - 核心功能（核心「智能」只保留 知识库 / 记忆，不再被内省 Pack 挤占）
-  { id: "nav-knowledge", href: "/knowledge", label: "知识库", group: "智能", layer: "core", defaultVisible: true, packId: KNOWLEDGE_PACK_ID, icon: <BookOpen size={16} />, keywords: "knowledge 知识 RAG" },
-  { id: "nav-memory", href: "/memory", label: "记忆", group: "智能", layer: "core", defaultVisible: true, packId: MEMORY_PACK_ID, icon: <Brain size={16} />, keywords: "memory 记忆 反馈 沉淀" },
+  { id: "nav-knowledge", href: "/knowledge", label: "知识库", group: "智能", layer: "core", icon: <BookOpen size={16} />, keywords: "knowledge 知识 RAG" },
+  { id: "nav-memory", href: "/memory", label: "记忆", group: "智能", layer: "core", icon: <Brain size={16} />, keywords: "memory 记忆 反馈 沉淀" },
 
   // 扩展 - 核心功能
-  { id: "nav-packs", href: "/packs", label: "能力包", group: "扩展", layer: "pack", defaultVisible: true, icon: <Boxes size={16} />, keywords: "packs pack runtime 能力包 热插拔 可选能力 默认入口" },
-  { id: "nav-cognis", href: "/cognis", label: "Cogni", group: "扩展", layer: "core", defaultVisible: true, packId: COGNI_CONSOLE_PACK_ID, icon: <BrainCircuit size={16} />, keywords: "Cogni cognis 助手 assistant 智体 认知内核 我的 Cogni" },
+  { id: "nav-packs", href: "/packs", label: "能力包", group: "扩展", layer: "pack", icon: <Boxes size={16} />, keywords: "packs pack runtime 能力包 热插拔 可选能力 默认入口" },
+  { id: "nav-cognis", href: "/cognis", label: "Cogni", group: "扩展", layer: "core", packId: COGNI_CONSOLE_PACK_ID, icon: <BrainCircuit size={16} />, keywords: "Cogni cognis 助手 assistant 智体 认知内核 我的 Cogni" },
 
   // 扩展 - 开发工具（full 模式）
   { id: "nav-skills", href: "/skills", label: "技能", group: "扩展", layer: "lab", packId: SKILLS_PACK_ID, icon: <Package size={16} />, keywords: "skills 技能 技能库 运行时技能 高级入口 legacy pack 的原子能力来源" },
   { id: "nav-plugins", href: "/plugins", label: "插件宿主", group: "扩展", layer: "control-plane", packId: CONTROL_PLANE_PACK_ID, icon: <Puzzle size={16} />, keywords: "plugins 插件 宿主 运行时 高级入口 legacy pack 的代码载体" },
 
   // 扩展 - 内省能力包（由对应 Pack 启用后出现，归入「扩展」而非核心「智能」，避免每个 Pack 都挤占主导航）
-  { id: "nav-inner-life", href: "/packs/inner-life", label: "内在生活", group: "扩展", layer: "pack", packId: "yunque.pack.inner-life", icon: <HeartPulse size={16} />, keywords: "inner life 内在生活 反思 好奇 dreaming 自省 内省" },
+  // inner-life / world-model / experience / cognitive-canary 现由「内在世界」表现层
+  // 聚合页统一承载（一个 tab 页），不再各占一条导航；夜校 / 微代理 仍独立。
+  { id: "nav-inner-world", href: "/packs/inner-world", label: "内在世界", group: "扩展", layer: "lab", packId: "yunque.pack.inner-world", icon: <Globe size={16} />, keywords: "inner world 内在世界 内在生活 世界模型 经验 认知金丝雀 反思 因果 自省 内省 聚合" },
   { id: "nav-night-school", href: "/packs/night-school", label: "夜校", group: "扩展", layer: "pack", packId: "yunque.pack.night-school", icon: <Lightbulb size={16} />, keywords: "night school 夜校 蒸馏 特质 学习 内省" },
-  { id: "nav-experience", href: "/packs/experience", label: "经验", group: "扩展", layer: "pack", packId: "yunque.pack.experience", icon: <SmilePlus size={16} />, keywords: "experience 经验 推荐 评估 沉淀 内省" },
-  { id: "nav-world-model", href: "/packs/world-model", label: "世界模型", group: "扩展", layer: "pack", packId: "yunque.pack.world-model", icon: <Globe size={16} />, keywords: "world model 世界模型 因果 causal 内省" },
   { id: "nav-micro-agent", href: "/packs/micro-agent", label: "微代理", group: "扩展", layer: "pack", packId: "yunque.pack.micro-agent", icon: <Bot size={16} />, keywords: "micro agent 微代理 react 子代理 内省" },
 
   // 系统 - 核心功能
   { id: "nav-settings", href: "/settings", label: "设置", group: "系统", layer: "core", defaultVisible: true, icon: <Settings size={16} />, keywords: "settings 偏好 设置" },
 
   // 系统 - 控制面（由 control-plane Pro 包驱动，启用后才出现）
-  { id: "nav-inbox", href: "/inbox", label: "收件箱", group: "系统", layer: "control-plane", packId: CONTROL_PLANE_PACK_ID, icon: <MailWarning size={16} />, keywords: "inbox 消息 通知 渠道 控制面" },
+  { id: "nav-system", href: "/system", label: "系统状态", group: "系统", layer: "control-plane", packId: CONTROL_PLANE_PACK_ID, icon: <LayoutDashboard size={16} />, keywords: "system 系统状态 指标 信任 渠道 成本 模块 运维 metrics trust channels cost modules" },
   { id: "nav-tools", href: "/tools", label: "终端", group: "系统", layer: "control-plane", packId: CONTROL_PLANE_PACK_ID, icon: <Wrench size={16} />, keywords: "tools terminal shell 工具 运维" },
-  { id: "nav-models", href: "/models", label: "模型", group: "系统", layer: "control-plane", packId: CONTROL_PLANE_PACK_ID, icon: <Cpu size={16} />, keywords: "models 模型 LLM 控制面" },
   { id: "nav-providers", href: "/settings/providers", label: "提供商", group: "系统", layer: "control-plane", packId: CONTROL_PLANE_PACK_ID, icon: <Globe size={16} />, keywords: "providers 提供商 api key 控制面" },
-  { id: "nav-metrics", href: "/metrics", label: "指标", group: "系统", layer: "control-plane", packId: CONTROL_PLANE_PACK_ID, icon: <BarChart3 size={16} />, keywords: "metrics 统计 指标 控制面" },
   { id: "nav-approvals", href: "/approvals", label: "审批", group: "系统", layer: "control-plane", packId: CONTROL_PLANE_PACK_ID, icon: <ShieldCheck size={16} />, keywords: "approvals 审批 控制面" },
   { id: "nav-audit", href: "/audit", label: "审计", group: "系统", layer: "control-plane", packId: CONTROL_PLANE_PACK_ID, icon: <Shield size={16} />, keywords: "audit 日志 审计 控制面" },
-  { id: "nav-trust", href: "/trust", label: "信任", group: "系统", layer: "control-plane", packId: CONTROL_PLANE_PACK_ID, icon: <ShieldCheck size={16} />, keywords: "trust 安全 信任 控制面" },
-  { id: "nav-tenants", href: "/tenants", label: "租户", group: "系统", layer: "control-plane", packId: CONTROL_PLANE_PACK_ID, icon: <Users size={16} />, keywords: "tenants 租户 团队 控制面" },
-  { id: "nav-bots", href: "/bots", label: "Bot", group: "系统", layer: "control-plane", packId: CONTROL_PLANE_PACK_ID, icon: <Bot size={16} />, keywords: "bots bot 机器人 渠道 控制面" },
 ];
 
 export const NAV_GROUP_ORDER: NavGroup[] = ["概览", "工作", "智能", "系统", "扩展"];

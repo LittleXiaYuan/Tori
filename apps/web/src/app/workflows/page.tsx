@@ -3,12 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, type WorkflowDef, type WorkflowInstance } from "@/lib/api";
-import { Card, Button, Spinner, Chip, Tooltip, Table, TextArea } from "@heroui/react";
+import { Card, Button, Spinner, Chip, Tooltip, TextArea } from "@heroui/react";
 import {
-  GitBranch, Plus, Trash2, Play, RefreshCw,
-  CheckCircle2, Square, Layers, Settings2, Sparkles, Wand2, ArrowRight,
+  GitBranch, Trash2, Play, RefreshCw, Pencil,
+  CheckCircle2, Square, Layers, Sparkles, Wand2,
 } from "lucide-react";
 import { showToast } from "@/components/toast-provider";
+import { confirmAction } from "@/components/confirm-dialog";
 import { STATUS_COLORS, relTime } from "@/lib/constants";
 import { useApiData } from "@/lib/use-api-data";
 import EmptyState from "@/components/empty-state";
@@ -80,7 +81,13 @@ export default function WorkflowsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("确定要删除这个工作流吗？此操作不可恢复。")) return;
+    const confirmed = await confirmAction({
+      title: "删除工作流",
+      body: "确定要删除这个工作流吗？此操作不可恢复。",
+      confirmLabel: "删除",
+      tone: "danger",
+    });
+    if (!confirmed) return;
     try {
       await api.workflowDelete(id);
       refresh();
@@ -104,34 +111,30 @@ export default function WorkflowsPage() {
   }
 
   return (
-    <div className="page-root space-y-6 animate-fade-in-up">
+    <section className="desktop-page-scroll workflows-page page-root space-y-6 animate-fade-in-up" aria-labelledby="workflows-title">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <header className="workflows-hero">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: "rgba(139,92,246,0.12)" }}>
             <GitBranch size={18} style={{ color: "#8b5cf6" }} />
           </div>
           <div>
-            <h1 className="page-title">工作流</h1>
-            <p className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>管理 DAG 工作流定义与执行实例</p>
+            <h1 id="workflows-title" className="page-title">工作流</h1>
+            <p className="workflows-hero__desc">把重复动作保存成可运行流程。先用自然语言生成，再按步骤微调和试运行。</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="secondary" size="sm" onPress={() => router.push("/workflow-editor")}>
+            <Pencil size={14} /> 设计工作流
+          </Button>
           <Tooltip delay={0}>
-            <Button isIconOnly variant="ghost" size="sm" onPress={refresh} style={{ color: "var(--yunque-text-muted)" }}>
+            <Button isIconOnly aria-label="刷新工作流" variant="ghost" size="sm" onPress={refresh} style={{ color: "var(--yunque-text-muted)" }}>
               <RefreshCw size={14} />
             </Button>
             <Tooltip.Content>刷新</Tooltip.Content>
           </Tooltip>
-          <Button
-            size="sm"
-            className="gap-1.5 rounded-lg btn-accent"
-            onPress={() => router.push("/workflow-editor")}
-          >
-            <Plus size={14} /> 新建工作流
-          </Button>
         </div>
-      </div>
+      </header>
 
 
       {/* NL2Workflow */}
@@ -140,27 +143,17 @@ export default function WorkflowsPage() {
           <div className="p-5 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg, rgba(139,92,246,0.2), rgba(59,130,246,0.14))", color: "#a78bfa" }}>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg, rgba(139,92,246,0.2), var(--yunque-accent-muted))", color: "#a78bfa" }}>
                   <Wand2 size={18} />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
                     <h2 className="text-base font-semibold" style={{ color: "var(--yunque-text)" }}>自然语言生成工作流</h2>
-                    <Chip size="sm" style={{ background: "rgba(139,92,246,0.14)", color: "#a78bfa" }}>NL2Workflow</Chip>
+                    <Chip size="sm" style={{ background: "rgba(139,92,246,0.14)", color: "#a78bfa" }}>草稿</Chip>
                   </div>
-                  <p className="text-xs mt-1" style={{ color: "var(--yunque-text-muted)" }}>描述目标即可生成可编辑 DAG；模型不可用时自动使用模板兜底，演示不会断流。</p>
+                  <p className="text-xs mt-1" style={{ color: "var(--yunque-text-muted)" }}>描述目标即可生成可运行的工作流；生成后会出现在下方列表，直接运行和查看实例。</p>
                 </div>
               </div>
-              {generatedWorkflow && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="gap-1.5"
-                  onPress={() => router.push(`/workflow-editor?id=${generatedWorkflow.id}`)}
-                >
-                  打开编辑器 <ArrowRight size={13} />
-                </Button>
-              )}
             </div>
 
             <TextArea
@@ -209,17 +202,29 @@ export default function WorkflowsPage() {
                   </div>
                   <div className="text-xs mt-1 truncate" style={{ color: "var(--yunque-text-muted)" }}>{generateMessage || generatedWorkflow.description}</div>
                 </div>
-                <Button size="sm" variant="outline" onPress={() => router.push(`/workflow-editor?id=${generatedWorkflow.id}`)}>
-                  查看 DAG
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onPress={() => router.push(`/workflow-editor?id=${encodeURIComponent(generatedWorkflow.id)}`)}
+                >
+                  <Pencil size={13} /> 继续设计
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  isPending={runningId === generatedWorkflow.id}
+                  onPress={() => handleRun(generatedWorkflow.id)}
+                >
+                  <Play size={13} /> 运行
                 </Button>
               </div>
             )}
           </div>
 
-          <div className="p-5 space-y-3" style={{ background: "linear-gradient(180deg, rgba(139,92,246,0.10), rgba(59,130,246,0.04))", borderLeft: "1px solid var(--yunque-border)" }}>
+          <div className="p-5 space-y-3" style={{ background: "linear-gradient(180deg, rgba(139,92,246,0.10), var(--yunque-accent-soft))", borderLeft: "1px solid var(--yunque-border)" }}>
             {[
               ["1", "理解意图", "把自然语言拆成节点与依赖"],
-              ["2", "保存定义", "直接进入工作流列表与编辑器"],
+              ["2", "保存定义", "生成后进入下方工作流列表"],
               ["3", "试运行", "复用现有实例与审计记录"],
             ].map(([n, title, desc]) => (
               <div key={n} className="flex gap-3">
@@ -234,30 +239,11 @@ export default function WorkflowsPage() {
         </div>
       </Card>
 
-      {/* Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 stagger-children">
-        <Card className="section-card p-4">
-          <div className="flex items-center gap-1.5 kpi-label mb-1">
-            <Layers size={13} /> 工作流定义
-          </div>
-          <div className="kpi-value">{workflows.length}</div>
-        </Card>
-        <Card className="section-card p-4">
-          <div className="flex items-center gap-1.5 kpi-label mb-1">
-            <Play size={13} /> 运行实例
-          </div>
-          <div className="kpi-value">{instances.length}</div>
-        </Card>
-        <Card className="section-card p-4">
-          <div className="flex items-center gap-1.5 kpi-label mb-1">
-            <CheckCircle2 size={13} /> 成功率
-          </div>
-          <div className="kpi-value">
-            {instances.length > 0
-              ? `${Math.round((instances.filter((i) => i.status === "completed").length / instances.length) * 100)}%`
-              : "-"}
-          </div>
-        </Card>
+      {/* Status strip */}
+      <div className="workflows-status-strip" aria-label="工作流摘要">
+        <span><Layers size={12} aria-hidden />定义 <strong>{workflows.length}</strong></span>
+        <span><Play size={12} aria-hidden />运行实例 <strong>{instances.length}</strong></span>
+        <span><CheckCircle2 size={12} aria-hidden />成功率 <strong>{instances.length > 0 ? `${Math.round((instances.filter((i) => i.status === "completed").length / instances.length) * 100)}%` : "-"}</strong></span>
       </div>
 
       {/* Tabs */}
@@ -266,12 +252,14 @@ export default function WorkflowsPage() {
           { key: "definitions" as const, label: "定义", count: workflows.length },
           { key: "instances" as const, label: "实例", count: instances.length },
         ].map(({ key, label, count }) => (
-          <button
-            key={key}
-            onClick={() => setTab(key)}
-            className="filter-pill"
-            data-active={tab === key}
-          >
+        <button
+          key={key}
+          type="button"
+          onClick={() => setTab(key)}
+          className="filter-pill"
+          data-active={tab === key}
+          aria-current={tab === key ? "page" : undefined}
+        >
             {label}
             <span className="text-[10px] opacity-70">{count}</span>
           </button>
@@ -280,146 +268,107 @@ export default function WorkflowsPage() {
 
       {/* Definitions Tab */}
       {tab === "definitions" && (
-        <Card>
+        <section aria-labelledby="workflow-definitions-heading">
+          <h2 id="workflow-definitions-heading" className="sr-only">工作流定义</h2>
           {workflows.length === 0 ? (
             <EmptyState
               icon={<GitBranch size={24} style={{ color: "#8b5cf6" }} />}
               title="还没有工作流"
-              description="创建你的第一个自动化工作流"
-              actionLabel="新建工作流"
-              onAction={() => router.push("/workflow-editor")}
+              description="在上方描述你想自动化的目标，云雀会生成可运行的工作流。"
             />
           ) : (
-            <Table>
-              <Table.ScrollContainer>
-                <Table.Content aria-label="工作流列表" className="min-w-[600px]">
-                  <Table.Header>
-                    <Table.Column isRowHeader>名称</Table.Column>
-                    <Table.Column>节点数</Table.Column>
-                    <Table.Column>版本</Table.Column>
-                    <Table.Column>更新时间</Table.Column>
-                    <Table.Column>操作</Table.Column>
-                  </Table.Header>
-                  <Table.Body>
-                    {workflows.map((wf) => (
-                      <Table.Row key={wf.id}>
-                        <Table.Cell>
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: "rgba(139,92,246,0.12)" }}>
-                              <GitBranch size={14} style={{ color: "#8b5cf6" }} />
-                            </div>
-                            <div className="min-w-0">
-                              <div className="text-sm font-medium truncate" style={{ color: "var(--yunque-text)" }}>{wf.name}</div>
-                              <div className="text-[11px] truncate" style={{ color: "var(--yunque-text-muted)" }}>{wf.description || wf.id}</div>
-                            </div>
+            <div className="workflow-card-list">
+              {workflows.map((wf) => (
+                <Card key={wf.id} className="workflow-list-card section-card hover-lift">
+                  <Card.Content className="p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0 flex items-start gap-3">
+                        <div className="workflow-list-card__icon">
+                          <GitBranch size={15} aria-hidden />
+                        </div>
+                        <div className="min-w-0">
+                          <h3 className="workflow-list-card__title">{wf.name}</h3>
+                          <p className="workflow-list-card__desc">{wf.description || wf.id}</p>
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
+                            <Chip size="sm" variant="soft">{wf.nodes?.length || 0} 节点</Chip>
+                            <Chip size="sm" variant="soft">v{wf.version}</Chip>
+                            <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>{relTime(wf.updated_at)}</span>
                           </div>
-                        </Table.Cell>
-                        <Table.Cell>
-                          <Chip size="sm" style={{ background: "rgba(255,255,255,0.06)", color: "var(--yunque-text-secondary)" }}>
-                            {wf.nodes?.length || 0} 节点
-                          </Chip>
-                        </Table.Cell>
-                        <Table.Cell>
-                          <span className="text-xs font-mono" style={{ color: "var(--yunque-text-secondary)" }}>v{wf.version}</span>
-                        </Table.Cell>
-                        <Table.Cell>
-                          <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>{relTime(wf.updated_at)}</span>
-                        </Table.Cell>
-                        <Table.Cell>
-                          <div className="flex items-center gap-1">
-                            <Tooltip delay={0}>
-                              <Button isIconOnly variant="ghost" size="sm" onPress={() => router.push(`/workflow-editor?id=${wf.id}`)}>
-                                <Settings2 size={13} />
-                              </Button>
-                              <Tooltip.Content>编辑</Tooltip.Content>
-                            </Tooltip>
-                            <Tooltip delay={0}>
-                              <Button
-                                isIconOnly variant="ghost" size="sm"
-                                isPending={runningId === wf.id}
-                                onPress={() => handleRun(wf.id)}
-                              >
-                                <Play size={13} style={{ color: "#22c55e" }} />
-                              </Button>
-                              <Tooltip.Content>运行</Tooltip.Content>
-                            </Tooltip>
-                            <Tooltip delay={0}>
-                              <Button isIconOnly variant="ghost" size="sm" onPress={() => handleDelete(wf.id)}>
-                                <Trash2 size={13} style={{ color: "#ef4444" }} />
-                              </Button>
-                              <Tooltip.Content>删除</Tooltip.Content>
-                            </Tooltip>
-                          </div>
-                        </Table.Cell>
-                      </Table.Row>
-                    ))}
-                  </Table.Body>
-                </Table.Content>
-              </Table.ScrollContainer>
-            </Table>
+                        </div>
+                      </div>
+                      <div className="workflow-list-card__actions">
+                        <Button
+                          size="sm"
+                          className="btn-accent"
+                          isPending={runningId === wf.id}
+                          onPress={() => handleRun(wf.id)}
+                        >
+                          <Play size={13} /> 运行
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onPress={() => router.push(`/workflow-editor?id=${encodeURIComponent(wf.id)}`)}
+                        >
+                          <Pencil size={13} /> 设计
+                        </Button>
+                        <Tooltip delay={0}>
+                          <Button isIconOnly aria-label={`删除工作流 ${wf.name}`} variant="ghost" size="sm" onPress={() => handleDelete(wf.id)}>
+                            <Trash2 size={13} style={{ color: "#ef4444" }} />
+                          </Button>
+                          <Tooltip.Content>删除</Tooltip.Content>
+                        </Tooltip>
+                      </div>
+                    </div>
+                  </Card.Content>
+                </Card>
+              ))}
+            </div>
           )}
-        </Card>
+        </section>
       )}
 
       {/* Instances Tab */}
       {tab === "instances" && (
-        <Card>
+        <section aria-labelledby="workflow-instances-heading">
+          <h2 id="workflow-instances-heading" className="sr-only">工作流实例</h2>
           {instances.length === 0 ? (
-            <EmptyState icon={<Play size={24} style={{ color: "#3b82f6" }} />} title="暂无运行实例" description="在「工作流定义」标签中选择一个工作流并点击运行，执行记录将显示在这里。" />
+            <EmptyState icon={<Play size={24} style={{ color: "var(--yunque-accent)" }} />} title="暂无运行实例" description="在「工作流定义」标签中选择一个工作流并点击运行，执行记录将显示在这里。" />
           ) : (
-            <Table>
-              <Table.ScrollContainer>
-                <Table.Content aria-label="工作流实例" className="min-w-[600px]">
-                  <Table.Header>
-                    <Table.Column isRowHeader>实例 ID</Table.Column>
-                    <Table.Column>工作流</Table.Column>
-                    <Table.Column>状态</Table.Column>
-                    <Table.Column>开始时间</Table.Column>
-                    <Table.Column>操作</Table.Column>
-                  </Table.Header>
-                  <Table.Body>
-                    {instances.map((inst) => {
-                      const color = STATUS_COLORS[inst.status] || STATUS_COLORS.pending;
-                      const label = statusLabel[inst.status] || inst.status;
-                      const wfName = workflows.find((w) => w.id === inst.definition_id)?.name || inst.definition_id;
-                      return (
-                        <Table.Row key={inst.id}>
-                          <Table.Cell>
-                            <span className="text-xs font-mono" style={{ color: "var(--yunque-text-secondary)" }}>{inst.id.slice(0, 8)}</span>
-                          </Table.Cell>
-                          <Table.Cell>
-                            <span className="text-sm" style={{ color: "var(--yunque-text)" }}>{wfName}</span>
-                          </Table.Cell>
-                          <Table.Cell>
-                            <Chip size="sm" style={{ background: `${color}18`, color }}>
-                              {label}
-                            </Chip>
-                          </Table.Cell>
-                          <Table.Cell>
-                            <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>{relTime(inst.started_at || inst.created_at)}</span>
-                          </Table.Cell>
-                          <Table.Cell>
-                            <div className="flex items-center gap-1">
-                              {inst.status === "running" && (
-                                <Tooltip delay={0}>
-                                  <Button isIconOnly variant="ghost" size="sm" onPress={() => handleCancel(inst.id)}>
-                                    <Square size={13} style={{ color: "#ef4444" }} />
-                                  </Button>
-                                  <Tooltip.Content>取消</Tooltip.Content>
-                                </Tooltip>
-                              )}
-                            </div>
-                          </Table.Cell>
-                        </Table.Row>
-                      );
-                    })}
-                  </Table.Body>
-                </Table.Content>
-              </Table.ScrollContainer>
-            </Table>
+            <div className="workflow-card-list">
+              {instances.map((inst) => {
+                const color = STATUS_COLORS[inst.status] || STATUS_COLORS.pending;
+                const label = statusLabel[inst.status] || inst.status;
+                const wfName = workflows.find((w) => w.id === inst.definition_id)?.name || inst.definition_id;
+                return (
+                  <Card key={inst.id} className="workflow-list-card section-card hover-lift">
+                    <Card.Content className="p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs" style={{ color: "var(--yunque-text-muted)" }}>{inst.id.slice(0, 8)}</span>
+                            <Chip size="sm" style={{ background: `${color}18`, color }}>{label}</Chip>
+                          </div>
+                          <div className="mt-1 text-sm font-medium" style={{ color: "var(--yunque-text)" }}>{wfName}</div>
+                          <div className="mt-1 text-xs" style={{ color: "var(--yunque-text-muted)" }}>{relTime(inst.started_at || inst.created_at)}</div>
+                        </div>
+                        {inst.status === "running" && (
+                          <Tooltip delay={0}>
+                            <Button variant="ghost" size="sm" onPress={() => handleCancel(inst.id)}>
+                              <Square size={13} /> 取消
+                            </Button>
+                            <Tooltip.Content>取消运行</Tooltip.Content>
+                          </Tooltip>
+                        )}
+                      </div>
+                    </Card.Content>
+                  </Card>
+                );
+              })}
+            </div>
           )}
-        </Card>
+        </section>
       )}
-    </div>
+    </section>
   );
 }

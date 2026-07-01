@@ -105,10 +105,14 @@ export default function AccountRail() {
             href: item.href,
             label: item.label,
             group: "扩展" as const,
-            layer: "pack" as const,
+            // Only actionable packs sit in the primary sidebar; infrastructure /
+            // experimental / documented packs drop into the collapsible advanced
+            // section ("高级入口") so ordinary users see a short, usable list.
+            layer: (item.usabilityKind === "actionable" ? "pack" : "lab") as NavItem["layer"],
             defaultVisible: true,
             icon: item.icon,
             keywords: item.keywords,
+            familyLabel: item.groupLabel,
           })),
         );
       })

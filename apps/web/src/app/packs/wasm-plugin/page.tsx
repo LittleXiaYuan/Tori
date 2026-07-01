@@ -13,12 +13,10 @@ import {
 } from "@heroui/react";
 import {
   AlertTriangle,
-  CheckCircle2,
   ClipboardList,
   Cpu,
   Download,
   FileCode2,
-  LockKeyhole,
   PackageCheck,
   Play,
   Power,
@@ -27,6 +25,8 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import PageHeader from "@/components/page-header";
+import ReadinessBadges from "@/components/readiness-badges";
+import { JsonViewer } from "@/components/json-viewer";
 import { showToast } from "@/components/toast-provider";
 import { formatErrorMessage } from "@/lib/error-utils";
 import { chatPromptHref } from "@/lib/pack-action-links";
@@ -47,61 +47,56 @@ import {
   type WASMPluginSummary,
 } from "yunque-client/wasm-plugin";
 import { createYunqueSDKClientOptions } from "@/lib/sdk-client";
+import { PackAbout, PackSectionTitle, PackStepsGrid, type PackBoundaryItem, type PackStep } from "@/components/packs/pack-page-kit";
 
 const wasmPluginPack = createWASMPluginPackClient(createYunqueSDKClientOptions());
 
-function statusTone(status: WASMPluginStatus | null): {
-  bg: string;
-  fg: string;
-} {
-  if (!status)
-    return { bg: "rgba(255,255,255,0.06)", fg: "var(--yunque-text-muted)" };
-  if (status.runtime_ready && status.abi_ready)
-    return { bg: "rgba(34,197,94,0.12)", fg: "#22c55e" };
-  if (status.runtime_ready)
-    return { bg: "rgba(250,204,21,0.12)", fg: "#facc15" };
-  return { bg: "rgba(239,68,68,0.12)", fg: "#ef4444" };
+type ChipColor = "success" | "warning" | "danger" | "default";
+
+// The status response is ~30 boolean readiness flags. Rendering each as a
+// KPI-size card overflowed and truncated technical tokens; instead we surface
+// the meaningful acceptance gates as a compact badge strip (ready / pending).
+const READINESS_FLAGS: {
+  label: string;
+  hint: string;
+  ready: (s: WASMPluginStatus | null) => boolean | undefined;
+}[] = [
+  { label: "Host ABI 计划", hint: "Host ABI plan preview 就绪", ready: (s) => s?.abi_plan_ready },
+  { label: "执行 Gate", hint: "真实执行前的 Host ABI execution gate 就绪", ready: (s) => s?.host_abi_execution_gate_ready },
+  { label: "模块完整性", hint: "模块 SHA-256 完整性 gate 就绪", ready: (s) => s?.module_integrity_gate_ready },
+  { label: "签名校验", hint: "远程包签名校验计划就绪", ready: (s) => s?.signature_verification_plan_ready },
+  { label: "远程安装", hint: "远程安装计划就绪", ready: (s) => s?.remote_install_plan_ready },
+  { label: "审批 Gate", hint: "远程安装审批 gate 计划就绪", ready: (s) => s?.approval_gate_plan_ready },
+  { label: "审批决策", hint: "审批决策计划就绪", ready: (s) => s?.approval_decision_plan_ready },
+  { label: "审批写回", hint: "审批写回计划 / 队列就绪", ready: (s) => s?.approval_writeback_plan_ready || s?.approval_queue_store_ready },
+  { label: "Installer", hint: "Installer 注册与接线就绪", ready: (s) => s?.installer_ready },
+];
+
+function statusColor(status: WASMPluginStatus | null): ChipColor {
+  if (!status) return "default";
+  if (status.runtime_ready && status.abi_ready) return "success";
+  if (status.runtime_ready) return "warning";
+  return "danger";
 }
 
-const userFacingSteps = [
-  {
-    title: "1. 先看能不能接入",
-    body: "校验插件清单、权限、模块 SHA-256 和 Host ABI 请求，先发现风险。",
-  },
-  {
-    title: "2. 再预演远程安装",
-    body: "对 packageUrl、签名、审批、下载缓存、验签和包结构逐段生成计划。",
-  },
-  {
-    title: "3. 最后留证据再放行",
-    body: "导出证据包，明确哪些记录只写在 pack-local，哪些还不能进入真实执行。",
-  },
+const userFacingSteps: PackStep[] = [
+  { key: "check", label: "先看能不能接入", detail: "校验插件清单、权限、模块 SHA-256 和 Host ABI 请求，先发现风险。" },
+  { key: "preview", label: "再预演远程安装", detail: "对 packageUrl、签名、审批、下载缓存、验签和包结构逐段生成计划。" },
+  { key: "evidence", label: "最后留证据再放行", detail: "导出证据包，明确哪些记录只写在 pack-local，哪些还不能进入真实执行。" },
 ];
 
-const boundaryItems = [
-  "不会绕过审批直接安装远程包。",
-  "不会把未验签包解包到 plugin_dir。",
-  "不会在 Host ABI 强执行未就绪时放开特权函数。",
-  "不会把实验链路包装成稳定第三方插件市场。",
+const boundaryItems: PackBoundaryItem[] = [
+  { key: "approval", label: "不绕审批", detail: "不会绕过审批直接安装远程包。", tone: "danger" },
+  { key: "unpack", label: "不解未验签包", detail: "不会把未验签包解包到 plugin_dir。", tone: "danger" },
+  { key: "abi", label: "不放开特权函数", detail: "不会在 Host ABI 强执行未就绪时放开特权函数。", tone: "danger" },
+  { key: "market", label: "不冒充插件市场", detail: "不会把实验链路包装成稳定第三方插件市场。", tone: "warning" },
 ];
 
-const workflowLoopItems = [
-  {
-    title: "1. 检查接入条件",
-    body: "先用清单、签名、SHA-256、审批和 Host ABI gate 判断这个能力能不能安全进入云雀。",
-  },
-  {
-    title: "2. 带回 Chat",
-    body: "把检查结果交给云雀解释，拆出需要修的权限、签名、入口或 WASM 模块问题。",
-  },
-  {
-    title: "3. 看证据位置",
-    body: "远程安装计划、写回记录和证据包是验收材料，不等于已经安装或执行。",
-  },
-  {
-    title: "4. 继续交给小羽改",
-    body: "如果能力不完整，把缺口带进工坊，让小羽改 yqpack 后再验收、打包和回滚。",
-  },
+const workflowSteps: PackStep[] = [
+  { key: "gate", label: "检查接入条件", detail: "先用清单、签名、SHA-256、审批和 Host ABI gate 判断这个能力能不能安全进入云雀。" },
+  { key: "chat", label: "带回 Chat", detail: "把检查结果交给云雀解释，拆出需要修的权限、签名、入口或 WASM 模块问题。" },
+  { key: "evidence", label: "看证据位置", detail: "远程安装计划、写回记录和证据包是验收材料，不等于已经安装或执行。" },
+  { key: "improve", label: "继续交给小羽改", detail: "如果能力不完整，把缺口带进工坊，让小羽改 yqpack 后再验收、打包和回滚。" },
 ];
 
 function sampleManifest(slug: string) {
@@ -433,7 +428,7 @@ export default function WASMPluginPackPage() {
     JSON.stringify({ a: 1, b: 2 }, null, 2),
   );
   const [result, setResult] = useState<WASMPluginExecuteResult | null>(null);
-  const tone = statusTone(status);
+  const runtimeStatusColor = statusColor(status);
 
   const selectedPlugin = useMemo(
     () => plugins.find((plugin) => plugin.slug === slug) || plugins[0] || null,
@@ -737,117 +732,38 @@ export default function WASMPluginPackPage() {
 
   return (
     <div className="page-root space-y-6 animate-fade-in-up">
-      <PageHeader icon={<Cpu size={20} />} title="WASM 插件引擎" />
+      <PageHeader
+        icon={<Cpu size={20} />}
+        title="WASM 插件引擎"
+        actions={<Button size="sm" variant="ghost" onPress={load}><RefreshCw size={14} />刷新</Button>}
+      />
 
-      <Card className="section-card overflow-hidden p-0">
-        <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_340px]">
-          <div className="p-5">
-            <div className="flex flex-wrap items-center gap-2">
-              <Chip
-                size="sm"
-                style={{
-                  background: "rgba(239,68,68,0.10)",
-                  color: "var(--yunque-danger)",
-                }}
-              >
-                高风险实验能力
-              </Chip>
-              <Chip size="sm" variant="soft">
-                远程安装先计划
-              </Chip>
-              <Chip size="sm" variant="soft">
-                沙箱执行先 dry-run
-              </Chip>
-            </div>
-            <div
-              className="mt-3 text-base font-semibold"
-              style={{ color: "var(--yunque-text)" }}
-            >
-              这个能力包现在能做什么
-            </div>
-            <div
-              className="mt-2 max-w-3xl text-sm leading-6"
-              style={{ color: "var(--yunque-text-secondary)" }}
-            >
-              它是第三方 WASM 能力进入云雀前的验收台：先检查插件清单、权限、
-              签名、包结构和 Host ABI 边界，再决定是否继续安装或执行。当前更适合开发者和
-              Pack 作者验证接入链路，不是给普通用户直接下载应用的商店页。
-            </div>
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
-              {userFacingSteps.map((item) => (
-                <div
-                  key={item.title}
-                  className="rounded-lg p-3"
-                  style={{
-                    background: "var(--yunque-bg-hover)",
-                    border: "1px solid var(--yunque-border)",
-                  }}
-                >
-                  <div
-                    className="text-sm font-medium"
-                    style={{ color: "var(--yunque-text)" }}
-                  >
-                    {item.title}
-                  </div>
-                  <div
-                    className="mt-2 text-xs leading-5"
-                    style={{ color: "var(--yunque-text-muted)" }}
-                  >
-                    {item.body}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div
-            className="p-5"
-            style={{
-              background: "rgba(239,68,68,0.06)",
-              borderLeft: "1px solid var(--yunque-border)",
-            }}
-          >
-            <div
-              className="mb-3 flex items-center gap-2 text-sm font-semibold"
-              style={{ color: "var(--yunque-text)" }}
-            >
-              <LockKeyhole size={16} style={{ color: "var(--yunque-danger)" }} />
-              当前不会做什么
-            </div>
-            <div className="space-y-2">
-              {boundaryItems.map((item) => (
-                <div
-                  key={item}
-                  className="flex gap-2 text-xs leading-5"
-                  style={{ color: "var(--yunque-text-secondary)" }}
-                >
-                  <CheckCircle2
-                    size={13}
-                    className="mt-0.5 shrink-0"
-                    style={{ color: "var(--yunque-success)" }}
-                  />
-                  <span>{item}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </Card>
+      <PackAbout
+        chips={<>
+          <Chip size="sm" color="danger">高风险实验能力</Chip>
+          <Chip size="sm" variant="soft">远程安装先计划</Chip>
+          <Chip size="sm" variant="soft">沙箱执行先 dry-run</Chip>
+        </>}
+        description="第三方 WASM 能力进入云雀前的验收台：先检查插件清单、权限、签名、包结构和 Host ABI 边界，再决定是否继续安装或执行。当前更适合开发者和 Pack 作者验证接入链路，不是给普通用户直接下载应用的商店页。"
+        boundaries={boundaryItems}
+      />
 
-      <Card className="section-card p-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <div
-              className="text-sm font-semibold"
-              style={{ color: "var(--yunque-text)" }}
-            >
-              从 WASM 验收到可用能力
-            </div>
-            <div
-              className="mt-1 text-xs leading-5"
-              style={{ color: "var(--yunque-text-muted)" }}
-            >
+      <div className="grid gap-3 md:grid-cols-3">
+        {userFacingSteps.map((item, idx) => (
+          <div key={item.key} className="rounded-xl border border-border bg-surface-secondary p-4">
+            <div className="text-sm font-medium text-foreground">{idx + 1}. {item.label}</div>
+            <div className="mt-2 text-xs leading-5 text-muted">{item.detail}</div>
+          </div>
+        ))}
+      </div>
+
+      <Card variant="default">
+        <Card.Header className="flex-row flex-wrap items-start justify-between gap-3">
+          <div className="flex flex-col gap-1">
+            <PackSectionTitle icon={<PackageCheck size={15} />} tone="accent">从 WASM 验收到可用能力</PackSectionTitle>
+            <span className="text-xs leading-5 text-muted">
               WASM 能力包的价值不是让用户读一堆技术 gate，而是把第三方能力先验收、留证据，再交给 Chat、任务中心和小羽逐步补成可用能力。
-            </div>
+            </span>
           </div>
           <div className="flex flex-wrap gap-2">
             <Link
@@ -865,100 +781,43 @@ export default function WASMPluginPackPage() {
               </Button>
             </Link>
           </div>
-        </div>
-        <div className="mt-3 grid gap-2 md:grid-cols-4">
-          {workflowLoopItems.map((item) => (
-            <div
-              key={item.title}
-              className="rounded-md border p-3"
-              style={{
-                borderColor: "var(--yunque-border)",
-                background: "var(--yunque-surface)",
-              }}
-            >
-              <div
-                className="text-xs font-medium"
-                style={{ color: "var(--yunque-text)" }}
-              >
-                {item.title}
-              </div>
-              <div
-                className="mt-2 text-[11px] leading-5"
-                style={{ color: "var(--yunque-text-muted)" }}
-              >
-                {item.body}
-              </div>
-            </div>
-          ))}
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2 text-xs">
-          <Link href="/trace">
-            <Button size="sm" variant="ghost">
-              核对执行轨迹
-            </Button>
-          </Link>
-          <Link href="/packs/studio?packId=yunque.pack.wasm-plugin">
-            <Button size="sm" variant="ghost">
-              让小羽继续改
-            </Button>
-          </Link>
-        </div>
+        </Card.Header>
+        <Card.Content className="flex flex-col gap-3">
+          <PackStepsGrid steps={workflowSteps} columns={4} />
+          <div className="flex flex-wrap gap-2 text-xs">
+            <Link href="/trace">
+              <Button size="sm" variant="ghost">核对执行轨迹</Button>
+            </Link>
+            <Link href="/packs/studio?packId=yunque.pack.wasm-plugin">
+              <Button size="sm" variant="ghost">让小羽继续改</Button>
+            </Link>
+          </div>
+        </Card.Content>
       </Card>
 
       <Card className="section-card p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <div
-              className="mb-3 text-sm font-semibold"
-              style={{ color: "var(--yunque-text)" }}
-            >
+            <div className="mb-3 text-sm font-semibold text-foreground">
               技术状态
             </div>
             <div className="mb-1 flex items-center gap-2">
-              <Chip size="sm" style={{ background: tone.bg, color: tone.fg }}>
+              <Chip size="sm" color={runtimeStatusColor}>
                 {status?.abi_ready
                   ? "ABI ready"
                   : status?.runtime_ready
                     ? "Runtime shell"
                     : "Disabled"}
               </Chip>
-              <Chip
-                size="sm"
-                style={{
-                  background: status?.abi_plan_ready
-                    ? "rgba(56,189,248,0.12)"
-                    : "rgba(250,204,21,0.12)",
-                  color: status?.abi_plan_ready ? "#38bdf8" : "#facc15",
-                }}
-              >
+              <Chip size="sm" color={status?.abi_plan_ready ? "default" : "warning"} variant="soft">
                 {status?.abi_plan_ready ? "Host ABI plan" : "ABI plan pending"}
               </Chip>
-              <Chip
-                size="sm"
-                style={{
-                  background: status?.host_abi_execution_gate_ready
-                    ? "rgba(34,197,94,0.12)"
-                    : "rgba(250,204,21,0.12)",
-                  color: status?.host_abi_execution_gate_ready
-                    ? "#22c55e"
-                    : "#facc15",
-                }}
-              >
+              <Chip size="sm" color={status?.host_abi_execution_gate_ready ? "success" : "warning"}>
                 {status?.host_abi_execution_gate_ready
                   ? "Host ABI execution gate"
                   : "Host ABI gate pending"}
               </Chip>
-              <Chip
-                size="sm"
-                style={{
-                  background: status?.remote_install_plan_ready
-                    ? "rgba(168,85,247,0.12)"
-                    : "rgba(250,204,21,0.12)",
-                  color: status?.remote_install_plan_ready
-                    ? "#c084fc"
-                    : "#facc15",
-                }}
-              >
+              <Chip size="sm" color={status?.remote_install_plan_ready ? "default" : "warning"} variant="soft">
                 {status?.remote_install_plan_ready
                   ? "Remote install plan"
                   : "Remote install pending"}
@@ -1016,31 +875,15 @@ export default function WASMPluginPackPage() {
               <Chip size="sm">
                 installer_ready: {String(status?.installer_ready ?? false)}
               </Chip>
-              <span
-                className="text-xs"
-                style={{ color: "var(--yunque-text-muted)" }}
-              >
+              <span className="text-xs text-muted">
                 {status?.pack_id || "yunque.pack.wasm-plugin"}
               </span>
             </div>
-            <details
-              className="mt-3 rounded-lg p-3 text-sm"
-              style={{
-                background: "var(--yunque-bg-hover)",
-                border: "1px solid var(--yunque-border)",
-                color: "var(--yunque-text-muted)",
-              }}
-            >
-              <summary
-                className="cursor-pointer font-medium"
-                style={{ color: "var(--yunque-text)" }}
-              >
+            <details className="mt-3 rounded-lg border border-border bg-surface-secondary p-3 text-sm text-muted">
+              <summary className="cursor-pointer font-medium text-foreground">
                 查看技术链路详情
               </summary>
-              <div
-                className="mt-3 leading-6"
-              style={{ color: "var(--yunque-text-muted)" }}
-            >
+              <div className="mt-3 leading-6 text-muted">
               当前切片先把 WASM 插件注册、load/unload 生命周期、沙箱执行
               dry-run、权限计划、Host ABI plan preview、真实执行前 Host ABI
               execution gate、远程签名包安装计划、远程安装审批 gate
@@ -1077,18 +920,18 @@ export default function WASMPluginPackPage() {
       </Card>
 
       {error && (
-        <Card className="p-4" style={{ background: "rgba(239,68,68,0.06)" }}>
-          <div
-            className="flex items-center gap-2 text-sm"
-            style={{ color: "var(--yunque-danger)" }}
-          >
+        <Card variant="secondary">
+          <Card.Content className="flex items-center gap-2 p-4 text-sm text-danger">
             <AlertTriangle size={16} />
             {error}
-          </div>
+          </Card.Content>
         </Card>
       )}
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-4 xl:grid-cols-8">
+      {/* Two real counts kept as compact metric tiles; everything else is a
+          readiness flag, not a metric — those move into the status strip below
+          so technical tokens (wazero / sha256 / plan) never get KPI-size font. */}
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <Card className="section-card p-4">
           <div className="kpi-label">插件数量</div>
           <div className="kpi-value">
@@ -1103,116 +946,44 @@ export default function WASMPluginPackPage() {
           </div>
         </Card>
         <Card className="section-card p-4">
-          <div className="kpi-label">Runtime</div>
-          <div className="kpi-value text-lg">
-            {status?.runtime_ready ? "wazero" : "pending"}
-          </div>
-        </Card>
-        <Card className="section-card p-4">
-          <div className="kpi-label">Host ABI</div>
-          <div className="kpi-value text-lg">
-            {status?.abi_plan_ready ? "plan" : "pending"}
-          </div>
-        </Card>
-        <Card className="section-card p-4">
-          <div className="kpi-label">执行 Gate</div>
-          <div className="kpi-value text-lg">
-            {status?.host_abi_execution_gate_ready ? "gate" : "pending"}
-          </div>
-          <div className="kpi-label mt-1">
-            enforcement: {String(status?.host_abi_enforcement_ready ?? false)}
-          </div>
-        </Card>
-        <Card className="section-card p-4">
-          <div className="kpi-label">模块完整性</div>
-          <div className="kpi-value text-lg">
-            {status?.module_integrity_gate_ready ? "sha256" : "pending"}
-          </div>
-        </Card>
-        <Card className="section-card p-4">
-          <div className="kpi-label">远程安装</div>
-          <div className="kpi-value text-lg">
-            {status?.remote_install_plan_ready ? "plan" : "pending"}
-          </div>
-        </Card>
-        <Card className="section-card p-4">
-          <div className="kpi-label">审批 Gate</div>
-          <div className="kpi-value text-lg">
-            {status?.approval_gate_plan_ready ? "plan" : "pending"}
-          </div>
-        </Card>
-        <Card className="section-card p-4">
           <div className="kpi-label">阶段</div>
-          <div className="kpi-value text-lg">
+          <div className="mt-1 text-sm font-medium text-foreground">
             {status?.stage || "pack-shell"}
           </div>
         </Card>
         <Card className="section-card p-4">
-          <div className="kpi-label">审批决策</div>
-          <div className="kpi-value text-lg">
-            {status?.approval_decision_plan_ready ? "plan" : "pending"}
-          </div>
-          <div className="kpi-label mt-1">
-            ready: {String(status?.approval_decision_ready ?? false)}
-          </div>
-        </Card>
-        <Card className="section-card p-4">
-          <div className="kpi-label">审批写回</div>
-          <div className="kpi-value text-lg">
-            {status?.approval_queue_store_ready
-              ? "queue"
-              : status?.approval_writeback_plan_ready
-                ? "plan"
-                : "pending"}
-          </div>
-          <div className="kpi-label mt-1">
-            ready: {String(status?.approval_writeback_ready ?? false)}
-          </div>
-        </Card>
-        <Card className="section-card p-4">
-          <div className="kpi-label">Installer</div>
-          <div className="kpi-value text-lg">
-            {status?.installer_registration_plan_ready
-              ? "register-plan"
-              : status?.package_inspect_writeback_ready
-                ? "inspect"
-                : status?.signature_verification_writeback_ready
-                  ? "verify"
-                  : status?.installer_download_writeback_ready
-                    ? "cache"
-                    : status?.installer_continuation_plan_ready
-                      ? "handoff"
-                      : "pending"}
-          </div>
-          <div className="kpi-label mt-1">
-            ready: {String(status?.installer_ready ?? false)} · registration
-            blocked:{" "}
-            {String(status?.installer_blocked_until_registration ?? true)}
+          <div className="kpi-label">Runtime</div>
+          <div className="mt-1 text-sm font-medium text-foreground">
+            {status?.runtime_ready ? "wazero" : "未就绪"}
           </div>
         </Card>
       </div>
 
+      <Card className="section-card p-4">
+        <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+          <ShieldCheck size={16} className="text-accent" />
+          就绪状态
+        </div>
+        <p className="mt-1 text-xs text-muted">
+          各验收 gate 与计划环节的就绪情况 —— 绿色表示已就绪，灰色表示仍待接通。
+        </p>
+        <div className="mt-3">
+          <ReadinessBadges flags={READINESS_FLAGS.map((f) => ({ label: f.label, hint: f.hint, ready: f.ready(status) }))} />
+        </div>
+      </Card>
+
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[360px_1fr]">
         <Card className="section-card overflow-hidden">
-          <div
-            className="flex items-center justify-between border-b px-4 py-3"
-            style={{ borderColor: "var(--yunque-border)" }}
-          >
+          <div className="flex items-center justify-between border-b border-border px-4 py-3">
             <div className="flex items-center gap-2 text-sm font-semibold">
               <FileCode2 size={16} />
               已注册 WASM 插件
             </div>
             <Chip size="sm">{plugins.length}</Chip>
           </div>
-          <div
-            className="max-h-[520px] divide-y overflow-auto"
-            style={{ borderColor: "var(--yunque-border)" }}
-          >
+          <div className="max-h-[520px] divide-y divide-border overflow-auto">
             {plugins.length === 0 ? (
-              <div
-                className="p-6 text-center text-sm"
-                style={{ color: "var(--yunque-text-muted)" }}
-              >
+              <div className="p-6 text-center text-sm text-muted">
                 还没有插件。可以先 dry-run 校验右侧样例，确认后去掉 dry_run
                 注册。
               </div>
@@ -1229,10 +1000,7 @@ export default function WASMPluginPackPage() {
                     </div>
                     <Chip size="sm">{plugin.status}</Chip>
                   </div>
-                  <div
-                    className="mt-1 truncate text-xs"
-                    style={{ color: "var(--yunque-text-muted)" }}
-                  >
+                  <div className="mt-1 truncate text-xs text-muted">
                     {plugin.slug} · {plugin.entrypoint}
                   </div>
                 </button>
@@ -1278,8 +1046,7 @@ export default function WASMPluginPackPage() {
                   Package inspect writeback
                 </div>
                 <div
-                  className="mt-1 text-xs"
-                  style={{ color: "var(--yunque-text-muted)" }}
+                  className="mt-1 text-xs text-muted"
                 >
                   包结构检查边界：消费 pack-local
                   signature-verification-store.json / record，读取已验签缓存
@@ -1365,19 +1132,9 @@ export default function WASMPluginPackPage() {
               <Chip size="sm">artifact: package-inspect-store.json</Chip>
             </div>
             {remotePackageInspect && (
-              <TextField
-                aria-label="WASM package inspect writeback result"
-                className="mt-3"
-                value={JSON.stringify(remotePackageInspect, null, 2)}
-                onChange={() => undefined}
-              >
-                <TextArea
-                  rows={11}
-                  aria-label="WASM package inspect writeback result"
-                  className="font-mono text-xs"
-                  readOnly
-                />
-              </TextField>
+              <div className="mt-3">
+                <JsonViewer title="Package inspect writeback result JSON" value={remotePackageInspect} rows={11} />
+              </div>
             )}
           </Card>
 
@@ -1389,8 +1146,7 @@ export default function WASMPluginPackPage() {
                   Installer registration handoff 计划
                 </div>
                 <div
-                  className="mt-1 text-xs"
-                  style={{ color: "var(--yunque-text-muted)" }}
+                  className="mt-1 text-xs text-muted"
                 >
                   plan-only 契约：消费 package-inspect-store.json /
                   package-inspect-record.json，确认 package_inspect_ready /
@@ -1500,19 +1256,9 @@ export default function WASMPluginPackPage() {
               <Chip size="sm">artifact: installer-audit-handoff-plan.json</Chip>
             </div>
             {remoteInstallerRegistration && (
-              <TextField
-                aria-label="WASM installer registration handoff plan result"
-                className="mt-3"
-                value={JSON.stringify(remoteInstallerRegistration, null, 2)}
-                onChange={() => undefined}
-              >
-                <TextArea
-                  rows={11}
-                  aria-label="WASM installer registration handoff plan result"
-                  className="font-mono text-xs"
-                  readOnly
-                />
-              </TextField>
+              <div className="mt-3">
+                <JsonViewer title="Installer registration handoff plan result JSON" value={remoteInstallerRegistration} rows={11} />
+              </div>
             )}
           </Card>
 
@@ -1524,8 +1270,7 @@ export default function WASMPluginPackPage() {
                   Installer continuation handoff 计划
                 </div>
                 <div
-                  className="mt-1 text-xs"
-                  style={{ color: "var(--yunque-text-muted)" }}
+                  className="mt-1 text-xs text-muted"
                 >
                   plan-only 契约：读取 pack-local approval-queue-store.json /
                   approval-queue-record.json，生成
@@ -1634,19 +1379,9 @@ export default function WASMPluginPackPage() {
               <Chip size="sm">artifact: installer-audit-handoff-plan.json</Chip>
             </div>
             {remoteInstallerPlan && (
-              <TextField
-                aria-label="WASM installer continuation plan result"
-                className="mt-3"
-                value={JSON.stringify(remoteInstallerPlan, null, 2)}
-                onChange={() => undefined}
-              >
-                <TextArea
-                  rows={11}
-                  aria-label="WASM installer continuation plan result"
-                  className="font-mono text-xs"
-                  readOnly
-                />
-              </TextField>
+              <div className="mt-3">
+                <JsonViewer title="Installer continuation plan result JSON" value={remoteInstallerPlan} rows={11} />
+              </div>
             )}
           </Card>
 
@@ -1658,8 +1393,7 @@ export default function WASMPluginPackPage() {
                   Installer download writeback
                 </div>
                 <div
-                  className="mt-1 text-xs"
-                  style={{ color: "var(--yunque-text-muted)" }}
+                  className="mt-1 text-xs text-muted"
                 >
                   真实写入边界：读取已 approved 的 pack-local approval queue
                   record，并要求本次请求显式 approved=true；下载包后只写
@@ -1749,19 +1483,9 @@ export default function WASMPluginPackPage() {
               <Chip size="sm">artifact: installer-package-cache.tgz</Chip>
             </div>
             {remoteInstallerDownload && (
-              <TextField
-                aria-label="WASM installer download writeback result"
-                className="mt-3"
-                value={JSON.stringify(remoteInstallerDownload, null, 2)}
-                onChange={() => undefined}
-              >
-                <TextArea
-                  rows={11}
-                  aria-label="WASM installer download writeback result"
-                  className="font-mono text-xs"
-                  readOnly
-                />
-              </TextField>
+              <div className="mt-3">
+                <JsonViewer title="Installer download writeback result JSON" value={remoteInstallerDownload} rows={11} />
+              </div>
             )}
           </Card>
 
@@ -1773,8 +1497,7 @@ export default function WASMPluginPackPage() {
                   Signature verification writeback
                 </div>
                 <div
-                  className="mt-1 text-xs"
-                  style={{ color: "var(--yunque-text-muted)" }}
+                  className="mt-1 text-xs text-muted"
                 >
                   验签写回边界：消费 pack-local installer-download-store.json /
                   installer-download-record.json， 读取缓存包并用审批记录中的
@@ -1872,19 +1595,9 @@ export default function WASMPluginPackPage() {
               <Chip size="sm">artifact: signature-verification-store.json</Chip>
             </div>
             {remoteSignatureVerification && (
-              <TextField
-                aria-label="WASM signature verification writeback result"
-                className="mt-3"
-                value={JSON.stringify(remoteSignatureVerification, null, 2)}
-                onChange={() => undefined}
-              >
-                <TextArea
-                  rows={11}
-                  aria-label="WASM signature verification writeback result"
-                  className="font-mono text-xs"
-                  readOnly
-                />
-              </TextField>
+              <div className="mt-3">
+                <JsonViewer title="Signature verification writeback result JSON" value={remoteSignatureVerification} rows={11} />
+              </div>
             )}
           </Card>
 
@@ -1896,8 +1609,7 @@ export default function WASMPluginPackPage() {
                   远程安装审批队列写回
                 </div>
                 <div
-                  className="mt-1 text-xs"
-                  style={{ color: "var(--yunque-text-muted)" }}
+                  className="mt-1 text-xs text-muted"
                 >
                   真实写入边界：只把审批 entry / decision 写入 pack-local
                   approval-queue-store.json，生成 approval-queue-record.json
@@ -2017,19 +1729,9 @@ export default function WASMPluginPackPage() {
               <Chip size="sm">artifact: approval-queue-record.json</Chip>
             </div>
             {remoteQueueWriteback && (
-              <TextField
-                aria-label="WASM remote install approval queue writeback result"
-                className="mt-3"
-                value={JSON.stringify(remoteQueueWriteback, null, 2)}
-                onChange={() => undefined}
-              >
-                <TextArea
-                  rows={11}
-                  aria-label="WASM remote install approval queue writeback result"
-                  className="font-mono text-xs"
-                  readOnly
-                />
-              </TextField>
+              <div className="mt-3">
+                <JsonViewer title="Approval queue writeback result JSON" value={remoteQueueWriteback} rows={11} />
+              </div>
             )}
           </Card>
 
@@ -2041,8 +1743,7 @@ export default function WASMPluginPackPage() {
                   远程安装审批决策计划
                 </div>
                 <div
-                  className="mt-1 text-xs"
-                  style={{ color: "var(--yunque-text-muted)" }}
+                  className="mt-1 text-xs text-muted"
                 >
                   plan-only 契约：固定 approved / denied / expired 的后续
                   installer 策略，只生成 approval-decision-plan.json
@@ -2130,19 +1831,9 @@ export default function WASMPluginPackPage() {
               <Chip size="sm">artifact: approval-decision-plan.json</Chip>
             </div>
             {remoteDecisionPlan && (
-              <TextField
-                aria-label="WASM remote install approval decision plan result"
-                className="mt-3"
-                value={JSON.stringify(remoteDecisionPlan, null, 2)}
-                onChange={() => undefined}
-              >
-                <TextArea
-                  rows={11}
-                  aria-label="WASM remote install approval decision plan result"
-                  className="font-mono text-xs"
-                  readOnly
-                />
-              </TextField>
+              <div className="mt-3">
+                <JsonViewer title="Approval decision plan result JSON" value={remoteDecisionPlan} rows={11} />
+              </div>
             )}
           </Card>
 
@@ -2154,8 +1845,7 @@ export default function WASMPluginPackPage() {
                   远程安装审批写回桥接计划
                 </div>
                 <div
-                  className="mt-1 text-xs"
-                  style={{ color: "var(--yunque-text-muted)" }}
+                  className="mt-1 text-xs text-muted"
                 >
                   plan-only 契约：只把 approval-queue-entry.json 与
                   approval-decision-plan.json 串成 approval-writeback-plan.json
@@ -2249,19 +1939,9 @@ export default function WASMPluginPackPage() {
               <Chip size="sm">artifact: approval-writeback-plan.json</Chip>
             </div>
             {remoteWritebackPlan && (
-              <TextField
-                aria-label="WASM remote install approval writeback plan result"
-                className="mt-3"
-                value={JSON.stringify(remoteWritebackPlan, null, 2)}
-                onChange={() => undefined}
-              >
-                <TextArea
-                  rows={11}
-                  aria-label="WASM remote install approval writeback plan result"
-                  className="font-mono text-xs"
-                  readOnly
-                />
-              </TextField>
+              <div className="mt-3">
+                <JsonViewer title="Approval writeback plan result JSON" value={remoteWritebackPlan} rows={11} />
+              </div>
             )}
           </Card>
 
@@ -2273,8 +1953,7 @@ export default function WASMPluginPackPage() {
                   远程安装审批 Gate 计划
                 </div>
                 <div
-                  className="mt-1 text-xs"
-                  style={{ color: "var(--yunque-text-muted)" }}
+                  className="mt-1 text-xs text-muted"
                 >
                   plan-only 契约：固定“远程签名 WASM
                   包安装必须先审批”的边界，只生成 approval-gate-plan.json /
@@ -2364,19 +2043,9 @@ export default function WASMPluginPackPage() {
               <Chip size="sm">artifact: approval-queue-entry.json</Chip>
             </div>
             {remoteApprovalPlan && (
-              <TextField
-                aria-label="WASM remote install approval gate plan result"
-                className="mt-3"
-                value={JSON.stringify(remoteApprovalPlan, null, 2)}
-                onChange={() => undefined}
-              >
-                <TextArea
-                  rows={11}
-                  aria-label="WASM remote install approval gate plan result"
-                  className="font-mono text-xs"
-                  readOnly
-                />
-              </TextField>
+              <div className="mt-3">
+                <JsonViewer title="Approval gate plan result JSON" value={remoteApprovalPlan} rows={11} />
+              </div>
             )}
           </Card>
 
@@ -2388,8 +2057,7 @@ export default function WASMPluginPackPage() {
                   远程签名包安装计划
                 </div>
                 <div
-                  className="mt-1 text-xs"
-                  style={{ color: "var(--yunque-text-muted)" }}
+                  className="mt-1 text-xs text-muted"
                 >
                   plan-only 契约：只生成 remote-install-plan.json /
                   signature-verification.json 预览，并固定 signature
@@ -2493,19 +2161,9 @@ export default function WASMPluginPackPage() {
               <Chip size="sm">artifact: signature-verification.json</Chip>
             </div>
             {remoteInstallPlan && (
-              <TextField
-                aria-label="WASM remote install plan result"
-                className="mt-3"
-                value={JSON.stringify(remoteInstallPlan, null, 2)}
-                onChange={() => undefined}
-              >
-                <TextArea
-                  rows={12}
-                  aria-label="WASM remote install plan result"
-                  className="font-mono text-xs"
-                  readOnly
-                />
-              </TextField>
+              <div className="mt-3">
+                <JsonViewer title="Remote install plan result JSON" value={remoteInstallPlan} rows={12} />
+              </div>
             )}
           </Card>
 
@@ -2517,8 +2175,7 @@ export default function WASMPluginPackPage() {
                   沙箱执行计划
                 </div>
                 <div
-                  className="mt-1 text-xs"
-                  style={{ color: "var(--yunque-text-muted)" }}
+                  className="mt-1 text-xs text-muted"
                 >
                   目标插件：{selectedPlugin?.slug || slug}
                 </div>
@@ -2566,10 +2223,7 @@ export default function WASMPluginPackPage() {
               />
             </TextField>
             {result ? (
-              <Card
-                className="mt-3 p-3"
-                style={{ background: "rgba(255,255,255,0.03)" }}
-              >
+              <Card className="mt-3 bg-surface-secondary p-3">
                 <div className="mb-2 flex items-center gap-2 text-sm font-medium">
                   <Chip size="sm">
                     {result.dry_run ? "dry-run" : "execute"}
@@ -2626,21 +2280,9 @@ export default function WASMPluginPackPage() {
                     {String(result.module_integrity_gate?.blocked)}
                   </Chip>
                 </div>
-                <TextField
-                  aria-label="WASM Plugin execution result"
-                  value={JSON.stringify(result, null, 2)}
-                  onChange={() => undefined}
-                >
-                  <TextArea
-                    rows={10}
-                    aria-label="WASM Plugin execution result"
-                    className="font-mono text-xs"
-                    readOnly
-                  />
-                </TextField>
+                <JsonViewer title="WASM Plugin execution result JSON" value={result} rows={10} />
                 <div
-                  className="mt-2 text-xs"
-                  style={{ color: "var(--yunque-text-muted)" }}
+                  className="mt-2 text-xs text-muted"
                 >
                   Host ABI plan preview 仅固定后续 host function
                   权限强执行契约；Host ABI execution gate
@@ -2652,13 +2294,7 @@ export default function WASMPluginPackPage() {
                 </div>
               </Card>
             ) : (
-              <div
-                className="mt-3 rounded-xl border border-dashed p-6 text-center text-sm"
-                style={{
-                  borderColor: "var(--yunque-border)",
-                  color: "var(--yunque-text-muted)",
-                }}
-              >
+              <div className="mt-3 rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted">
                 选择 loaded 插件后，可以先生成权限计划与沙箱 dry-run 执行计划。
               </div>
             )}

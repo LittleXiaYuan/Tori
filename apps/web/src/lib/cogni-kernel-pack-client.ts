@@ -51,6 +51,7 @@ export interface CogniKernelPackClient {
   list(): Promise<CogniListResponse>;
   get(id: string): Promise<{ id: string; declaration: CogniDeclaration; enabled: boolean }>;
   add(declaration: CogniDeclaration): Promise<{ status: string; id: string }>;
+  update(id: string, declaration: CogniDeclaration): Promise<{ status: string; id: string }>;
   remove(id: string): Promise<{ status: string; id: string }>;
   setEnabled(id: string, enabled: boolean): Promise<{ status: string; id: string }>;
   reload(): Promise<CogniReloadResponse>;
@@ -79,6 +80,11 @@ export function createCogniKernelPackClient(): CogniKernelPackClient {
     add: (declaration) =>
       fetcher<{ status: string; id: string }>("/v1/cognis", {
         method: "POST",
+        body: JSON.stringify(declaration),
+      }),
+    update: (id, declaration) =>
+      fetcher<{ status: string; id: string }>(`/v1/cognis/${enc(id)}`, {
+        method: "PUT",
         body: JSON.stringify(declaration),
       }),
     remove: (id) => fetcher<{ status: string; id: string }>(`/v1/cognis/${enc(id)}`, { method: "DELETE" }),

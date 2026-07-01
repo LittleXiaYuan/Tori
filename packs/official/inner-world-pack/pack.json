@@ -1,0 +1,50 @@
+{
+  "id": "yunque.pack.inner-world",
+  "name": "Inner World Pack",
+  "version": "0.1.0",
+  "description": "内在世界：把内在生活、世界模型、经验沉淀与认知金丝雀聚合到一个标签页面板的表现层能力包。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "frontend": {
+    "menus": [
+      {
+        "key": "inner-world",
+        "label": "内在世界",
+        "path": "/packs/inner-world",
+        "icon": "globe",
+        "order": 72
+      }
+    ],
+    "routes": [
+      {
+        "path": "/packs/inner-world",
+        "component": "innerworld/InnerWorldPackPage",
+        "title": "内在世界"
+      }
+    ],
+    "assets": {
+      "type": "builtin",
+      "entry": "innerworld/InnerWorldPackPage"
+    }
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "group": "inner-world",
+    "sync": "presentation-aggregator",
+    "aggregates": "yunque.pack.inner-life,yunque.pack.world-model,yunque.pack.experience,yunque.pack.cognitive-canary",
+    "descriptionStyle": "one-line-plus-three-examples",
+    "example1": "在一个面板里切换内在生活、世界模型、经验与认知金丝雀。",
+    "example2": "复用四个自省/认知探测器的原有能力，无需逐个打开独立页面。",
+    "example3": "作为内在世界入口，统一查看 Agent 的自省、因果推理与经验沉淀。",
+    "usability": "experimental",
+    "primaryActionLabel": "打开内在世界",
+    "primaryActionPath": "/packs/inner-world",
+    "usageSurface": "内在世界标签页面板（内在生活、世界模型、经验、认知金丝雀）",
+    "limitation": "这是表现层聚合，本身不提供后端能力；四个子探测器各自的后端模块与路由保持独立运行。"
+  },
+  "status": "alpha"
+}

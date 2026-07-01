@@ -15,6 +15,12 @@ type Input struct {
 	Message             string
 	UserID              string
 	Channel             string
+	// Scope is the coarse conversation kind ("emotional", "technical", "").
+	// It drives the pkg/belief scope gate inside HostAdapter.BuildContext:
+	// a belief with non-empty Scopes only activates when Scope matches one
+	// of them; empty Scope = global beliefs only. Empty when the host has no
+	// intent signal (preserves prior behavior for callers that never set Scope).
+	Scope               string
 	Hints               map[string]string
 	RequestedToolAction *ToolAction
 }
@@ -59,6 +65,13 @@ const (
 )
 
 // BeliefNode is a local seed or activated belief.
+//
+// Scopes is the coarse conversation kinds where this belief activates.
+// Empty Scopes = global (activates in every scope). Non-empty Scopes = the
+// belief only activates when the current scope matches one of them, which
+// is the pkg/belief scope gate (#34). Example: an emotional boundary like
+// "不能虚假承诺永久陪伴" declares Scopes: ["emotional"] so it stays dormant
+// during technical/code conversations but guards emotional ones.
 type BeliefNode struct {
 	ID         string     `json:"id" yaml:"id"`
 	Kind       BeliefKind `json:"kind" yaml:"kind"`
@@ -66,6 +79,7 @@ type BeliefNode struct {
 	Confidence float64    `json:"confidence,omitempty" yaml:"confidence,omitempty"`
 	SourcePack string     `json:"source_pack,omitempty" yaml:"source_pack,omitempty"`
 	ReadOnly   bool       `json:"read_only,omitempty" yaml:"read_only,omitempty"`
+	Scopes     []string   `json:"scopes,omitempty" yaml:"scopes,omitempty"`
 }
 
 // InnerState is what the host can inject into a later prompt/planner context.

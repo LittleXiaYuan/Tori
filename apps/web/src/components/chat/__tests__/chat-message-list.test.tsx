@@ -363,8 +363,9 @@ describe("ChatMessageList file preview", () => {
     expect(screen.getByText("Experimental Pack")).toBeInTheDocument();
     expect(screen.getByText("需补入口")).toBeInTheDocument();
     expect(screen.getByText("打开/使用入口")).toBeInTheDocument();
-    expect(screen.getAllByText(/验收出口：回中心确认状态/).length).toBeGreaterThan(1);
-    expect(screen.getByText(/没有独立入口时，从 Chat、任务、记忆或知识流程复验/)).toBeInTheDocument();
+    expect(screen.getAllByText(/验收：中心看状态/).length).toBeGreaterThan(1);
+    expect(screen.queryByText(/验收出口：回中心确认状态/)).not.toBeInTheDocument();
+    expect(screen.getByText(/没有独立入口时，从 Chat、任务、记忆或知识流程触发/)).toBeInTheDocument();
     expect(screen.getByText(/预览差异、运行审计、重新打包并复检 SHA/)).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: /打开工坊/ })[0]).toHaveAttribute("href", "/packs/studio?pack=yunque.pack.needs-entry&from=batch");
     expect(screen.getAllByRole("link", { name: /^详情/ })[0]).toHaveAttribute("href", "/packs/detail?id=yunque.pack.needs-entry");

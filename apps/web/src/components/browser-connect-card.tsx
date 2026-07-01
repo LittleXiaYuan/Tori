@@ -27,14 +27,14 @@ export function BrowserConnectCard({ requirement, connected, onOpenSetup, onRefr
     <div
       className="mt-3 rounded-[18px] border p-3"
       style={{
-        background: "linear-gradient(180deg, rgba(59,130,246,0.09), rgba(59,130,246,0.03))",
-        borderColor: "rgba(59,130,246,0.18)",
+        background: "linear-gradient(180deg, var(--yunque-accent-muted), var(--yunque-accent-soft))",
+        borderColor: "var(--yunque-accent-muted)",
       }}
     >
       <div className="flex items-start gap-3">
         <div
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl"
-          style={{ background: "rgba(59,130,246,0.14)", color: "#60a5fa" }}
+          style={{ background: "var(--yunque-accent-muted)", color: "var(--yunque-accent)" }}
         >
           <Download size={18} />
         </div>

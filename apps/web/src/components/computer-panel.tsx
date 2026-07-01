@@ -421,7 +421,7 @@ function TimelineView({ items, isLive }: { items: TimelineItem[]; isLive?: boole
   }
 
   const statusTone: Record<TimelineStatus, { color: string; bg: string; label: string }> = {
-    running: { color: "#60a5fa", bg: "rgba(59,130,246,0.14)", label: "进行中" },
+    running: { color: "var(--yunque-accent-strong)", bg: "var(--yunque-accent-muted)", label: "进行中" },
     done: { color: "#34d399", bg: "rgba(52,211,153,0.12)", label: "完成" },
     error: { color: "#f87171", bg: "rgba(248,113,113,0.12)", label: "异常" },
     info: { color: "#cbd5e1", bg: "rgba(203,213,225,0.09)", label: "记录" },
@@ -429,8 +429,8 @@ function TimelineView({ items, isLive }: { items: TimelineItem[]; isLive?: boole
 
   return (
     <div className="h-full overflow-y-auto p-4">
-      <div className="mb-4 rounded-[24px] border p-4" style={{ background: "linear-gradient(135deg, rgba(59,130,246,0.10), rgba(14,165,233,0.04))", borderColor: "rgba(59,130,246,0.18)" }}>
-        <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: "#e0f2fe" }}>
+      <div className="mb-4 rounded-[24px] border p-4" style={{ background: "linear-gradient(135deg, var(--yunque-accent-muted), var(--yunque-accent-soft))", borderColor: "var(--yunque-border-accent)" }}>
+        <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
           {isLive ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
           <span>{isLive ? "云雀正在推进任务" : "工作过程已记录"}</span>
         </div>
@@ -446,7 +446,7 @@ function TimelineView({ items, isLive }: { items: TimelineItem[]; isLive?: boole
           return (
             <div key={`${item.id}-${index}`} className="relative pl-8">
               {index < items.length - 1 && <div className="absolute left-[13px] top-8 bottom-[-14px] w-px" style={{ background: "rgba(148,163,184,0.18)" }} />}
-              <div className="absolute left-0 top-1 flex h-7 w-7 items-center justify-center rounded-full" style={{ background: tone.bg, color: tone.color, boxShadow: displayStatus === "running" ? `0 0 12px ${tone.color}55` : undefined }}>
+              <div className="absolute left-0 top-1 flex h-7 w-7 items-center justify-center rounded-full" style={{ background: tone.bg, color: tone.color, boxShadow: displayStatus === "running" ? "0 0 12px var(--yunque-accent-glow)" : undefined }}>
                 {displayStatus === "running" ? <Loader2 size={13} className="animate-spin" /> : timelineIcon(item.kind)}
               </div>
               <div className="rounded-[22px] border px-4 py-3" style={{ background: "rgba(255,255,255,0.035)", borderColor: "rgba(255,255,255,0.07)" }}>
@@ -489,7 +489,7 @@ function TerminalView({ lines }: { lines: TerminalLine[] }) {
       {lines.map((line, i) => (
         <div key={`${line.time}-${i}`} className="mb-2 rounded-xl px-3 py-2" style={{ background: line.type === "cmd" ? "rgba(34,197,94,0.08)" : line.type === "error" ? "rgba(239,68,68,0.09)" : "rgba(255,255,255,0.03)" }}>
           <div className="flex items-center gap-2">
-            <span style={{ color: line.type === "cmd" ? "#4ade80" : line.type === "error" ? "#f87171" : "#93c5fd" }}>
+            <span style={{ color: line.type === "cmd" ? "#4ade80" : line.type === "error" ? "#f87171" : "var(--yunque-accent-strong)" }}>
               {line.type === "cmd" ? "$" : line.type === "error" ? "!" : ">"}
             </span>
             <span className="flex-1 whitespace-pre-wrap break-all">{line.text.replace(/^\$\s*/, "")}</span>
@@ -571,11 +571,13 @@ function EditorView({ files }: { files: EditorFile[] }) {
         {files.map((entry, i) => (
           <button
             key={`${entry.path}-${entry.time}-${i}`}
+            type="button"
             onClick={() => setSelected(i)}
+            aria-current={i === selected ? "true" : undefined}
             className="mb-2 w-full rounded-2xl border px-3 py-3 text-left transition-all last:mb-0"
             style={{
-              background: i === selected ? "rgba(59,130,246,0.12)" : "rgba(255,255,255,0.02)",
-              borderColor: i === selected ? "rgba(59,130,246,0.28)" : "var(--yunque-border)",
+              background: i === selected ? "var(--yunque-accent-muted)" : "rgba(255,255,255,0.02)",
+              borderColor: i === selected ? "var(--yunque-border-accent)" : "var(--yunque-border)",
             }}
           >
             <div className="truncate text-xs font-semibold" style={{ color: "var(--yunque-text)" }}>{entry.path.split("/").pop() || entry.path || "Untitled"}</div>
@@ -603,7 +605,7 @@ function ThinkingView({ entries }: { entries: ThinkingEntry[] }) {
   }
 
   const tone = {
-    thought: { bg: "rgba(59,130,246,0.08)", border: "rgba(59,130,246,0.18)", label: "Thought" },
+    thought: { bg: "var(--yunque-accent-soft)", border: "var(--yunque-border-accent)", label: "Thought" },
     observation: { bg: "rgba(245,158,11,0.08)", border: "rgba(245,158,11,0.18)", label: "Observation" },
     plan: { bg: "rgba(168,85,247,0.08)", border: "rgba(168,85,247,0.18)", label: "Plan" },
   } as const;
@@ -707,7 +709,6 @@ export function ComputerPanel({ steps, traceEvents, taskStatus, taskName, isLive
               if (data.event === "browser.screenshot") {
                 if (data.data?.image) setSseImage(data.data.image);
                 if (data.data?.url) setSseUrl(data.data.url);
-                setActiveTab("browser");
               }
             } catch {}
           }
@@ -742,15 +743,15 @@ export function ComputerPanel({ steps, traceEvents, taskStatus, taskName, isLive
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px]" style={{ background: "rgba(59,130,246,0.12)", color: "#93c5fd" }}>
+              <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px]" style={{ background: "var(--yunque-accent-muted)", color: "var(--yunque-accent-strong)" }}>
                 <Monitor size={11} /> {taskName || "工作现场"}
               </span>
-              {activeSummary && <span className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ background: "#60a5fa" }} />}
+              {activeSummary && <span className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ background: "var(--yunque-accent)" }} />}
             </div>
             <div className="mt-1.5 truncate text-xs leading-5" style={{ color: "#94a3b8" }}>{activeSummary ? activeLabel : "查看 Agent 刚刚使用过的终端、浏览器、文件和思考证据。"}</div>
           </div>
           {onClose && (
-            <button onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-2xl transition-colors" style={{ background: "rgba(255,255,255,0.05)", color: "#94a3b8" }}>
+            <button type="button" aria-label="关闭工作现场" onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-2xl transition-colors" style={{ background: "rgba(255,255,255,0.05)", color: "#94a3b8" }}>
               <X size={16} />
             </button>
           )}
@@ -764,22 +765,25 @@ export function ComputerPanel({ steps, traceEvents, taskStatus, taskName, isLive
             <span>{progressPct}%</span>
           </div>
           <div className="h-1.5 overflow-hidden rounded-full" style={{ background: "rgba(255,255,255,0.07)" }}>
-            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${progressPct}%`, background: progressPct >= 100 ? "#22c55e" : "#3b82f6" }} />
+            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${progressPct}%`, background: progressPct >= 100 ? "#22c55e" : "var(--yunque-accent)" }} />
           </div>
         </div>
       )}
 
       <div className="border-b px-3 py-2" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2" role="tablist" aria-label="工作现场视图">
           {tabs.map((tab) => (
             <button
+              type="button"
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
+              role="tab"
+              aria-selected={activeTab === tab.key}
               className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-[11px] transition-all"
               style={{
-                background: activeTab === tab.key ? "rgba(59,130,246,0.16)" : "rgba(255,255,255,0.04)",
+                background: activeTab === tab.key ? "var(--yunque-accent-muted)" : "rgba(255,255,255,0.04)",
                 color: activeTab === tab.key ? "#dbeafe" : "#94a3b8",
-                border: `1px solid ${activeTab === tab.key ? "rgba(59,130,246,0.28)" : "rgba(255,255,255,0.06)"}`,
+                border: `1px solid ${activeTab === tab.key ? "var(--yunque-border-accent)" : "rgba(255,255,255,0.06)"}`,
               }}
             >
               {tab.icon}
@@ -803,8 +807,8 @@ export function ComputerPanel({ steps, traceEvents, taskStatus, taskName, isLive
           <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: "#64748b" }}>Generated files</div>
           <div className="space-y-2">
             {parsed.files.map((file, index) => (
-              <a key={`${file.path}-${index}`} href={`/api/files/download?path=${encodeURIComponent(file.path)}`} download={file.name} className="flex items-center gap-3 rounded-[18px] border px-3 py-3 transition-all" style={{ borderColor: "rgba(59,130,246,0.18)", background: "rgba(59,130,246,0.08)" }}>
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl" style={{ background: "rgba(59,130,246,0.16)", color: "#93c5fd" }}><FileCode size={15} /></div>
+              <a key={`${file.path}-${index}`} href={`/api/files/download?path=${encodeURIComponent(file.path)}`} download={file.name} className="flex items-center gap-3 rounded-[18px] border px-3 py-3 transition-all" style={{ borderColor: "var(--yunque-border-accent)", background: "var(--yunque-accent-soft)" }}>
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl" style={{ background: "var(--yunque-accent-muted)", color: "var(--yunque-accent-strong)" }}><FileCode size={15} /></div>
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-medium" style={{ color: "#dbeafe" }}>{file.name}</div>
                   <div className="mt-0.5 text-[11px]" style={{ color: "#94a3b8" }}>{humanFileSize(file.size) || "Ready to download"}</div>

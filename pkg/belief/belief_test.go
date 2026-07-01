@@ -274,7 +274,8 @@ func TestEngine_EvaluateInteraction(t *testing.T) {
 		g.Add(b)
 	}
 
-	result, err := e.EvaluateInteraction("I need you to be gentle with me", nil)
+	result, err := e.EvaluateInteraction("I need you to be gentle with me", nil, "")
+
 	if err != nil {
 		t.Fatalf("EvaluateInteraction() error = %v", err)
 	}
@@ -430,7 +431,7 @@ func TestEngine_EmptyGraph(t *testing.T) {
 	g := NewBeliefGraph()
 	e := NewEngine(g)
 
-	result, err := e.EvaluateInteraction("hello", nil)
+	result, err := e.EvaluateInteraction("hello", nil, "")
 	if err != nil {
 		t.Fatalf("EvaluateInteraction() on empty graph error = %v", err)
 	}
@@ -448,4 +449,97 @@ func extractIDs(nodes []*BeliefNode) []string {
 		out[i] = n.ID
 	}
 	return out
+}
+
+// TestEngine_ScopeGate verifies that scoped beliefs only activate when the
+// current conversation scope matches one of their declared scopes.
+//
+// This is the fix for云雀 feedback #34: "永远不会离开你" was polluting
+// technical discussions because there was no scope dimension. Now a boundary
+// belief scoped to ["emotional"] should NOT activate in a "technical" scope.
+func TestEngine_ScopeGate(t *testing.T) {
+	g := NewBeliefGraph()
+	e := NewEngine(g)
+
+	// boundary belief scoped to emotional conversations only
+	emotionalBoundary := &BeliefNode{
+		ID:       "stay_with_you",
+		Statement: "我永远不会离开你",
+		Kind:     KindBoundary,
+		Strength: 0.9, Confidence: 0.9, Valence: 0.6, Stability: 0.8, Plasticity: 0.1,
+		Scopes:   []string{"emotional"},
+	}
+	// value belief scoped to technical conversations
+	technicalValue := &BeliefNode{
+		ID:       "code_quality",
+		Statement: "code quality over speed",
+		Kind:     KindValue,
+		Strength: 0.8, Confidence: 0.8, Valence: 0.5, Stability: 0.7, Plasticity: 0.2,
+		Scopes:   []string{"technical"},
+	}
+	// global belief (no scopes) — always activates
+	globalBoundary := &BeliefNode{
+		ID:       "never_lie",
+		Statement: "do not lie to please",
+		Kind:     KindBoundary,
+		Strength: 0.9, Confidence: 0.95, Valence: -0.3, Stability: 0.9, Plasticity: 0.05,
+	}
+	for _, b := range []*BeliefNode{emotionalBoundary, technicalValue, globalBoundary} {
+		g.Add(b)
+	}
+
+	// Case 1: technical scope — emotional boundary MUST NOT activate,
+	// technical value and global boundary SHOULD activate.
+	// Message deliberately contains keywords from all three beliefs so the
+	// ONLY thing being tested is the scope gate (not keyword activation).
+	resTech, err := e.EvaluateInteraction("help me debug this code quality issue, do not lie to please, will you leave me", nil, "technical")
+	if err != nil {
+		t.Fatalf("technical scope error: %v", err)
+	}
+	if contains(resTech.Boundaries, "我永远不会离开你") {
+		t.Error("FAIL: emotional boundary leaked into technical scope — #34 regress")
+	}
+	if !contains(resTech.ActiveBeliefs, "code_quality") {
+		t.Error("FAIL: technical value belief should activate in technical scope")
+	}
+	if !contains(resTech.Boundaries, "do not lie to please") {
+		t.Error("FAIL: global boundary should activate regardless of scope")
+	}
+
+	// Case 2: emotional scope — emotional boundary SHOULD activate,
+	// technical value MUST NOT. Message contains the chinese statement verbatim
+	// (keyword activation uses strings.Contains on the whole space-separated
+	// token, so chinese statements need the exact phrase in the message).
+	resEmo, err := e.EvaluateInteraction("我永远不会离开你吗 help me debug code quality, do not lie to please", nil, "emotional")
+	if err != nil {
+		t.Fatalf("emotional scope error: %v", err)
+	}
+	if !contains(resEmo.Boundaries, "我永远不会离开你") {
+		t.Error("FAIL: emotional boundary should activate in emotional scope")
+	}
+	if contains(resEmo.ActiveBeliefs, "code_quality") {
+		t.Error("FAIL: technical value leaked into emotional scope")
+	}
+
+	// Case 3: empty scope (caller didn't declare) — scoped beliefs MUST NOT
+	// activate (they require explicit scope match), only global ones fire.
+	resEmpty, err := e.EvaluateInteraction("help me with code quality, will you leave me, do not lie to please", nil, "")
+	if err != nil {
+		t.Fatalf("empty scope error: %v", err)
+	}
+	if contains(resEmpty.ActiveBeliefs, "code_quality") || contains(resEmpty.ActiveBeliefs, "stay_with_you") {
+		t.Error("FAIL: scoped beliefs should NOT activate when scope is empty/undeclared")
+	}
+	if !contains(resEmpty.Boundaries, "do not lie to please") {
+		t.Error("FAIL: global boundary should still activate with empty scope")
+	}
+}
+
+func contains(list []string, item string) bool {
+	for _, s := range list {
+		if s == item {
+			return true
+		}
+	}
+	return false
 }

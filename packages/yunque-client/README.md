@@ -148,7 +148,6 @@ runtime code; reserve the package root for full generated API coverage.
 ```ts
 import { createAgentKit } from "yunque-client/agent-kit";
 import { createAuthClient } from "yunque-client/auth";
-import { createAiriClient } from "yunque-client/airi";
 import { createBackupClient } from "yunque-client/backup";
 import { createPacksClient, hasCatalogSourceIssues, summarizeCapabilityPrepare, summarizeCatalogSourceReports } from "yunque-client/packs";
 import { createPlannerRecoveryClient } from "yunque-client/planner-recovery";
@@ -955,10 +954,6 @@ const realtime = createRealtimeClient({
 const ws = realtime.connect();
 ws.addEventListener("open", () => realtime.send(ws, realtime.ping()));
 
-const airi = createAiriClient({ baseUrl: "http://localhost:9090" });
-const airiModels = await airi.models();
-console.log(airiModels.data[0]?.id);
-
 const memory = createMemoryClient({
   baseUrl: "http://localhost:9090",
   apiKey: "<your-api-key>",
@@ -1753,7 +1748,7 @@ console.log(sandboxStatus.key_source);
 ```
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
-in only `auth`, `backup`, `packs`, `airi`, `planner-recovery`, `planner`, `planner-read`, `planner-control`, `planner-checkpoints`, `planner-resume`, `planner-execution-state`, `chat`, `chat-basic`, `chat-agentic`, `chat-stream`, `cognis`, `cognis-registry`, `cognis-observe`, `cognis-traces`, `cognis-health`, `cognis-alerts`, `cognis-experience`, `cognis-evolution`, `cognis-federation`, `cognis-workflows`, `cognis-bundles`, `cognisdk-schema`, `cognisdk-package`, `events`, `events-stream`, `events-parse`, `realtime`, `realtime-connect`, `realtime-messages`, `webchat`, `webchat-widget`, `webchat-embed`, `conversations`, `conversations-read`, `conversations-control`, `conversation-sessions`, `conversation-messages`, `conversation-replay`, `conversation-message-control`, `conversation-manage`, `subagents`, `subagents-read`, `subagents-control`, `bots`, `bots-read`, `bots-control`, `bots-list`, `bots-detail`, `bots-inbox`, `bots-channels`, `discovery`, `discovery-identity`, `discovery-embeddings`, `discovery-search`, `identity`, `embeddings`, `search`, `interactions`, `emotion`, `emotion-history`, `emotion-stickers`, `reactions`, `instructions`, `rbac`, `roles`, `role-bindings`, `my-roles`, `permissions`, `memory`, `memory-search`, `memory-stats`, `memory-add`, `memory-compact`, `tasks`, `task-context`, `task-observe`, `task-templates`, `task-threads`, `task-gaps`, `task-memory`, `task-thread-read`, `task-thread-control`, `task-lifecycle`, `task-read`, `task-create`, `task-delete`, `knowledge`, `knowledge-search`, `knowledge-ingest`, `knowledge-sources`, `knowledge-source-read`, `knowledge-source-control`, `knowledge-import`, `knowledge-upload`, or
+in only `auth`, `backup`, `packs`, `planner-recovery`, `planner`, `planner-read`, `planner-control`, `planner-checkpoints`, `planner-resume`, `planner-execution-state`, `chat`, `chat-basic`, `chat-agentic`, `chat-stream`, `cognis`, `cognis-registry`, `cognis-observe`, `cognis-traces`, `cognis-health`, `cognis-alerts`, `cognis-experience`, `cognis-evolution`, `cognis-federation`, `cognis-workflows`, `cognis-bundles`, `cognisdk-schema`, `cognisdk-package`, `events`, `events-stream`, `events-parse`, `realtime`, `realtime-connect`, `realtime-messages`, `webchat`, `webchat-widget`, `webchat-embed`, `conversations`, `conversations-read`, `conversations-control`, `conversation-sessions`, `conversation-messages`, `conversation-replay`, `conversation-message-control`, `conversation-manage`, `subagents`, `subagents-read`, `subagents-control`, `bots`, `bots-read`, `bots-control`, `bots-list`, `bots-detail`, `bots-inbox`, `bots-channels`, `discovery`, `discovery-identity`, `discovery-embeddings`, `discovery-search`, `identity`, `embeddings`, `search`, `interactions`, `emotion`, `emotion-history`, `emotion-stickers`, `reactions`, `instructions`, `rbac`, `roles`, `role-bindings`, `my-roles`, `permissions`, `memory`, `memory-search`, `memory-stats`, `memory-add`, `memory-compact`, `tasks`, `task-context`, `task-observe`, `task-templates`, `task-threads`, `task-gaps`, `task-memory`, `task-thread-read`, `task-thread-control`, `task-lifecycle`, `task-read`, `task-create`, `task-delete`, `knowledge`, `knowledge-search`, `knowledge-ingest`, `knowledge-sources`, `knowledge-source-read`, `knowledge-source-control`, `knowledge-import`, `knowledge-upload`, or
 `providers`/`provider-control`/`provider-mode`/`provider-session`/`provider-health`/`provider-registry`/`breaker`/`provider-breaker`/`models`/`setup`/`setup-detect`/`setup-templates`/`setup-provider`/`setup-install`/`documents`/`document-templates`/`document-generate`/`document-docx`/`document-xlsx`/`document-pptx`/`document-html`/`approvals`/`approval-queue`/`approval-pending`/`approval-history`/`approval-rules`/`trace`/`trace-events`/`trace-recent`/`trace-by-id`/`task-trace`/`browser`/`browser-status`/`browser-capture`/`browser-opp`/`browser-extension`/`sbom-drift`/`sbom-drift-ci`/`runtime`/`runtime-queue`/`runtime-events`/`runtime-queue-read`/`runtime-queue-control`/`router`/`modes`/`modes-observe`
 `/ide`/`persona`/`persona-state`/`persona-skills`/`persona-presets`/`workflow`/`workflow-definitions`/`workflow-runs`/`workflow-read`/`workflow-write`/`workflow-run`/`workflow-instances`/`cost`/`cost-budget`/`cost-alerts`/`cost-observe`/`cost-task`/`cost-history`/`usage`/`lora`/`lora-observe`/`lora-status`/`lora-history`/`lora-control`/`lora-config`/`lora-preview`/`lora-evolution`/`lora-trigger`/`lora-rollback`/`iterate`/`iterate-review`/`iterate-pending`/`iterate-decisions`/`iterate-cycle`/`trust`/`trust-control`/`review`/`skillgrow`/`audit`/`audit-chain`/`audit-tail`/`audit-verify`/`audit-trail`/`heartbeat`/`heartbeat-observe`/`heartbeat-control`
 `/reverie`/`federation`/`federation-peers`/`federation-stats`/`federation-capabilities`/`system`/`system-probes`/`system-ops`/`settings`/`settings-config`/`settings-backup`/`settings-schema`/`settings-runtime`/`tori`/`tori-observe`/`tori-bind`/`upload`/`speech`/`speech-tts`/`speech-stt`/`speech-voices`/`upload`/`admin`/`files`/`files-list`/`files-preview`/`cron`/`skillhub`/`skillhub-installed`/`skillhub-versions`/`skills`/`skills-catalog`/`skills-scan`/`skills-dynamic`/`skills-suggestions`/`plugins`/`plugin-toggle`/`plugin-ui`/`plugin-reload`/`plugin-folder`/`connectors`/`connector-catalog`/`connector-auth`/`connector-actions`/`connector-list`/`connector-detail`/`connector-connect`/`connector-disconnect`/`notify`/`notify-share`/`notify-channels`/`notify-channel-read`/`notify-channel-control`/`projects`/`project-read`/`project-list`/`project-detail`/`project-write`/`market`/`market-search`/`market-query`/`market-top`/`market-stats`/`dispatch`/`dispatch-read`/`dispatch-workers`/`dispatch-queue`/`dispatch-worker-config`/`dispatch-control`/`orchestrator`/`orchestrator-read`/`orchestrator-status`/`orchestrator-events`/`orchestrator-control`/`fork`/`fork-read`/`fork-root`/`fork-list`/`fork-control`/`scheduler`/`graph`/`graph-read`/`graph-entities`/`graph-relations`/`graph-context`/`graph-stats`/`graph-write`/`plugin-api`/`plugin-llm`/`plugin-search`/`plugin-memory`/`plugin-memory-read`/`plugin-memory-write`/`plugin-agent-memory`/`plugin-agent-memory-search`/`plugin-agent-memory-write`/`plugin-knowledge`/`plugin-knowledge-search`/`plugin-knowledge-ingest`/`plugin-cron`/`plugin-cron-read`/`plugin-cron-control`/`plugin-send`/`plugin-extensions`/`plugin-extensions-list`/`plugin-extension-register`/`state`/`triggers`/`trigger-definitions`/`trigger-definition-control`/`trigger-history`/`trigger-emit`/`missions`/`reflect`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
@@ -1802,7 +1797,6 @@ npm run test -- state-actions state-capabilities
 | `src/auth.ts` | Lightweight hand-written setup status, password login/setup, Tori OAuth URL, and API-key to JWT exchange slice |
 | `src/backup.ts` | Lightweight backup info/export/import slice for external restore tools, admin pages, plugins, and automation scripts without importing settings or the full generated SDK |
 | `src/packs.ts` | Lightweight Pack Runtime registry client for frontend shell menu/route sync, enable/disable/rollback, and automation scripts |
-| `src/airi.ts` | Lightweight hand-written Airi bridge status, OpenAI-compatible models, and chat completions slice |
 | `src/planner-recovery.ts` | Lightweight hand-written Planner recovery slice for incremental imports |
 | `src/planner.ts` | Lightweight planner facade over checkpoint recovery and execution state |
 | `src/planner-read.ts` | Lightweight Planner checkpoint/job/execution-state read facade without recovery mutation APIs |
@@ -2584,23 +2578,6 @@ The lightweight Modes SDK exposes persona modes, current-mode reads, and mode sw
 ### Interactions SDK
 
 The lightweight Interactions SDK exposes emotion history, sticker mappings, user instructions, emoji reactions, and sticker sending helpers for external plugin UIs, front-end admin pages, CLIs, sidecars, and automation scripts without importing the full platform client. It maps directly to `/v1/emotion/*`, `/v1/instructions*`, `/v1/react`, and `/v1/sticker/send`; Agent Kit also exposes this surface as `kit.interactions` / `kit.Interactions`.
-
-### Airi Bridge SDK
-
-The lightweight Airi Bridge SDK exposes `/v1/ext/airi/status`, `/v1/ext/airi/models`, and `/v1/ext/airi/chat/completions` for front-end pages, desktop widgets, plugins, CLIs, and automation scripts that need the OpenAI-compatible desktop pet bridge without importing the full platform client. Agent Kit also exposes this surface as `kit.airi`.
-
-```ts
-import { createAiriClient } from "yunque-client/airi";
-
-const airi = createAiriClient({ baseUrl: "http://localhost:9090", token: "<token>" });
-const status = await airi.status();
-const models = await airi.models();
-const reply = await airi.chatCompletions({
-  model: "yunque-airi",
-  messages: [{ role: "user", content: "你好" }],
-});
-const streamItems = airi.streamChatCompletions({ messages: [{ role: "user", content: "hi" }] });
-```
 
 ### Cognition SDK Schema Helpers
 

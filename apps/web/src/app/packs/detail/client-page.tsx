@@ -10,6 +10,7 @@ import {
   Boxes,
   ChevronDown,
   ChevronUp,
+  Code2,
   Download,
   ExternalLink,
   Info,
@@ -984,13 +985,10 @@ export default function PackDetailClientPage() {
           </Card>
         )}
 
-        <Card className="section-card p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <ShieldCheck size={16} style={{ color: "var(--yunque-accent)" }} />
-            <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
-              安装前确认
-            </div>
-          </div>
+        <CollapsibleSection
+          title="安装前确认"
+          icon={<ShieldCheck size={16} style={{ color: "var(--yunque-accent)" }} />}
+        >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="rounded-md p-3 border" style={{ borderColor: "var(--yunque-border)" }}>
               <div className="text-xs font-medium mb-2" style={{ color: "var(--yunque-text)" }}>它会获得什么能力</div>
@@ -1054,15 +1052,12 @@ export default function PackDetailClientPage() {
               </div>
             </div>
           )}
-        </Card>
+        </CollapsibleSection>
 
-        <Card className="section-card p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Sparkles size={16} style={{ color: "var(--yunque-primary)" }} />
-            <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
-              云雀如何使用它
-            </div>
-          </div>
+        <CollapsibleSection
+          title="云雀如何使用它"
+          icon={<Sparkles size={16} style={{ color: "var(--yunque-primary)" }} />}
+        >
           <div className="space-y-2">
             {usageExplanation.map((line) => (
               <div key={line} className="flex items-start gap-2 text-sm" style={{ color: "var(--yunque-text-secondary)" }}>
@@ -1071,17 +1066,14 @@ export default function PackDetailClientPage() {
               </div>
             ))}
           </div>
-        </Card>
+        </CollapsibleSection>
 
         {/* 能力清单 */}
         {caps.length > 0 && (
-          <Card className="section-card p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <Workflow size={16} style={{ color: "var(--yunque-primary)" }} />
-              <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
-                提供的能力 ({caps.length})
-              </div>
-            </div>
+          <CollapsibleSection
+            title={`提供的能力 (${caps.length})`}
+            icon={<Workflow size={16} style={{ color: "var(--yunque-primary)" }} />}
+          >
             <div className="flex flex-wrap gap-1.5">
               {caps.map((cap) => (
                 <Chip
@@ -1094,17 +1086,14 @@ export default function PackDetailClientPage() {
                 </Chip>
               ))}
             </div>
-          </Card>
+          </CollapsibleSection>
         )}
 
         {surfaceLabels.length > 0 && (
-          <Card className="section-card p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <Workflow size={16} style={{ color: "var(--yunque-accent)" }} />
-              <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
-                能力形态
-              </div>
-            </div>
+          <CollapsibleSection
+            title="能力形态"
+            icon={<Workflow size={16} style={{ color: "var(--yunque-accent)" }} />}
+          >
             <div className="flex flex-wrap gap-1.5">
               {surfaceLabels.map((label) => (
                 <Chip key={label} size="sm" style={{ background: "var(--yunque-accent-soft)", color: "var(--yunque-primary)" }}>
@@ -1117,15 +1106,15 @@ export default function PackDetailClientPage() {
                 独立界面包运行在沙箱隔离环境中：不直接获得云雀 token，默认隔离页面能力，只能通过自身声明的后端路由与云雀通信，越权调用会被拒绝并记录。
               </div>
             )}
-          </Card>
+          </CollapsibleSection>
         )}
 
         {/* 前端入口 */}
         {(menus.length > 0 || routesFrontend.length > 0) && (
-          <Card className="section-card p-4">
-            <div className="text-sm font-semibold mb-3" style={{ color: "var(--yunque-text)" }}>
-              界面入口
-            </div>
+          <CollapsibleSection
+            title="界面入口"
+            icon={<ExternalLink size={16} style={{ color: "var(--yunque-accent)" }} />}
+          >
             <div className="space-y-2">
               {[...menus, ...routesFrontend.map((route) => ({ key: route.path, label: route.title || route.path, path: route.path }))].map((menu) => (
                 <Link key={menu.key} href={menu.path}>
@@ -1144,15 +1133,15 @@ export default function PackDetailClientPage() {
                 </Link>
               ))}
             </div>
-          </Card>
+          </CollapsibleSection>
         )}
 
         {/* SDK 入口 */}
         {sdkLanguages.length > 0 && (
-          <Card className="section-card p-4">
-            <div className="text-sm font-semibold mb-3" style={{ color: "var(--yunque-text)" }}>
-              开发者 SDK
-            </div>
+          <CollapsibleSection
+            title="开发者 SDK"
+            icon={<Code2 size={16} style={{ color: "var(--yunque-accent)" }} />}
+          >
             <div className="space-y-1">
               {sdkLanguages.map(([lang, importPath]) => (
                 <div key={lang} className="flex items-center gap-3 text-xs">
@@ -1163,7 +1152,7 @@ export default function PackDetailClientPage() {
                 </div>
               ))}
             </div>
-          </Card>
+          </CollapsibleSection>
         )}
 
         {/* 高级技术详情 */}

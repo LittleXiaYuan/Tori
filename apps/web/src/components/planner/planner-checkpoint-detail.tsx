@@ -1,11 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Button, Card, Chip, Spinner } from "@heroui/react";
 import { ArrowLeft, ExternalLink, FileText, GitBranch, Play, RefreshCw } from "lucide-react";
 import { api, BASE, getAuthHeaders } from "@/lib/api";
-import type { PlannerCheckpointRecoveryAction, PlannerCheckpointResumePlanJob, PlannerCheckpointResumePlanJobEvent, PlannerCheckpointResumePlanJobResponse, PlannerCheckpointResumePlanResponse, PlannerCheckpointResumeTaskResponse, PlannerCheckpointStep, PlannerCheckpointSummary, PlannerExecutionStateResponse } from "@/lib/api-types";
+import type { PlannerCheckpointRecoveryAction, PlannerCheckpointResumePlanJob, PlannerCheckpointResumePlanJobEvent, PlannerCheckpointResumePlanJobResponse, PlannerCheckpointResumePlanResponse, PlannerCheckpointResumeTaskResponse, PlannerCheckpointStep, PlannerCheckpointSummary, PlannerExecutionStateRecoveryTarget, PlannerExecutionStateResponse } from "@/lib/api-types";
 import { formatErrorMessage } from "@/lib/error-utils";
+import { resolvePlannerRecoveryTarget } from "@/lib/planner-recovery-target";
 
 interface PlannerCheckpointDetailProps {
   planId?: string;
@@ -95,7 +97,7 @@ function stepStatusColor(status?: string): string {
     case "done":
     case "completed": return "#86efac";
     case "failed": return "#fca5a5";
-    case "running": return "#93c5fd";
+    case "running": return "var(--yunque-accent-strong)";
     case "skipped": return "#cbd5e1";
     default: return "#c4b5fd";
   }
@@ -126,6 +128,12 @@ function displayRecoveryText(text?: string): string {
     .trim();
 }
 
+function compactSessionLabel(sessionId: string | undefined): string {
+  const normalized = sessionId?.trim();
+  if (!normalized) return "";
+  return `会话 ${normalized.length > 8 ? normalized.slice(-8) : normalized}`;
+}
+
 function isStepComplete(status?: string): boolean {
   return status === "done" || status === "completed" || status === "skipped";
 }
@@ -139,7 +147,7 @@ function getPlannerGraphState(step: PlannerCheckpointStep, stepById: Map<number,
     return { state: "done", label: "已完成", color: "#86efac", hint: "这一步已完成，现场已保留。" };
   }
   if (actualStatus === "running") {
-    return { state: "running", label: "执行中", color: "#93c5fd", hint: "这一步正在执行。" };
+    return { state: "running", label: "执行中", color: "var(--yunque-accent-strong)", hint: "这一步正在执行。" };
   }
   if (actualStatus === "failed") {
     return { state: "failed", label: "需处理", color: "#fca5a5", hint: "这一步失败了，建议先看失败原因。" };
@@ -175,7 +183,7 @@ function graphStateBackground(state: PlannerGraphState): string {
     case "done": return "rgba(34,197,94,0.08)";
     case "ready": return "rgba(14,165,233,0.08)";
     case "blocked": return "rgba(251,191,36,0.08)";
-    case "running": return "rgba(59,130,246,0.08)";
+    case "running": return "var(--yunque-accent-soft)";
     case "failed": return "rgba(239,68,68,0.08)";
     case "pending": return "rgba(167,139,250,0.08)";
     default: return "rgba(255,255,255,0.03)";
@@ -455,15 +463,27 @@ export function PlannerCheckpointDetail({
     acc[node.graph.state] = (acc[node.graph.state] || 0) + 1;
     return acc;
   }, {} as Record<PlannerGraphState, number>), [graphNodes]);
+  const failedExecutionSteps = executionState?.failure_summary?.failed_steps?.slice(0, 3) || [];
+  const hasStructuredFailedSteps = failedExecutionSteps.length > 0;
+  const executionPlanId = executionState?.plan_id || checkpoint?.plan_id || planId;
+  const primaryRecoveryTarget = resolvePlannerRecoveryTarget(executionState?.failure_summary?.primary_target, executionPlanId);
+  const executionSessionLabel = compactSessionLabel(
+    executionState?.checkpoint?.session_id ||
+    checkpoint?.session_id ||
+    executionState?.latest_job?.session_id ||
+    executionState?.events?.find((event) => event.session_id)?.session_id ||
+    resumePlanJob?.session_id ||
+    resumePlanEvents.find((event) => event.session_id)?.session_id,
+  );
 
   return (
     <main className="min-h-screen px-5 py-6" style={{ background: "var(--yunque-bg)", color: "var(--yunque-text)" }}>
       <div className="mx-auto flex max-w-5xl flex-col gap-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <a href="/chat" className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm" style={{ color: "var(--yunque-text-muted)", border: "1px solid var(--yunque-border)" }}>
+            <Link href="/chat" className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm" style={{ color: "var(--yunque-text-muted)", border: "1px solid var(--yunque-border)" }}>
               <ArrowLeft size={14} /> 返回聊天
-            </a>
+            </Link>
             <div>
               <h1 className="text-xl font-semibold">Planner 恢复点详情</h1>
               <p className="text-sm" style={{ color: "var(--yunque-text-muted)" }}>查看原始 DAG 步骤、依赖关系和可恢复现场。</p>
@@ -516,13 +536,13 @@ export function PlannerCheckpointDetail({
                     </Button>
                   )}
                   {resumeTaskId && (
-                    <a
+                    <Link
                       href={`/task-detail?id=${encodeURIComponent(resumeTaskId)}`}
                       className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm"
                       style={{ color: "#c4b5fd", border: "1px solid rgba(167,139,250,0.2)", background: "rgba(167,139,250,0.08)" }}
                     >
                       查看任务 <ExternalLink size={12} />
-                    </a>
+                    </Link>
                   )}
                 </div>
               )}
@@ -591,12 +611,35 @@ export function PlannerCheckpointDetail({
                     {executionState.next_action && <Chip size="sm" style={{ background: "rgba(251,191,36,0.1)", color: "#fcd34d" }}>下一步：{recoveryActionLabel(executionState.next_action)}</Chip>}
                   </div>
                 </div>
-                <div className="grid gap-3 md:grid-cols-3">
+                {primaryRecoveryTarget?.href && (
+                  <div
+                    aria-label="Planner 主恢复入口"
+                    className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2"
+                    style={{ borderColor: "rgba(167,139,250,0.24)", background: "rgba(167,139,250,0.08)" }}
+                  >
+                    <span className="text-xs font-medium" style={{ color: "#c4b5fd" }}>主恢复入口</span>
+                    <Link
+                      href={primaryRecoveryTarget.href}
+                      className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold"
+                      style={{ color: "#c4b5fd", border: "1px solid rgba(167,139,250,0.24)", background: "rgba(255,255,255,0.04)" }}
+                    >
+                      {primaryRecoveryTarget.label || "打开恢复目标"}
+                      <ExternalLink size={11} aria-hidden />
+                    </Link>
+                  </div>
+                )}
+                <div className={`grid gap-3 ${executionSessionLabel ? "md:grid-cols-4" : "md:grid-cols-3"}`}>
                   <div className="rounded-2xl border p-3" style={{ borderColor: "var(--yunque-border)", background: "rgba(255,255,255,0.03)" }}>
                     <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>恢复点</div>
                     <div className="mt-1 text-sm">{executionState.checkpoint?.completed ?? checkpoint.completed}/{executionState.checkpoint?.total ?? checkpoint.total} 已完成</div>
                     {executionState.checkpoint?.recoverable && <div className="mt-1 text-xs" style={{ color: "#fcd34d" }}>现场可恢复</div>}
                   </div>
+                  {executionSessionLabel && (
+                    <div className="rounded-2xl border p-3" style={{ borderColor: "var(--yunque-border)", background: "rgba(255,255,255,0.03)" }}>
+                      <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>会话</div>
+                      <div className="mt-1 text-sm">{executionSessionLabel}</div>
+                    </div>
+                  )}
                   <div className="rounded-2xl border p-3" style={{ borderColor: "var(--yunque-border)", background: "rgba(255,255,255,0.03)" }}>
                     <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>最近续跑</div>
                     <div className="mt-1 break-all text-sm">{executionState.latest_job?.id || "暂无 Job"}</div>
@@ -610,9 +653,40 @@ export function PlannerCheckpointDetail({
                     {executionState.failure_summary?.next_step && <div className="mt-1 text-xs" style={{ color: "var(--yunque-text-muted)" }}>{executionState.failure_summary.next_step}</div>}
                   </div>
                 </div>
-                {executionState.failure_summary?.ruled_out?.length ? (
+                {executionState.failure_summary?.ruled_out?.length && !hasStructuredFailedSteps ? (
                   <div className="mt-3 rounded-xl px-3 py-2 text-xs" style={{ color: "var(--yunque-text-muted)", background: "rgba(239,68,68,0.08)" }}>
                     已暂时排除：{executionState.failure_summary.ruled_out.slice(0, 3).join("；")}
+                  </div>
+                ) : null}
+                {failedExecutionSteps.length > 0 ? (
+                  <div className="mt-3 rounded-xl px-3 py-2 text-xs" style={{ color: "var(--yunque-text-muted)", background: "rgba(239,68,68,0.08)" }}>
+                    <div className="font-medium" style={{ color: "#fca5a5" }}>失败步骤</div>
+                    <ul className="mt-2 space-y-2">
+                      {failedExecutionSteps.map((step) => {
+                        const stepRecoveryTarget = resolvePlannerRecoveryTarget(step.recovery_target, executionPlanId);
+                        return (
+                          <li key={`failed-step-${step.id}`} className="flex flex-col gap-1 rounded-lg border px-2 py-2" style={{ borderColor: "rgba(239,68,68,0.18)", background: "rgba(255,255,255,0.03)" }}>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-mono" style={{ color: "#fca5a5" }}>#{step.id}</span>
+                              <span className="font-medium text-[var(--yunque-text)]">{step.action || step.skill || "未命名步骤"}</span>
+                              {step.skill && <Chip size="sm" style={{ background: "rgba(14,165,233,0.1)", color: "#7dd3fc" }}>{step.skill}</Chip>}
+                            </div>
+                            {!stepRecoveryTarget?.href && step.error && <div>{displayRecoveryText(step.error)}</div>}
+                            {!stepRecoveryTarget?.href && step.recommendation && <div style={{ color: "var(--yunque-text-secondary)" }}>{step.recommendation}</div>}
+                            {stepRecoveryTarget?.href && (
+                              <Link
+                                href={stepRecoveryTarget.href}
+                                className="mt-1 inline-flex w-fit items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium"
+                                style={{ color: "#c4b5fd", border: "1px solid rgba(167,139,250,0.24)", background: "rgba(167,139,250,0.08)" }}
+                              >
+                                {stepRecoveryTarget.label || "打开恢复目标"}
+                                <ExternalLink size={11} aria-hidden />
+                              </Link>
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ul>
                   </div>
                 ) : null}
                 {executionState.cogni ? (

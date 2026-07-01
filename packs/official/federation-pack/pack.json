@@ -5,7 +5,7 @@
   "description": "跨实例协作能力：查看联邦 peer、发布/发现 OPP 能力、委派任务、广播能力，并接收远端联邦协议消息。",
   "requiresCore": ">=0.1.0",
   "optional": true,
-  "defaultState": "enabled",
+  "defaultState": "disabled",
   "backend": {
     "capabilities": [
       "federation.peers",

@@ -1,8 +1,9 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useLayoutEffect, useRef, useState, useTransition } from "react";
+import { useTransition } from "react";
 import { Settings, Cpu, Plug, Bell, Palette } from "lucide-react";
+
 
 const tabs = [
   { href: "/settings", label: "通用配置", labelEn: "General", icon: <Settings size={14} />, exact: true },
@@ -16,81 +17,42 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
   const pathname = usePathname();
   const router = useRouter();
   const [, startTransition] = useTransition();
-  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
-  const [indicator, setIndicator] = useState<{ left: number; width: number; ready: boolean }>({
-    left: 0,
-    width: 0,
-    ready: false,
-  });
 
-  const activeIdx = tabs.findIndex((t) =>
+  const activeTab = tabs.find((t) =>
     t.exact ? pathname === t.href : pathname?.startsWith(t.href),
   );
-
-  // 同步药丸指示器位置，匹配当前 active tab 的 offsetLeft/offsetWidth。
-  useLayoutEffect(() => {
-    const el = activeIdx >= 0 ? tabRefs.current[activeIdx] : null;
-    if (!el) return;
-    setIndicator({ left: el.offsetLeft, width: el.offsetWidth, ready: true });
-  }, [activeIdx]);
-
-  // 字体加载或容器宽度变化时（如窗口缩放）重新计算位置。
-  useEffect(() => {
-    const recalc = () => {
-      const el = activeIdx >= 0 ? tabRefs.current[activeIdx] : null;
-      if (!el) return;
-      setIndicator({ left: el.offsetLeft, width: el.offsetWidth, ready: true });
-    };
-    window.addEventListener("resize", recalc);
-    return () => window.removeEventListener("resize", recalc);
-  }, [activeIdx]);
+  const selectedKey = activeTab?.href || "/settings";
 
   return (
-    <div className="page-root animate-fade-in-up">
-      <div className="page-header">
-        <div>
-          <h1 className="page-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <Settings size={20} style={{ color: "var(--yunque-accent)" }} /> 设置
-          </h1>
-          <p className="page-subtitle">系统配置、模型参数与安全选项</p>
+    <div className="flex flex-col h-full animate-fade-in-up">
+      <div className="w-full border-b border-white/5 bg-transparent backdrop-blur-md">
+        <div className="w-full max-w-5xl mx-auto px-6 pt-4">
+          <nav className="flex gap-6 relative" aria-label="设置分类">
+            {tabs.map((tab) => {
+              const isSelected = selectedKey === tab.href;
+              return (
+                <button
+                  key={tab.href}
+                  aria-current={isSelected ? "page" : undefined}
+                  onClick={() => startTransition(() => router.push(tab.href))}
+                  className={`relative h-12 flex items-center space-x-2 px-1 text-sm font-medium transition-colors ${isSelected ? 'text-[var(--yunque-accent)]' : 'text-[var(--yunque-text-secondary)] hover:text-[var(--yunque-text)]'}`}
+                >
+                  {tab.icon}
+                  <span>{tab.label}</span>
+                  {isSelected && (
+                    <span className="absolute bottom-[-1px] left-0 w-full h-[2px] bg-[var(--yunque-accent)]" />
+                  )}
+                </button>
+              );
+            })}
+          </nav>
         </div>
       </div>
 
-      <nav className="settings-tabs" role="tablist">
-        <span
-          className="settings-tab-indicator"
-          aria-hidden="true"
-          data-ready={indicator.ready || undefined}
-          style={{
-            transform: `translateX(${indicator.left}px)`,
-            width: `${indicator.width}px`,
-          }}
-        />
-        {tabs.map((tab, i) => {
-          const active = i === activeIdx;
-          return (
-            <button
-              key={tab.href}
-              ref={(el) => {
-                tabRefs.current[i] = el;
-              }}
-              role="tab"
-              aria-selected={active}
-              className="settings-tab"
-              data-active={active || undefined}
-              onClick={() => {
-                if (!active) startTransition(() => router.push(tab.href));
-              }}
-            >
-              {tab.icon}
-              <span>{tab.label}</span>
-            </button>
-          );
-        })}
-      </nav>
-
-      <div className="settings-tab-content">
-        {children}
+      <div className="flex-1 overflow-auto">
+        <div className="w-full max-w-5xl mx-auto px-6 py-8">
+          {children}
+        </div>
       </div>
     </div>
   );

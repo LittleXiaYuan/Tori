@@ -27,10 +27,6 @@
       "types": "./src/packs.ts",
       "import": "./src/packs.ts"
     },
-    "./airi": {
-      "types": "./src/airi.ts",
-      "import": "./src/airi.ts"
-    },
     "./planner-recovery": {
       "types": "./src/planner-recovery.ts",
       "import": "./src/planner-recovery.ts"

@@ -74,13 +74,41 @@ func (h *Handler) Stop(ctx context.Context) error {
 	return nil
 }
 
-// Routes exposes the read-only night-school endpoints.
+// Routes exposes the night-school endpoints. Reads are the dreaming/distill/
+// trait views; the single write lets a user curate the learned profile by
+// forgetting a trait they disagree with (the dreaming loop produces traits, but
+// the user stays in control of what sticks).
 func (h *Handler) Routes() []packruntime.BackendRoute {
 	return []packruntime.BackendRoute{
 		{Method: http.MethodGet, Path: "/v1/night-school/dreams", Handler: h.Dreams},
 		{Method: http.MethodGet, Path: "/v1/night-school/distill", Handler: h.Distill},
 		{Method: http.MethodGet, Path: "/v1/night-school/traits", Handler: h.Traits},
+		{Method: http.MethodPost, Path: "/v1/night-school/traits/forget", Handler: h.ForgetTrait},
 	}
+}
+
+// ForgetTraitRequest identifies the learned trait to forget.
+type ForgetTraitRequest struct {
+	Dimension  string `json:"dimension"`
+	Preference string `json:"preference"`
+}
+
+// ForgetTrait removes a learned trait the user disagrees with. The trait store
+// persists the deletion, so a wrong preference stops shaping the persona.
+func (h *Handler) ForgetTrait(w http.ResponseWriter, r *http.Request) {
+	var req ForgetTraitRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"无法解析请求体"}`, http.StatusBadRequest)
+		return
+	}
+	if strings.TrimSpace(req.Dimension) == "" || strings.TrimSpace(req.Preference) == "" {
+		http.Error(w, `{"error":"dimension 与 preference 不能为空"}`, http.StatusBadRequest)
+		return
+	}
+	if h.traitStore != nil {
+		h.traitStore.Remove(req.Dimension, req.Preference)
+	}
+	writeJSON(w, map[string]any{"ok": true})
 }
 
 // DreamsResponse is the payload of GET /v1/night-school/dreams.

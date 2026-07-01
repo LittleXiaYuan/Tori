@@ -191,6 +191,7 @@ func (s *JSONStore) RecoverInterrupted() int {
 		if t.Status == StatusRunning || t.Status == StatusPlanning {
 			t.Status = StatusInterrupted
 			t.Error = "process restarted while task was executing"
+			t.RecoveryHint = InferRecoveryHint(t, "store:recover_interrupted")
 			t.FinishedAt = &now
 			// Mark any running/retrying steps as pending so they can be retried on resume
 			for i := range t.Steps {

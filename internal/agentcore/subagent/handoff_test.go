@@ -119,15 +119,15 @@ func TestHandoffRegistry_Execute(t *testing.T) {
 	hr.Register(HandoffConfig{Name: "weather", Description: "Weather agent", ProviderID: "gpt4"})
 
 	// Set run function that echoes input
-	hr.SetRunFunc(func(ctx context.Context, agentName, input, providerOverride string) (string, error) {
-		if agentName != "weather" {
-			return "", fmt.Errorf("unexpected agent: %s", agentName)
-		}
-		if providerOverride != "gpt4" {
-			return "", fmt.Errorf("expected provider override gpt4, got %s", providerOverride)
-		}
-		return "北京今天晴，25°C", nil
-	})
+	hr.SetRunFunc(func(ctx context.Context, agentName, input, providerOverride string) (string, string, error) {
+	  if agentName != "weather" {
+	   return "", "", fmt.Errorf("unexpected agent: %s", agentName)
+	  }
+	  if providerOverride != "gpt4" {
+	   return "", "", fmt.Errorf("expected provider override gpt4, got %s", providerOverride)
+	  }
+	  return "北京今天晴，25°C", "", nil
+	 })
 
 	result, err := hr.Execute(context.Background(), "parent-1", "weather", "北京今天天气怎么样", "")
 	if err != nil {
@@ -149,9 +149,9 @@ func TestHandoffRegistry_Execute(t *testing.T) {
 func TestHandoffRegistry_ExecuteNotRegistered(t *testing.T) {
 	mgr := NewManager()
 	hr := NewHandoffRegistry(mgr)
-	hr.SetRunFunc(func(ctx context.Context, agentName, input, providerOverride string) (string, error) {
-		return "ok", nil
-	})
+	hr.SetRunFunc(func(ctx context.Context, agentName, input, providerOverride string) (string, string, error) {
+	  return "ok", "", nil
+	 })
 
 	_, err := hr.Execute(context.Background(), "parent", "nonexistent", "test", "")
 	if err == nil {
@@ -174,9 +174,9 @@ func TestHandoffRegistry_ExecuteError(t *testing.T) {
 	mgr := NewManager()
 	hr := NewHandoffRegistry(mgr)
 	hr.Register(HandoffConfig{Name: "failing"})
-	hr.SetRunFunc(func(ctx context.Context, agentName, input, providerOverride string) (string, error) {
-		return "", fmt.Errorf("LLM timeout")
-	})
+	hr.SetRunFunc(func(ctx context.Context, agentName, input, providerOverride string) (string, string, error) {
+	  return "", "", fmt.Errorf("LLM timeout")
+	 })
 
 	_, err := hr.Execute(context.Background(), "parent", "failing", "input", "")
 	if err == nil {

@@ -17,133 +17,46 @@ const FAIL_THRESHOLD = 3;
 const BLIP_RECHECK_MS = 1200;
 
 function Splash({ state, detail, onRetry }: { state: ServiceState; detail?: string; onRetry: () => void }) {
-  const offline = state === "offline";
+  const [elapsedMs, setElapsedMs] = useState(0);
 
-  // Paint a dark backdrop while the splash is up. The desktop runs in a
-  // transparent window (for Mica): that transparent WebView2 only composites
-  // the ROOT background layer opaquely, so a fill on the high z-index splash
-  // stays see-through and the light, near-opaque #bg-overlay (z-index:-1)
-  // bleeds in — the "washed-out white" loader. #bg-overlay itself DOES paint,
-  // so we darken it (plus html/body) while the splash is mounted and restore
-  // everything on unmount so Mica returns for the app.
   useEffect(() => {
-    const root = document.documentElement;
-    const body = document.body;
-    const overlay = document.getElementById("bg-overlay");
-    const prevRoot = root.style.backgroundColor;
-    const prevBody = body.style.backgroundColor;
-    const prevOverlay = overlay?.style.background ?? "";
-    const dark =
-      "radial-gradient(130% 100% at 50% -12%, rgba(56,189,248,0.20), transparent 46%)," +
-      "radial-gradient(120% 110% at 50% 116%, rgba(139,92,246,0.18), transparent 50%)," +
-      "linear-gradient(165deg, #0a1020 0%, #0e1628 48%, #0a0f1c 100%)";
-    root.style.backgroundColor = "#0a0f1c";
-    body.style.backgroundColor = "#0a0f1c";
-    if (overlay) overlay.style.background = dark;
-    return () => {
-      root.style.backgroundColor = prevRoot;
-      body.style.backgroundColor = prevBody;
-      if (overlay) overlay.style.background = prevOverlay;
-    };
+    const start = Date.now();
+    const interval = setInterval(() => {
+      setElapsedMs(Date.now() - start);
+    }, 100);
+    return () => clearInterval(interval);
   }, []);
 
+  const elapsedSecs = (elapsedMs / 1000).toFixed(1);
+
   return (
-    <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden"
-      style={{ backgroundColor: "#0a0f1c", userSelect: "none", WebkitUserSelect: "none" }}
-    >
-      {/* Opaque dark backdrop promoted to its own compositing layer. In Tauri's
-          transparent WebView2 window (body is transparent for Mica), a fill on a
-          non-layered element stays see-through and the light #bg-overlay bleeds
-          in — that is why the splash looked washed-out/white. translateZ forces a
-          real layer, the same reason the blurred auroras/badge paint opaque. */}
-      <div
-        aria-hidden
-        className="absolute inset-0"
-        style={{
-          transform: "translateZ(0)",
-          willChange: "transform",
-          background:
-            "radial-gradient(130% 100% at 50% -12%, rgba(56,189,248,0.20), transparent 46%)," +
-            "radial-gradient(120% 110% at 50% 116%, rgba(139,92,246,0.18), transparent 50%)," +
-            "linear-gradient(165deg, #0a1020 0%, #0e1628 48%, #0a0f1c 100%)",
-        }}
-      />
-      <div aria-hidden className="yq-aurora yq-aurora-a" />
-      <div aria-hidden className="yq-aurora yq-aurora-b" />
-      <div aria-hidden className="absolute inset-0 yq-grain" />
-
-      <div className="relative flex flex-col items-center gap-7 px-8 text-center yq-rise">
-        <div className="relative flex h-24 w-24 items-center justify-center">
-          {/* plain rotating ring */}
-          <div
-            aria-hidden
-            className="absolute inset-0 rounded-full yq-spin"
-            style={{ border: "3px solid rgba(148,163,184,0.16)", borderTopColor: "#60a5fa" }}
-          />
-          {/* brand badge — Mica dark translucent surface, soft glyph */}
-          <div
-            className="flex h-12 w-12 items-center justify-center rounded-xl text-lg font-bold"
-            style={{
-              background: "rgba(148,163,184,0.10)",
-              border: "1px solid rgba(148,163,184,0.16)",
-              color: "#94a3b8",
-              backdropFilter: "blur(6px)",
-            }}
-          >
-            云
-          </div>
+    <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, width: "100vw", height: "100vh", zIndex: 9999, background: "var(--yunque-bg, #000)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "#fff", overflow: "hidden" }}>
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundImage: "radial-gradient(circle at 50% 50%, rgba(255,255,255,0.03) 1px, transparent 1px)", backgroundSize: "32px 32px", opacity: 0.5 }} />
+      <div style={{ position: "absolute", width: "60vw", height: "60vw", background: "radial-gradient(circle, var(--yunque-accent, rgba(255,255,255,0.1)) 0%, transparent 60%)", opacity: 0.15, filter: "blur(80px)", animation: "pulse 4s ease-in-out infinite alternate" }} />
+      
+      <div style={{ zIndex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 24 }}>
+        <div style={{ position: "relative", width: 48, height: 48, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, borderRadius: "50%", border: "1px solid rgba(255,255,255,0.1)" }} />
+          <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, borderRadius: "50%", borderTop: "1px solid var(--yunque-accent, #fff)", animation: "spin 1s linear infinite" }} />
+          <div style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--yunque-accent, #fff)", boxShadow: "0 0 12px var(--yunque-accent, #fff)" }} />
         </div>
-
-        <div className="space-y-2">
-          <div
-            className="text-[22px] font-extrabold"
-            style={{ color: "#f1f5f9", letterSpacing: "0.18em", textShadow: "0 1px 24px rgba(56,189,248,.25)" }}
-          >
-            云雀 Agent
-          </div>
-          <div
-            aria-live="polite"
-            className="text-[13px] leading-6"
-            style={{ color: offline ? "rgba(252,165,165,.92)" : "rgba(148,163,184,.92)" }}
-          >
-            {offline ? detail || "本地服务连接断开，正在自动重试…" : "正在连接本地服务，请稍候…"}
-          </div>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 16, fontWeight: 500, letterSpacing: "0.1em", marginBottom: 8 }}>等待健康信号...</div>
+          <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", letterSpacing: "0.05em" }}>{detail || "CONNECTING"}</div>
         </div>
-
-        {offline && (
-          <button
-            type="button"
-            onClick={onRetry}
-            className="yq-btn group inline-flex items-center gap-2 rounded-full px-5 py-2 text-[13px] font-semibold text-white"
-          >
-            <RefreshCw size={14} className="transition-transform duration-500 group-hover:rotate-180" />
-            立即重新连接
-          </button>
-        )}
+      </div>
+      
+      <div style={{ position: "absolute", bottom: 40, fontSize: 11, fontFamily: "ui-monospace, monospace", color: "rgba(255,255,255,0.3)" }}>
+        {elapsedSecs}s
       </div>
 
       <style>{`
-        @keyframes yqSpin { to { transform: rotate(360deg); } }
-        .yq-spin { animation: yqSpin 0.9s linear infinite; }
-        @keyframes yqRise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
-        .yq-rise { animation: yqRise .5s ease-out both; }
-        /* static blurred glows (no per-frame animation) to stay light in the webview */
-        .yq-aurora { position:absolute; width:42vw; height:42vw; border-radius:9999px; filter:blur(80px); opacity:.45; pointer-events:none; }
-        .yq-aurora-a { top:-12%; left:10%; background:radial-gradient(circle, rgba(56,189,248,.5), transparent 60%); }
-        .yq-aurora-b { bottom:-14%; right:8%; background:radial-gradient(circle, rgba(139,92,246,.45), transparent 60%); }
-        .yq-grain { opacity:.05; background-image:radial-gradient(rgba(255,255,255,.7) .5px, transparent .6px); background-size:3px 3px; }
-        .yq-btn { background:rgba(255,255,255,.08); border:1px solid rgba(148,163,184,.28); backdrop-filter:blur(8px); transition:background .2s,border-color .2s,transform .2s; }
-        .yq-btn:hover { background:rgba(56,189,248,.16); border-color:rgba(56,189,248,.5); transform:translateY(-1px); }
-        .yq-btn:active { transform:translateY(0); }
-        @media (prefers-reduced-motion: reduce) {
-          .yq-spin,.yq-rise { animation:none !important; }
-        }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes pulse { from { opacity: 0.1; transform: scale(0.9); } to { opacity: 0.2; transform: scale(1.1); } }
       `}</style>
     </div>
   );
 }
-
 function getHealthUrl(): string {
   if (BASE) return `${BASE.replace(/\/$/, "")}/healthz`;
   // Prefer the same-origin health endpoint. In Next dev this goes through

@@ -1,0 +1,32 @@
+{
+  "mcpServers": {
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"]
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest"]
+    },
+    "heroui-pro": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "hpmcp@latest",
+        "react",
+        "0596988c-4375-41e0-98b7-61f22bddf6f1"
+      ]
+    },
+    "heroui-native-pro": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "hpmcp@latest",
+        "native",
+        "0596988c-4375-41e0-98b7-61f22bddf6f1"
+      ]
+    }
+  }
+}

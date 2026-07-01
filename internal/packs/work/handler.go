@@ -302,7 +302,7 @@ func (h *Handler) handleTaskCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(t)
+	_ = json.NewEncoder(w).Encode(task.WithRecoveryHint(t))
 }
 
 func (h *Handler) handleTaskList(w http.ResponseWriter, r *http.Request) {
@@ -318,11 +318,15 @@ func (h *Handler) handleTaskList(w http.ResponseWriter, r *http.Request) {
 			apperror.WriteCode(w, apperror.CodeNotFound, "task not found")
 			return
 		}
-		_ = json.NewEncoder(w).Encode(t)
+		_ = json.NewEncoder(w).Encode(task.WithRecoveryHint(t))
 		return
 	}
 	tasks := store.List(h.gateway.TenantOf(r.Context()), 50)
-	_ = json.NewEncoder(w).Encode(tasks)
+	out := make([]*task.Task, 0, len(tasks))
+	for _, t := range tasks {
+		out = append(out, task.WithRecoveryHint(t))
+	}
+	_ = json.NewEncoder(w).Encode(out)
 }
 
 func (h *Handler) handleTaskDelete(w http.ResponseWriter, r *http.Request) {

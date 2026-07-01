@@ -40,6 +40,7 @@ func (p *Planner) runLongHorizon(ctx context.Context, req PlanRequest) (*PlanRes
 			return
 		}
 		evt.Meta.TenantID = req.TenantID
+		evt.Meta.SessionID = req.SessionID
 		evt.Meta.TaskID = req.TaskID
 		evt.Detail = friendlyLongHorizonCheckpoint(cp)
 		req.StepCallback(evt)
@@ -58,6 +59,7 @@ func (p *Planner) runLongHorizon(ctx context.Context, req PlanRequest) (*PlanRes
 		evt := observe.NewEvent(req.TraceID, observe.DomainPlanner, observe.EventPlan,
 			fmt.Sprintf("📋 规划完成：%d 个步骤", len(pl.Steps)))
 		evt.Meta.TenantID = req.TenantID
+		evt.Meta.SessionID = req.SessionID
 		evt.Meta.TaskID = req.TaskID
 		evt.Detail = friendlyLongHorizonCheckpoint(createdCheckpoint)
 		req.StepCallback(evt)
@@ -90,6 +92,9 @@ func (p *Planner) runLongHorizon(ctx context.Context, req PlanRequest) (*PlanRes
 // are reset to pending and executed under the normal DAG dependency gate.
 func (p *Planner) ResumeLongHorizonCheckpoint(ctx context.Context, req PlanRequest, cp LongHorizonCheckpoint, action string) (*PlanResult, error) {
 	action = NormalizeCheckpointResumeAction(action)
+	if strings.TrimSpace(req.SessionID) == "" {
+		req.SessionID = strings.TrimSpace(cp.SessionID)
+	}
 	if action == "partial" {
 		return partialCheckpointResult(cp), nil
 	}
@@ -131,6 +136,7 @@ func (p *Planner) ResumeLongHorizonCheckpoint(ctx context.Context, req PlanReque
 			return
 		}
 		evt.Meta.TenantID = req.TenantID
+		evt.Meta.SessionID = req.SessionID
 		evt.Meta.TaskID = req.TaskID
 		evt.Detail = friendlyLongHorizonCheckpoint(currentCheckpoint)
 		req.StepCallback(evt)
@@ -157,6 +163,7 @@ func (p *Planner) ResumeLongHorizonCheckpoint(ctx context.Context, req PlanReque
 		evt := observe.NewEvent(req.TraceID, observe.DomainPlanner, observe.EventPlan,
 			fmt.Sprintf("📋 已从恢复点继续：%d 个步骤", len(pl.Steps)))
 		evt.Meta.TenantID = req.TenantID
+		evt.Meta.SessionID = req.SessionID
 		evt.Meta.TaskID = req.TaskID
 		evt.Detail = friendlyLongHorizonCheckpoint(createdCheckpoint)
 		req.StepCallback(evt)
@@ -188,6 +195,9 @@ func resumedLongHorizonCheckpoint(req PlanRequest, source LongHorizonCheckpoint,
 	if strings.TrimSpace(source.TaskID) != "" {
 		cp.TaskID = source.TaskID
 	}
+	if strings.TrimSpace(source.SessionID) != "" {
+		cp.SessionID = source.SessionID
+	}
 	if strings.TrimSpace(source.Goal) != "" {
 		cp.Goal = source.Goal
 	}
@@ -209,6 +219,7 @@ func (p *Planner) emitResumedLongHorizonCheckpoint(req PlanRequest, source LongH
 	}
 	evt := observe.NewEvent(req.TraceID, observe.DomainPlanner, observe.EventPlan, summary)
 	evt.Meta.TenantID = req.TenantID
+	evt.Meta.SessionID = req.SessionID
 	evt.Meta.TaskID = req.TaskID
 	evt.Detail = friendlyLongHorizonCheckpoint(cp)
 	req.StepCallback(evt)

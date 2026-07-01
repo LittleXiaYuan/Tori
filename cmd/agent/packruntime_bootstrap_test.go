@@ -85,8 +85,8 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 	if !ok {
 		t.Fatal("expected Skill Market builtin pack to be installed")
 	}
-	if market.Status != packruntime.PackStatusEnabled {
-		t.Fatalf("expected Skill Market default enabled, got %s", market.Status)
+	if market.Status != packruntime.PackStatusDisabled {
+		t.Fatalf("expected Skill Market default disabled, got %s", market.Status)
 	}
 	if market.Manifest.SDK.TypeScript != "yunque-client/market" {
 		t.Fatalf("unexpected Skill Market SDK import: %s", market.Manifest.SDK.TypeScript)
@@ -105,8 +105,8 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 	if !ok {
 		t.Fatal("expected SkillHub builtin pack to be installed")
 	}
-	if skillhub.Status != packruntime.PackStatusEnabled {
-		t.Fatalf("expected SkillHub default enabled, got %s", skillhub.Status)
+	if skillhub.Status != packruntime.PackStatusDisabled {
+		t.Fatalf("expected SkillHub default disabled, got %s", skillhub.Status)
 	}
 	if skillhub.Manifest.SDK.TypeScript != "yunque-client/skillhub" {
 		t.Fatalf("unexpected SkillHub SDK import: %s", skillhub.Manifest.SDK.TypeScript)
@@ -210,8 +210,8 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 	if !ok {
 		t.Fatal("expected Federation builtin pack to be installed")
 	}
-	if federationPack.Status != packruntime.PackStatusEnabled {
-		t.Fatalf("expected Federation default enabled, got %s", federationPack.Status)
+	if federationPack.Status != packruntime.PackStatusDisabled {
+		t.Fatalf("expected Federation default disabled, got %s", federationPack.Status)
 	}
 	if federationPack.Manifest.SDK.TypeScript != "yunque-client/federation" {
 		t.Fatalf("unexpected Federation SDK import: %s", federationPack.Manifest.SDK.TypeScript)
@@ -445,8 +445,8 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 	if !ok {
 		t.Fatal("expected Desktop Shell builtin pack to be installed")
 	}
-	if desktopPack.Status != packruntime.PackStatusEnabled {
-		t.Fatalf("expected Desktop Shell default enabled, got %s", desktopPack.Status)
+	if desktopPack.Status != packruntime.PackStatusDisabled {
+		t.Fatalf("expected Desktop Shell default disabled, got %s", desktopPack.Status)
 	}
 	if desktopPack.Manifest.SDK.TypeScript != "yunque-client/desktop" {
 		t.Fatalf("unexpected Desktop Shell SDK import: %s", desktopPack.Manifest.SDK.TypeScript)
@@ -775,8 +775,8 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 	if !ok {
 		t.Fatal("expected Tori builtin pack to be installed")
 	}
-	if toriPack.Status != packruntime.PackStatusEnabled {
-		t.Fatalf("expected Tori default enabled, got %s", toriPack.Status)
+	if toriPack.Status != packruntime.PackStatusDisabled {
+		t.Fatalf("expected Tori default disabled, got %s", toriPack.Status)
 	}
 	if toriPack.Manifest.SDK.TypeScript != "yunque-client/tori" {
 		t.Fatalf("unexpected Tori SDK import: %s", toriPack.Manifest.SDK.TypeScript)
@@ -791,8 +791,9 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 	ensureBuiltinPacks(registry)
 	// Count reflects the current auto-seeded packs/official/ set. Adjust if the
 	// builtin pack set changes (dlc-demo stays excluded by design; security-lab
-	// is the presentation-layer aggregator over the four security/ops packs).
-	if got := len(registry.List()); got != 66 {
+	// and inner-world are presentation-layer aggregators over the security/ops
+	// and introspection packs respectively).
+	if got := len(registry.List()); got != 67 {
 		t.Fatalf("expected idempotent builtin install, got %d packs", got)
 	}
 }

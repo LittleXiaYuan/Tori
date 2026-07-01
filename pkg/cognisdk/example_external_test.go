@@ -10,7 +10,8 @@ import (
 
 func ExampleHostAdapter_BuildContext() {
 	adapter := cognisdk.NewHostAdapter(cognisdk.Config{})
-	ctx := adapter.BuildContext(context.Background(), "请先帮我修复测试", "tenant-a", "chat")
+	// technical scope: work pack's "deliver_work" value activates for the work task.
+	ctx := adapter.BuildContext(context.Background(), "请先帮我修复测试", "tenant-a", "chat", "technical")
 
 	fmt.Println(strings.Contains(ctx, "deliver_work"))
 	// Output: true

@@ -875,6 +875,12 @@ func loadBuiltinPackManifest(manifestPath string) (packruntime.Manifest, error) 
 
 func builtinPackManifestCandidates(manifestPath string) []string {
 	candidates := []string{manifestPath}
+	// CWD-relative walk-up: covers `go test ./cmd/agent/...` (CWD=cmd/agent/,
+	// needs ../../) and any invocation whose CWD is below the repo root. Mirrors
+	// locateBuiltinPackDir so manifest loading and pack discovery agree.
+	for i := 1; i <= 4; i++ {
+		candidates = append(candidates, filepath.Join(strings.Repeat("../", i), manifestPath))
+	}
 	if exe, err := os.Executable(); err == nil {
 		dir := filepath.Dir(exe)
 		for i := 0; i < 7; i++ {

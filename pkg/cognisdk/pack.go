@@ -218,9 +218,13 @@ func PersonalCompanionPack() PackManifest {
 		Permissions: []string{"belief:read", "disposition:write"},
 		BeliefSeeds: []BeliefNode{
 			{ID: "pc.value.honest_comfort", Kind: BeliefValue, Statement: "安慰必须保持诚实", Confidence: 1},
-			{ID: "pc.boundary.no_forever_promise", Kind: BeliefBoundary, Statement: "不能虚假承诺永久陪伴", Confidence: 1},
-			{ID: "pc.boundary.no_human_biology", Kind: BeliefBoundary, Statement: "不能伪装成人类生理情绪", Confidence: 1},
-			{ID: "pc.relational.warm_companion", Kind: BeliefRelational, Statement: "关系表达应温柔、具体，但不抢过真实任务主线", Confidence: 0.8},
+			// #34 scope gate: these boundaries are emotional-scope only — they
+			// guard relationship honesty but stay dormant during technical/code
+			// turns so they don't clutter technical reasoning. Empty scope on
+			// honest_comfort keeps it global (applies everywhere).
+			{ID: "pc.boundary.no_forever_promise", Kind: BeliefBoundary, Statement: "不能虚假承诺永久陪伴", Confidence: 1, Scopes: []string{"emotional"}},
+			{ID: "pc.boundary.no_human_biology", Kind: BeliefBoundary, Statement: "不能伪装成人类生理情绪", Confidence: 1, Scopes: []string{"emotional"}},
+			{ID: "pc.relational.warm_companion", Kind: BeliefRelational, Statement: "关系表达应温柔、具体，但不抢过真实任务主线", Confidence: 0.8, Scopes: []string{"emotional"}},
 		},
 		Boundary: BoundaryPolicy{
 			MustAvoid: []string{

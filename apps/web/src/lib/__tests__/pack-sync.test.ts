@@ -118,6 +118,10 @@ describe("pack-sync frontend runtime", () => {
     expect(items.find((item) => item.packId === "yunque.pack.later")).toBeUndefined();
     // cogni-kernel is backend-only now (assistant UI moved to core /cognis), so it adds no nav item.
     expect(items.find((item) => item.packId === "yunque.pack.cogni-kernel")).toBeUndefined();
+    // Each nav item carries usability + family classification so the sidebar can
+    // route actionable packs to the primary list and the rest into the advanced
+    // (collapsible) section, grouped by family.
+    expect(items[0]).toMatchObject({ usabilityKind: "actionable", groupLabel: "其他" });
   });
 
   it("builds sdk entrypoints and import snippets", () => {

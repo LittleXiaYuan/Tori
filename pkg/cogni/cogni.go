@@ -159,6 +159,15 @@ type ActivationRules struct {
 	// Requires an embedder wired into the Hook (SetEmbedder); inert otherwise,
 	// so existing keyword-only Cognis are unaffected.
 	Semantic *SemanticActivation `json:"semantic,omitempty"`
+
+	// IntentMatch declares intent-based activation using cognisdk's perception
+	// result. When cognisdk detectPerception infers intent "work_task" and a
+	// Declaration lists "work_task" here, the IntentWeight is added to the
+	// activation score. Step 3 of cogni consolidation: cogni Declaration 激活
+	// 现在能参考 cognisdk 的意图感知，消除两边各自猜意图的冗余。Inert when
+	// no PerceptionHint is wired (backward compatible).
+	IntentMatch []string `json:"intent_match,omitempty"`
+	IntentWeight float64 `json:"intent_weight,omitempty"`
 }
 
 // SemanticActivation declares embedding-based activation signals. The example

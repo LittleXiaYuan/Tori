@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import BackupPage from "../packs/backup/page";
 
@@ -26,14 +26,25 @@ describe("BackupPage", () => {
     });
   });
 
-  it("explains backup as a reversible local data workflow with destructive restore warning", async () => {
+  it("leads with backup/restore actions and data, not boilerplate", async () => {
     render(<BackupPage />);
 
-    expect(await screen.findByText("这个能力包现在适合做什么")).toBeInTheDocument();
-    expect(screen.getByText("可直接使用")).toBeInTheDocument();
-    expect(screen.getByText("本地数据")).toBeInTheDocument();
-    expect(screen.getByText("导入会覆盖")).toBeInTheDocument();
-    expect(screen.getByText(/升级、迁移或排障前保留一份云雀本地数据副本/)).toBeInTheDocument();
+    // The page leads with the actual tool: export/restore actions, stats and file list.
+    expect(await screen.findByText("memory.json")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /导出备份/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /选择文件恢复/ })).toBeInTheDocument();
+    expect(screen.getByText("数据文件")).toBeInTheDocument();
+    expect(screen.getByText("总计大小")).toBeInTheDocument();
+  });
+
+  it("keeps reversible/destructive guidance behind the about disclosure", async () => {
+    render(<BackupPage />);
+    await screen.findByText("memory.json");
+
+    const trigger = screen.getByRole("button", { name: /关于这个能力包/ });
+    fireEvent.click(trigger);
+
+    expect(await screen.findByText(/升级、迁移或排障前保留一份云雀本地数据副本/)).toBeInTheDocument();
     expect(screen.getByText("1. 先看备份范围")).toBeInTheDocument();
     expect(screen.getByText("2. 导出可回滚副本")).toBeInTheDocument();
     expect(screen.getByText("3. 谨慎导入恢复")).toBeInTheDocument();

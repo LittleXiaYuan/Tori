@@ -50,6 +50,7 @@ export interface CogniDeclaration {
   priority?: number;
   exclusive?: string;
   checks?: CogniActivationCheck[];
+  workflows?: CogniWorkflowDef[];
 }
 
 export interface CogniEntryStatus {

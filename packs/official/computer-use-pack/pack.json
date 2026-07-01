@@ -75,6 +75,7 @@
     "rollback": true
   },
   "metadata": {
+    "group": "automation-lab",
     "blueprint": "docs/spec/computer-use-pack.md",
     "stage": "permissioned-plan-before-executor",
     "sync": "backend-registry-drives-frontend",

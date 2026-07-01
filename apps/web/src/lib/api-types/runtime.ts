@@ -7,7 +7,7 @@
 // share a lot of structural references (TaskInfo→TaskStep→TaskWorkingMemory,
 // TriggerDef→TriggerAction, WorkflowDef→WorkflowNode→Edge→Variable, etc.).
 
-// --- Channels (inbox / bots / heartbeat / qq) ---
+// --- Channels (inbox / bots / heartbeat) ---
 
 export interface InboxItem {
   id: string;
@@ -51,19 +51,6 @@ export interface BotsResponse {
   bots: BotInfo[];
   total: number;
   active: number;
-}
-
-export interface QQAnalysis {
-  id: string;
-  file_name: string;
-  total_messages: number;
-  participants: string[];
-  time_range: string;
-  summary: string;
-  persona_profiles: Record<string, string>;
-  top_topics: string[];
-  sentiment: string;
-  analyzed_at: string;
 }
 
 // --- Conversations ---
@@ -115,6 +102,26 @@ export interface TaskStep {
   duration_ms?: number;
 }
 
+export interface TaskRecoveryAction {
+  id: string;
+  label: string;
+  href?: string;
+  method?: string;
+  endpoint?: string;
+  body?: Record<string, unknown>;
+}
+
+export interface TaskRecoveryHint {
+  category: string;
+  severity: "danger" | "warning" | "success" | string;
+  summary: string;
+  detail?: string;
+  primary_action: TaskRecoveryAction;
+  secondary_actions?: TaskRecoveryAction[];
+  source: string;
+  group_key?: string;
+}
+
 export interface TaskInfo {
   id: string;
   title: string;
@@ -125,6 +132,7 @@ export interface TaskInfo {
   steps: TaskStep[] | null;
   artifacts?: Array<{ path: string; type: string; name?: string; mime_type?: string; size?: number }>;
   error?: string;
+  recovery_hint?: TaskRecoveryHint;
   tenant_id: string;
   created_at: string;
   updated_at: string;
@@ -600,6 +608,7 @@ export interface PlannerCheckpointStep {
 
 export interface PlannerCheckpointSummary {
   plan_id: string;
+  session_id?: string;
   task_id?: string;
   goal?: string;
   status: string;
@@ -673,6 +682,7 @@ export interface PlannerCheckpointResumePlanResponse {
   friendly_error?: string;
   recoverable?: boolean;
   next_action?: "retry_failed" | "create_task" | "partial" | "inspect_dependencies" | string;
+  primary_target?: PlannerExecutionStateRecoveryTarget;
   result?: {
     reply?: string;
     skills_used?: string[];
@@ -687,6 +697,7 @@ export interface PlannerCheckpointResumePlanJobEvent {
   id: string;
   type: string;
   summary: string;
+  session_id?: string;
   skill?: string;
   timestamp: string;
 }
@@ -696,11 +707,13 @@ export interface PlannerCheckpointResumePlanJob {
   status: string;
   action: PlannerCheckpointRecoveryAction;
   plan_id: string;
+  session_id?: string;
   task_id?: string;
   error?: string;
   friendly_error?: string;
   recoverable?: boolean;
   next_action?: "retry_failed" | "create_task" | "partial" | "inspect_dependencies" | string;
+  primary_target?: PlannerExecutionStateRecoveryTarget;
   result?: PlannerCheckpointResumePlanResponse["result"];
   events?: PlannerCheckpointResumePlanJobEvent[];
   started_at: string;
@@ -711,12 +724,32 @@ export interface PlannerCheckpointResumePlanJobResponse {
   job: PlannerCheckpointResumePlanJob;
 }
 
+export interface PlannerExecutionStateRecoveryTarget {
+  category: "provider" | "connector" | "browser" | "skill" | "tool" | "sandbox" | "approval" | "dependency" | string;
+  label: string;
+  href?: string;
+  action?: string;
+  group_key?: string;
+}
+
 export interface PlannerExecutionStateFailureSummary {
   failed_count: number;
   completed_count: number;
   failed_tools?: string[];
+  failed_steps?: Array<{
+    id: number;
+    action: string;
+    skill?: string;
+    status: string;
+    error?: string;
+    recommendation?: string;
+    recovery_target?: PlannerExecutionStateRecoveryTarget;
+  }>;
+  primary_target?: PlannerExecutionStateRecoveryTarget;
   tried?: string[];
   ruled_out?: string[];
+  failure_pattern?: string;
+  recommendation?: string;
   next_step?: string;
 }
 

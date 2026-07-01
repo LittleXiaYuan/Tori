@@ -426,6 +426,7 @@ func (s *ExecutionRuntimeService) EmitToolStartForRequest(req ToolStartEventRequ
 		fmt.Sprintf("🔧 正在调用 [%s]...", req.SkillName))
 	evt.Meta.Skill = req.SkillName
 	evt.Meta.TenantID = req.Request.TenantID
+	evt.Meta.SessionID = req.Request.SessionID
 	evt.Meta.TaskID = req.Request.TaskID
 	evt.Detail = observe.ToolStartDetail{Skill: req.SkillName, Args: req.Args}
 	req.Request.StepCallback(evt)
@@ -438,6 +439,7 @@ func (s *ExecutionRuntimeService) EmitThinkingForRequest(req ThinkingEventReques
 	}
 	evt := observe.NewEvent(req.Request.TraceID, observe.DomainPlanner, observe.EventThinking, req.Summary)
 	evt.Meta.TenantID = req.Request.TenantID
+	evt.Meta.SessionID = req.Request.SessionID
 	evt.Meta.TaskID = req.Request.TaskID
 	evt.Detail = req.Detail
 	req.Request.StepCallback(evt)
@@ -748,6 +750,7 @@ func emitToolResultEvent(req PlanRequest, skillName, output, friendlyError strin
 	trEvt := observe.NewEvent(req.TraceID, observe.DomainPlanner, observe.EventToolResult, trSummary)
 	trEvt.Meta.Skill = skillName
 	trEvt.Meta.TenantID = req.TenantID
+	trEvt.Meta.SessionID = req.SessionID
 	trEvt.Meta.TaskID = req.TaskID
 	trEvt.Detail = detail
 	req.StepCallback(trEvt)
@@ -760,6 +763,7 @@ func emitFailureRecoveryEvent(req PlanRequest, summary PlannerFailureSummary) {
 	evt := observe.NewEvent(req.TraceID, observe.DomainPlanner, observe.EventReflect,
 		"检测到连续失败，正在切换执行策略")
 	evt.Meta.TenantID = req.TenantID
+	evt.Meta.SessionID = req.SessionID
 	evt.Meta.TaskID = req.TaskID
 	evt.Detail = summary
 	req.StepCallback(evt)
@@ -772,6 +776,7 @@ func emitPartialResultEvent(req PlanRequest, planSteps []PlanStep, rawErr string
 	evt := observe.NewEvent(req.TraceID, observe.DomainPlanner, observe.EventPartial,
 		"已返回阶段结果，现场已保留，可继续恢复")
 	evt.Meta.TenantID = req.TenantID
+	evt.Meta.SessionID = req.SessionID
 	evt.Meta.TaskID = req.TaskID
 	evt.Detail = buildPartialResultDetail(planSteps, rawErr)
 	req.StepCallback(evt)
@@ -784,6 +789,7 @@ func emitReflectRetryEvent(req PlanRequest) {
 	evt := observe.NewEvent(req.TraceID, observe.DomainPlanner, observe.EventReflect,
 		"🔄 回答质量不够好，正在重新思考...")
 	evt.Meta.TenantID = req.TenantID
+	evt.Meta.SessionID = req.SessionID
 	evt.Meta.TaskID = req.TaskID
 	req.StepCallback(evt)
 }

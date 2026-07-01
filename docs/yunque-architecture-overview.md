@@ -168,7 +168,7 @@ SSE 事件类型:`ping`、`step`(thinking/tool_start/tool_result/reflect/handoff
 
 ## 7. 前端 (apps/web, Next.js App Router)
 
-- ~56 个页面(`src/app/**/page.tsx`):`chat`、`packs/*`(含 `cognis`「我的助手」、`lora`、`browser`...)、`settings/*`、`memory`、`models`、`missions`、`dashboard`、`knowledge`、`skills`、`plugins`、`tools`、`approvals`、`audit`、`trust`、`workflows`、`bots`、`inbox`、`login`、`setup`、`ext/*`(airi/paper/qqchat)。
+- ~56 个页面(`src/app/**/page.tsx`):`chat`、`packs/*`(含 `cognis`「我的助手」、`lora`、`browser`...)、`settings/*`、`memory`、`models`、`missions`、`dashboard`、`knowledge`、`skills`、`plugins`、`tools`、`approvals`、`audit`、`trust`、`workflows`、`bots`、`inbox`、`login`、`setup`、`ext/*`(paper)。
 - API 客户端 `src/lib/api-core.ts`:HTTP 调用 + SSE/EventSource 消费 + 鉴权 token。
 - 进度面板 `src/components/task-progress-panel.tsx`:Cursor 式计划清单。
 - Pack 同步 `src/lib/pack-sync.tsx`:菜单/路由随后端 enabled packs 动态生成。

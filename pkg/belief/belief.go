@@ -98,6 +98,23 @@ type BeliefNode struct {
 	// Related connects this belief to others in the graph.
 	Related []BeliefEdge `json:"related,omitempty"`
 
+	// ── Scope ──
+
+	// Scopes optionally restricts WHERE this belief activates. Empty = global
+	// (activates in every conversation). Non-empty = only activates when the
+	// current conversation scope matches one of these tags.
+	//
+	// Scope tags are coarse conversation kinds, e.g. "emotional", "technical",
+	// "creative", "transactional". The caller derives the current scope from
+	// channel/intent and passes it to EvaluateInteraction.
+	//
+	// Use cases:
+	//   - A boundary belief "永远不会离开你" scopes to ["emotional"] so it
+	//     doesn't pollute a technical Q&A.
+	//   - A value belief "code quality > speed" scopes to ["technical"] so it
+	//     only orients engineering discussions.
+	Scopes []string `json:"scopes,omitempty"`
+
 	// ── Lifecycle ──
 
 	// LastUpdatedAt is the timestamp of the most recent update.

@@ -1612,7 +1612,6 @@ type AgentKit struct {
 	Embeddings        *embeddingsNamespace
 	WebSearch         *searchNamespace
 	Router            *routerNamespace
-	Airi              *airiNamespace
 	Settings          *settingsNamespace
 	System            *systemNamespace
 	Auth              *authNamespace
@@ -7036,7 +7035,6 @@ func NewAgentKit() AgentKit {
 		Embeddings:        Embeddings,
 		WebSearch:         WebSearch,
 		Router:            Router,
-		Airi:              Airi,
 		Settings:          Settings,
 		System:            System,
 		Auth:              Auth,
@@ -7332,102 +7330,6 @@ func (s *stateNamespace) ReleaseResource(ctx context.Context, id string) (StateR
 		return StateResourceMutationResponse{}, err
 	}
 	return out, nil
-}
-
-// Airi provides focused access to the Airi desktop-pet bridge and OpenAI-compatible chat endpoints.
-var Airi = &airiNamespace{}
-
-type airiNamespace struct{}
-
-type AiriStatusResponse map[string]any
-
-type AiriModel struct {
-	ID      string `json:"id"`
-	Object  string `json:"object,omitempty"`
-	Created int64  `json:"created,omitempty"`
-	OwnedBy string `json:"owned_by,omitempty"`
-}
-
-type AiriModelsResponse struct {
-	Object string      `json:"object,omitempty"`
-	Data   []AiriModel `json:"data"`
-}
-
-type AiriChatMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
-}
-
-type AiriChatCompletionRequest struct {
-	Model    string            `json:"model,omitempty"`
-	Messages []AiriChatMessage `json:"messages"`
-	Stream   bool              `json:"stream,omitempty"`
-}
-
-type AiriChatCompletionResponse map[string]any
-
-type AiriStreamItem struct {
-	Kind  string
-	Chunk AiriChatCompletionResponse
-}
-
-func (a *airiNamespace) Status(ctx context.Context) (AiriStatusResponse, error) {
-	var out AiriStatusResponse
-	if err := apiCallInto(ctx, http.MethodGet, "/v1/ext/airi/status", nil, &out); err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (a *airiNamespace) Models(ctx context.Context) (AiriModelsResponse, error) {
-	var out AiriModelsResponse
-	if err := apiCallInto(ctx, http.MethodGet, "/v1/ext/airi/models", nil, &out); err != nil {
-		return AiriModelsResponse{}, err
-	}
-	if out.Data == nil {
-		out.Data = []AiriModel{}
-	}
-	return out, nil
-}
-
-func (a *airiNamespace) ChatCompletions(ctx context.Context, req AiriChatCompletionRequest) (AiriChatCompletionResponse, error) {
-	req.Stream = false
-	var out AiriChatCompletionResponse
-	if err := apiCallInto(ctx, http.MethodPost, "/v1/ext/airi/chat/completions", req, &out); err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (a *airiNamespace) StreamRequest(req AiriChatCompletionRequest) AiriChatCompletionRequest {
-	req.Stream = true
-	return req
-}
-
-func (a *airiNamespace) ParseStream(text string) []AiriStreamItem {
-	frames := strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n\n")
-	out := make([]AiriStreamItem, 0, len(frames))
-	for _, frame := range frames {
-		var data []string
-		for _, line := range strings.Split(frame, "\n") {
-			if strings.HasPrefix(line, "data:") {
-				data = append(data, strings.TrimSpace(strings.TrimPrefix(line, "data:")))
-			}
-		}
-		if len(data) == 0 {
-			continue
-		}
-		raw := strings.Join(data, "\n")
-		if raw == "[DONE]" {
-			out = append(out, AiriStreamItem{Kind: "done"})
-			continue
-		}
-		var chunk AiriChatCompletionResponse
-		if err := json.Unmarshal([]byte(raw), &chunk); err == nil {
-			out = append(out, AiriStreamItem{Kind: "chunk", Chunk: chunk})
-		}
-	}
-	return out
 }
 
 // ── LLM ──

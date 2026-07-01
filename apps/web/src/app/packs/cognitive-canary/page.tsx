@@ -5,9 +5,11 @@ import Link from "next/link";
 import { Button, Card, Chip, Input, Label, Spinner, TextArea, TextField } from "@heroui/react";
 import { Activity, AlertTriangle, CalendarClock, ClipboardList, Download, GitCompareArrows, RefreshCw, Send, ShieldCheck, Sparkles, Workflow } from "lucide-react";
 import PageHeader from "@/components/page-header";
+import { JsonViewer } from "@/components/json-viewer";
 import { showToast } from "@/components/toast-provider";
 import { formatErrorMessage } from "@/lib/error-utils";
 import { chatPromptHref } from "@/lib/pack-action-links";
+import { PackAbout, PackSectionTitle, PackStepsGrid, type PackBoundaryItem, type PackStep } from "@/components/packs/pack-page-kit";
 import { createCognitiveCanaryPackClient, type CognitiveCanaryReport, type CognitiveCanaryReportSummary, type CognitiveCanaryResponseCollectorPipelinePlan, type CognitiveCanaryResponseCollectorWritebackReport, type CognitiveCanaryScenario, type CognitiveCanaryShadowPlan, type CognitiveCanaryStatus } from "@/lib/cognitive-canary-pack-client";
 
 const cognitiveCanaryPack = createCognitiveCanaryPackClient();
@@ -48,54 +50,36 @@ function sampleScenarios() {
   }, null, 2);
 }
 
-function gateTone(gate?: string): { bg: string; fg: string } {
+type ChipColor = "danger" | "warning" | "success" | "default";
+
+// Map a promotion gate status to a semantic Chip color (no hand-rolled rgba).
+function gateColor(gate?: string): ChipColor {
   switch (gate) {
-    case "block": return { bg: "rgba(239,68,68,0.16)", fg: "#ef4444" };
-    case "warn": return { bg: "rgba(250,204,21,0.14)", fg: "#facc15" };
-    case "pass": return { bg: "rgba(34,197,94,0.12)", fg: "#22c55e" };
-    default: return { bg: "rgba(56,189,248,0.12)", fg: "#38bdf8" };
+    case "block": return "danger";
+    case "warn": return "warning";
+    case "pass": return "success";
+    default: return "default";
   }
 }
 
-const userFacingSteps = [
-  {
-    title: "1. 准备回归题集",
-    body: "维护关键场景、期望关键词和稳定版本回答，作为认知质量基线。",
-  },
-  {
-    title: "2. 对比候选表现",
-    body: "运行本地确定性评估，查看质量、延迟、安全通过率和 promotion 建议。",
-  },
-  {
-    title: "3. 生成上线计划",
-    body: "输出 shadow、collector、judge、metrics 与 rollback 的交接计划。",
-  },
+const userFacingSteps: PackStep[] = [
+  { key: "prepare", label: "准备回归题集", detail: "维护关键场景、期望关键词和稳定版本回答，作为认知质量基线。" },
+  { key: "compare", label: "对比候选表现", detail: "运行本地确定性评估，查看质量、延迟、安全通过率和 promotion 建议。" },
+  { key: "plan", label: "生成上线计划", detail: "输出 shadow、collector、judge、metrics 与 rollback 的交接计划。" },
 ];
 
-const boundaryItems = [
-  "不会自动切换模型版本。",
-  "不会 mirror 真实流量或采集用户回答。",
-  "不会调用 LLM-as-Judge batch。",
-  "不会发布指标或执行自动回滚。",
+const boundaryItems: PackBoundaryItem[] = [
+  { key: "switch", label: "不切换版本", detail: "不会自动切换模型版本。" },
+  { key: "mirror", label: "不镜像流量", detail: "不会 mirror 真实流量或采集用户回答。" },
+  { key: "judge", label: "不调 Judge", detail: "不会调用 LLM-as-Judge batch。" },
+  { key: "rollback", label: "不发指标不回滚", detail: "不会发布指标或执行自动回滚。" },
 ];
 
-const workflowLoopItems = [
-  {
-    title: "1. 维护题集",
-    body: "把关键问答、安全决策和延迟期望放进回归题集，形成模型变更前的检查清单。",
-  },
-  {
-    title: "2. 带回 Chat",
-    body: "让云雀解释 block/warn 原因，生成修提示词、修 Cogni 策略或回滚候选的任务。",
-  },
-  {
-    title: "3. 看上线依据",
-    body: "报告、shadow 计划和 collector store 是上线评审材料，不会自动放量。",
-  },
-  {
-    title: "4. 继续补能力",
-    body: "如果评估维度不够，把失败样例交给小羽补新的场景、指标或判断规则。",
-  },
+const workflowLoopItems: PackStep[] = [
+  { key: "maintain", label: "维护题集", detail: "把关键问答、安全决策和延迟期望放进回归题集，形成模型变更前的检查清单。" },
+  { key: "chat", label: "带回 Chat", detail: "让云雀解释 block/warn 原因，生成修提示词、修 Cogni 策略或回滚候选的任务。" },
+  { key: "review", label: "看上线依据", detail: "报告、shadow 计划和 collector store 是上线评审材料，不会自动放量。" },
+  { key: "extend", label: "继续补能力", detail: "如果评估维度不够，把失败样例交给小羽补新的场景、指标或判断规则。" },
 ];
 
 export default function CognitiveCanaryPackPage() {
@@ -115,7 +99,7 @@ export default function CognitiveCanaryPackPage() {
   const [pipelinePlan, setPipelinePlan] = useState<CognitiveCanaryResponseCollectorPipelinePlan | null>(null);
 
   const selectedReport = useMemo(() => report || null, [report]);
-  const tone = gateTone(selectedReport?.gate_status || reports[0]?.gate_status);
+  const toneColor = gateColor(selectedReport?.gate_status || reports[0]?.gate_status);
 
   const load = useCallback(async () => {
     setError(null);
@@ -269,63 +253,40 @@ export default function CognitiveCanaryPackPage() {
     <div className="page-root space-y-6 animate-fade-in-up">
       <PageHeader icon={<GitCompareArrows size={20} />} title="Cognitive Canary" />
 
-      <Card className="section-card overflow-hidden p-0">
-        <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="p-5">
-            <div className="flex flex-wrap items-center gap-2">
-              <Chip size="sm" style={{ background: "rgba(245,158,11,0.12)", color: "var(--yunque-warning)" }}>实验中</Chip>
-              <Chip size="sm" variant="soft">可运行回归</Chip>
-              <Chip size="sm" variant="soft">上线只生成计划</Chip>
-            </div>
-            <div className="mt-3 text-base font-semibold" style={{ color: "var(--yunque-text)" }}>
-              这个能力包现在适合做什么
-            </div>
-            <div className="mt-2 max-w-3xl text-sm leading-6" style={{ color: "var(--yunque-text-secondary)" }}>
-              它用于在模型、提示词或 Cogni 策略变更前做认知回归检查，判断候选版本是否让回答质量、安全性或延迟变差。当前可以维护场景、运行 deterministic canary、查看 promotion/block 报告并导出证据；真实灰度流量、Judge 批处理、指标发布和自动回滚仍是计划。
-            </div>
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
-              {userFacingSteps.map((item) => (
-                <div key={item.title} className="rounded-lg p-3" style={{ background: "var(--yunque-bg-hover)", border: "1px solid var(--yunque-border)" }}>
-                  <div className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>{item.title}</div>
-                  <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>{item.body}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="p-5" style={{ background: "rgba(245,158,11,0.08)", borderLeft: "1px solid var(--yunque-border)" }}>
-            <div className="mb-3 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>当前不会做什么</div>
-            <div className="space-y-2 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
-              {boundaryItems.map((item) => <div key={item}>{item}</div>)}
-            </div>
-          </div>
-        </div>
-      </Card>
+      <PackAbout
+        chips={<>
+          <Chip size="sm" color="warning">实验中</Chip>
+          <Chip size="sm" variant="soft">可运行回归</Chip>
+          <Chip size="sm" variant="soft">上线只生成计划</Chip>
+        </>}
+        description="它用于在模型、提示词或 Cogni 策略变更前做认知回归检查，判断候选版本是否让回答质量、安全性或延迟变差。当前可以维护场景、运行 deterministic canary、查看 promotion/block 报告并导出证据；真实灰度流量、Judge 批处理、指标发布和自动回滚仍是计划。"
+        boundaries={boundaryItems}
+      />
 
-      <Card className="section-card p-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <div className="mb-3 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>技术状态</div>
-            <div className="mb-1 flex items-center gap-2">
-              <Chip size="sm" style={{ background: status?.shadow_traffic_ready ? "rgba(34,197,94,0.12)" : "rgba(250,204,21,0.12)", color: status?.shadow_traffic_ready ? "#22c55e" : "#facc15" }}>
-                {status?.shadow_traffic_ready ? "Shadow traffic ready" : status?.shadow_plan_ready ? "Plan shell" : "Pack shell"}
-              </Chip>
-              <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>{status?.pack_id || "yunque.pack.cognitive-canary"}</span>
-            </div>
-            <div className="text-sm" style={{ color: "var(--yunque-text-muted)" }}>
-              当前切片已把 canary scenario set、deterministic local judge、认知质量 SLI、promotion/block 决策、shadow response collector / judge / metrics / rollback 计划、pack-local response collector store 写回、response collector pipeline plan-only handoff 和证据包放进可选 Pack。真实 shadow traffic、live collector、LLM-as-Judge batch、Prometheus 指标和自动回滚写回后续接入。
-            </div>
-          </div>
+      <Card variant="default">
+        <Card.Header className="flex-row flex-wrap items-center justify-between gap-2">
+          <PackSectionTitle icon={<Sparkles size={15} />} tone="accent">怎么用</PackSectionTitle>
           <Button size="sm" variant="ghost" onPress={load}><RefreshCw size={14} />刷新</Button>
-        </div>
+        </Card.Header>
+        <Card.Content className="flex flex-col gap-4">
+          <PackStepsGrid steps={userFacingSteps} columns={3} />
+          <div className="flex flex-wrap items-center gap-2">
+            <Chip size="sm" color={status?.shadow_traffic_ready ? "success" : "warning"}>
+              {status?.shadow_traffic_ready ? "Shadow traffic ready" : status?.shadow_plan_ready ? "Plan shell" : "Pack shell"}
+            </Chip>
+            <span className="font-mono text-xs text-muted">{status?.pack_id || "yunque.pack.cognitive-canary"}</span>
+          </div>
+          <div className="text-sm leading-6 text-muted">
+            当前切片已把 canary scenario set、deterministic local judge、认知质量 SLI、promotion/block 决策、shadow response collector / judge / metrics / rollback 计划、pack-local response collector store 写回、response collector pipeline plan-only handoff 和证据包放进可选 Pack。真实 shadow traffic、live collector、LLM-as-Judge batch、Prometheus 指标和自动回滚写回后续接入。
+          </div>
+        </Card.Content>
       </Card>
 
-      <Card className="section-card p-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>从回归结果到上线决策</div>
-            <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
-              Cognitive Canary 用来把“模型或策略变好了吗”变成可复查证据：先跑回归，再让云雀解释差异，最后由你决定是否继续推进。
-            </div>
+      <Card variant="default">
+        <Card.Header className="flex-row flex-wrap items-start justify-between gap-3">
+          <div className="flex flex-col gap-1">
+            <PackSectionTitle icon={<Workflow size={15} />} tone="accent">从回归结果到上线决策</PackSectionTitle>
+            <span className="text-xs leading-5 text-muted">Cognitive Canary 用来把“模型或策略变好了吗”变成可复查证据：先跑回归，再让云雀解释差异，最后由你决定是否继续推进。</span>
           </div>
           <div className="flex flex-wrap gap-2">
             <Link href={chatPromptHref("请根据 Cognitive Canary 的最新报告，解释候选版本是否值得继续推进，并把需要修复的场景拆成任务。")}>
@@ -339,24 +300,19 @@ export default function CognitiveCanaryPackPage() {
               </Button>
             </Link>
           </div>
-        </div>
-        <div className="mt-3 grid gap-2 md:grid-cols-4">
-          {workflowLoopItems.map((item) => (
-            <div key={item.title} className="rounded-md border p-3" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-surface)" }}>
-              <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>{item.title}</div>
-              <div className="mt-2 text-[11px] leading-5" style={{ color: "var(--yunque-text-muted)" }}>{item.body}</div>
-            </div>
-          ))}
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2 text-xs">
-          <Link href="/trace"><Button size="sm" variant="ghost">核对执行轨迹</Button></Link>
-          <Link href="/packs/studio?packId=yunque.pack.cognitive-canary"><Button size="sm" variant="ghost">让小羽继续改</Button></Link>
-        </div>
+        </Card.Header>
+        <Card.Content className="flex flex-col gap-3">
+          <PackStepsGrid steps={workflowLoopItems} columns={4} />
+          <div className="flex flex-wrap gap-2">
+            <Link href="/trace"><Button size="sm" variant="ghost">核对执行轨迹</Button></Link>
+            <Link href="/packs/studio?packId=yunque.pack.cognitive-canary"><Button size="sm" variant="ghost">让小羽继续改</Button></Link>
+          </div>
+        </Card.Content>
       </Card>
 
       {error && (
-        <Card className="p-4" style={{ background: "rgba(239,68,68,0.06)" }}>
-          <div className="flex items-center gap-2 text-sm" style={{ color: "var(--yunque-danger)" }}><AlertTriangle size={16} />{error}</div>
+        <Card variant="secondary">
+          <Card.Content className="flex items-center gap-2 text-sm text-danger"><AlertTriangle size={16} />{error}</Card.Content>
         </Card>
       )}
 
@@ -364,21 +320,21 @@ export default function CognitiveCanaryPackPage() {
         <Card className="section-card p-4"><div className="kpi-label">Scenarios</div><div className="kpi-value">{status?.scenario_count ?? scenarios.length}</div></Card>
         <Card className="section-card p-4"><div className="kpi-label">Reports</div><div className="kpi-value">{status?.report_count ?? reports.length}</div></Card>
         <Card className="section-card p-4"><div className="kpi-label">Quality</div><div className="kpi-value">{(selectedReport?.quality_score ?? reports[0]?.quality_score ?? status?.last_report?.quality_score ?? 0).toFixed(2)}</div></Card>
-        <Card className="section-card p-4"><div className="kpi-label">Shadow Plan</div><div className="kpi-value text-lg" style={{ color: tone.fg }}>{status?.shadow_plan_ready ? "plan" : "pending"}</div></Card>
-        <Card className="section-card p-4"><div className="kpi-label">Collector Store</div><div className="kpi-value text-lg">{status?.response_collector_store?.record_count ?? 0}</div></Card>
+        <Card className="section-card p-4"><div className="kpi-label">Shadow Plan</div><div className="mt-1 text-sm font-medium text-foreground">{status?.shadow_plan_ready ? "已就绪" : "待接通"}</div></Card>
+        <Card className="section-card p-4"><div className="kpi-label">Collector Store</div><div className="kpi-value">{status?.response_collector_store?.record_count ?? 0}</div></Card>
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[380px_1fr]">
         <Card className="section-card overflow-hidden">
-          <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "var(--yunque-border)" }}>
+          <div className="flex items-center justify-between border-b px-4 py-3 border-border">
             <div className="flex items-center gap-2 text-sm font-semibold"><Sparkles size={16} />评估报告</div>
             <Chip size="sm">{reports.length}</Chip>
           </div>
-          <div className="max-h-[520px] divide-y overflow-auto" style={{ borderColor: "var(--yunque-border)" }}>
-            {reports.length === 0 ? <div className="p-6 text-center text-sm" style={{ color: "var(--yunque-text-muted)" }}>还没有报告。可以先保存 scenario set 并运行一次 canary 评估。</div> : reports.map((item) => (
+          <div className="max-h-[520px] divide-y overflow-auto border-border">
+            {reports.length === 0 ? <div className="p-6 text-center text-sm text-muted">还没有报告。可以先保存 scenario set 并运行一次 canary 评估。</div> : reports.map((item) => (
               <button key={item.id} onClick={async () => setReport((await cognitiveCanaryPack.report(item.id)).report)} className="block w-full px-4 py-3 text-left hover:bg-white/5">
-                <div className="flex items-center justify-between gap-2"><div className="font-medium">{item.id}</div><Chip size="sm" style={{ background: gateTone(item.gate_status).bg, color: gateTone(item.gate_status).fg }}>{item.gate_status}</Chip></div>
-                <div className="mt-1 truncate text-xs" style={{ color: "var(--yunque-text-muted)" }}>quality {item.quality_score.toFixed(2)} · delta {item.delta_score.toFixed(2)} · safety {Math.round(item.safety_pass_rate)}% · {item.promotion_decision}</div>
+                <div className="flex items-center justify-between gap-2"><div className="font-medium">{item.id}</div><Chip size="sm" color={gateColor(item.gate_status)}>{item.gate_status}</Chip></div>
+                <div className="mt-1 truncate text-xs text-muted">quality {item.quality_score.toFixed(2)} · delta {item.delta_score.toFixed(2)} · safety {Math.round(item.safety_pass_rate)}% · {item.promotion_decision}</div>
               </button>
             ))}
           </div>
@@ -400,7 +356,7 @@ export default function CognitiveCanaryPackPage() {
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <div className="flex items-center gap-2 text-sm font-semibold"><Activity size={16} />Deterministic local judge</div>
-                <div className="mt-1 text-xs" style={{ color: "var(--yunque-text-muted)" }}>本阶段为 pack-shell：用本地确定性规则计算 cognitive_quality_score / delta / safety / latency gate，并生成 shadow traffic / LLM-as-Judge / metrics / rollback plan；真实执行后续接。</div>
+                <div className="mt-1 text-xs text-muted">本阶段为 pack-shell：用本地确定性规则计算 cognitive_quality_score / delta / safety / latency gate，并生成 shadow traffic / LLM-as-Judge / metrics / rollback plan；真实执行后续接。</div>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <TextField className="min-w-40" value={stableVersion} onChange={setStableVersion}>
@@ -424,19 +380,16 @@ export default function CognitiveCanaryPackPage() {
             </div>
 
             {selectedReport ? (
-              <Card className="p-3" style={{ background: "rgba(255,255,255,0.03)" }}>
+              <Card className="p-3 bg-surface-secondary">
                 <div className="mb-2 flex flex-wrap items-center gap-2 text-sm font-medium">
-                  <Chip size="sm" style={{ background: tone.bg, color: tone.fg }}>{selectedReport.gate_status}</Chip>
+                  <Chip size="sm" color={toneColor}>{selectedReport.gate_status}</Chip>
                   <span>{selectedReport.id}</span>
-                  <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>{selectedReport.stable_version || "stable"} → {selectedReport.candidate_version || "candidate"}</span>
+                  <span className="text-xs text-muted">{selectedReport.stable_version || "stable"} → {selectedReport.candidate_version || "candidate"}</span>
                 </div>
-                <TextField value={JSON.stringify(selectedReport, null, 2)} onChange={() => undefined}>
-                  <Label>评估报告 JSON</Label>
-                  <TextArea rows={20} aria-label="Cognitive Canary report JSON" className="font-mono text-xs" readOnly />
-                </TextField>
+                <JsonViewer title="评估报告 JSON" value={selectedReport} rows={20} />
               </Card>
             ) : (
-              <div className="rounded-xl border border-dashed p-6 text-center text-sm" style={{ borderColor: "var(--yunque-border)", color: "var(--yunque-text-muted)" }}>运行后会展示 cognitive_quality_score / delta / safety_pass_rate / promotion_decision。</div>
+              <div className="rounded-xl border border-dashed p-6 text-center text-sm border-border text-muted">运行后会展示 cognitive_quality_score / delta / safety_pass_rate / promotion_decision。</div>
             )}
           </Card>
 
@@ -452,11 +405,8 @@ export default function CognitiveCanaryPackPage() {
                 <Chip size="sm">judge_ready: {String(shadowPlan.judge_pipeline_ready)}</Chip>
                 <Chip size="sm">auto_rollback_ready: {String(shadowPlan.auto_rollback_ready)}</Chip>
               </div>
-              <TextField value={JSON.stringify(shadowPlan, null, 2)} onChange={() => undefined}>
-                <Label>Shadow 计划 JSON</Label>
-                <TextArea rows={12} aria-label="Cognitive Canary Shadow Plan JSON" className="font-mono text-xs" readOnly />
-              </TextField>
-              <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+              <JsonViewer title="Shadow 计划 JSON" value={shadowPlan} rows={12} />
+              <div className="mt-2 text-xs text-muted">
                 非破坏性计划：只预览 response collector artifact 名称、SHA-256 内容哈希、labels 和 writes_files=false；“写入 Collector Store” 只持久化 pack-local JSON bridge，不会 mirror live traffic、不会写 collector artifact 文件、不会调用 LLM-as-Judge batch、不会发布 Prometheus 指标、不会执行 rollback，也不会写 release state。
               </div>
             </Card>
@@ -474,11 +424,8 @@ export default function CognitiveCanaryPackPage() {
                 <Chip size="sm">collector_ready: {String(collectorWriteback.response_collector_ready)}</Chip>
                 <Chip size="sm">shadow_ready: {String(collectorWriteback.shadow_traffic_ready)}</Chip>
               </div>
-              <TextField value={JSON.stringify(collectorWriteback, null, 2)} onChange={() => undefined}>
-                <Label>Collector 写回 JSON</Label>
-                <TextArea rows={12} aria-label="Cognitive Canary Response Collector Writeback JSON" className="font-mono text-xs" readOnly />
-              </TextField>
-              <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+              <JsonViewer title="Collector 写回 JSON" value={collectorWriteback} rows={12} />
+              <div className="mt-2 text-xs text-muted">
                 当前仅写入 `response-collector-store.json` / `response-collector-record.json` 的 pack-local 元数据桥；真实 collector pipeline、Prometheus 和 release rollback 仍保持 false。
               </div>
             </Card>
@@ -496,11 +443,8 @@ export default function CognitiveCanaryPackPage() {
                 <Chip size="sm">collector_ready: {String(pipelinePlan.response_collector_ready)}</Chip>
                 <Chip size="sm">writes_files: {String(pipelinePlan.writes_files)}</Chip>
               </div>
-              <TextField value={JSON.stringify(pipelinePlan, null, 2)} onChange={() => undefined}>
-                <Label>Collector Pipeline JSON</Label>
-                <TextArea rows={12} aria-label="Cognitive Canary Response Collector Pipeline Plan JSON" className="font-mono text-xs" readOnly />
-              </TextField>
-              <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+              <JsonViewer title="Collector Pipeline JSON" value={pipelinePlan} rows={12} />
+              <div className="mt-2 text-xs text-muted">
                 `response-collector-pipeline-plan.json` / `response-collector-handoff-plan.json` 只把 pack-local store 记录映射为后续 live collector pipeline 输入契约；当前不会 mirror traffic、不会写 response payload artifact、不会调用 LLM-as-Judge、不会发布 Prometheus，也不会触发 rollback。
               </div>
             </Card>

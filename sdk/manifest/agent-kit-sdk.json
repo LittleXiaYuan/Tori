@@ -91,8 +91,7 @@
     "discovery",
     "identity-resolution",
     "embeddings-runtime",
-    "web-search",
-    "airi-bridge"
+    "web-search"
   ],
   "capabilities": [
     {
@@ -454,10 +453,6 @@
     {
       "name": "plugin",
       "description": "Access the lightweight Plugin API Runtime client or namespace."
-    },
-    {
-      "name": "airi",
-      "description": "Access the lightweight Airi bridge client or namespace for status, OpenAI-compatible models, chat completions, and stream parsing."
     }
   ],
   "languages": {
@@ -552,7 +547,6 @@
         "embeddings": "createAgentKit().embeddings",
         "search": "createAgentKit().search",
         "modes": "createAgentKit().modes",
-        "airi": "createAgentKit().airi",
         "pluginReload": "createAgentKit().pluginReload",
         "pluginFiles": "createAgentKit().pluginFiles",
         "pluginFolder": "createAgentKit().pluginFolder",
@@ -657,7 +651,6 @@
         "embeddings": "yunque.NewAgentKit().Embeddings",
         "search": "yunque.NewAgentKit().WebSearch",
         "modes": "yunque.NewAgentKit().Modes",
-        "airi": "yunque.NewAgentKit().Airi",
         "pluginReload": "yunque.NewAgentKit().PluginReload",
         "pluginFiles": "yunque.NewAgentKit().PluginFiles",
         "pluginFolder": "yunque.NewAgentKit().PluginFolder",
@@ -762,7 +755,6 @@
         "embeddings": "yunque.create_agent_kit().embeddings",
         "search": "yunque.create_agent_kit().search_sdk",
         "modes": "yunque.create_agent_kit().modes",
-        "airi": "yunque.create_agent_kit().airi",
         "pluginReload": "yunque.create_agent_kit().plugin_reload",
         "pluginFiles": "yunque.create_agent_kit().plugin_files",
         "pluginFolder": "yunque.create_agent_kit().plugin_folder",
@@ -867,7 +859,6 @@
         "embeddings": "AgentKit::embeddings",
         "search": "AgentKit::search",
         "modes": "AgentKit::modes",
-        "airi": "AgentKit::airi",
         "pluginReload": "AgentKit::plugin_reload",
         "pluginFiles": "AgentKit::plugin_files",
         "pluginFolder": "AgentKit::plugin_folder",

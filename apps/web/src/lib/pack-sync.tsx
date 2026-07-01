@@ -5,7 +5,7 @@ import { BrainCircuit, CircuitBoard, HardDriveDownload, Package, Puzzle } from "
 import { createPacksClient } from "yunque-client/packs";
 import type { InstalledPack, PackBackendRouteSpec, PackDistributionManifest, PackFrontendAssets, PackFrontendMenu } from "yunque-client/packs";
 import { createYunqueSDKClientOptions } from "@/lib/sdk-client";
-import { packSafeOpenPath } from "@/lib/pack-presentation";
+import { packGroupKey, packGroupLabel, packSafeOpenPath, packUsability } from "@/lib/pack-presentation";
 
 
 export interface PackSdkEntrypoint {
@@ -42,6 +42,13 @@ export interface PackNavItem {
   packName: string;
   order: number;
   keywords: string;
+  /** Usability kind from the manifest — "actionable" packs surface in the
+   *  primary sidebar; everything else is routed into the collapsible advanced
+   *  section so ordinary users aren't flooded with infra/experimental packs. */
+  usabilityKind: "actionable" | "infrastructure" | "experimental" | "documented";
+  /** metadata.group key + display label, for family sub-grouping in the flyout. */
+  groupKey: string;
+  groupLabel: string;
 }
 
 const packIconMap: Record<string, React.ReactNode> = {
@@ -74,10 +81,14 @@ export async function fetchEnabledPacks(): Promise<InstalledPack[]> {
  *  are surfaced via the static NAV_ITEMS catalog (group 扩展) instead of being
  *  re-emitted here, so enabling them never double-lists every surface. */
 const CORE_PROMOTED_PACK_IDS = new Set<string>([
+  // inner-life / world-model / experience / cognitive-canary are now consolidated
+  // into the 内在世界 (inner-world) aggregator surface, reached via the static
+  // NAV_ITEMS "内在世界" entry — their own manifest menus must not also pack-list.
   "yunque.pack.inner-life",
   "yunque.pack.night-school",
   "yunque.pack.experience",
   "yunque.pack.world-model",
+  "yunque.pack.cognitive-canary",
   "yunque.pack.micro-agent",
 ]);
 
@@ -103,6 +114,9 @@ export function buildPackNavItems(packs: InstalledPack[]): PackNavItem[] {
     .flatMap((pack) => {
       const manifest = pack.manifest;
       const menus = manifest.frontend?.menus || [];
+      const usabilityKind = packUsability(manifest).kind;
+      const groupKey = packGroupKey(manifest);
+      const groupLabel = packGroupLabel(groupKey);
       return menus
         .map((menu: PackFrontendMenu) => {
           const href = packSafeOpenPath(manifest, menu.path);
@@ -116,6 +130,9 @@ export function buildPackNavItems(packs: InstalledPack[]): PackNavItem[] {
             packName: manifest.name,
             order: menu.order ?? 999,
             keywords: `${manifest.id} ${manifest.name} ${manifest.description || ""} ${menu.key} ${menu.label} pack 能力包`,
+            usabilityKind,
+            groupKey,
+            groupLabel,
           };
         })
         .filter((item): item is PackNavItem => Boolean(item));

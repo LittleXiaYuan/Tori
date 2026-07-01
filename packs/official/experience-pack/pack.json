@@ -74,6 +74,8 @@
     "rollback": true
   },
   "metadata": {
+    "group": "inner-world",
+    "catalogHidden": "true",
     "sync": "backend-registry-drives-frontend",
     "descriptionStyle": "one-line-plus-three-examples",
     "usability": "actionable",

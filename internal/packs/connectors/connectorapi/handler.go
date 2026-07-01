@@ -35,18 +35,21 @@ func (h *Handler) RouteSpecs() []Route {
 }
 
 type connectorView struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Icon        string `json:"icon"`
-	Category    string `json:"category"`
-	AuthType    string `json:"auth_type"`
-	Beta        bool   `json:"beta,omitempty"`
-	Supported   bool   `json:"supported"`
-	Status      string `json:"status"`
-	UserInfo    string `json:"user_info,omitempty"`
-	Error       string `json:"error,omitempty"`
-	ActionCount int    `json:"action_count"`
+	ID             string                     `json:"id"`
+	Name           string                     `json:"name"`
+	Description    string                     `json:"description"`
+	Icon           string                     `json:"icon"`
+	Category       string                     `json:"category"`
+	AuthType       string                     `json:"auth_type"`
+	Beta           bool                       `json:"beta,omitempty"`
+	Supported      bool                       `json:"supported"`
+	Status         string                     `json:"status"`
+	UserInfo       string                     `json:"user_info,omitempty"`
+	Error          string                     `json:"error,omitempty"`
+	ActionCount    int                        `json:"action_count"`
+	AllowlistCount int                        `json:"allowlist_count"`
+	AllowedActions []string                   `json:"allowed_actions,omitempty"`
+	LastEvent      *connectors.ConnectorEvent `json:"last_event,omitempty"`
 }
 
 func (h *Handler) registry() *connectors.Registry {
@@ -71,19 +74,23 @@ func (h *Handler) handleList(w http.ResponseWriter, r *http.Request) {
 	views := make([]connectorView, 0, len(defs))
 	for _, d := range defs {
 		inst := registry.GetInstance(d.ID)
+		supported := registry.HasHandler(d.ID)
 		views = append(views, connectorView{
-			ID:          d.ID,
-			Name:        d.Name,
-			Description: d.Description,
-			Icon:        d.Icon,
-			Category:    d.Category,
-			AuthType:    d.AuthType,
-			Beta:        d.Beta,
-			Supported:   registry.HasHandler(d.ID),
-			Status:      string(inst.Status),
-			UserInfo:    inst.UserInfo,
-			Error:       inst.Error,
-			ActionCount: len(d.Actions),
+			ID:             d.ID,
+			Name:           d.Name,
+			Description:    d.Description,
+			Icon:           d.Icon,
+			Category:       d.Category,
+			AuthType:       d.AuthType,
+			Beta:           d.Beta,
+			Supported:      supported,
+			Status:         string(inst.Status),
+			UserInfo:       inst.UserInfo,
+			Error:          inst.Error,
+			ActionCount:    len(d.Actions),
+			AllowlistCount: len(allowedConnectorActions(d, supported)),
+			AllowedActions: allowedConnectorActions(d, supported),
+			LastEvent:      inst.LastEvent,
 		})
 	}
 	writeJSON(w, map[string]any{"connectors": views})
@@ -110,12 +117,15 @@ func (h *Handler) handleDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	inst := registry.GetInstance(connID)
+	supported := registry.HasHandler(connID)
 	writeJSON(w, map[string]any{
-		"connector": def,
-		"supported": registry.HasHandler(connID),
-		"status":    string(inst.Status),
-		"user_info": inst.UserInfo,
-		"error":     inst.Error,
+		"connector":       def,
+		"supported":       supported,
+		"status":          string(inst.Status),
+		"user_info":       inst.UserInfo,
+		"error":           inst.Error,
+		"allowed_actions": allowedConnectorActions(def, supported),
+		"last_event":      inst.LastEvent,
 	})
 }
 
@@ -222,4 +232,17 @@ func writeJSONStatus(w http.ResponseWriter, status int, value any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(value)
+}
+
+func allowedConnectorActions(def *connectors.ConnectorDef, supported bool) []string {
+	if def == nil || !supported || len(def.Actions) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(def.Actions))
+	for _, action := range def.Actions {
+		if action.ID != "" {
+			out = append(out, action.ID)
+		}
+	}
+	return out
 }

@@ -1,13 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type Key } from "react";
 import Link from "next/link";
 import {
   Button,
   Card,
   Chip,
-  Input,
   Label,
+  ListBox,
   Spinner,
   TextArea,
   TextField,
@@ -25,9 +25,11 @@ import {
   Sparkles,
 } from "lucide-react";
 import PageHeader from "@/components/page-header";
+import { JsonViewer } from "@/components/json-viewer";
 import { showToast } from "@/components/toast-provider";
 import { formatErrorMessage } from "@/lib/error-utils";
 import { chatPromptHref } from "@/lib/pack-action-links";
+import { PackAbout, PackSectionTitle, PackStepsGrid, type PackBoundaryItem, type PackStep } from "@/components/packs/pack-page-kit";
 import {
   createChaosProbePackClient,
   type ChaosProbeDefinition,
@@ -76,58 +78,40 @@ function sampleDefinitions() {
   );
 }
 
-function gateTone(gate?: string): { bg: string; fg: string } {
+type ChipColor = "danger" | "warning" | "success" | "default";
+
+// Map a health gate status to a semantic Chip color (no hand-rolled rgba).
+function gateColor(gate?: string): ChipColor {
   switch (gate) {
     case "fail":
-      return { bg: "rgba(239,68,68,0.16)", fg: "#ef4444" };
+      return "danger";
     case "warn":
-      return { bg: "rgba(250,204,21,0.14)", fg: "#facc15" };
+      return "warning";
     case "pass":
-      return { bg: "rgba(34,197,94,0.12)", fg: "#22c55e" };
+      return "success";
     default:
-      return { bg: "rgba(56,189,248,0.12)", fg: "#38bdf8" };
+      return "default";
   }
 }
 
-const userFacingSteps = [
-  {
-    title: "1. 准备安全探针",
-    body: "维护只读 health、guardrail 或 runtime 检查项，明确每个探针的安全范围。",
-  },
-  {
-    title: "2. 运行一次演练",
-    body: "生成健康报告、失败原因和降级建议，判断系统是否仍能稳住。",
-  },
-  {
-    title: "3. 输出运行计划",
-    body: "生成调度、指标、告警和降级状态引擎的交接计划。",
-  },
+const userFacingSteps: PackStep[] = [
+  { key: "prepare", label: "准备安全探针", detail: "维护只读 health、guardrail 或 runtime 检查项，明确每个探针的安全范围。" },
+  { key: "run", label: "运行一次演练", detail: "生成健康报告、失败原因和降级建议，判断系统是否仍能稳住。" },
+  { key: "plan", label: "输出运行计划", detail: "生成调度、指标、告警和降级状态引擎的交接计划。" },
 ];
 
-const boundaryItems = [
-  "不会破坏生产环境或注入真实故障。",
-  "不会创建后台定时任务。",
-  "不会发送告警或发布 Prometheus 指标。",
-  "不会写入真实 runtime degrade-state engine。",
+const boundaryItems: PackBoundaryItem[] = [
+  { key: "prod", label: "不破坏生产", detail: "不会破坏生产环境或注入真实故障。" },
+  { key: "cron", label: "不建定时任务", detail: "不会创建后台定时任务。" },
+  { key: "alert", label: "不发告警", detail: "不会发送告警或发布 Prometheus 指标。" },
+  { key: "engine", label: "不写降级引擎", detail: "不会写入真实 runtime degrade-state engine。" },
 ];
 
-const workflowLoopItems = [
-  {
-    title: "1. 准备探针",
-    body: "把 health、guardrail 和关键链路检查写成安全探针，先限定影响范围。",
-  },
-  {
-    title: "2. 带回 Chat",
-    body: "让云雀解释失败原因、降级等级和修复顺序，再拆成可以执行的任务。",
-  },
-  {
-    title: "3. 看证据位置",
-    body: "报告、调度计划和本地降级状态是演练证据，不会直接改线上状态。",
-  },
-  {
-    title: "4. 继续补能力",
-    body: "如果探针太少或误报，把真实报告交给小羽补检查项和判断规则。",
-  },
+const workflowLoopItems: PackStep[] = [
+  { key: "prepare", label: "准备探针", detail: "把 health、guardrail 和关键链路检查写成安全探针，先限定影响范围。" },
+  { key: "chat", label: "带回 Chat", detail: "让云雀解释失败原因、降级等级和修复顺序，再拆成可以执行的任务。" },
+  { key: "evidence", label: "看证据位置", detail: "报告、调度计划和本地降级状态是演练证据，不会直接改线上状态。" },
+  { key: "extend", label: "继续补能力", detail: "如果探针太少或误报，把真实报告交给小羽补检查项和判断规则。" },
 ];
 
 export default function ChaosProbePackPage() {
@@ -158,7 +142,11 @@ export default function ChaosProbePackPage() {
     useState<ChaosProbeDegradeStateEnginePlan | null>(null);
 
   const selectedReport = useMemo(() => report || null, [report]);
-  const tone = gateTone(selectedReport?.gate_status || reports[0]?.gate_status);
+  const selectedProbeIds = useMemo(
+    () => new Set(probeIDs.split(",").map((item) => item.trim()).filter(Boolean)),
+    [probeIDs],
+  );
+  const toneColor = gateColor(selectedReport?.gate_status || reports[0]?.gate_status);
 
   const load = useCallback(async () => {
     setError(null);
@@ -234,6 +222,14 @@ export default function ChaosProbePackPage() {
     } finally {
       setBusy(null);
     }
+  };
+
+  const updateProbeSelection = (keys: "all" | Set<Key>) => {
+    if (keys === "all") {
+      setProbeIDs(probes.map((probe) => probe.id).join(","));
+      return;
+    }
+    setProbeIDs(Array.from(keys).map(String).join(","));
   };
 
   const exportEvidence = async () => {
@@ -354,86 +350,47 @@ export default function ChaosProbePackPage() {
     <div className="page-root space-y-6 animate-fade-in-up">
       <PageHeader icon={<Activity size={20} />} title="Chaos Probe" />
 
-      <Card className="section-card overflow-hidden p-0">
-        <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="p-5">
-            <div className="flex flex-wrap items-center gap-2">
-              <Chip size="sm" style={{ background: "rgba(245,158,11,0.12)", color: "var(--yunque-warning)" }}>实验中</Chip>
-              <Chip size="sm" variant="soft">只跑安全探针</Chip>
-              <Chip size="sm" variant="soft">降级只生成计划</Chip>
-            </div>
-            <div className="mt-3 text-base font-semibold" style={{ color: "var(--yunque-text)" }}>
-              这个能力包现在适合做什么
-            </div>
-            <div className="mt-2 max-w-3xl text-sm leading-6" style={{ color: "var(--yunque-text-secondary)" }}>
-              它用于用安全探针检查云雀运行时、护栏和关键链路是否健康，帮助你在真正事故前看到降级建议。当前可以保存 probe definitions、运行 one-shot 检查、查看健康报告并导出证据；真实后台调度、指标发布、告警发送和运行时降级写入仍是计划。
-            </div>
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
-              {userFacingSteps.map((item) => (
-                <div key={item.title} className="rounded-lg p-3" style={{ background: "var(--yunque-bg-hover)", border: "1px solid var(--yunque-border)" }}>
-                  <div className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>{item.title}</div>
-                  <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>{item.body}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="p-5" style={{ background: "rgba(245,158,11,0.08)", borderLeft: "1px solid var(--yunque-border)" }}>
-            <div className="mb-3 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>当前不会做什么</div>
-            <div className="space-y-2 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
-              {boundaryItems.map((item) => <div key={item}>{item}</div>)}
-            </div>
-          </div>
-        </div>
-      </Card>
+      <PackAbout
+        chips={<>
+          <Chip size="sm" color="warning">实验中</Chip>
+          <Chip size="sm" variant="soft">只跑安全探针</Chip>
+          <Chip size="sm" variant="soft">降级只生成计划</Chip>
+        </>}
+        description="它用于用安全探针检查云雀运行时、护栏和关键链路是否健康，帮助你在真正事故前看到降级建议。当前可以保存 probe definitions、运行 one-shot 检查、查看健康报告并导出证据；真实后台调度、指标发布、告警发送和运行时降级写入仍是计划。"
+        boundaries={boundaryItems}
+      />
 
-      <Card className="section-card p-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <div className="mb-3 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>技术状态</div>
-            <div className="mb-1 flex items-center gap-2">
-              <Chip
-                size="sm"
-                style={{
-                  background: status?.scheduler_ready
-                    ? "rgba(34,197,94,0.12)"
-                    : "rgba(250,204,21,0.12)",
-                  color: status?.scheduler_ready ? "#22c55e" : "#facc15",
-                }}
-              >
-                {status?.scheduler_ready ? "Scheduler ready" : "Pack shell"}
-              </Chip>
-              <span
-                className="text-xs"
-                style={{ color: "var(--yunque-text-muted)" }}
-              >
-                {status?.pack_id || "yunque.pack.chaos-probe"}
-              </span>
-            </div>
-            <div
-              className="text-sm"
-              style={{ color: "var(--yunque-text-muted)" }}
-            >
-              当前切片已把安全探针 registry、one-shot
-              run、健康评分、降级建议、scheduler/metrics/alert write-back
-              计划、pack-local degrade-state store 和证据包放进可选
-              Pack。真实后台调度、Prometheus metrics 发布、告警发送和 runtime
-              degrade-state engine 后续接入。
-            </div>
-          </div>
+      <Card variant="default">
+        <Card.Header className="flex-row flex-wrap items-center justify-between gap-2">
+          <PackSectionTitle icon={<Sparkles size={15} />} tone="accent">怎么用</PackSectionTitle>
           <Button size="sm" variant="ghost" onPress={load}>
             <RefreshCw size={14} />
             刷新
           </Button>
-        </div>
+        </Card.Header>
+        <Card.Content className="flex flex-col gap-4">
+          <PackStepsGrid steps={userFacingSteps} columns={3} />
+          <div className="flex items-center gap-2">
+            <Chip size="sm" color={status?.scheduler_ready ? "success" : "warning"}>
+              {status?.scheduler_ready ? "Scheduler ready" : "Pack shell"}
+            </Chip>
+            <span className="font-mono text-xs text-muted">{status?.pack_id || "yunque.pack.chaos-probe"}</span>
+          </div>
+          <div className="text-sm leading-6 text-muted">
+            当前切片已把安全探针 registry、one-shot
+            run、健康评分、降级建议、scheduler/metrics/alert write-back
+            计划、pack-local degrade-state store 和证据包放进可选
+            Pack。真实后台调度、Prometheus metrics 发布、告警发送和 runtime
+            degrade-state engine 后续接入。
+          </div>
+        </Card.Content>
       </Card>
 
-      <Card className="section-card p-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>从安全探针到修复任务</div>
-            <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
-              Chaos Probe 的目标不是制造事故，而是用可控探针提前发现薄弱点，把报告变成任务、证据和后续能力补强。
-            </div>
+      <Card variant="default">
+        <Card.Header className="flex-row flex-wrap items-start justify-between gap-3">
+          <div className="flex flex-col gap-1">
+            <PackSectionTitle icon={<ShieldCheck size={15} />} tone="accent">从安全探针到修复任务</PackSectionTitle>
+            <span className="text-xs leading-5 text-muted">Chaos Probe 的目标不是制造事故，而是用可控探针提前发现薄弱点，把报告变成任务、证据和后续能力补强。</span>
           </div>
           <div className="flex flex-wrap gap-2">
             <Link href={chatPromptHref("请根据 Chaos Probe 的最新健康报告，解释风险等级、优先修复项和需要观察的指标，并拆成任务。")}>
@@ -447,30 +404,22 @@ export default function ChaosProbePackPage() {
               </Button>
             </Link>
           </div>
-        </div>
-        <div className="mt-3 grid gap-2 md:grid-cols-4">
-          {workflowLoopItems.map((item) => (
-            <div key={item.title} className="rounded-md border p-3" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-surface)" }}>
-              <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>{item.title}</div>
-              <div className="mt-2 text-[11px] leading-5" style={{ color: "var(--yunque-text-muted)" }}>{item.body}</div>
-            </div>
-          ))}
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2 text-xs">
-          <Link href="/trace"><Button size="sm" variant="ghost">核对执行轨迹</Button></Link>
-          <Link href="/packs/studio?packId=yunque.pack.chaos-probe"><Button size="sm" variant="ghost">让小羽继续改</Button></Link>
-        </div>
+        </Card.Header>
+        <Card.Content className="flex flex-col gap-3">
+          <PackStepsGrid steps={workflowLoopItems} columns={4} />
+          <div className="flex flex-wrap gap-2">
+            <Link href="/trace"><Button size="sm" variant="ghost">核对执行轨迹</Button></Link>
+            <Link href="/packs/studio?packId=yunque.pack.chaos-probe"><Button size="sm" variant="ghost">让小羽继续改</Button></Link>
+          </div>
+        </Card.Content>
       </Card>
 
       {error && (
-        <Card className="p-4" style={{ background: "rgba(239,68,68,0.06)" }}>
-          <div
-            className="flex items-center gap-2 text-sm"
-            style={{ color: "var(--yunque-danger)" }}
-          >
+        <Card variant="secondary">
+          <Card.Content className="flex items-center gap-2 text-sm text-danger">
             <AlertTriangle size={16} />
             {error}
-          </div>
+          </Card.Content>
         </Card>
       )}
 
@@ -500,46 +449,30 @@ export default function ChaosProbePackPage() {
         </Card>
         <Card className="section-card p-4">
           <div className="kpi-label">Scheduler Plan</div>
-          <div className="kpi-value text-lg" style={{ color: tone.fg }}>
-            {status?.scheduler_plan_ready ? "plan" : "pending"}
+          <div className="mt-1 text-sm font-medium text-foreground">
+            {status?.scheduler_plan_ready ? "已就绪" : "待接通"}
           </div>
         </Card>
         <Card className="section-card p-4">
           <div className="kpi-label">Degrade Store</div>
-          <div
-            className="kpi-value text-lg"
-            style={{
-              color: status?.runtime_degrade_state_ready
-                ? "#22c55e"
-                : "#38bdf8",
-            }}
-          >
-            {status?.degrade_state_store_ready ? "local" : "pending"}
+          <div className={`mt-1 text-sm font-medium ${status?.runtime_degrade_state_ready ? "text-success" : "text-accent"}`}>
+            {status?.degrade_state_store_ready ? "已就绪" : "待接通"}
           </div>
         </Card>
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[380px_1fr]">
         <Card className="section-card overflow-hidden">
-          <div
-            className="flex items-center justify-between border-b px-4 py-3"
-            style={{ borderColor: "var(--yunque-border)" }}
-          >
+          <div className="flex items-center justify-between border-b px-4 py-3 border-border">
             <div className="flex items-center gap-2 text-sm font-semibold">
               <Sparkles size={16} />
               健康报告
             </div>
             <Chip size="sm">{reports.length}</Chip>
           </div>
-          <div
-            className="max-h-[520px] divide-y overflow-auto"
-            style={{ borderColor: "var(--yunque-border)" }}
-          >
+          <div className="max-h-[520px] divide-y overflow-auto border-border">
             {reports.length === 0 ? (
-              <div
-                className="p-6 text-center text-sm"
-                style={{ color: "var(--yunque-text-muted)" }}
-              >
+              <div className="p-6 text-center text-sm text-muted">
                 还没有报告。可以先保存 probe definitions 并运行一次探针。
               </div>
             ) : (
@@ -553,20 +486,11 @@ export default function ChaosProbePackPage() {
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className="font-medium">{item.id}</div>
-                    <Chip
-                      size="sm"
-                      style={{
-                        background: gateTone(item.gate_status).bg,
-                        color: gateTone(item.gate_status).fg,
-                      }}
-                    >
+                    <Chip size="sm" color={gateColor(item.gate_status)}>
                       {item.gate_status}
                     </Chip>
                   </div>
-                  <div
-                    className="mt-1 truncate text-xs"
-                    style={{ color: "var(--yunque-text-muted)" }}
-                  >
+                  <div className="mt-1 truncate text-xs text-muted">
                     health {Math.round(item.health_score)} · pass{" "}
                     {item.pass_count} · fail {item.fail_count} · L
                     {item.degrade_level}
@@ -609,23 +533,40 @@ export default function ChaosProbePackPage() {
                   <Play size={16} />
                   Safe probe run
                 </div>
-                <div
-                  className="mt-1 text-xs"
-                  style={{ color: "var(--yunque-text-muted)" }}
-                >
+                <div className="mt-1 text-xs text-muted">
                   本阶段不创建真实后台任务；degrade write-back 只写 pack-local
                   store，不写 runtime degrade state。
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <TextField
-                  className="min-w-64"
-                  value={probeIDs}
-                  onChange={setProbeIDs}
-                >
+                <div className="min-w-72">
                   <Label>Probe ID 列表</Label>
-                  <Input placeholder="probe ids" />
-                </TextField>
+                  {probes.length > 0 ? (
+                    <ListBox
+                      aria-label="选择要运行的 Chaos probes"
+                      selectionMode="multiple"
+                      selectedKeys={selectedProbeIds}
+                      onSelectionChange={updateProbeSelection}
+                      className="mt-1 max-h-40 overflow-auto rounded-lg border p-1 border-border"
+                    >
+                      {probes.map((probe) => (
+                        <ListBox.Item key={probe.id} id={probe.id} textValue={probe.name || probe.id}>
+                          <div className="flex flex-col">
+                            <span className="text-xs font-medium">{probe.name || probe.id}</span>
+                            <span className="text-[11px] font-mono text-muted">{probe.id}</span>
+                          </div>
+                        </ListBox.Item>
+                      ))}
+                    </ListBox>
+                  ) : (
+                    <div className="mt-1 rounded-lg border border-dashed p-3 text-xs border-border text-muted">
+                      暂无已保存探针。未选择时会让后端运行全部可用探针。
+                    </div>
+                  )}
+                  <div className="mt-1 text-[11px] text-muted">
+                    未选择时运行全部探针。
+                  </div>
+                </div>
                 <Button
                   variant="outline"
                   isPending={busy === "scheduler"}
@@ -670,40 +611,17 @@ export default function ChaosProbePackPage() {
             </div>
 
             {selectedReport ? (
-              <Card
-                className="p-3"
-                style={{ background: "rgba(255,255,255,0.03)" }}
-              >
+              <Card className="p-3 bg-surface-secondary">
                 <div className="mb-2 flex items-center gap-2 text-sm font-medium">
-                  <Chip
-                    size="sm"
-                    style={{ background: tone.bg, color: tone.fg }}
-                  >
+                  <Chip size="sm" color={toneColor}>
                     {selectedReport.gate_status}
                   </Chip>
                   <span>{selectedReport.id}</span>
                 </div>
-                <TextField
-                  value={JSON.stringify(selectedReport, null, 2)}
-                  onChange={() => undefined}
-                >
-                  <Label>运行报告 JSON</Label>
-                  <TextArea
-                    rows={18}
-                    aria-label="Chaos probe report JSON"
-                    className="font-mono text-xs"
-                    readOnly
-                  />
-                </TextField>
+                <JsonViewer title="运行报告 JSON" value={selectedReport} rows={18} />
               </Card>
             ) : (
-              <div
-                className="rounded-xl border border-dashed p-6 text-center text-sm"
-                style={{
-                  borderColor: "var(--yunque-border)",
-                  color: "var(--yunque-text-muted)",
-                }}
-              >
+              <div className="rounded-xl border border-dashed p-6 text-center text-sm border-border text-muted">
                 运行后会展示 health score / degrade level / remediation 细节。
               </div>
             )}
@@ -725,22 +643,8 @@ export default function ChaosProbePackPage() {
                   prometheus_ready: {String(schedulerPlan.prometheus_ready)}
                 </Chip>
               </div>
-              <TextField
-                value={JSON.stringify(schedulerPlan, null, 2)}
-                onChange={() => undefined}
-              >
-                <Label>Scheduler 计划 JSON</Label>
-                <TextArea
-                  rows={12}
-                  aria-label="Chaos Probe Scheduler Plan JSON"
-                  className="font-mono text-xs"
-                  readOnly
-                />
-              </TextField>
-              <div
-                className="mt-2 text-xs"
-                style={{ color: "var(--yunque-text-muted)" }}
-              >
+              <JsonViewer title="Scheduler 计划 JSON" value={schedulerPlan} rows={12} />
+              <div className="mt-2 text-xs text-muted">
                 非破坏性计划：不会创建 scheduler job、不会发布 Prometheus
                 指标、不会发送告警，也不会写入 runtime degrade state。
               </div>
@@ -767,22 +671,8 @@ export default function ChaosProbePackPage() {
                   {String(degradeWriteback.runtime_degrade_state_ready)}
                 </Chip>
               </div>
-              <TextField
-                value={JSON.stringify(degradeWriteback, null, 2)}
-                onChange={() => undefined}
-              >
-                <Label>本地降级状态 JSON</Label>
-                <TextArea
-                  rows={12}
-                  aria-label="Chaos Probe Degrade State Writeback JSON"
-                  className="font-mono text-xs"
-                  readOnly
-                />
-              </TextField>
-              <div
-                className="mt-2 text-xs"
-                style={{ color: "var(--yunque-text-muted)" }}
-              >
+              <JsonViewer title="本地降级状态 JSON" value={degradeWriteback} rows={12} />
+              <div className="mt-2 text-xs text-muted">
                 已持久化到 pack-local `degrade-state-store.json`；不会修改
                 runtime degrade state、不会触发降级状态机、不会发布 Prometheus
                 指标或发送 alert。
@@ -810,22 +700,8 @@ export default function ChaosProbePackPage() {
                   merkle_append: {String(enginePlan.merkle_append_ready)}
                 </Chip>
               </div>
-              <TextField
-                value={JSON.stringify(enginePlan, null, 2)}
-                onChange={() => undefined}
-              >
-                <Label>Engine handoff JSON</Label>
-                <TextArea
-                  rows={12}
-                  aria-label="Chaos Probe Degrade Engine Plan JSON"
-                  className="font-mono text-xs"
-                  readOnly
-                />
-              </TextField>
-              <div
-                className="mt-2 text-xs"
-                style={{ color: "var(--yunque-text-muted)" }}
-              >
+              <JsonViewer title="Engine handoff JSON" value={enginePlan} rows={12} />
+              <div className="mt-2 text-xs text-muted">
                 `degrade-engine-plan.json` 只把 pack-local
                 degrade-state-record 映射为后续 runtime engine
                 消费契约；`runtime_degrade_state_ready=false`、

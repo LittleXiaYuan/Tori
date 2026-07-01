@@ -45,13 +45,14 @@ type HandoffExecutionHooksProvider interface {
 }
 
 type HandoffExecutionResult struct {
-	Handled   bool
-	ToolName  string
-	AgentName string
-	Input     string
-	Reply     string
-	Duration  time.Duration
-	Err       error
+	Handled       bool
+	ToolName      string
+	AgentName     string
+	Input         string
+	Reply         string
+	PartialResult string // #33: subagent's recoverable work on timeout/cancel
+	Duration      time.Duration
+	Err           error
 }
 
 func NewDelegationRuntimeService() *DelegationRuntimeService {
@@ -163,19 +164,22 @@ func (s *DelegationRuntimeService) ExecuteHandoffForRequest(ctx context.Context,
 	}
 
 	reply := ""
+	partial := ""
 	if hr != nil {
 		reply = hr.Reply
+		partial = hr.PartialResult
 	}
 	emitHandoffDone(req, agentName, reply, duration, err)
 
 	return HandoffExecutionResult{
-		Handled:   true,
-		ToolName:  toolName,
-		AgentName: agentName,
-		Input:     input,
-		Reply:     reply,
-		Duration:  duration,
-		Err:       err,
+		Handled:       true,
+		ToolName:      toolName,
+		AgentName:     agentName,
+		Input:         input,
+		Reply:         reply,
+		PartialResult: partial,
+		Duration:      duration,
+		Err:           err,
 	}
 }
 
@@ -201,6 +205,8 @@ func emitHandoffStart(req PlanRequest, agentName, input string) {
 	evt := observe.NewEvent(req.TraceID, observe.DomainAgent, observe.EventHandoffStart,
 		fmt.Sprintf("🤖 委派 [%s]：%s", agentName, truncate(input, 80)))
 	evt.Meta.TenantID = req.TenantID
+	evt.Meta.SessionID = req.SessionID
+	evt.Meta.TaskID = req.TaskID
 	evt.Meta.Skill = agentName
 	evt.Detail = observe.HandoffDetail{Agent: agentName, Input: truncate(input, 200)}
 	req.StepCallback(evt)
@@ -213,6 +219,8 @@ func emitHandoffDone(req PlanRequest, agentName, reply string, duration time.Dur
 	doneEvt := observe.NewEvent(req.TraceID, observe.DomainAgent, observe.EventHandoffDone,
 		fmt.Sprintf("✅ [%s] 完成 (%.1fs)", agentName, duration.Seconds()))
 	doneEvt.Meta.TenantID = req.TenantID
+	doneEvt.Meta.SessionID = req.SessionID
+	doneEvt.Meta.TaskID = req.TaskID
 	doneEvt.Meta.Skill = agentName
 	detail := observe.HandoffDetail{Agent: agentName, DurMs: duration.Milliseconds()}
 	if err != nil {

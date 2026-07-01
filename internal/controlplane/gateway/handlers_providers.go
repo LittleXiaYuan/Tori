@@ -75,6 +75,7 @@ func (g *Gateway) handleProviderRegister(w http.ResponseWriter, r *http.Request)
 
 	var req struct {
 		PresetID string `json:"preset_id"`
+		ID       string `json:"id"`
 		BaseURL  string `json:"base_url"`
 		APIKey   string `json:"api_key"`
 		Model    string `json:"model"`
@@ -137,6 +138,11 @@ func (g *Gateway) handleProviderRegister(w http.ResponseWriter, r *http.Request)
 	}
 	if req.Tier != "" {
 		cfg.Tier = req.Tier
+	}
+	// An explicit ID lets the UI register several custom models that share a
+	// model name but differ by base URL / display name without colliding.
+	if req.ID != "" {
+		cfg.ID = req.ID
 	}
 	if cfg.ID == "" {
 		cfg.ID = "custom-" + req.Model

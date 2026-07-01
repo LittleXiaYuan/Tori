@@ -202,6 +202,7 @@ func (g *Gateway) ExecuteChatPipeline(ctx context.Context, req *ChatRequest) (*C
 		TeacherID:      req.TeacherID,
 		StudentID:      req.StudentID,
 		TenantID:       req.TenantID,
+		SessionID:      req.SessionID,
 		RoutedTier:     routedTier,
 		ClientOverride: sessionClient,
 		EmotionHint:    emotionHint,

@@ -272,6 +272,15 @@ export interface ConnectorAction {
   parameters?: ConnectorParam[];
 }
 
+export interface ConnectorEvent {
+  kind: string;
+  connector_id: string;
+  action_id?: string;
+  status: string;
+  message?: string;
+  at: string;
+}
+
 export interface ConnectorView {
   id: string;
   name: string;
@@ -285,6 +294,9 @@ export interface ConnectorView {
   user_info?: string;
   error?: string;
   action_count: number;
+  allowlist_count?: number;
+  allowed_actions?: string[];
+  last_event?: ConnectorEvent;
 }
 
 export interface ConnectorDef {

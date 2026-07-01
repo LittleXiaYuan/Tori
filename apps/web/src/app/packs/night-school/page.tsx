@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Button, Card, Spinner, Chip } from "@heroui/react";
-import { GraduationCap, MoonStar, Lightbulb, User, AlertTriangle, Send, ClipboardList } from "lucide-react";
+import { GraduationCap, MoonStar, Lightbulb, User, AlertTriangle, Send, ClipboardList, Trash2 } from "lucide-react";
 import PageHeader from "@/components/page-header";
 import { formatErrorMessage } from "@/lib/error-utils";
 import { chatPromptHref, taskDetailHref } from "@/lib/pack-action-links";
+import { PackAbout, PackSectionTitle, type PackBoundaryItem } from "@/components/packs/pack-page-kit";
 import {
   createNightSchoolPackClient,
   type DreamEntry,
@@ -16,45 +17,11 @@ import {
 
 const nightSchool = createNightSchoolPackClient();
 
-const userFacingSteps = [
-  {
-    title: "1. 看夜间复盘",
-    body: "查看云雀从已完成任务中整理出的梦境、规则和模式。",
-  },
-  {
-    title: "2. 应用蒸馏经验",
-    body: "把某条经验带回 Chat，让云雀按它改进下一次任务。",
-  },
-  {
-    title: "3. 检查学到的画像",
-    body: "确认偏好特征是否合理，避免长期学习方向跑偏。",
-  },
-];
-
-const boundaryItems = [
-  "不会在夜间自动执行新任务。",
-  "不会直接改你的真实文件或配置。",
-  "不会把低置信度画像当成硬规则。",
-  "不会替代你对经验是否有用的判断。",
-];
-
-const workflowLoopItems = [
-  {
-    title: "1. 找到经验",
-    body: "先看梦境、规则或失败模式，确认它来自哪类已完成任务。",
-  },
-  {
-    title: "2. 应用到下一次",
-    body: "把经验带回 Chat，让云雀按它改写计划或补充检查项。",
-  },
-  {
-    title: "3. 验证结果",
-    body: "在任务中心看新任务是否真的少犯同类错误。",
-  },
-  {
-    title: "4. 修正画像",
-    body: "如果画像不准，把反馈写回记忆或继续交给小羽优化页面说明。",
-  },
+const boundaryItems: PackBoundaryItem[] = [
+  { key: "exec", label: "不自动执行任务", detail: "不会在夜间自动执行新任务。" },
+  { key: "files", label: "不改真实文件", detail: "不会直接改你的真实文件或配置。" },
+  { key: "trust", label: "不当硬规则", detail: "不会把低置信度画像当成硬规则。" },
+  { key: "judge", label: "不替你判断", detail: "不会替代你对经验是否有用的判断。" },
 ];
 
 function applyDistillPrompt(entry: DistillEntry): string {
@@ -69,179 +36,84 @@ function applyDistillPrompt(entry: DistillEntry): string {
 function formatTimestamp(iso: string): string {
   if (!iso) return "—";
   try {
-    const d = new Date(iso);
-    return d.toLocaleString();
+    return new Date(iso).toLocaleString();
   } catch {
     return iso;
   }
 }
 
-function ColumnHeader({
-  icon,
-  title,
-  hint,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  hint?: string;
-}) {
+function EmptyState({ text, action }: { text: string; action?: React.ReactNode }) {
   return (
-    <div className="flex items-center gap-2 mb-3">
-      <span style={{ color: "var(--yunque-accent)" }}>{icon}</span>
-      <span className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
-        {title}
-      </span>
-      {hint ? (
-        <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>
-          {hint}
-        </span>
-      ) : null}
+    <div className="flex flex-col items-center gap-3 rounded-xl bg-surface-secondary px-4 py-8 text-center">
+      <span className="text-sm leading-6 text-muted">{text}</span>
+      {action}
     </div>
   );
 }
 
-function EmptyState({ text }: { text: string }) {
+function ColumnCard({ icon, title, hint, loading, empty, emptyText, emptyAction, children }: {
+  icon: React.ReactNode;
+  title: string;
+  hint?: string;
+  loading: boolean;
+  empty: boolean;
+  emptyText: string;
+  emptyAction?: React.ReactNode;
+  children?: React.ReactNode;
+}) {
   return (
-    <div
-      className="text-xs px-3 py-6 text-center rounded-md"
-      style={{ color: "var(--yunque-text-muted)", background: "rgba(255,255,255,0.02)" }}
-    >
-      {text}
-    </div>
+    <Card variant="default">
+      <Card.Header className="flex-row items-center gap-2">
+        <PackSectionTitle icon={icon} tone="accent">{title}</PackSectionTitle>
+        {hint ? <span className="text-xs text-muted">{hint}</span> : null}
+      </Card.Header>
+      <Card.Content>
+        {loading ? (
+          <div className="flex items-center gap-2 text-sm text-muted"><Spinner size="sm" /> 加载中…</div>
+        ) : empty ? (
+          <EmptyState text={emptyText} action={emptyAction} />
+        ) : (
+          <div className="flex flex-col gap-2.5">{children}</div>
+        )}
+      </Card.Content>
+    </Card>
   );
 }
 
 function DreamsColumn({ items, loading }: { items: DreamEntry[]; loading: boolean }) {
   return (
-    <Card className="section-card p-4">
-      <ColumnHeader icon={<MoonStar size={16} />} title="梦境" hint="夜间学习周期" />
-      {loading ? (
-        <div className="flex items-center gap-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
-          <Spinner size="sm" /> 加载中…
+    <ColumnCard icon={<MoonStar size={16} />} title="梦境" hint="夜间学习周期" loading={loading} empty={items.length === 0} emptyText="夜校在凌晨 02:00–05:00 自动复盘已完成的任务。还没有记录——先去完成一个任务。" emptyAction={<Link href="/missions"><Button size="sm" variant="outline"><ClipboardList size={13} /> 去任务中心</Button></Link>}>
+      {items.map((d) => (
+        <div key={d.id} className="rounded-xl bg-surface-secondary px-4 py-3">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Chip size="sm" variant="soft">探索 {d.explorations_run}</Chip>
+            <Chip size="sm" variant="soft">事实 {d.facts_discovered}</Chip>
+            <Chip size="sm" variant="soft">想法 {d.thoughts_generated}</Chip>
+            <Chip size="sm" variant="soft">技能 {d.skills_suggested}</Chip>
+            <span className="ml-auto text-xs text-muted">{formatTimestamp(d.created_at)}</span>
+          </div>
         </div>
-      ) : items.length === 0 ? (
-        <EmptyState text="还没有夜间学习记录。02:00–05:00 期间会自动运行。" />
-      ) : (
-        <div className="space-y-2">
-          {items.map((d) => (
-            <div
-              key={d.id}
-              className="rounded-md px-3 py-2 text-sm"
-              style={{ background: "rgba(255,255,255,0.02)", border: "1px solid var(--yunque-border)" }}
-            >
-              <div className="flex items-center gap-2 mb-1 flex-wrap">
-                <Chip size="sm">探索 {d.explorations_run}</Chip>
-                <Chip size="sm">事实 {d.facts_discovered}</Chip>
-                <Chip size="sm">想法 {d.thoughts_generated}</Chip>
-                <Chip size="sm">技能 {d.skills_suggested}</Chip>
-                <span className="text-xs ml-auto" style={{ color: "var(--yunque-text-muted)" }}>
-                  {formatTimestamp(d.created_at)}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </Card>
+      ))}
+    </ColumnCard>
   );
 }
 
-function DistillColumn({
-  rules,
-  patterns,
-  insights,
-  loading,
-}: {
-  rules: DistillEntry[];
-  patterns: DistillEntry[];
-  insights: DistillEntry[];
-  loading: boolean;
-}) {
-  const total = rules.length + patterns.length + insights.length;
+function DistillCard({ entry, accent }: { entry: DistillEntry; accent: "success" | "warning" | "danger" | "default" }) {
   return (
-    <Card className="section-card p-4">
-      <ColumnHeader icon={<Lightbulb size={16} />} title="经验" hint="任务蒸馏" />
-      {loading ? (
-        <div className="flex items-center gap-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
-          <Spinner size="sm" /> 加载中…
-        </div>
-      ) : total === 0 ? (
-        <EmptyState text="还没有蒸馏出的经验。每次任务完成后会自动分析。" />
-      ) : (
-        <div className="space-y-3">
-          {patterns.length > 0 ? (
-            <div>
-              <div className="text-xs mb-1" style={{ color: "var(--yunque-text-muted)" }}>模式 · {patterns.length}</div>
-              <div className="space-y-2">
-                {patterns.map((p) => (
-                  <DistillCard key={p.id} entry={p} accent="success" />
-                ))}
-              </div>
-            </div>
-          ) : null}
-          {rules.length > 0 ? (
-            <div>
-              <div className="text-xs mb-1" style={{ color: "var(--yunque-text-muted)" }}>规则 · {rules.length}</div>
-              <div className="space-y-2">
-                {rules.map((r) => (
-                  <DistillCard key={r.id} entry={r} accent="warning" />
-                ))}
-              </div>
-            </div>
-          ) : null}
-          {insights.length > 0 ? (
-            <div>
-              <div className="text-xs mb-1" style={{ color: "var(--yunque-text-muted)" }}>工具洞见 · {insights.length}</div>
-              <div className="space-y-2">
-                {insights.map((i) => (
-                  <DistillCard key={i.id} entry={i} accent="default" />
-                ))}
-              </div>
-            </div>
-          ) : null}
-        </div>
-      )}
-    </Card>
-  );
-}
-
-function DistillCard({
-  entry,
-  accent,
-}: {
-  entry: DistillEntry;
-  accent: "success" | "warning" | "danger" | "default";
-}) {
-  return (
-    <div
-      className="rounded-md px-3 py-2 text-sm"
-      style={{ background: "rgba(255,255,255,0.02)", border: "1px solid var(--yunque-border)" }}
-    >
-      <div className="flex items-center gap-2 mb-1">
-        <Chip size="sm" color={accent}>
-          {(entry.confidence * 100).toFixed(0)}%
-        </Chip>
-        <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>
-          {entry.key}
-        </span>
-        <span className="text-xs ml-auto" style={{ color: "var(--yunque-text-muted)" }}>
-          {formatTimestamp(entry.created_at)}
-        </span>
+    <div className="rounded-xl bg-surface-secondary px-4 py-3">
+      <div className="mb-1.5 flex items-center gap-2">
+        <Chip size="sm" color={accent}>{(entry.confidence * 100).toFixed(0)}%</Chip>
+        <span className="text-xs text-muted">{entry.key}</span>
+        <span className="ml-auto text-xs text-muted">{formatTimestamp(entry.created_at)}</span>
       </div>
-      <div className="whitespace-pre-line" style={{ color: "var(--yunque-text)" }}>
-        {entry.content}
-      </div>
+      <div className="whitespace-pre-line text-sm leading-6 text-foreground">{entry.content}</div>
       <div className="mt-2 flex flex-wrap gap-2">
         <Link href={chatPromptHref(applyDistillPrompt(entry))}>
-          <Button size="sm" variant="ghost">
-            <Send size={13} /> 应用这条经验
-          </Button>
+          <Button size="sm" variant="ghost"><Send size={13} /> 应用这条经验</Button>
         </Link>
         {entry.task_id ? (
           <Link href={taskDetailHref(entry.task_id)}>
-            <Button size="sm" variant="ghost">
-              <ClipboardList size={13} /> 查看来源任务
-            </Button>
+            <Button size="sm" variant="ghost"><ClipboardList size={13} /> 查看来源任务</Button>
           </Link>
         ) : null}
       </div>
@@ -249,43 +121,47 @@ function DistillCard({
   );
 }
 
-function TraitsColumn({ items, loading }: { items: TraitEntry[]; loading: boolean }) {
+function DistillColumn({ rules, patterns, insights, loading }: { rules: DistillEntry[]; patterns: DistillEntry[]; insights: DistillEntry[]; loading: boolean }) {
+  const total = rules.length + patterns.length + insights.length;
+  const group = (label: string, items: DistillEntry[], accent: "success" | "warning" | "default") =>
+    items.length > 0 ? (
+      <div className="flex flex-col gap-2">
+        <div className="text-xs text-muted">{label} · {items.length}</div>
+        {items.map((it) => <DistillCard key={it.id} entry={it} accent={accent} />)}
+      </div>
+    ) : null;
   return (
-    <Card className="section-card p-4">
-      <ColumnHeader icon={<User size={16} />} title="画像" hint="对你的偏好" />
-      {loading ? (
-        <div className="flex items-center gap-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
-          <Spinner size="sm" /> 加载中…
-        </div>
-      ) : items.length === 0 ? (
-        <EmptyState text="还没有学到关于你的偏好。多聊几次会逐渐建立画像。" />
-      ) : (
-        <div className="space-y-2">
-          {items.map((t) => {
-            const pct = (t.confidence * 100).toFixed(0);
-            const color = t.confidence >= 0.7 ? "success" : t.confidence < 0.4 ? "danger" : "warning";
-            return (
-              <div
-                key={t.id}
-                className="rounded-md px-3 py-2 text-sm"
-                style={{ background: "rgba(255,255,255,0.02)", border: "1px solid var(--yunque-border)" }}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <Chip size="sm">{t.dimension}</Chip>
-                  <Chip size="sm" color={color}>
-                    {pct}%
-                  </Chip>
-                  <span className="text-xs ml-auto" style={{ color: "var(--yunque-text-muted)" }}>
-                    命中 {t.hit_count}
-                  </span>
-                </div>
-                <div style={{ color: "var(--yunque-text)" }}>{t.preference}</div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </Card>
+    <ColumnCard icon={<Lightbulb size={16} />} title="经验" hint="任务蒸馏" loading={loading} empty={total === 0} emptyText="完成任务后会自动蒸馏经验。现在还没有——去 Chat 派个任务让云雀跑起来。" emptyAction={<Link href={chatPromptHref("帮我规划并完成一个任务；完成后我想在夜校看到蒸馏出的经验。")}><Button size="sm" variant="outline"><Send size={13} /> 去 Chat 派任务</Button></Link>}>
+      {group("模式", patterns, "success")}
+      {group("规则", rules, "warning")}
+      {group("工具洞见", insights, "default")}
+    </ColumnCard>
+  );
+}
+
+function TraitsColumn({ items, loading, onForget, forgetting }: { items: TraitEntry[]; loading: boolean; onForget: (t: TraitEntry) => void; forgetting: string | null }) {
+  return (
+    <ColumnCard icon={<User size={16} />} title="画像" hint="对你的偏好" loading={loading} empty={items.length === 0} emptyText="多在 Chat 交流，云雀会逐步建立你的偏好画像。" emptyAction={<Link href="/chat"><Button size="sm" variant="outline"><Send size={13} /> 去 Chat 聊聊</Button></Link>}>
+      {items.map((t) => {
+        const pct = (t.confidence * 100).toFixed(0);
+        const color = t.confidence >= 0.7 ? "success" : t.confidence < 0.4 ? "danger" : "warning";
+        return (
+          <div key={t.id} className="rounded-xl bg-surface-secondary px-4 py-3">
+            <div className="mb-1.5 flex items-center gap-2">
+              <Chip size="sm" variant="soft">{t.dimension}</Chip>
+              <Chip size="sm" color={color}>{pct}%</Chip>
+              <span className="ml-auto text-xs text-muted">命中 {t.hit_count}</span>
+            </div>
+            <div className="text-sm leading-6 text-foreground">{t.preference}</div>
+            <div className="mt-2 flex justify-end">
+              <Button size="sm" variant="ghost" isPending={forgetting === t.id} onPress={() => onForget(t)}>
+                <Trash2 size={13} /> 不准，忘掉
+              </Button>
+            </div>
+          </div>
+        );
+      })}
+    </ColumnCard>
   );
 }
 
@@ -297,6 +173,7 @@ export default function NightSchoolPackPage() {
   const [traits, setTraits] = useState<TraitEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [forgetting, setForgetting] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -319,101 +196,61 @@ export default function NightSchoolPackPage() {
     }
   }, []);
 
+  const handleForget = useCallback(async (t: TraitEntry) => {
+    setForgetting(t.id);
+    try {
+      await nightSchool.forgetTrait(t.dimension, t.preference);
+      setTraits((prev) => prev.filter((x) => x.id !== t.id));
+    } catch (e) {
+      setError(formatErrorMessage(e, "删除画像失败"));
+    } finally {
+      setForgetting(null);
+    }
+  }, []);
+
   useEffect(() => {
     refresh();
   }, [refresh]);
 
   return (
     <div className="page-root space-y-6 animate-fade-in-up">
-      <PageHeader icon={<GraduationCap size={20} />} title="夜校" />
+      <PageHeader
+        icon={<GraduationCap size={20} />}
+        title="夜校"
+        actions={<div className="flex flex-wrap gap-2">
+          <Link href={chatPromptHref("请从夜校里挑一条最有价值的经验，应用到我接下来的任务计划里，并列出需要验证的检查项。")}>
+            <Button size="sm" className="btn-accent"><Send size={14} /> 带回 Chat</Button>
+          </Link>
+          <Link href="/missions"><Button size="sm" variant="outline"><ClipboardList size={14} /> 看任务</Button></Link>
+        </div>}
+      />
 
-      <Card className="section-card overflow-hidden p-0">
-        <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="p-5">
-            <div className="flex flex-wrap items-center gap-2">
-              <Chip size="sm" style={{ background: "rgba(34,197,94,0.10)", color: "var(--yunque-success)" }}>可直接使用</Chip>
-              <Chip size="sm" variant="soft">复盘任务</Chip>
-              <Chip size="sm" variant="soft">可带回 Chat</Chip>
-            </div>
-            <div className="mt-3 text-base font-semibold" style={{ color: "var(--yunque-text)" }}>
-              这个能力包现在适合做什么
-            </div>
-            <div className="mt-2 max-w-3xl text-sm leading-6" style={{ color: "var(--yunque-text-secondary)" }}>
-              它用于把已完成任务里的经验、失败模式和用户偏好整理出来，让云雀下次做得更稳。当前可以查看夜间复盘、蒸馏规则、工具洞察和画像特征，并把任一条经验带回 Chat 应用到新任务。
-            </div>
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
-              {userFacingSteps.map((item) => (
-                <div key={item.title} className="rounded-lg p-3" style={{ background: "var(--yunque-bg-hover)", border: "1px solid var(--yunque-border)" }}>
-                  <div className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>{item.title}</div>
-                  <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>{item.body}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="p-5" style={{ background: "rgba(245,158,11,0.08)", borderLeft: "1px solid var(--yunque-border)" }}>
-            <div className="mb-3 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>当前不会做什么</div>
-            <div className="space-y-2 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
-              {boundaryItems.map((item) => <div key={item}>{item}</div>)}
-            </div>
-          </div>
-        </div>
-      </Card>
+      <PackAbout
+        chips={<>
+          <Chip size="sm" color="success">可直接使用</Chip>
+          <Chip size="sm" variant="soft">复盘任务</Chip>
+          <Chip size="sm" variant="soft">可带回 Chat</Chip>
+        </>}
+        description="把已完成任务里的经验、失败模式和偏好整理出来，让云雀下次做得更稳。可查看夜间复盘、蒸馏规则、工具洞察和画像，并把任一条经验带回 Chat。"
+        boundaries={boundaryItems}
+      />
 
-      <Card className="section-card p-4 text-sm" style={{ color: "var(--yunque-text-muted)" }}>
-        Agent 会在夜间复盘：从已完成任务中蒸馏可复用的规则与模式，并通过对话学习关于你的偏好画像。
-      </Card>
-
-      <Card className="section-card p-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>从夜间复盘到下一次任务</div>
-            <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
-              夜校不是后台故事板；它应该把已完成任务里的经验变成下一次任务的检查清单。
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Link href={chatPromptHref("请从夜校里挑一条最有价值的经验，应用到我接下来的任务计划里，并列出需要验证的检查项。")}>
-              <Button size="sm" className="btn-accent">
-                <Send size={13} /> 带回 Chat
-              </Button>
-            </Link>
-            <Link href="/missions">
-              <Button size="sm" variant="outline">
-                <ClipboardList size={13} /> 看任务
-              </Button>
-            </Link>
-          </div>
-        </div>
-        <div className="mt-3 grid gap-2 md:grid-cols-4">
-          {workflowLoopItems.map((item) => (
-            <div key={item.title} className="rounded-md border p-3" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-surface)" }}>
-              <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>{item.title}</div>
-              <div className="mt-2 text-[11px] leading-5" style={{ color: "var(--yunque-text-muted)" }}>{item.body}</div>
-            </div>
-          ))}
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2 text-xs">
-          <Link href="/memory"><Button size="sm" variant="ghost">修正记忆画像</Button></Link>
-          <Link href="/trace"><Button size="sm" variant="ghost">查看执行轨迹</Button></Link>
-          <Link href="/packs/studio?packId=yunque.pack.night-school"><Button size="sm" variant="ghost">让小羽继续改</Button></Link>
-        </div>
-      </Card>
+      <div className="flex items-center gap-2 px-1">
+        <PackSectionTitle icon={<MoonStar size={15} />} tone="accent">夜间复盘 · 经验 · 画像</PackSectionTitle>
+      </div>
 
       {error ? (
-        <Card className="p-4" style={{ background: "rgba(239,68,68,0.05)" }}>
-          <div className="flex items-center gap-2">
-            <AlertTriangle size={16} style={{ color: "var(--yunque-danger)" }} />
-            <span className="text-sm" style={{ color: "var(--yunque-danger)" }}>
-              {error}
-            </span>
-          </div>
+        <Card variant="secondary">
+          <Card.Content className="flex items-center gap-2 text-sm text-danger">
+            <AlertTriangle size={16} /> {error}
+          </Card.Content>
         </Card>
       ) : null}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <DreamsColumn items={dreams} loading={loading} />
         <DistillColumn rules={rules} patterns={patterns} insights={insights} loading={loading} />
-        <TraitsColumn items={traits} loading={loading} />
+        <TraitsColumn items={traits} loading={loading} onForget={handleForget} forgetting={forgetting} />
       </div>
     </div>
   );

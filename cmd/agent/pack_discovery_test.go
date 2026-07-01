@@ -1,9 +1,25 @@
 package main
 
 import (
+	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 )
+
+// containsManifestSuffix reports whether any discovered path ends with the given
+// repo-relative manifest path. discoverBuiltinPackManifestPaths returns
+// OS-native, CWD-relative paths (e.g. "..\\..\\packs\\official\\backup-pack\\pack.json"
+// under `go test ./cmd/agent`), so we compare on slash-normalized suffixes rather
+// than exact, separator- and CWD-sensitive literals.
+func containsManifestSuffix(paths []string, want string) bool {
+	for _, p := range paths {
+		if strings.HasSuffix(filepath.ToSlash(p), want) {
+			return true
+		}
+	}
+	return false
+}
 
 // TestDiscoverBuiltinPackManifestPaths verifies Phase-A brick 1: builtin packs
 // are sourced from on-disk manifests under packs/official, the manual-install
@@ -66,12 +82,12 @@ func TestDiscoverBuiltinPackManifestPaths(t *testing.T) {
 		"packs/official/triggers-pack/pack.json",
 	}
 	for _, w := range want {
-		if !slices.Contains(paths, w) {
+		if !containsManifestSuffix(paths, w) {
 			t.Errorf("discovered paths missing %q; got %v", w, paths)
 		}
 	}
 
-	if slices.Contains(paths, "packs/official/dlc-demo-pack/pack.json") {
+	if containsManifestSuffix(paths, "packs/official/dlc-demo-pack/pack.json") {
 		t.Error("dlc-demo-pack must stay excluded from auto-discovery")
 	}
 

@@ -49,6 +49,8 @@ export interface NightSchoolPackClient {
   dreams(limit?: number): Promise<DreamsResponse>;
   distill(limit?: number): Promise<DistillResponse>;
   traits(limit?: number): Promise<TraitsResponse>;
+  /** Forget a learned trait the user disagrees with (persists on the server). */
+  forgetTrait(dimension: string, preference: string): Promise<{ ok: boolean }>;
 }
 
 function withLimit(path: string, limit?: number): string {
@@ -63,5 +65,9 @@ export function createNightSchoolPackClient(): NightSchoolPackClient {
     dreams: (limit) => fetcher<DreamsResponse>(withLimit("/v1/night-school/dreams", limit)),
     distill: (limit) => fetcher<DistillResponse>(withLimit("/v1/night-school/distill", limit)),
     traits: (limit) => fetcher<TraitsResponse>(withLimit("/v1/night-school/traits", limit)),
+    forgetTrait: (dimension, preference) => fetcher<{ ok: boolean }>("/v1/night-school/traits/forget", {
+      method: "POST",
+      body: JSON.stringify({ dimension, preference }),
+    }),
   };
 }

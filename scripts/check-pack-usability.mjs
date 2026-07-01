@@ -9,11 +9,9 @@ const repoRoot = resolve(import.meta.dirname, "..");
 const argv = parseArgs(process.argv.slice(2));
 const officialDir = resolveArgPath(argv["source-dir"] || "packs/official");
 const appDir = resolveArgPath(argv["app-dir"] || "apps/web/src/app");
-const surfaceGuidanceFile = resolveArgPath(argv["surface-guidance"] || "apps/web/src/lib/pack-surface-guidance.ts");
 const strict = argv.strict === true;
 const jsonReport = argv["json-report"] === true;
 const outputPath = typeof argv.output === "string" ? resolveArgPath(argv.output) : "";
-const surfaceGuidance = existsSync(surfaceGuidanceFile) ? readFileSync(surfaceGuidanceFile, "utf8") : "";
 
 const manifests = findPackManifests(officialDir)
   .map((manifestPath) => ({ manifestPath, manifest: readJson(manifestPath) }))
@@ -306,11 +304,12 @@ function auditPack({ manifestPath, manifest }) {
   if (
     metadata.usability === "infrastructure" &&
     metadata.internalOnly !== "true" &&
-    !surfaceGuidance.includes(String(manifest.id))
+    metadata.primaryActionPath &&
+    !appRouteExists(metadata.primaryActionPath)
   ) {
     issues.push({
-      code: "missing-surface-guidance",
-      message: "infrastructure pack should be explained on its consuming user surface",
+      code: "missing-infrastructure-primary-path-unreachable",
+      message: "infrastructure pack's primaryActionPath does not map to an existing app page or Chat entry",
       blocking: true,
     });
   }

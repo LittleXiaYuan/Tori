@@ -75,12 +75,13 @@ func TestPlannerCheckpointsListCompactByDefault(t *testing.T) {
 	if err := store.Save(context.Background(), planner.LongHorizonCheckpoint{
 		PlanID:      "plan-new",
 		TenantID:    tenant.ID,
+		SessionID:   "session-1",
 		TaskID:      "task-1",
 		Goal:        "继续推进云雀 planner",
 		Status:      "failed",
 		CurrentStep: 2,
 		Completed:   2,
-		Total:       4,
+		Total:       6,
 		Error:       strings.Repeat("err", 120),
 		Recoverable: true,
 		ResumeHint:  "可继续恢复",
@@ -109,7 +110,7 @@ func TestPlannerCheckpointsListCompactByDefault(t *testing.T) {
 		t.Fatalf("expected one checkpoint, got %+v", resp)
 	}
 	got := resp.Checkpoints[0]
-	if got.PlanID != "plan-new" || got.TaskID != "task-1" || got.Goal != "继续推进云雀 planner" || got.Status != "failed" {
+	if got.PlanID != "plan-new" || got.SessionID != "session-1" || got.TaskID != "task-1" || got.Goal != "继续推进云雀 planner" || got.Status != "failed" {
 		t.Fatalf("unexpected checkpoint summary: %+v", got)
 	}
 	if len(got.PlanSnapshot) != 0 {
@@ -924,6 +925,7 @@ func TestPlannerCheckpointResumePlanAsyncJobCanBePolled(t *testing.T) {
 	if err := store.Save(context.Background(), planner.LongHorizonCheckpoint{
 		PlanID:      "plan-async",
 		TenantID:    tenant.ID,
+		SessionID:   "session-async",
 		TaskID:      "task-async",
 		Goal:        "异步续跑 planner",
 		Status:      "failed",
@@ -951,6 +953,9 @@ func TestPlannerCheckpointResumePlanAsyncJobCanBePolled(t *testing.T) {
 	if accepted.JobID == "" || accepted.Status != "accepted" {
 		t.Fatalf("expected accepted job response, got %+v", accepted)
 	}
+	if accepted.Checkpoint.SessionID != "session-async" {
+		t.Fatalf("expected accepted response checkpoint session, got %+v", accepted.Checkpoint)
+	}
 
 	var jobResp plannerCheckpointResumePlanJobResponse
 	for i := 0; i < 20; i++ {
@@ -972,6 +977,9 @@ func TestPlannerCheckpointResumePlanAsyncJobCanBePolled(t *testing.T) {
 	if jobResp.Job.Status != "completed" || jobResp.Job.Result == nil || len(jobResp.Job.Result.Plan) != 1 {
 		t.Fatalf("expected completed async resume job, got %+v", jobResp.Job)
 	}
+	if jobResp.Job.SessionID != "session-async" {
+		t.Fatalf("expected async job to expose checkpoint session, got %+v", jobResp.Job)
+	}
 	if len(jobResp.Job.Events) == 0 {
 		t.Fatalf("expected async resume job events, got %+v", jobResp.Job)
 	}
@@ -979,7 +987,7 @@ func TestPlannerCheckpointResumePlanAsyncJobCanBePolled(t *testing.T) {
 		t.Fatalf("expected UI-safe event type and summary, got %+v", jobResp.Job.Events[0])
 	}
 	lastEvent := jobResp.Job.Events[len(jobResp.Job.Events)-1]
-	if lastEvent.Type != "planner.resume_plan_done" || !strings.Contains(lastEvent.Summary, "原规划续跑已完成") {
+	if lastEvent.Type != "planner.resume_plan_done" || lastEvent.SessionID != "session-async" || !strings.Contains(lastEvent.Summary, "原规划续跑已完成") {
 		t.Fatalf("expected terminal completion event, got %+v", lastEvent)
 	}
 }
@@ -1196,6 +1204,13 @@ func TestPlannerResumePlanJobEndpointSanitizesStoredRawFailure(t *testing.T) {
 		if !strings.Contains(w.Body.String(), "现场已保留") {
 			t.Fatalf("%s: expected actionable friendly recovery wording, got %s", path, w.Body.String())
 		}
+		var resp plannerCheckpointResumePlanJobResponse
+		if err := json.NewDecoder(strings.NewReader(w.Body.String())).Decode(&resp); err != nil {
+			t.Fatalf("%s: decode job response: %v", path, err)
+		}
+		if resp.Job.PrimaryTarget == nil || resp.Job.PrimaryTarget.Category != "provider" || resp.Job.PrimaryTarget.Href != "/settings/providers?tab=providers" {
+			t.Fatalf("%s: expected provider recovery target for stored failed job, got %+v", path, resp.Job.PrimaryTarget)
+		}
 	}
 }
 
@@ -1371,10 +1386,11 @@ func TestPlannerResumePlanJobPersistsAcrossGatewayInstances(t *testing.T) {
 		Action:     "continue",
 		TenantID:   "tenant-persist",
 		PlanID:     "plan-persist",
+		SessionID:  "session-persist",
 		StartedAt:  "2026-05-11T00:00:00Z",
 		FinishedAt: "2026-05-11T00:00:03Z",
 		Result:     &planner.PlanResult{Plan: []planner.PlanStep{{ID: 1, Action: "继续修复 Planner", Status: planner.StepDone}}},
-		Events:     []plannerCheckpointResumePlanJobEvent{{ID: "evt-persist", Type: "planner.tool_result", Summary: "恢复完成", Timestamp: "2026-05-11T00:00:02Z"}},
+		Events:     []plannerCheckpointResumePlanJobEvent{{ID: "evt-persist", Type: "planner.tool_result", Summary: "恢复完成", SessionID: "session-persist", Timestamp: "2026-05-11T00:00:02Z"}},
 	})
 
 	g2 := &Gateway{}
@@ -1386,10 +1402,13 @@ func TestPlannerResumePlanJobPersistsAcrossGatewayInstances(t *testing.T) {
 	if job.Status != "completed" || job.PlanID != "plan-persist" {
 		t.Fatalf("unexpected job: %+v", job)
 	}
+	if job.SessionID != "session-persist" {
+		t.Fatalf("persisted job session not restored: %+v", job)
+	}
 	if job.Result == nil || len(job.Result.Plan) != 1 || job.Result.Plan[0].Action != "继续修复 Planner" {
 		t.Fatalf("persisted result not restored: %+v", job.Result)
 	}
-	if len(job.Events) != 1 || job.Events[0].Summary != "恢复完成" {
+	if len(job.Events) != 1 || job.Events[0].Summary != "恢复完成" || job.Events[0].SessionID != "session-persist" {
 		t.Fatalf("persisted events not restored: %+v", job.Events)
 	}
 }
@@ -1439,6 +1458,7 @@ func TestPlannerExecutionStateUnifiesCheckpointLatestJobAndFailureSummary(t *tes
 	if err := store.Save(context.Background(), planner.LongHorizonCheckpoint{
 		PlanID:      "plan-state",
 		TenantID:    tenant.ID,
+		SessionID:   "session-state",
 		TaskID:      "task-state",
 		Goal:        "继续推进 Planner",
 		Status:      "failed",
@@ -1460,6 +1480,7 @@ func TestPlannerExecutionStateUnifiesCheckpointLatestJobAndFailureSummary(t *tes
 		Action:        "retry_failed",
 		TenantID:      tenant.ID,
 		PlanID:        "plan-state",
+		SessionID:     "session-state",
 		TaskID:        "task-state",
 		Error:         raw,
 		FriendlyError: raw,
@@ -1467,7 +1488,7 @@ func TestPlannerExecutionStateUnifiesCheckpointLatestJobAndFailureSummary(t *tes
 		NextAction:    "retry_failed",
 		StartedAt:     "2026-05-11T01:00:01Z",
 		FinishedAt:    "2026-05-11T01:00:02Z",
-		Events:        []plannerCheckpointResumePlanJobEvent{{ID: "evt-state", Type: "planner.tool_result", Summary: raw, Timestamp: "2026-05-11T01:00:02Z"}},
+		Events:        []plannerCheckpointResumePlanJobEvent{{ID: "evt-state", Type: "planner.tool_result", Summary: raw, SessionID: "session-state", Timestamp: "2026-05-11T01:00:02Z"}},
 		Result: &planner.PlanResult{Plan: []planner.PlanStep{
 			{ID: 0, Action: "读取技术蓝图", Skill: "file_open", Status: planner.StepDone, Result: "已读取 doc"},
 			{ID: 1, Action: "续跑失败步骤", Skill: "file_exec", Status: planner.StepFailed, Error: raw},
@@ -1491,14 +1512,27 @@ func TestPlannerExecutionStateUnifiesCheckpointLatestJobAndFailureSummary(t *tes
 	if resp.Checkpoint == nil || resp.Checkpoint.Error == "" || strings.Contains(resp.Checkpoint.Error, "context deadline exceeded") {
 		t.Fatalf("checkpoint should be present with friendly error, got %+v", resp.Checkpoint)
 	}
+	if resp.Checkpoint.SessionID != "session-state" {
+		t.Fatalf("execution-state checkpoint should expose session, got %+v", resp.Checkpoint)
+	}
 	if resp.LatestJob == nil || resp.LatestJob.ID != "resume-plan-state" || len(resp.Events) != 1 {
 		t.Fatalf("expected latest job and events, got job=%+v events=%+v", resp.LatestJob, resp.Events)
+	}
+	if resp.LatestJob.SessionID != "session-state" || resp.Events[0].SessionID != "session-state" {
+		t.Fatalf("execution-state should expose session on latest job and events, got job=%+v events=%+v", resp.LatestJob, resp.Events)
 	}
 	if resp.RecoveryPlan == nil || resp.RecoveryPlan.Mode != "retry_failed" || len(resp.RecoveryPlan.Steps) != 2 {
 		t.Fatalf("expected retry recovery plan, got %+v", resp.RecoveryPlan)
 	}
 	if resp.FailureSummary == nil || resp.FailureSummary.FailedCount != 1 || resp.FailureSummary.CompletedCount != 1 {
 		t.Fatalf("expected compact failure summary, got %+v", resp.FailureSummary)
+	}
+	if len(resp.FailureSummary.FailedSteps) != 1 {
+		t.Fatalf("expected structured failed step, got %+v", resp.FailureSummary)
+	}
+	failedStep := resp.FailureSummary.FailedSteps[0]
+	if failedStep.ID != 1 || failedStep.Skill != "file_exec" || failedStep.Action != "续跑失败步骤" || failedStep.Error == "" || failedStep.Recommendation == "" {
+		t.Fatalf("unexpected failed step recovery detail: %+v", failedStep)
 	}
 	encoded := strings.ToLower(responseBody)
 	for _, banned := range []string{"handoff agent", "execution failed", "context deadline exceeded", "all fallback", "eof", "api.moonshot.ai"} {
@@ -1508,6 +1542,173 @@ func TestPlannerExecutionStateUnifiesCheckpointLatestJobAndFailureSummary(t *tes
 	}
 	if !strings.Contains(responseBody, "现场") {
 		t.Fatalf("execution-state response should keep actionable friendly recovery wording, got %s", responseBody)
+	}
+}
+
+func TestPlannerExecutionStateAddsRecoveryTargetsForFailedSteps(t *testing.T) {
+	gw, tm := newTestGatewayMigrationEnabled()
+	tenant := tm.Register("planner-execution-state-targets")
+	store := planner.NewFileLongHorizonCheckpointStore(filepath.Join(t.TempDir(), "checkpoints.jsonl"))
+	gw.planner = planner.NewPlanner(nil, gw.registry, 8)
+	gw.planner.SetLongHorizonCheckpointStore(store)
+
+	if err := store.Save(context.Background(), planner.LongHorizonCheckpoint{
+		PlanID:      "plan-state-targets",
+		TenantID:    tenant.ID,
+		TaskID:      "task-state-targets",
+		Goal:        "验证恢复目标",
+		Status:      "failed",
+		Completed:   0,
+		Total:       8,
+		Recoverable: true,
+		UpdatedAt:   time.Date(2026, 5, 11, 4, 0, 0, 0, time.UTC),
+		PlanSnapshot: []planner.PlanStep{
+			{ID: 0, Action: "调用模型", Skill: "llm", Status: planner.StepFailed, Error: "all fallback LLM clients failed: EOF"},
+			{ID: 1, Action: "读取 GitHub issue", Skill: "github", Status: planner.StepFailed, Error: "connector github token expired"},
+			{ID: 2, Action: "打开浏览器", Skill: "browser", Status: planner.StepFailed, Error: "browser extension pairing lost"},
+			{ID: 3, Action: "等待前置步骤", Status: planner.StepFailed, Error: "dependency step 2 尚未完成"},
+			{ID: 4, Action: "调用缺失技能", Skill: "document_writer", Status: planner.StepFailed, Error: "unknown skill: document_writer"},
+			{ID: 5, Action: "调用缺失工具", Skill: "tool", Status: planner.StepFailed, Error: "未知工具：browser_extract"},
+			{ID: 6, Action: "操作桌面应用", Skill: "computer_use", Status: planner.StepFailed, Error: "desktop sandbox unavailable"},
+			{ID: 7, Action: "删除工作区文件", Skill: "shell", Status: planner.StepFailed, Error: "approval required before deleting workspace files"},
+		},
+	}); err != nil {
+		t.Fatalf("append checkpoint: %v", err)
+	}
+
+	req := authedRequest(http.MethodGet, "/v1/planner/execution-state?plan_id=plan-state-targets", "", tenant.APIKey)
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected execution-state 200, got %d body=%s", w.Code, w.Body.String())
+	}
+	var resp plannerExecutionStateResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.FailureSummary == nil || len(resp.FailureSummary.FailedSteps) != 8 {
+		t.Fatalf("expected failed step summary, got %+v", resp.FailureSummary)
+	}
+	if resp.FailureSummary.PrimaryTarget == nil || resp.FailureSummary.PrimaryTarget.Href != "/settings/providers?tab=providers" || resp.FailureSummary.PrimaryTarget.GroupKey != "provider|/settings/providers?tab=providers" {
+		t.Fatalf("expected provider primary target, got %+v", resp.FailureSummary.PrimaryTarget)
+	}
+	targets := map[int]*plannerExecutionStateRecoveryTarget{}
+	for _, step := range resp.FailureSummary.FailedSteps {
+		targets[step.ID] = step.RecoveryTarget
+	}
+	if targets[0] == nil || targets[0].Category != "provider" || targets[0].Href != "/settings/providers?tab=providers" || targets[0].GroupKey != "provider|/settings/providers?tab=providers" {
+		t.Fatalf("expected provider target for step 0, got %+v", targets[0])
+	}
+	if targets[1] == nil || targets[1].Category != "connector" || targets[1].Href != "/settings/connectors?focus=github" || targets[1].GroupKey != "connector|/settings/connectors?focus=github" {
+		t.Fatalf("expected focused connector target for step 1, got %+v", targets[1])
+	}
+	if targets[2] == nil || targets[2].Category != "browser" || targets[2].Href != "/packs/browser" || targets[2].GroupKey != "connector|/packs/browser" {
+		t.Fatalf("expected browser target for step 2, got %+v", targets[2])
+	}
+	if targets[3] == nil || targets[3].Category != "dependency" || targets[3].Href != "/planner-checkpoint?plan_id=plan-state-targets#dependency-view" || targets[3].GroupKey != "dependency|/planner-checkpoint?plan_id=plan-state-targets#dependency-view" {
+		t.Fatalf("expected dependency target for step 3, got %+v", targets[3])
+	}
+	if targets[4] == nil || targets[4].Category != "skill" || targets[4].Href != "/skills" || targets[4].GroupKey != "skill|/skills" {
+		t.Fatalf("expected skill target for step 4, got %+v", targets[4])
+	}
+	if targets[5] == nil || targets[5].Category != "tool" || targets[5].Href != "/tools" || targets[5].GroupKey != "tool|/tools" {
+		t.Fatalf("expected tool target for step 5, got %+v", targets[5])
+	}
+	if targets[6] == nil || targets[6].Category != "sandbox" || targets[6].Href != "/packs/computer-use" || targets[6].GroupKey != "sandbox|/packs/computer-use" {
+		t.Fatalf("expected sandbox target for step 6, got %+v", targets[6])
+	}
+	if targets[7] == nil || targets[7].Category != "approval" || targets[7].Href != "/approvals" || targets[7].GroupKey != "approval|/approvals" {
+		t.Fatalf("expected approval target for step 7, got %+v", targets[7])
+	}
+}
+
+func TestPlannerFailedStepRecoveryTargetPrefersUnknownToolOverBrowserName(t *testing.T) {
+	target := plannerFailedStepRecoveryTarget("", planner.PlanStep{
+		Action: "Run missing tool",
+		Skill:  "tool",
+		Status: planner.StepFailed,
+		Error:  "unknown tool: browser_extract",
+	})
+	if target == nil || target.Category != "tool" || target.Href != "/tools" {
+		t.Fatalf("expected unknown browser-named tool to target tools, got %+v", target)
+	}
+}
+
+func TestPlannerFailedStepRecoveryTargetRoutesAllowlistToConnectors(t *testing.T) {
+	target := plannerFailedStepRecoveryTarget("", planner.PlanStep{
+		Action: "Run create_issue",
+		Skill:  "workspace_action",
+		Status: planner.StepFailed,
+		Error:  "allowlist denied for create_issue",
+	})
+	if target == nil || target.Category != "connector" || target.Href != "/settings/connectors" {
+		t.Fatalf("expected allowlist failure to target connectors, got %+v", target)
+	}
+}
+
+func TestPlannerFailedStepRecoveryTargetDoesNotTreatAuthFailuresAsApproval(t *testing.T) {
+	tests := []struct {
+		name         string
+		step         planner.PlanStep
+		wantCategory string
+		wantHref     string
+	}{
+		{
+			name: "connector forbidden",
+			step: planner.PlanStep{
+				Action: "Read GitHub issue",
+				Skill:  "github",
+				Status: planner.StepFailed,
+				Error:  "connector github returned 403 forbidden: token lacks repository scope",
+			},
+			wantCategory: "connector",
+			wantHref:     "/settings/connectors?focus=github",
+		},
+		{
+			name: "provider forbidden",
+			step: planner.PlanStep{
+				Action: "Call model",
+				Skill:  "llm",
+				Status: planner.StepFailed,
+				Error:  "OpenAI provider returned 403 forbidden",
+			},
+			wantCategory: "provider",
+			wantHref:     "/settings/providers?tab=providers",
+		},
+		{
+			name: "provider forbidden with explicit id",
+			step: planner.PlanStep{
+				Action: "Call model",
+				Skill:  "llm",
+				Status: planner.StepFailed,
+				Error:  "provider_id=qwen-backup returned 403 forbidden",
+			},
+			wantCategory: "provider",
+			wantHref:     "/settings/providers?focus=qwen-backup",
+		},
+		{
+			name: "real approval",
+			step: planner.PlanStep{
+				Action: "Delete workspace file",
+				Skill:  "shell",
+				Status: planner.StepFailed,
+				Error:  "approval required before deleting workspace files",
+			},
+			wantCategory: "approval",
+			wantHref:     "/approvals",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			target := plannerFailedStepRecoveryTarget("", tt.step)
+			if target == nil || target.Category != tt.wantCategory || target.Href != tt.wantHref {
+				t.Fatalf("target=%+v, want category=%s href=%s", target, tt.wantCategory, tt.wantHref)
+			}
+			if target.GroupKey == "" {
+				t.Fatalf("target missing group key: %+v", target)
+			}
+		})
 	}
 }
 

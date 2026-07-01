@@ -2,27 +2,40 @@ package planner
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 )
 
 // PlannerFailureSummary is a compact, user-visible recovery note generated
 // when the planner has enough evidence that it is repeating a failing path.
 type PlannerFailureSummary struct {
-	FailedCount    int      `json:"failed_count"`
-	CompletedCount int      `json:"completed_count,omitempty"`
-	FailedTools    []string `json:"failed_tools,omitempty"`
-	Tried          []string `json:"tried,omitempty"`
-	RuledOut       []string `json:"ruled_out,omitempty"`
-	FailurePattern string   `json:"failure_pattern,omitempty"`
-	Recommendation string   `json:"recommendation,omitempty"`
-	NextStep       string   `json:"next_step"`
-	Recoverable    bool     `json:"recoverable"`
+	FailedCount    int                    `json:"failed_count"`
+	CompletedCount int                    `json:"completed_count,omitempty"`
+	FailedTools    []string               `json:"failed_tools,omitempty"`
+	Tried          []string               `json:"tried,omitempty"`
+	RuledOut       []string               `json:"ruled_out,omitempty"`
+	FailurePattern string                 `json:"failure_pattern,omitempty"`
+	Recommendation string                 `json:"recommendation,omitempty"`
+	NextStep       string                 `json:"next_step"`
+	Recoverable    bool                   `json:"recoverable"`
+	PrimaryTarget  *PlannerRecoveryTarget `json:"primary_target,omitempty"`
+}
+
+type PlannerRecoveryTarget struct {
+	Category string `json:"category"`
+	Label    string `json:"label"`
+	Href     string `json:"href,omitempty"`
+	Action   string `json:"action,omitempty"`
 }
 
 type plannerFailureBucket string
 
 const (
 	failureBucketTimeout    plannerFailureBucket = "timeout_or_connection"
+	failureBucketProvider   plannerFailureBucket = "provider_unavailable"
+	failureBucketConnector  plannerFailureBucket = "connector_unavailable"
+	failureBucketBrowser    plannerFailureBucket = "browser_unavailable"
+	failureBucketSkill      plannerFailureBucket = "skill_unavailable"
 	failureBucketTool       plannerFailureBucket = "tool_unavailable"
 	failureBucketPath       plannerFailureBucket = "path_or_file_error"
 	failureBucketTrust      plannerFailureBucket = "needs_confirmation"
@@ -72,7 +85,9 @@ func buildPlannerFailureSummary(steps []PlanStep) (PlannerFailureSummary, bool) 
 	if summary.FailedCount < 2 {
 		return summary, false
 	}
-	summary.FailurePattern, summary.Recommendation = summarizePlannerFailurePattern(buckets, summary.FailedTools)
+	dominant := dominantPlannerFailureBucket(buckets)
+	summary.FailurePattern, summary.Recommendation = summarizePlannerFailurePattern(dominant, summary.FailedTools)
+	summary.PrimaryTarget = plannerRecoveryTargetForFailureBucket(dominant, steps)
 	summary.NextStep = summary.Recommendation
 	if summary.NextStep == "" {
 		summary.NextStep = "停止重复失败路径，换一个工具、降低任务粒度，或先汇总已获得证据再继续。"
@@ -89,8 +104,22 @@ func classifyPlannerFailure(rawErr string) plannerFailureBucket {
 		strings.Contains(normalized, "not under allowed"),
 		strings.Contains(normalized, "permission denied"):
 		return failureBucketTool
-	case strings.Contains(normalized, "unknown skill"), strings.Contains(normalized, "allowed tool surface"):
+	case strings.Contains(normalized, "unknown tool"),
+		strings.Contains(normalized, "allowed tool surface"),
+		strings.Contains(normalized, "unknown skill") && strings.Contains(normalized, "_tool"):
 		return failureBucketTool
+	case strings.Contains(normalized, "unknown skill"),
+		strings.Contains(normalized, "missing skill"),
+		strings.Contains(normalized, "skill not found"),
+		strings.Contains(normalized, "skill growth disabled"),
+		strings.Contains(normalized, "no skill providers configured"):
+		return failureBucketSkill
+	case plannerFailureMentionsBrowserRecovery(normalized):
+		return failureBucketBrowser
+	case plannerFailureMentionsConnectorRecovery(normalized):
+		return failureBucketConnector
+	case plannerFailureMentionsProviderRecovery(normalized):
+		return failureBucketProvider
 	case strings.Contains(normalized, "no such file"),
 		strings.Contains(normalized, "file not found"),
 		strings.Contains(normalized, "cannot find"),
@@ -126,9 +155,116 @@ func classifyPlannerFailure(rawErr string) plannerFailureBucket {
 	}
 }
 
-func summarizePlannerFailurePattern(buckets map[plannerFailureBucket]int, failedTools []string) (string, string) {
+func plannerFailureMentionsBrowserRecovery(normalized string) bool {
+	return strings.Contains(normalized, "browser extension") ||
+		strings.Contains(normalized, "browser pairing") ||
+		strings.Contains(normalized, "extension pairing") ||
+		strings.Contains(normalized, "browser not paired") ||
+		strings.Contains(normalized, "browser pack") ||
+		strings.Contains(normalized, "chrome extension") ||
+		strings.Contains(normalized, "浏览器扩展") ||
+		strings.Contains(normalized, "浏览器配对")
+}
+
+func plannerFailureMentionsConnectorRecovery(normalized string) bool {
+	if strings.Contains(normalized, "allowlist") || strings.Contains(normalized, "allow-list") {
+		return true
+	}
+	if !strings.Contains(normalized, "connector") && plannerFailureConnectorID(normalized) == "" {
+		return false
+	}
+	return plannerFailureMentionsConnectorFailureWord(normalized)
+}
+
+func plannerFailureMentionsConnectorFailureWord(normalized string) bool {
+	return strings.Contains(normalized, "oauth") ||
+		strings.Contains(normalized, "credential") ||
+		strings.Contains(normalized, "unauthorized") ||
+		strings.Contains(normalized, "forbidden") ||
+		strings.Contains(normalized, "authentication") ||
+		strings.Contains(normalized, "authorization") ||
+		strings.Contains(normalized, "token expired") ||
+		strings.Contains(normalized, "invalid token") ||
+		strings.Contains(normalized, "rate limit") ||
+		strings.Contains(normalized, "429") ||
+		strings.Contains(normalized, "upstream") ||
+		strings.Contains(normalized, "expired") ||
+		strings.Contains(normalized, "denied") ||
+		strings.Contains(normalized, "failed") ||
+		strings.Contains(normalized, "unavailable")
+}
+
+func plannerFailureConnectorID(normalized string) string {
+	for _, id := range []string{"github", "gmail", "google_calendar", "calendar", "slack", "notion", "linear", "jira"} {
+		if strings.Contains(normalized, id) {
+			if id == "calendar" {
+				return "google_calendar"
+			}
+			return id
+		}
+	}
+	return ""
+}
+
+func plannerFailureMentionsProviderRecovery(normalized string) bool {
+	providerTerm := strings.Contains(normalized, "provider") ||
+		strings.Contains(normalized, "model") ||
+		strings.Contains(normalized, "llm") ||
+		strings.Contains(normalized, "openai") ||
+		strings.Contains(normalized, "qwen") ||
+		strings.Contains(normalized, "moonshot") ||
+		strings.Contains(normalized, "api key") ||
+		strings.Contains(normalized, "apikey") ||
+		strings.Contains(normalized, "模型") ||
+		strings.Contains(normalized, "供应商") ||
+		strings.Contains(normalized, "密钥")
+	if !providerTerm {
+		return false
+	}
+	return strings.Contains(normalized, "401") ||
+		strings.Contains(normalized, "402") ||
+		strings.Contains(normalized, "403") ||
+		strings.Contains(normalized, "429") ||
+		strings.Contains(normalized, "unauthorized") ||
+		strings.Contains(normalized, "forbidden") ||
+		strings.Contains(normalized, "invalid authentication") ||
+		strings.Contains(normalized, "authentication fails") ||
+		strings.Contains(normalized, "invalid api key") ||
+		strings.Contains(normalized, "quota") ||
+		strings.Contains(normalized, "rate limit") ||
+		strings.Contains(normalized, "too many requests") ||
+		strings.Contains(normalized, "balance") ||
+		strings.Contains(normalized, "billing") ||
+		strings.Contains(normalized, "payment") ||
+		strings.Contains(normalized, "认证") ||
+		strings.Contains(normalized, "鉴权") ||
+		strings.Contains(normalized, "余额") ||
+		strings.Contains(normalized, "额度") ||
+		strings.Contains(normalized, "限流") ||
+		strings.Contains(normalized, "欠费")
+}
+
+func plannerFailureConnectorIDFromSteps(steps []PlanStep) string {
+	for _, step := range steps {
+		text := strings.ToLower(strings.Join([]string{step.Error, step.Action, step.Skill}, " "))
+		if id := plannerFailureConnectorID(text); id != "" {
+			return id
+		}
+	}
+	return ""
+}
+
+func plannerConnectorRecoveryHref(connectorID string) string {
+	connectorID = strings.TrimSpace(connectorID)
+	if connectorID == "" {
+		return "/settings/connectors"
+	}
+	return "/settings/connectors?focus=" + url.QueryEscape(connectorID)
+}
+
+func dominantPlannerFailureBucket(buckets map[plannerFailureBucket]int) plannerFailureBucket {
 	if len(buckets) == 0 {
-		return "重复失败路径", "停止重复失败路径，换一个工具、降低任务粒度，或先汇总已获得证据再继续。"
+		return failureBucketRepeated
 	}
 	var dominant plannerFailureBucket
 	dominantCount := -1
@@ -138,6 +274,10 @@ func summarizePlannerFailurePattern(buckets map[plannerFailureBucket]int, failed
 			dominantCount = count
 		}
 	}
+	return dominant
+}
+
+func summarizePlannerFailurePattern(dominant plannerFailureBucket, failedTools []string) (string, string) {
 	toolHint := ""
 	if len(failedTools) > 0 {
 		toolHint = "，暂不重复使用 " + strings.Join(failedTools, "、")
@@ -145,6 +285,14 @@ func summarizePlannerFailurePattern(buckets map[plannerFailureBucket]int, failed
 	switch dominant {
 	case failureBucketTimeout:
 		return "模型或子任务响应不稳定", "先返回阶段结果或切为后台任务；继续时降低任务粒度" + toolHint + "。"
+	case failureBucketProvider:
+		return "模型供应商不可用", "先检查模型密钥、额度、限流或供应商配置，再继续执行失败步骤" + toolHint + "。"
+	case failureBucketConnector:
+		return "连接器不可用", "先修复连接器授权、allowlist 或限流，再继续执行失败步骤" + toolHint + "。"
+	case failureBucketBrowser:
+		return "浏览器连接不可用", "先恢复浏览器扩展配对或打开浏览器包，再继续执行失败步骤" + toolHint + "。"
+	case failureBucketSkill:
+		return "所需技能不可用", "先安装、启用或替换技能，再继续执行失败步骤" + toolHint + "。"
 	case failureBucketTool:
 		return "所需工具不可用或不在当前工具范围", "改用当前可用工具，或先请求开放/替换工具后再继续。"
 	case failureBucketPath:
@@ -160,22 +308,85 @@ func summarizePlannerFailurePattern(buckets map[plannerFailureBucket]int, failed
 	}
 }
 
+func plannerRecoveryTargetForFailureBucket(bucket plannerFailureBucket, steps []PlanStep) *PlannerRecoveryTarget {
+	switch bucket {
+	case failureBucketTimeout, failureBucketProvider:
+		return &PlannerRecoveryTarget{
+			Category: "provider",
+			Label:    "检查模型供应商",
+			Href:     "/settings/providers?tab=providers",
+			Action:   "open_provider_settings",
+		}
+	case failureBucketConnector:
+		return &PlannerRecoveryTarget{
+			Category: "connector",
+			Label:    "修复连接器",
+			Href:     plannerConnectorRecoveryHref(plannerFailureConnectorIDFromSteps(steps)),
+			Action:   "repair_connector",
+		}
+	case failureBucketBrowser:
+		return &PlannerRecoveryTarget{
+			Category: "browser",
+			Label:    "打开浏览器包",
+			Href:     "/packs/browser",
+			Action:   "repair_browser",
+		}
+	case failureBucketSkill:
+		return &PlannerRecoveryTarget{
+			Category: "skill",
+			Label:    "检查技能",
+			Href:     "/skills",
+			Action:   "repair_skill",
+		}
+	case failureBucketTool, failureBucketRuntime:
+		return &PlannerRecoveryTarget{
+			Category: "tool",
+			Label:    "检查工具",
+			Href:     "/tools",
+			Action:   "repair_tool",
+		}
+	case failureBucketTrust:
+		return &PlannerRecoveryTarget{
+			Category: "approval",
+			Label:    "处理审批",
+			Href:     "/approvals",
+			Action:   "open_approvals",
+		}
+	case failureBucketDependency:
+		return &PlannerRecoveryTarget{
+			Category: "dependency",
+			Label:    "查看依赖关系",
+			Action:   "inspect_dependencies",
+		}
+	default:
+		return nil
+	}
+}
+
 func plannerFailureBucketPriority(bucket plannerFailureBucket) int {
 	switch bucket {
 	case failureBucketTimeout:
 		return 0
-	case failureBucketTool:
+	case failureBucketProvider:
 		return 1
-	case failureBucketPath:
+	case failureBucketConnector:
 		return 2
-	case failureBucketTrust:
+	case failureBucketBrowser:
 		return 3
-	case failureBucketDependency:
+	case failureBucketSkill:
 		return 4
-	case failureBucketRuntime:
+	case failureBucketTool:
 		return 5
-	default:
+	case failureBucketPath:
+		return 6
+	case failureBucketTrust:
+		return 7
+	case failureBucketDependency:
+		return 8
+	case failureBucketRuntime:
 		return 9
+	default:
+		return 10
 	}
 }
 
@@ -189,6 +400,18 @@ func buildToolFailureDiagnostic(rawErr string) ToolFailureDiagnostic {
 	case failureBucketTimeout:
 		d.Cause = "等待时间过长或连接中断"
 		d.NextStep = "稍后重试、缩小输入范围，或改为后台任务。"
+	case failureBucketProvider:
+		d.Cause = "模型供应商认证、额度、限流或配置不可用"
+		d.NextStep = "先检查模型密钥、额度、限流或供应商配置，再继续失败步骤。"
+	case failureBucketConnector:
+		d.Cause = "连接器授权、allowlist、限流或上游服务不可用"
+		d.NextStep = "先修复连接器，再重试失败步骤。"
+	case failureBucketBrowser:
+		d.Cause = "浏览器扩展、配对或远控入口不可用"
+		d.NextStep = "先打开浏览器包并恢复配对，再继续任务。"
+	case failureBucketSkill:
+		d.Cause = "技能不可用或尚未安装"
+		d.NextStep = "先安装、启用或替换技能后继续。"
 	case failureBucketTool:
 		d.Cause = "工具不可用或访问范围不足"
 		d.NextStep = "改用当前可用工具，或先开放/替换工具后继续。"

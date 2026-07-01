@@ -4,15 +4,14 @@ import { Suspense, useEffect, useState, useCallback } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import AccountRail from "@/components/layout/account-rail";
 import AuthGuard from "@/components/auth-guard";
-import { Toaster } from "@/components/toast-provider";
+import { showToast, Toaster } from "@/components/toast-provider";
+import { ConfirmDialogProvider } from "@/components/confirm-dialog";
 import CommandPalette from "@/components/command-palette";
 import { CherrySettingsModal } from "@/components/cherry/settings-modal";
-import { FloatingWidget } from "@/components/floating-widget";
-import { OnboardingGuide } from "@/components/onboarding-guide";
 import { SelectionToolbar } from "@/components/selection-toolbar";
 import ServiceConnectionGuard from "@/components/service-connection-guard";
 import { I18nProvider } from "@/lib/i18n";
-import { DragRegion } from "@/components/title-bar";
+import { AppTitleBar } from "@/components/layout/app-title-bar";
 
 const NO_SIDEBAR_PATHS = ["/login", "/setup"];
 const BARE_PATHS = ["/selection-popup"];
@@ -63,16 +62,58 @@ function useSystemThemeBridge(): void {
   }, []);
 }
 
+function useFontScaleBridge(): void {
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const apply = () => {
+      try {
+        const raw = localStorage.getItem("yunque_user_preferences");
+        if (!raw) {
+          document.documentElement.style.setProperty("--font-scale", "1");
+          return;
+        }
+        const parsed = JSON.parse(raw);
+        const fontSize = parsed?.interface?.fontSize || "default";
+        const scaleMap: Record<string, string> = {
+          "small": "0.9",
+          "default": "1",
+          "large": "1.15"
+        };
+        document.documentElement.style.setProperty("--font-scale", scaleMap[fontSize] || "1");
+      } catch {
+        document.documentElement.style.setProperty("--font-scale", "1");
+      }
+    };
+    apply();
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "yunque_user_preferences") apply();
+    };
+    window.addEventListener("storage", onStorage);
+    // Custom event for immediate cross-component sync
+    window.addEventListener("yunque:preferences-updated", apply);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("yunque:preferences-updated", apply);
+    };
+  }, []);
+}
+
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   useSystemThemeBridge();
+  useFontScaleBridge();
 
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsSection, setSettingsSection] = useState<string | undefined>(undefined);
   const [zenMode, setZenMode] = useState(false);
 
   useEffect(() => {
-    const handler = () => setSettingsOpen(true);
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { section?: string } | undefined;
+      setSettingsSection(detail?.section);
+      setSettingsOpen(true);
+    };
     window.addEventListener("yunque:open-settings", handler);
     const zenOn = () => setZenMode(true);
     const zenOff = () => setZenMode(false);
@@ -85,6 +126,31 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       window.removeEventListener("yunque:zen-on", zenOn);
       window.removeEventListener("yunque:zen-off", zenOff);
       window.removeEventListener("yunque:zen-toggle", zenToggle);
+    };
+  }, []);
+
+  useEffect(() => {
+    let unlistenTray: (() => void) | undefined;
+    let unlistenReady: (() => void) | undefined;
+    let unlistenError: (() => void) | undefined;
+    void import("@tauri-apps/api/event")
+      .then(async ({ listen }) => {
+        unlistenTray = await listen("yunque:window-hidden-to-tray", () => {
+          showToast("云雀仍在托盘运行，可点击托盘图标重新打开。", "info");
+        });
+        unlistenReady = await listen<{ port?: number }>("backend:ready", (event) => {
+          const port = event.payload?.port;
+          showToast(port ? `本地后端已就绪：127.0.0.1:${port}` : "本地后端已就绪", "success");
+        });
+        unlistenError = await listen<{ message?: string }>("backend:error", (event) => {
+          showToast(event.payload?.message || "本地后端启动异常，可在连接页重试。", "error");
+        });
+      })
+      .catch(() => {});
+    return () => {
+      unlistenTray?.();
+      unlistenReady?.();
+      unlistenError?.();
     };
   }, []);
 
@@ -105,23 +171,25 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const onAuthPath = NO_SIDEBAR_PATHS.some((path) => pathname?.startsWith(path));
   const onBarePath = BARE_PATHS.some((path) => pathname?.startsWith(path));
-  const showFloatingWidget = !onAuthPath && pathname !== "/chat" && !pathname?.startsWith("/chat/");
 
   if (onBarePath) return <>{children}</>;
 
   return (
     <I18nProvider>
-      <DragRegion />
       <ServiceConnectionGuard>
         <AuthGuard>
+        {/* Unified full-width title bar (frameless window): brand left,
+            theme + settings + window controls right. All columns sit below
+            it so the chrome reads as one app surface (QQ/Cherry-style). */}
+        <AppTitleBar />
         {!onAuthPath && (
           <div style={{
             width: zenMode ? 0 : "var(--rail-w, 64px)",
             minWidth: zenMode ? 0 : "var(--rail-w, 64px)",
-            height: "100vh",
+            height: "calc(100vh - var(--titlebar-h, 32px))",
             position: "fixed",
             left: 0,
-            top: 0,
+            top: "var(--titlebar-h, 32px)",
             overflow: "hidden",
             transition: "width 0.3s cubic-bezier(.22,1,.36,1), min-width 0.3s cubic-bezier(.22,1,.36,1)",
             zIndex: 100,
@@ -129,9 +197,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <AccountRail />
           </div>
         )}
-        <main id="main-content" className="flex min-h-screen flex-1 flex-col overflow-hidden" style={{
+        <main id="main-content" className="flex flex-1 flex-col overflow-hidden" style={{
           opacity: "var(--yunque-content-opacity, 1)",
           marginLeft: !onAuthPath && !zenMode ? "var(--rail-w, 64px)" : 0,
+          height: "calc(100vh - var(--titlebar-h, 32px))",
+          marginTop: "var(--titlebar-h, 32px)",
           transition: "margin-left 0.3s cubic-bezier(.22,1,.36,1)",
         }}>
           <Suspense fallback={<PageFallback />}>
@@ -139,15 +209,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </Suspense>
         </main>
         <Toaster />
+        <ConfirmDialogProvider />
         {!onAuthPath && <CommandPalette />}
         {!onAuthPath && (
           <CherrySettingsModal
             open={settingsOpen}
             onClose={() => setSettingsOpen(false)}
+            initialSection={settingsSection as never}
           />
         )}
-        {showFloatingWidget && <FloatingWidget />}
-        {!onAuthPath && <OnboardingGuide />}
         {!onAuthPath && <SelectionToolbar onAction={handleSelectionAction} />}
         </AuthGuard>
       </ServiceConnectionGuard>

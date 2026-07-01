@@ -15,17 +15,17 @@ import (
 func TestDelegationRuntimeServiceHandoffBoundary(t *testing.T) {
 	mgr := subagent.NewManager()
 	reg := subagent.NewHandoffRegistry(mgr)
-	reg.SetRunFunc(func(_ context.Context, agentName, input, providerOverride string) (string, error) {
-		if agentName != "research" {
-			t.Fatalf("unexpected agent %q", agentName)
-		}
-		if input != "collect evidence" {
-			t.Fatalf("unexpected input %q", input)
-		}
-		if providerOverride != "smart" {
+	reg.SetRunFunc(func(_ context.Context, agentName, input, providerOverride string) (string, string, error) {
+	  if agentName != "research" {
+	   t.Fatalf("unexpected agent %q", agentName)
+	  }
+	  if input != "collect evidence" {
+	   t.Fatalf("unexpected input %q", input)
+	  }
+	  if providerOverride != "smart" {
 			t.Fatalf("unexpected provider override %q", providerOverride)
 		}
-		return "handoff done", nil
+		return "handoff done", "", nil
 	})
 	if err := reg.Register(subagent.HandoffConfig{Name: "research", Description: "research agent"}); err != nil {
 		t.Fatalf("register handoff: %v", err)
@@ -55,14 +55,14 @@ func TestDelegationRuntimeServiceHandoffBoundary(t *testing.T) {
 func TestDelegationRuntimeServiceExecuteHandoffForRequestEmitsEventsAndHooks(t *testing.T) {
 	mgr := subagent.NewManager()
 	reg := subagent.NewHandoffRegistry(mgr)
-	reg.SetRunFunc(func(_ context.Context, agentName, input, providerOverride string) (string, error) {
+	reg.SetRunFunc(func(_ context.Context, agentName, input, providerOverride string) (string, string, error) {
 		if agentName != "research" || input != "collect evidence" || providerOverride != "smart" {
 			t.Fatalf("unexpected handoff call agent=%q input=%q provider=%q", agentName, input, providerOverride)
 		}
 		if StepCallbackFromCtx(context.Background()) != nil {
 			t.Fatal("empty context should not contain callback")
 		}
-		return "handoff done", nil
+		return "handoff done", "", nil
 	})
 	if err := reg.Register(subagent.HandoffConfig{Name: "research", Description: "research agent"}); err != nil {
 		t.Fatalf("register handoff: %v", err)
@@ -78,6 +78,8 @@ func TestDelegationRuntimeServiceExecuteHandoffForRequestEmitsEventsAndHooks(t *
 		context.Background(),
 		PlanRequest{
 			TenantID:      "tenant-a",
+			SessionID:     "session-a",
+			TaskID:        "task-a",
 			TraceID:       "trace-a",
 			ModelOverride: "smart",
 			StepCallback:  func(evt observe.AgentEvent) { events = append(events, evt) },
@@ -115,8 +117,11 @@ func TestDelegationRuntimeServiceExecuteHandoffForRequestEmitsEventsAndHooks(t *
 	if events[0].Type != observe.EventHandoffStart || events[1].Type != observe.EventHandoffDone {
 		t.Fatalf("unexpected event types %q %q", events[0].Type, events[1].Type)
 	}
-	if events[0].Meta.TenantID != "tenant-a" || events[0].Meta.Skill != "research" {
+	if events[0].Meta.TenantID != "tenant-a" || events[0].Meta.SessionID != "session-a" || events[0].Meta.TaskID != "task-a" || events[0].Meta.Skill != "research" {
 		t.Fatalf("unexpected start metadata %#v", events[0].Meta)
+	}
+	if events[1].Meta.TenantID != "tenant-a" || events[1].Meta.SessionID != "session-a" || events[1].Meta.TaskID != "task-a" || events[1].Meta.Skill != "research" {
+		t.Fatalf("unexpected done metadata %#v", events[1].Meta)
 	}
 	if detail, ok := events[1].Detail.(observe.HandoffDetail); !ok || detail.Reply != "handoff done" || detail.Agent != "research" {
 		t.Fatalf("unexpected done detail %#v", events[1].Detail)
@@ -126,12 +131,12 @@ func TestDelegationRuntimeServiceExecuteHandoffForRequestEmitsEventsAndHooks(t *
 func TestDelegationRuntimeServiceExecuteHandoffForRequestUsesFirstStringArgAndFailureDetail(t *testing.T) {
 	mgr := subagent.NewManager()
 	reg := subagent.NewHandoffRegistry(mgr)
-	reg.SetRunFunc(func(_ context.Context, _ string, input, _ string) (string, error) {
-		if input != "fallback input" {
-			t.Fatalf("expected fallback input, got %q", input)
-		}
-		return "", context.DeadlineExceeded
-	})
+	reg.SetRunFunc(func(_ context.Context, _ string, input, _ string) (string, string, error) {
+	  if input != "fallback input" {
+	   t.Fatalf("expected fallback input, got %q", input)
+	  }
+	  return "", "", context.DeadlineExceeded
+	 })
 	if err := reg.Register(subagent.HandoffConfig{Name: "research"}); err != nil {
 		t.Fatalf("register handoff: %v", err)
 	}

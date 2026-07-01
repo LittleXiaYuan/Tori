@@ -81,7 +81,7 @@ export function BrowserSessionCard({
   const statusStyle = takeover
     ? { background: "rgba(245,158,11,0.12)", color: "#f59e0b" }
     : connected
-      ? { background: "rgba(59,130,246,0.12)", color: "#60a5fa" }
+      ? { background: "var(--yunque-accent-muted)", color: "var(--yunque-accent)" }
       : { background: "rgba(248,113,113,0.12)", color: "#f87171" };
   const statusHint = takeover
     ? "You are currently controlling the browser. Resume when you want the agent to continue."
@@ -94,8 +94,8 @@ export function BrowserSessionCard({
     : notice?.tone === "warning"
       ? { background: "rgba(245,158,11,0.12)", color: "#fbbf24" }
       : notice?.tone === "success"
-        ? { background: "rgba(34,197,94,0.12)", color: "#86efac" }
-        : { background: "rgba(59,130,246,0.12)", color: "#93c5fd" };
+      ? { background: "rgba(34,197,94,0.12)", color: "#86efac" }
+        : { background: "var(--yunque-accent-muted)", color: "var(--yunque-accent)" };
 
   const updatedLabel = session?.updatedAt ? new Date(session.updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
   const artifactUpdatedLabel = artifact?.updatedAt ? new Date(artifact.updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
@@ -106,8 +106,8 @@ export function BrowserSessionCard({
       style={{
         background: takeover
           ? "linear-gradient(180deg, rgba(245,158,11,0.12), rgba(245,158,11,0.04))"
-          : "linear-gradient(180deg, rgba(59,130,246,0.1), rgba(59,130,246,0.03))",
-        borderColor: takeover ? "rgba(245,158,11,0.22)" : "rgba(59,130,246,0.18)",
+          : "linear-gradient(180deg, var(--yunque-accent-muted), var(--yunque-accent-soft))",
+        borderColor: takeover ? "rgba(245,158,11,0.22)" : "var(--yunque-accent-muted)",
       }}
     >
       <div className={`flex ${compact ? "flex-col gap-2" : "flex-col gap-3 md:flex-row md:items-start md:justify-between"}`}>
@@ -115,9 +115,9 @@ export function BrowserSessionCard({
           <div className="flex flex-wrap items-center gap-2">
             <div
               className="flex h-8 w-8 items-center justify-center rounded-2xl"
-              style={{ background: takeover ? "rgba(245,158,11,0.14)" : "rgba(59,130,246,0.14)" }}
+              style={{ background: takeover ? "rgba(245,158,11,0.14)" : "var(--yunque-accent-muted)" }}
             >
-              {takeover ? <AlertTriangle size={14} style={{ color: "#f59e0b" }} /> : <Monitor size={14} style={{ color: "#60a5fa" }} />}
+              {takeover ? <AlertTriangle size={14} style={{ color: "#f59e0b" }} /> : <Monitor size={14} style={{ color: "var(--yunque-accent)" }} />}
             </div>
             <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>{t("browser.runtime")}</div>
             <Chip size="sm" style={{ ...statusStyle, fontSize: "var(--text-2xs)", transition: "all var(--duration-base) ease" }}>{statusLabel}</Chip>
@@ -151,7 +151,7 @@ export function BrowserSessionCard({
             <div className={`animate-content-fade interactive-preview-panel mt-3 border ${compact ? "rounded-[16px] px-2.5 py-2" : "rounded-2xl px-3 py-2.5"}`} style={{ background: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.06)" }}>
               <div className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: "var(--yunque-text-muted)" }}>{t("browser.latest")}</div>
               <div className={`mt-2 flex flex-wrap items-center ${compact ? "gap-1.5" : "gap-2"} text-[11px]`} style={{ color: "var(--yunque-text-secondary)" }}>
-                {artifact.action && <span className="rounded-full px-2 py-1" style={{ background: "rgba(59,130,246,0.12)", color: "#93c5fd" }}>{browserActionLabel(artifact.action)}</span>}
+                {artifact.action && <span className="rounded-full px-2 py-1" style={{ background: "var(--yunque-accent-muted)", color: "var(--yunque-accent)" }}>{browserActionLabel(artifact.action)}</span>}
                 {typeof artifact.elementCount === "number" && <span className="rounded-full px-2 py-1" style={{ background: "rgba(255,255,255,0.05)" }}>{artifact.elementCount} {t("browser.elements")}</span>}
                 {!compact && typeof artifact.textLength === "number" && artifact.textLength > 0 && <span className="rounded-full px-2 py-1" style={{ background: "rgba(255,255,255,0.05)" }}>{artifact.textLength} chars</span>}
                 {artifact.hasScreenshot && <span className="rounded-full px-2 py-1" style={{ background: "rgba(34,197,94,0.12)", color: "#86efac" }}>{t("browser.screenshot")}</span>}
@@ -205,7 +205,7 @@ export function BrowserSessionCard({
             <Button
               size="sm"
               className="rounded-full px-3"
-              style={{ background: "rgba(59,130,246,0.14)", color: "#93c5fd" }}
+              style={{ background: "var(--yunque-accent-muted)", color: "var(--yunque-accent)" }}
               isDisabled={!!pendingAction}
               isPending={pendingAction === "bridge/resume"}
               onPress={() => onAction("bridge/resume")}

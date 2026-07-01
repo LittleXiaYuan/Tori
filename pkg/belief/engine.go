@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 )
 
 // UpdateKind describes the type of belief update.
@@ -170,8 +171,12 @@ func (e *Engine) Graph() *BeliefGraph { return e.graph }
 // EvaluateInteraction processes an interaction and produces an ActivateResult
 // describing which beliefs are relevant to the current context.
 //
+// scope is the coarse conversation kind ("emotional", "technical", etc.).
+// A belief with non-empty Scopes only activates when scope matches one of them;
+// a belief with empty Scopes activates globally (preserves prior behavior).
+//
 // This does NOT modify the graph — it only reads.
-func (e *Engine) EvaluateInteraction(message string, tags []string) (*ActivateResult, error) {
+func (e *Engine) EvaluateInteraction(message string, tags []string, scope string) (*ActivateResult, error) {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
@@ -187,17 +192,35 @@ func (e *Engine) EvaluateInteraction(message string, tags []string) (*ActivateRe
 			continue // beliefs below threshold aren't active
 		}
 
-		// Simple keyword-based activation.
-		// In production, this would use semantic similarity.
-		stmtLower := strings.ToLower(node.Statement)
-		words := strings.Fields(stmtLower)
-		matched := false
-		for _, w := range words {
-			if len(w) > 2 && strings.Contains(msgLower, w) {
-				matched = true
-				break
-			}
+		// Scope gate: if the belief declares scopes, only activate when the
+		// current conversation scope matches. Empty scopes = global.
+		if len(node.Scopes) > 0 && !scopeMatches(node.Scopes, scope) {
+			continue
 		}
+
+		// Keyword-based activation that works for both space-delimited
+		 // languages (English) and character-based languages (Chinese/Japanese).
+		 // strings.Fields fails for Chinese — no spaces means the whole
+		 // Statement becomes one token requiring an exact substring match.
+		 // Instead we extract overlapping bigrams (2-char sliding window)
+		 // from the Statement and check if any appear in the message.
+		 // Bigrams are short enough to catch partial matches ("承诺" in
+		 // "不能虚假承诺永久陪伴") while long enough to avoid false
+		 // positives from single characters. For English, bigrams
+		 // naturally overlap with word fragments, and the original
+		 // len>2 guard is preserved by only emitting bigrams from
+		 // Statements longer than 2 characters.
+		 stmtLower := strings.ToLower(node.Statement)
+		 matched := false
+		 if len(stmtLower) > 2 {
+		  runes := []rune(stmtLower)
+		  for i := 0; i <= len(runes)-2 && !matched; i++ {
+		   bigram := string(runes[i : i+2])
+		   if isContentBigram(bigram) && strings.Contains(msgLower, bigram) {
+		    matched = true
+		   }
+		  }
+		 }
 
 		if !matched && len(tags) > 0 {
 			// Check tags as secondary signal.
@@ -233,6 +256,34 @@ func (e *Engine) EvaluateInteraction(message string, tags []string) (*ActivateRe
 	result.Tendency = e.computeTendency(result.ActiveBeliefs)
 
 	return result, nil
+}
+
+// scopeMatches returns true when the current scope is one of the belief's
+// declared scopes. Empty current scope never matches a scoped belief (scoped
+// beliefs only fire when the caller explicitly declares a matching scope),
+// which prevents scoped beliefs from leaking into undeclared/scopeless calls.
+func scopeMatches(declared []string, current string) bool {
+	if current == "" {
+		return false
+	}
+	for _, s := range declared {
+		if s == current {
+			return true
+		}
+	}
+	return false
+}
+
+// isContentBigram returns true when the 2-character slice contains at least
+// one letter or CJK ideograph — pure punctuation/whitespace bigrams like "  "
+// or "，。" should not be used as activation signals.
+func isContentBigram(s string) bool {
+	for _, r := range s {
+		if unicode.IsLetter(r) {
+			return true
+		}
+	}
+	return false
 }
 
 // computeTendency aggregates active beliefs into a direction label.

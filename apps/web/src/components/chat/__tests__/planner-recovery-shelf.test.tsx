@@ -22,6 +22,10 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+function openRecoveryDetails() {
+  fireEvent.click(screen.getByRole("button", { name: "展开恢复任务" }));
+}
+
 describe("PlannerRecoveryShelf", () => {
   it("reloads recoverable checkpoints when refreshSignal changes", async () => {
     const onSend = vi.fn();
@@ -39,8 +43,37 @@ describe("PlannerRecoveryShelf", () => {
     await waitFor(() => {
       expect(list).toHaveBeenCalledTimes(2);
       expect(screen.getByText("最近可恢复任务")).toBeInTheDocument();
-      expect(screen.getByText("plan-restore-1")).toBeInTheDocument();
+      expect(screen.getByText("需要恢复 · 2/4")).toBeInTheDocument();
     });
+    openRecoveryDetails();
+    expect(screen.getByText("plan-restore-1")).toBeInTheDocument();
+  });
+
+  it("keeps recovery controls collapsed by default in chat", () => {
+    const onSend = vi.fn();
+    render(<PlannerRecoveryShelf fetchOnMount={false} initialCheckpoints={[failedCheckpoint]} onSend={onSend} />);
+
+    expect(screen.getByText("最近可恢复任务")).toBeInTheDocument();
+    expect(screen.getByText("现场已保留，需要时展开继续；默认不打断当前对话。")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "展开恢复任务" })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("plan-restore-1")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "继续执行" })).not.toBeInTheDocument();
+  });
+
+  it("shows compact session attribution without exposing raw session ids", () => {
+    const onSend = vi.fn();
+    const checkpointWithSession: PlannerCheckpointSummary = {
+      ...failedCheckpoint,
+      session_id: "planner-session-abcdef5678",
+    };
+
+    render(<PlannerRecoveryShelf fetchOnMount={false} initialCheckpoints={[checkpointWithSession]} onSend={onSend} />);
+
+    expect(screen.getByText("需要恢复 · 会话 cdef5678 · 2/4")).toBeInTheDocument();
+    expect(screen.queryByText(/planner-session-abcdef5678/)).not.toBeInTheDocument();
+    openRecoveryDetails();
+    expect(screen.getByText("会话 cdef5678")).toBeInTheDocument();
+    expect(screen.queryByText(/planner-session-abcdef5678/)).not.toBeInTheDocument();
   });
 
   it("renders recoverable checkpoints and sends a continue prompt", () => {
@@ -62,6 +95,7 @@ describe("PlannerRecoveryShelf", () => {
     render(<PlannerRecoveryShelf fetchOnMount={false} initialCheckpoints={[failedCheckpoint]} onSend={onSend} recoverCheckpoint={recoverCheckpoint} />);
 
     expect(screen.getByText("最近可恢复任务")).toBeInTheDocument();
+    openRecoveryDetails();
     expect(screen.getByText("plan-restore-1")).toBeInTheDocument();
     expect(screen.getByText("工具暂时不可用")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /详情页/ })).toHaveAttribute("href", "/planner-checkpoint?plan_id=plan-restore-1");
@@ -72,6 +106,75 @@ describe("PlannerRecoveryShelf", () => {
       expect(recoverCheckpoint).toHaveBeenCalledWith("plan-restore-1", "continue");
       expect(onSend).toHaveBeenCalledWith("后端恢复 prompt：plan-restore-1");
       expect(screen.getByText("将继续 2 个步骤，按依赖顺序执行")).toBeInTheDocument();
+    });
+  });
+
+  it("shows a structured recovery target link when execution state provides one", async () => {
+    const onSend = vi.fn();
+    const getExecutionState = vi.fn().mockResolvedValue({
+      plan_id: "plan-restore-1",
+      status: "failed",
+      action: "continue",
+      failure_summary: {
+        failed_count: 1,
+        completed_count: 2,
+        primary_target: {
+          category: "connector",
+          label: "修复 GitHub",
+          href: "/settings/connectors?focus=github",
+          action: "repair_connector",
+        },
+      },
+    });
+
+    render(
+      <PlannerRecoveryShelf
+        fetchOnMount={false}
+        initialCheckpoints={[failedCheckpoint]}
+        onSend={onSend}
+        getExecutionState={getExecutionState}
+      />,
+    );
+
+    expect(screen.queryByRole("link", { name: /修复 GitHub/ })).not.toBeInTheDocument();
+    openRecoveryDetails();
+
+    await waitFor(() => {
+      expect(getExecutionState).toHaveBeenCalledWith("plan-restore-1");
+      expect(screen.getByRole("link", { name: /修复 GitHub/ })).toHaveAttribute("href", "/settings/connectors?focus=github");
+    });
+  });
+
+  it("anchors sandbox recovery targets without href to the computer use pack", async () => {
+    const onSend = vi.fn();
+    const getExecutionState = vi.fn().mockResolvedValue({
+      plan_id: "plan-sandbox-1",
+      status: "failed",
+      action: "retry_failed",
+      failure_summary: {
+        failed_count: 1,
+        completed_count: 1,
+        primary_target: {
+          category: "sandbox",
+          label: "检查桌面沙箱",
+          action: "repair_sandbox",
+        },
+      },
+    });
+
+    render(
+      <PlannerRecoveryShelf
+        fetchOnMount={false}
+        initialCheckpoints={[failedCheckpoint]}
+        onSend={onSend}
+        getExecutionState={getExecutionState}
+      />,
+    );
+
+    openRecoveryDetails();
+
+    await waitFor(() => {
+      expect(screen.getByRole("link", { name: /检查桌面沙箱/ })).toHaveAttribute("href", "/packs/computer-use");
     });
   });
 
@@ -90,6 +193,7 @@ describe("PlannerRecoveryShelf", () => {
 
     render(<PlannerRecoveryShelf fetchOnMount={false} initialCheckpoints={[rawErrorCheckpoint]} onSend={onSend} />);
 
+    openRecoveryDetails();
     expect(screen.getByText(/响应暂时超时/)).toBeInTheDocument();
     expect(screen.queryByText(/context deadline exceeded/)).not.toBeInTheDocument();
     expect(screen.queryByText(/handoff agent/)).not.toBeInTheDocument();
@@ -115,6 +219,7 @@ describe("PlannerRecoveryShelf", () => {
     });
     render(<PlannerRecoveryShelf fetchOnMount={false} initialCheckpoints={[failedCheckpoint]} onSend={onSend} recoverCheckpoint={recoverCheckpoint} />);
 
+    openRecoveryDetails();
     fireEvent.click(screen.getByRole("button", { name: "先返回阶段结果" }));
 
     return waitFor(() => {
@@ -136,6 +241,7 @@ describe("PlannerRecoveryShelf", () => {
     });
     render(<PlannerRecoveryShelf fetchOnMount={false} initialCheckpoints={[failedCheckpoint]} onSend={onSend} getCheckpointDetails={getCheckpointDetails} />);
 
+    openRecoveryDetails();
     fireEvent.click(screen.getByRole("button", { name: "查看步骤" }));
 
     return waitFor(() => {
@@ -170,6 +276,7 @@ describe("PlannerRecoveryShelf", () => {
     });
     render(<PlannerRecoveryShelf fetchOnMount={false} initialCheckpoints={[failedCheckpoint]} onSend={onSend} getCheckpointDetails={getCheckpointDetails} />);
 
+    openRecoveryDetails();
     fireEvent.click(screen.getByRole("button", { name: "查看步骤" }));
 
     return waitFor(() => {
@@ -187,6 +294,7 @@ describe("PlannerRecoveryShelf", () => {
     const getCheckpointDetails = vi.fn().mockRejectedValue(new Error("context deadline exceeded"));
     render(<PlannerRecoveryShelf fetchOnMount={false} initialCheckpoints={[failedCheckpoint]} onSend={onSend} getCheckpointDetails={getCheckpointDetails} />);
 
+    openRecoveryDetails();
     fireEvent.click(screen.getByRole("button", { name: "查看步骤" }));
 
     return waitFor(() => {
@@ -224,6 +332,7 @@ describe("PlannerRecoveryShelf", () => {
     });
     render(<PlannerRecoveryShelf fetchOnMount={false} initialCheckpoints={[failedCheckpoint]} onSend={onSend} resumeCheckpoint={resumeCheckpoint} getTask={getTask} />);
 
+    openRecoveryDetails();
     fireEvent.click(screen.getByRole("button", { name: "后台续跑" }));
 
     return waitFor(() => {
@@ -265,6 +374,7 @@ describe("PlannerRecoveryShelf", () => {
     });
     render(<PlannerRecoveryShelf fetchOnMount={false} initialCheckpoints={[failedCheckpoint]} onSend={onSend} resumePlan={resumePlan} />);
 
+    openRecoveryDetails();
     fireEvent.click(screen.getByRole("button", { name: "原规划续跑" }));
 
     return waitFor(() => {
@@ -289,6 +399,7 @@ describe("PlannerRecoveryShelf", () => {
     });
     render(<PlannerRecoveryShelf fetchOnMount={false} initialCheckpoints={[failedCheckpoint]} onSend={onSend} resumePlan={resumePlan} />);
 
+    openRecoveryDetails();
     fireEvent.click(screen.getByRole("button", { name: "原规划续跑" }));
 
     return waitFor(() => {
@@ -315,6 +426,7 @@ describe("PlannerRecoveryShelf", () => {
     });
     render(<PlannerRecoveryShelf fetchOnMount={false} initialCheckpoints={[failedCheckpoint]} onSend={onSend} getResumePlanJob={getResumePlanJob} />);
 
+    openRecoveryDetails();
     fireEvent.click(screen.getByRole("button", { name: "最近续跑" }));
 
     return waitFor(() => {
@@ -363,6 +475,7 @@ describe("PlannerRecoveryShelf", () => {
     });
     render(<PlannerRecoveryShelf fetchOnMount={false} initialCheckpoints={[failedCheckpoint]} onSend={onSend} resumePlan={resumePlan} getResumePlanJob={getResumePlanJob} />);
 
+    openRecoveryDetails();
     fireEvent.click(screen.getByRole("button", { name: "原规划续跑" }));
 
     return waitFor(() => {
@@ -416,6 +529,12 @@ describe("PlannerRecoveryShelf", () => {
         friendly_error: "这次续跑等待时间过长，现场已经保留；建议重试失败步骤。",
         recoverable: true,
         next_action: "retry_failed",
+        primary_target: {
+          category: "connector",
+          label: "修复 GitHub",
+          href: "/settings/connectors?focus=github",
+          action: "repair_connector",
+        },
         events: [],
         started_at: "2026-05-11T02:00:00Z",
         finished_at: "2026-05-11T02:02:00Z",
@@ -423,6 +542,7 @@ describe("PlannerRecoveryShelf", () => {
     });
     render(<PlannerRecoveryShelf fetchOnMount={false} initialCheckpoints={[failedCheckpoint]} onSend={onSend} resumePlan={resumePlan} getResumePlanJob={getResumePlanJob} recoverCheckpoint={recoverCheckpoint} />);
 
+    openRecoveryDetails();
     fireEvent.click(screen.getByRole("button", { name: "原规划续跑" }));
 
     return waitFor(() => {
@@ -432,6 +552,7 @@ describe("PlannerRecoveryShelf", () => {
       await waitFor(() => {
         expect(screen.getAllByText(/这次续跑等待时间过长/).length).toBeGreaterThan(0);
         expect(screen.getByRole("button", { name: "按建议重试" })).toBeInTheDocument();
+        expect(screen.getByRole("link", { name: /修复 GitHub/ })).toHaveAttribute("href", "/settings/connectors?focus=github");
         expect(screen.queryByText(/context deadline exceeded/)).not.toBeInTheDocument();
         expect(screen.queryByText(/handoff agent/)).not.toBeInTheDocument();
       });
@@ -487,6 +608,7 @@ describe("PlannerRecoveryShelf", () => {
       />,
     );
 
+    openRecoveryDetails();
     fireEvent.click(screen.getByRole("button", { name: "原规划续跑" }));
 
     return waitFor(() => {
@@ -525,6 +647,7 @@ describe("PlannerRecoveryShelf", () => {
     });
     render(<PlannerRecoveryShelf fetchOnMount={false} initialCheckpoints={[failedCheckpoint]} onSend={onSend} resumePlan={resumePlan} />);
 
+    openRecoveryDetails();
     fireEvent.click(screen.getByRole("button", { name: "原规划续跑" }));
 
     return waitFor(() => {
@@ -557,6 +680,7 @@ describe("PlannerRecoveryShelf", () => {
     });
     render(<PlannerRecoveryShelf fetchOnMount={false} initialCheckpoints={[failedCheckpoint]} onSend={onSend} resumeCheckpoint={resumeCheckpoint} getTask={getTask} />);
 
+    openRecoveryDetails();
     fireEvent.click(screen.getByRole("button", { name: "后台续跑" }));
 
     return waitFor(() => {

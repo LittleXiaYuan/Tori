@@ -123,6 +123,7 @@ func (r *Runner) handleStepFailure(ctx context.Context, t *Task, step *Step, err
 
 	t.Status = StatusFailed
 	t.Error = fmt.Sprintf("step %d failed after %d retries: %v", step.ID, step.RetryCount, err)
+	t.RecoveryHint = InferRecoveryHint(t, "runner:step")
 	t.FinishedAt = &stepDone
 	r.store.Update(t)
 	r.emit("task_failed", t.ID, t.Error)

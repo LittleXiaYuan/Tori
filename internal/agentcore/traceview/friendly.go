@@ -115,9 +115,51 @@ func FriendlyDetail(detail any) any {
 			clone.Reason = friendly
 		}
 		return &clone
+	case planner.PlannerFailureSummary:
+		return friendlyPlannerFailureSummary(d)
+	case *planner.PlannerFailureSummary:
+		if d == nil {
+			return detail
+		}
+		clone := friendlyPlannerFailureSummary(*d)
+		return &clone
 	default:
 		return sanitizeDetailValue(detail)
 	}
+}
+
+func friendlyPlannerFailureSummary(summary planner.PlannerFailureSummary) planner.PlannerFailureSummary {
+	summary.Tried = friendlyStringSlice(summary.Tried)
+	summary.RuledOut = friendlyStringSlice(summary.RuledOut)
+	summary.FailurePattern = friendlyString(summary.FailurePattern)
+	summary.Recommendation = friendlyString(summary.Recommendation)
+	summary.NextStep = friendlyString(summary.NextStep)
+	return summary
+}
+
+func friendlyStringSlice(items []string) []string {
+	if len(items) == 0 {
+		return items
+	}
+	out := make([]string, len(items))
+	changed := false
+	for i, item := range items {
+		out[i] = friendlyString(item)
+		if out[i] != item {
+			changed = true
+		}
+	}
+	if changed {
+		return out
+	}
+	return items
+}
+
+func friendlyString(item string) string {
+	if friendly := FriendlyError(item); friendly != "" {
+		return friendly
+	}
+	return item
 }
 
 func sanitizeDetailValue(value any) any {

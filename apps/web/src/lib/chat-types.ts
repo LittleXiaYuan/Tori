@@ -68,8 +68,6 @@ export interface Message {
   skillSuggestions?: SkillGrowthSuggestion[];
   contextLayers?: string[];
   sandbox?: SandboxInfo;
-  airiSynced?: boolean;
-  airiEmotion?: string;
   timestamp?: number;
   cognitiveMemories?: MemoryAccess[];
   cognitiveReflections?: ReflectionEvent[];

@@ -224,9 +224,10 @@ func TestExecutionRuntimeServiceEmitToolStartForRequest(t *testing.T) {
 	var event observe.AgentEvent
 	NewExecutionRuntimeService(3).EmitToolStartForRequest(ToolStartEventRequest{
 		Request: PlanRequest{
-			TraceID:  "trace-tool-start",
-			TenantID: "tenant-tool-start",
-			TaskID:   "task-tool-start",
+			TraceID:   "trace-tool-start",
+			TenantID:  "tenant-tool-start",
+			SessionID: "session-tool-start",
+			TaskID:    "task-tool-start",
 			StepCallback: func(evt observe.AgentEvent) {
 				event = evt
 			},
@@ -235,7 +236,7 @@ func TestExecutionRuntimeServiceEmitToolStartForRequest(t *testing.T) {
 		Args:      map[string]any{"path": "README.md"},
 	})
 
-	if event.Type != observe.EventToolStart || event.Meta.Skill != "reader" || event.Meta.TenantID != "tenant-tool-start" || event.Meta.TaskID != "task-tool-start" {
+	if event.Type != observe.EventToolStart || event.Meta.Skill != "reader" || event.Meta.TenantID != "tenant-tool-start" || event.Meta.SessionID != "session-tool-start" || event.Meta.TaskID != "task-tool-start" {
 		t.Fatalf("unexpected tool start event: %#v", event)
 	}
 	if !strings.Contains(event.Summary, "reader") {
@@ -258,15 +259,16 @@ func TestExecutionRuntimeServiceEmitToolStartForRequestNoCallback(t *testing.T) 
 func TestExecutionRuntimeServiceEmitStepThinkingForRequest(t *testing.T) {
 	var event observe.AgentEvent
 	NewExecutionRuntimeService(3).EmitStepThinkingForRequest(PlanRequest{
-		TraceID:  "trace-thinking",
-		TenantID: "tenant-thinking",
-		TaskID:   "task-thinking",
+		TraceID:   "trace-thinking",
+		TenantID:  "tenant-thinking",
+		SessionID: "session-thinking",
+		TaskID:    "task-thinking",
 		StepCallback: func(evt observe.AgentEvent) {
 			event = evt
 		},
 	}, 2)
 
-	if event.Type != observe.EventThinking || event.Meta.TenantID != "tenant-thinking" || event.Meta.TaskID != "task-thinking" {
+	if event.Type != observe.EventThinking || event.Meta.TenantID != "tenant-thinking" || event.Meta.SessionID != "session-thinking" || event.Meta.TaskID != "task-thinking" {
 		t.Fatalf("unexpected thinking event: %#v", event)
 	}
 	if !strings.Contains(event.Summary, "第 2 轮") {
@@ -277,9 +279,10 @@ func TestExecutionRuntimeServiceEmitStepThinkingForRequest(t *testing.T) {
 func TestExecutionRuntimeServiceReasoningDeltaCallbackForRequest(t *testing.T) {
 	var events []observe.AgentEvent
 	cb := NewExecutionRuntimeService(3).ReasoningDeltaCallbackForRequest(PlanRequest{
-		TraceID:  "trace-reasoning-delta",
-		TenantID: "tenant-reasoning-delta",
-		TaskID:   "task-reasoning-delta",
+		TraceID:   "trace-reasoning-delta",
+		TenantID:  "tenant-reasoning-delta",
+		SessionID: "session-reasoning-delta",
+		TaskID:    "task-reasoning-delta",
 		StepCallback: func(evt observe.AgentEvent) {
 			events = append(events, evt)
 		},
@@ -295,7 +298,7 @@ func TestExecutionRuntimeServiceReasoningDeltaCallbackForRequest(t *testing.T) {
 		t.Fatalf("expected only non-empty reasoning delta to emit, got %#v", events)
 	}
 	event := events[0]
-	if event.Type != observe.EventThinking || event.Summary != "思考片段" || event.Meta.TenantID != "tenant-reasoning-delta" || event.Meta.TaskID != "task-reasoning-delta" {
+	if event.Type != observe.EventThinking || event.Summary != "思考片段" || event.Meta.TenantID != "tenant-reasoning-delta" || event.Meta.SessionID != "session-reasoning-delta" || event.Meta.TaskID != "task-reasoning-delta" {
 		t.Fatalf("unexpected reasoning delta event: %#v", event)
 	}
 	detail, ok := event.Detail.(map[string]string)
@@ -312,9 +315,10 @@ func TestExecutionRuntimeServiceApplyReflectRetryForRequestEmitsEventAndMessages
 	var event observe.AgentEvent
 	result := NewExecutionRuntimeService(3).ApplyReflectRetryForRequest(ReflectRetryRequest{
 		Request: PlanRequest{
-			TraceID:  "trace-reflect-retry",
-			TenantID: "tenant-reflect-retry",
-			TaskID:   "task-reflect-retry",
+			TraceID:   "trace-reflect-retry",
+			TenantID:  "tenant-reflect-retry",
+			SessionID: "session-reflect-retry",
+			TaskID:    "task-reflect-retry",
 			StepCallback: func(evt observe.AgentEvent) {
 				event = evt
 			},
@@ -325,7 +329,7 @@ func TestExecutionRuntimeServiceApplyReflectRetryForRequestEmitsEventAndMessages
 		EmitEvent:        true,
 	})
 
-	if event.Type != observe.EventReflect || event.Meta.TenantID != "tenant-reflect-retry" || event.Meta.TaskID != "task-reflect-retry" {
+	if event.Type != observe.EventReflect || event.Meta.TenantID != "tenant-reflect-retry" || event.Meta.SessionID != "session-reflect-retry" || event.Meta.TaskID != "task-reflect-retry" {
 		t.Fatalf("unexpected reflect retry event: %#v", event)
 	}
 	if !strings.Contains(event.Summary, "回答质量不够好") {
@@ -434,8 +438,9 @@ func TestExecutionRuntimeServiceApplyToolResultForRequestFailureUsesFriendlyText
 	var event observe.AgentEvent
 	processed := NewExecutionRuntimeService(3).ApplyToolResultForRequest(ToolResultPostprocessRequest{
 		Request: PlanRequest{
-			TraceID:  "trace-failed",
-			TenantID: "tenant-failed",
+			TraceID:   "trace-failed",
+			TenantID:  "tenant-failed",
+			SessionID: "session-failed",
 			StepCallback: func(evt observe.AgentEvent) {
 				event = evt
 			},
@@ -465,6 +470,9 @@ func TestExecutionRuntimeServiceApplyToolResultForRequestFailureUsesFriendlyText
 	}
 	if event.Type != observe.EventToolResult || !strings.Contains(event.Summary, "暂未完成") || strings.Contains(event.Summary, "context deadline exceeded") {
 		t.Fatalf("unexpected failure event summary: %#v", event)
+	}
+	if event.Meta.SessionID != "session-failed" {
+		t.Fatalf("tool result event should carry session metadata, got %#v", event.Meta)
 	}
 	detail, ok := event.Detail.(observe.ToolResultDetail)
 	if !ok || detail.Result != "" || !strings.Contains(detail.Error, "现场已保留") || strings.Contains(detail.Error, "context deadline exceeded") {
@@ -502,9 +510,10 @@ func TestExecutionRuntimeServiceApplyToolFailureRecoveryForRequestEmitsPromptAnd
 	var event observe.AgentEvent
 	result := NewExecutionRuntimeService(3).ApplyToolFailureRecoveryForRequest(ToolFailureRecoveryRequest{
 		Request: PlanRequest{
-			TraceID:  "trace-recovery",
-			TenantID: "tenant-recovery",
-			TaskID:   "task-recovery",
+			TraceID:   "trace-recovery",
+			TenantID:  "tenant-recovery",
+			SessionID: "session-recovery",
+			TaskID:    "task-recovery",
 			StepCallback: func(evt observe.AgentEvent) {
 				event = evt
 			},
@@ -523,12 +532,46 @@ func TestExecutionRuntimeServiceApplyToolFailureRecoveryForRequestEmitsPromptAnd
 	if !strings.Contains(result.Prompt, "Planner 自愈提示") || !strings.Contains(result.Prompt, "不要继续重复同一路径") {
 		t.Fatalf("unexpected recovery prompt: %q", result.Prompt)
 	}
-	if event.Type != observe.EventReflect || event.Meta.TenantID != "tenant-recovery" || event.Meta.TaskID != "task-recovery" {
+	if event.Type != observe.EventReflect || event.Meta.TenantID != "tenant-recovery" || event.Meta.SessionID != "session-recovery" || event.Meta.TaskID != "task-recovery" {
 		t.Fatalf("unexpected recovery event: %#v", event)
 	}
 	detail, ok := event.Detail.(PlannerFailureSummary)
 	if !ok || detail.FailedCount != 2 || !detail.Recoverable {
 		t.Fatalf("unexpected recovery detail: %#v", event.Detail)
+	}
+}
+
+func TestExecutionRuntimeServiceRecoveryEventCarriesFocusedConnectorTarget(t *testing.T) {
+	var event observe.AgentEvent
+	result := NewExecutionRuntimeService(3).ApplyToolFailureRecoveryForRequest(ToolFailureRecoveryRequest{
+		Request: PlanRequest{
+			TraceID:   "trace-connector-recovery",
+			TenantID:  "tenant-connector-recovery",
+			SessionID: "session-connector-recovery",
+			TaskID:    "task-connector-recovery",
+			StepCallback: func(evt observe.AgentEvent) {
+				event = evt
+			},
+		},
+		PlanSteps: []PlanStep{
+			{ID: 1, Skill: "github", Status: StepFailed, Error: "connector github token expired"},
+			{ID: 2, Skill: "github", Status: StepFailed, Error: "github rate limit 429"},
+		},
+		LastFailedCount: 0,
+	})
+
+	if !result.Applied {
+		t.Fatalf("expected connector recovery to apply, got %#v", result)
+	}
+	detail, ok := event.Detail.(PlannerFailureSummary)
+	if !ok {
+		t.Fatalf("expected recovery event detail, got %#v", event.Detail)
+	}
+	if detail.PrimaryTarget == nil || detail.PrimaryTarget.Category != "connector" || detail.PrimaryTarget.Href != "/settings/connectors?focus=github" {
+		t.Fatalf("expected focused connector target in event detail, got %#v", detail.PrimaryTarget)
+	}
+	if event.Meta.SessionID != "session-connector-recovery" {
+		t.Fatalf("connector recovery event should carry session metadata, got %#v", event.Meta)
 	}
 }
 
@@ -702,9 +745,10 @@ func TestExecutionRuntimeServicePartialPlanResultForRequestEmitsEvent(t *testing
 	result := NewExecutionRuntimeService(3).PartialPlanResultForRequest(PartialPlanResultRequest{
 		State: PlanResultExecutionState{
 			Request: PlanRequest{
-				TraceID:  "trace-partial",
-				TenantID: "tenant-partial",
-				TaskID:   "task-partial",
+				TraceID:   "trace-partial",
+				TenantID:  "tenant-partial",
+				SessionID: "session-partial",
+				TaskID:    "task-partial",
 				StepCallback: func(evt observe.AgentEvent) {
 					event = evt
 				},
@@ -722,7 +766,7 @@ func TestExecutionRuntimeServicePartialPlanResultForRequestEmitsEvent(t *testing
 	if result == nil || result.Steps != 7 {
 		t.Fatalf("unexpected partial result: %#v", result)
 	}
-	if event.Type != observe.EventPartial || event.Meta.TenantID != "tenant-partial" || event.Meta.TaskID != "task-partial" {
+	if event.Type != observe.EventPartial || event.Meta.TenantID != "tenant-partial" || event.Meta.SessionID != "session-partial" || event.Meta.TaskID != "task-partial" {
 		t.Fatalf("unexpected partial event: %#v", event)
 	}
 	detail, ok := event.Detail.(observe.PartialResultDetail)

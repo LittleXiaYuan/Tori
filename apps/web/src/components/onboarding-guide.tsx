@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@heroui/react";
 import {
   Sparkles, ArrowRight, X, CheckCircle2, Circle, Loader2,
@@ -227,6 +228,7 @@ function ProviderSetupStep({ onNext, onSkip }: { onNext: () => void; onSkip: () 
             key={p.id}
             className="onboard-provider-card"
             data-selected={selectedPreset === p.id || undefined}
+            aria-pressed={selectedPreset === p.id}
             onClick={() => setSelectedPreset(p.id)}
           >
             <span className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>{p.name}</span>
@@ -238,11 +240,14 @@ function ProviderSetupStep({ onNext, onSkip }: { onNext: () => void; onSkip: () 
       <div className="mt-5">
         <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--yunque-text-secondary)" }}>{t("onboarding.provider.apiKey")}</label>
         <input
+          name="api_key"
           type="password"
+          autoComplete="off"
+          spellCheck={false}
           value={apiKey}
           onChange={(e) => { setApiKey(e.target.value); autoDetect(e.target.value); }}
           placeholder={t("onboarding.provider.apiKeyPlaceholder")}
-          className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
+          className="w-full px-3 py-2.5 rounded-xl text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--yunque-border-focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--yunque-bg)]"
           style={{
             background: "var(--yunque-surface-2)",
             border: `1px solid ${error ? "var(--yunque-danger)" : "var(--yunque-border)"}`,
@@ -276,15 +281,16 @@ function ProviderSetupStep({ onNext, onSkip }: { onNext: () => void; onSkip: () 
 
 function InteractiveDemoStep({ onNext }: { onNext: () => void }) {
   const { t } = useI18n();
+  const router = useRouter();
   const [sent, setSent] = useState(false);
 
   const handleSend = useCallback((text: string) => {
     setSent(true);
     void markOnboardingComplete();
     setTimeout(() => {
-      window.location.href = scenarioChatHref(text);
+      router.push(scenarioChatHref(text));
     }, 300);
-  }, []);
+  }, [router]);
 
   return (
     <div className="px-8 pt-8 pb-8 animate-fade-in-up">

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -26,6 +28,7 @@ type plannerCheckpointListResponse struct {
 
 type plannerCheckpointSummary struct {
 	PlanID       string             `json:"plan_id"`
+	SessionID    string             `json:"session_id,omitempty"`
 	TaskID       string             `json:"task_id,omitempty"`
 	Goal         string             `json:"goal,omitempty"`
 	Status       string             `json:"status"`
@@ -76,16 +79,17 @@ type plannerCheckpointResumeTaskResponse struct {
 }
 
 type plannerCheckpointResumePlanResponse struct {
-	Status        string                   `json:"status"`
-	Action        string                   `json:"action"`
-	PlanID        string                   `json:"plan_id"`
-	JobID         string                   `json:"job_id,omitempty"`
-	FriendlyError string                   `json:"friendly_error,omitempty"`
-	Recoverable   bool                     `json:"recoverable,omitempty"`
-	NextAction    string                   `json:"next_action,omitempty"`
-	Result        *planner.PlanResult      `json:"result"`
-	RecoveryPlan  plannerCheckpointPlan    `json:"recovery_plan"`
-	Checkpoint    plannerCheckpointSummary `json:"checkpoint"`
+	Status        string                               `json:"status"`
+	Action        string                               `json:"action"`
+	PlanID        string                               `json:"plan_id"`
+	JobID         string                               `json:"job_id,omitempty"`
+	FriendlyError string                               `json:"friendly_error,omitempty"`
+	Recoverable   bool                                 `json:"recoverable,omitempty"`
+	NextAction    string                               `json:"next_action,omitempty"`
+	PrimaryTarget *plannerExecutionStateRecoveryTarget `json:"primary_target,omitempty"`
+	Result        *planner.PlanResult                  `json:"result"`
+	RecoveryPlan  plannerCheckpointPlan                `json:"recovery_plan"`
+	Checkpoint    plannerCheckpointSummary             `json:"checkpoint"`
 }
 
 type plannerCheckpointResumePlanJob struct {
@@ -94,11 +98,13 @@ type plannerCheckpointResumePlanJob struct {
 	Action        string                                `json:"action"`
 	TenantID      string                                `json:"tenant_id,omitempty"`
 	PlanID        string                                `json:"plan_id"`
+	SessionID     string                                `json:"session_id,omitempty"`
 	TaskID        string                                `json:"task_id,omitempty"`
 	Error         string                                `json:"error,omitempty"`
 	FriendlyError string                                `json:"friendly_error,omitempty"`
 	Recoverable   bool                                  `json:"recoverable,omitempty"`
 	NextAction    string                                `json:"next_action,omitempty"`
+	PrimaryTarget *plannerExecutionStateRecoveryTarget  `json:"primary_target,omitempty"`
 	Result        *planner.PlanResult                   `json:"result,omitempty"`
 	Events        []plannerCheckpointResumePlanJobEvent `json:"events,omitempty"`
 	StartedAt     string                                `json:"started_at"`
@@ -109,6 +115,7 @@ type plannerCheckpointResumePlanJobEvent struct {
 	ID        string `json:"id"`
 	Type      string `json:"type"`
 	Summary   string `json:"summary"`
+	SessionID string `json:"session_id,omitempty"`
 	Skill     string `json:"skill,omitempty"`
 	Timestamp string `json:"timestamp"`
 }
@@ -132,14 +139,34 @@ type plannerExecutionStateResponse struct {
 }
 
 type plannerExecutionStateFailureSummary struct {
-	FailedCount    int      `json:"failed_count"`
-	CompletedCount int      `json:"completed_count"`
-	FailedTools    []string `json:"failed_tools,omitempty"`
-	Tried          []string `json:"tried,omitempty"`
-	RuledOut       []string `json:"ruled_out,omitempty"`
-	FailurePattern string   `json:"failure_pattern,omitempty"`
-	Recommendation string   `json:"recommendation,omitempty"`
-	NextStep       string   `json:"next_step,omitempty"`
+	FailedCount    int                                  `json:"failed_count"`
+	CompletedCount int                                  `json:"completed_count"`
+	FailedTools    []string                             `json:"failed_tools,omitempty"`
+	FailedSteps    []plannerExecutionStateFailedStep    `json:"failed_steps,omitempty"`
+	PrimaryTarget  *plannerExecutionStateRecoveryTarget `json:"primary_target,omitempty"`
+	Tried          []string                             `json:"tried,omitempty"`
+	RuledOut       []string                             `json:"ruled_out,omitempty"`
+	FailurePattern string                               `json:"failure_pattern,omitempty"`
+	Recommendation string                               `json:"recommendation,omitempty"`
+	NextStep       string                               `json:"next_step,omitempty"`
+}
+
+type plannerExecutionStateFailedStep struct {
+	ID             int                                  `json:"id"`
+	Action         string                               `json:"action"`
+	Skill          string                               `json:"skill,omitempty"`
+	Status         string                               `json:"status"`
+	Error          string                               `json:"error,omitempty"`
+	Recommendation string                               `json:"recommendation,omitempty"`
+	RecoveryTarget *plannerExecutionStateRecoveryTarget `json:"recovery_target,omitempty"`
+}
+
+type plannerExecutionStateRecoveryTarget struct {
+	Category string `json:"category"`
+	Label    string `json:"label"`
+	Href     string `json:"href,omitempty"`
+	Action   string `json:"action,omitempty"`
+	GroupKey string `json:"group_key,omitempty"`
 }
 
 type plannerExecutionStateCogniSummary struct {
@@ -172,6 +199,9 @@ type plannerCheckpointPlanStep struct {
 	Selected  bool   `json:"selected"`
 	Reason    string `json:"reason,omitempty"`
 }
+
+var plannerProviderIDHintPattern = regexp.MustCompile(`\bprovider(?:[_\s-]?id)?\s*[:=]\s*["']?([a-z0-9][a-z0-9_.:-]{1,80})`)
+var plannerProviderTokenPattern = regexp.MustCompile(`[a-z0-9][a-z0-9_.:-]{2,80}`)
 
 // handlePlannerCheckpoints lists recent long-horizon checkpoints.
 //
@@ -442,7 +472,7 @@ func (g *Gateway) handlePlannerCheckpointResumePlan(w http.ResponseWriter, r *ht
 	}
 	if req.Async {
 		tenantID := tenantFromCtx(r.Context())
-		job, reused := g.reservePlannerResumeJob(cp.PlanID, cp.TaskID, tenantID, req.Action)
+		job, reused := g.reservePlannerResumeJob(cp.PlanID, cp.SessionID, cp.TaskID, tenantID, req.Action)
 		if !reused {
 			safego.Go("planner-resume-plan-"+job.ID, func() {
 				defer func() {
@@ -482,12 +512,13 @@ func (g *Gateway) handlePlannerCheckpointResumePlan(w http.ResponseWriter, r *ht
 		}
 		w.WriteHeader(http.StatusAccepted)
 		writeJSON(w, plannerCheckpointResumePlanResponse{
-			Status:       "accepted",
-			Action:       req.Action,
-			PlanID:       cp.PlanID,
-			JobID:        job.ID,
-			RecoveryPlan: recoveryPlan,
-			Checkpoint:   summarizePlannerCheckpoint(cp, true),
+			Status:        "accepted",
+			Action:        req.Action,
+			PlanID:        cp.PlanID,
+			JobID:         job.ID,
+			PrimaryTarget: plannerResumePrimaryRecoveryTarget(cp.PlanID, cp.Error, &planner.PlanResult{Plan: cp.PlanSnapshot}, recoveryPlan),
+			RecoveryPlan:  recoveryPlan,
+			Checkpoint:    summarizePlannerCheckpoint(cp, true),
 		})
 		return
 	}
@@ -516,6 +547,7 @@ func (g *Gateway) handlePlannerCheckpointResumePlan(w http.ResponseWriter, r *ht
 		FriendlyError: friendlyError,
 		Recoverable:   recoverable,
 		NextAction:    nextAction,
+		PrimaryTarget: plannerResumePrimaryRecoveryTarget(cp.PlanID, plannerResumePlanResultError(result), result, recoveryPlan),
 		Result:        sanitizePlannerPlanResult(result),
 		RecoveryPlan:  recoveryPlan,
 		Checkpoint:    summarizePlannerCheckpoint(cp, true),
@@ -597,7 +629,7 @@ func (g *Gateway) handlePlannerExecutionState(w http.ResponseWriter, r *http.Req
 		action = defaultPlannerExecutionStateAction(summary, latestJob)
 	}
 	recoveryPlan := buildPlannerCheckpointPlan(cp, action, buildPlannerRecoveryPrompt(cp, action))
-	failureSummary := buildPlannerExecutionStateFailureSummary(summary.PlanSnapshot, latestJob)
+	failureSummary := buildPlannerExecutionStateFailureSummary(planID, summary.PlanSnapshot, latestJob)
 	status := summary.Status
 	nextAction := ""
 	updatedAt := summary.UpdatedAt
@@ -780,6 +812,7 @@ func plannerResumeJobEventFromAgent(evt observe.AgentEvent) plannerCheckpointRes
 		ID:        evt.ID,
 		Type:      evt.QualifiedType(),
 		Summary:   plannerResumeJobEventDisplaySummary(evt.Summary),
+		SessionID: evt.Meta.SessionID,
 		Skill:     evt.Meta.Skill,
 		Timestamp: evt.Timestamp.UTC().Format(time.RFC3339),
 	}
@@ -804,6 +837,7 @@ func plannerResumeJobTerminalEvent(job plannerCheckpointResumePlanJob) plannerCh
 		ID:        fmt.Sprintf("%s-terminal", job.ID),
 		Type:      "planner.resume_plan_done",
 		Summary:   plannerResumeJobEventDisplaySummary(summary),
+		SessionID: job.SessionID,
 		Timestamp: timestamp,
 	}
 }
@@ -871,6 +905,40 @@ func applyPlannerResumeJobFailureAdvice(job *plannerCheckpointResumePlanJob, rec
 	job.FriendlyError = friendly
 	job.NextAction = nextAction
 	job.Recoverable = true
+	job.PrimaryTarget = plannerResumePrimaryRecoveryTarget(job.PlanID, job.Error, job.Result, recoveryPlan)
+}
+
+func plannerResumePrimaryRecoveryTarget(planID string, rawError string, result *planner.PlanResult, recoveryPlan plannerCheckpointPlan) *plannerExecutionStateRecoveryTarget {
+	if result != nil && len(result.Plan) > 0 {
+		if summary := buildPlannerExecutionStateFailureSummary(planID, result.Plan, nil); summary != nil && summary.PrimaryTarget != nil {
+			return summary.PrimaryTarget
+		}
+	}
+	rawError = strings.TrimSpace(rawError)
+	if rawError == "" {
+		return nil
+	}
+	for _, step := range recoveryPlan.Steps {
+		if !step.Selected {
+			continue
+		}
+		target := plannerFailedStepRecoveryTarget(planID, planner.PlanStep{
+			ID:        step.ID,
+			Action:    step.Action,
+			Skill:     step.Skill,
+			Status:    planner.StepFailed,
+			Error:     rawError,
+			DependsOn: step.DependsOn,
+		})
+		if target != nil {
+			return target
+		}
+	}
+	return plannerFailedStepRecoveryTarget(planID, planner.PlanStep{
+		Action: "planner resume",
+		Status: planner.StepFailed,
+		Error:  rawError,
+	})
 }
 
 func plannerResumePlanResultFailed(result *planner.PlanResult) bool {
@@ -934,7 +1002,7 @@ func defaultPlannerExecutionStateAction(cp plannerCheckpointSummary, latestJob *
 	return "continue"
 }
 
-func buildPlannerExecutionStateFailureSummary(snapshot []planner.PlanStep, latestJob *plannerCheckpointResumePlanJob) *plannerExecutionStateFailureSummary {
+func buildPlannerExecutionStateFailureSummary(planID string, snapshot []planner.PlanStep, latestJob *plannerCheckpointResumePlanJob) *plannerExecutionStateFailureSummary {
 	steps := snapshot
 	if latestJob != nil && latestJob.Result != nil && len(latestJob.Result.Plan) > 0 {
 		steps = latestJob.Result.Plan
@@ -972,6 +1040,23 @@ func buildPlannerExecutionStateFailureSummary(snapshot []planner.PlanStep, lates
 			if errText == "" {
 				errText = "这一步没有顺利完成，现场已保留。"
 			}
+			_, stepRecommendation := plannerCheckpointFailureAnalysis([]string{step.Error}, []string{label})
+			if stepRecommendation == "" {
+				stepRecommendation = "先重试此步骤；如果同一路径再次失败，换工具或降低任务粒度。"
+			}
+			recoveryTarget := plannerFailedStepRecoveryTarget(planID, step)
+			if summary.PrimaryTarget == nil && recoveryTarget != nil {
+				summary.PrimaryTarget = recoveryTarget
+			}
+			summary.FailedSteps = append(summary.FailedSteps, plannerExecutionStateFailedStep{
+				ID:             step.ID,
+				Action:         plannerRecoveryStepAction(step),
+				Skill:          step.Skill,
+				Status:         string(step.Status),
+				Error:          truncateStr(errText, 180),
+				Recommendation: stepRecommendation,
+				RecoveryTarget: recoveryTarget,
+			})
 			summary.RuledOut = append(summary.RuledOut, fmt.Sprintf("%s: %s", label, truncateStr(errText, 140)))
 		}
 	}
@@ -999,6 +1084,284 @@ func buildPlannerExecutionStateFailureSummary(snapshot []planner.PlanStep, lates
 		summary.NextStep = "当前没有失败步骤，可按原规划继续或整理阶段结果。"
 	}
 	return summary
+}
+
+func plannerFailedStepRecoveryTarget(planID string, step planner.PlanStep) *plannerExecutionStateRecoveryTarget {
+	text := strings.ToLower(strings.Join([]string{
+		step.Error,
+		step.Action,
+		step.Skill,
+	}, " "))
+	if strings.TrimSpace(text) == "" {
+		return nil
+	}
+
+	if plannerRecoveryTextMentionsApproval(text) {
+		return newPlannerExecutionStateRecoveryTarget("approval", "处理审批", "/approvals", "handle_approval")
+	}
+	if plannerRecoveryTextMentionsSandbox(text) {
+		return newPlannerExecutionStateRecoveryTarget("sandbox", "检查桌面沙箱", "/packs/computer-use", "repair_sandbox")
+	}
+	if plannerRecoveryTextMentionsSkill(text) {
+		return newPlannerExecutionStateRecoveryTarget("skill", "检查技能", "/skills", "repair_skill")
+	}
+	if plannerRecoveryTextMentionsTool(text) {
+		return newPlannerExecutionStateRecoveryTarget("tool", "检查工具", "/tools", "repair_tool")
+	}
+	if plannerRecoveryTextMentionsBrowser(text) {
+		return newPlannerExecutionStateRecoveryTarget("browser", "打开浏览器包", "/packs/browser", "repair_browser")
+	}
+	if connectorID, ok := plannerRecoveryTextConnectorID(text); ok {
+		href := "/settings/connectors"
+		if connectorID != "" {
+			href += "?focus=" + url.QueryEscape(connectorID)
+		}
+		return newPlannerExecutionStateRecoveryTarget("connector", "修复连接器", href, "repair_connector")
+	}
+	if plannerStepUsesProviderRuntime(step) {
+		return newPlannerExecutionStateRecoveryTarget("provider", "检查模型供应商", plannerProviderRecoveryHref(text), "repair_provider")
+	}
+	if plannerRecoveryTextMentionsProvider(text) {
+		return newPlannerExecutionStateRecoveryTarget("provider", "检查模型供应商", plannerProviderRecoveryHref(text), "repair_provider")
+	}
+	if plannerRecoveryTextMentionsDependency(text) {
+		href := ""
+		if strings.TrimSpace(planID) != "" {
+			href = "/planner-checkpoint?plan_id=" + url.QueryEscape(planID) + "#dependency-view"
+		}
+		return newPlannerExecutionStateRecoveryTarget("dependency", "查看依赖关系", href, "inspect_dependencies")
+	}
+	return nil
+}
+
+func newPlannerExecutionStateRecoveryTarget(category string, label string, href string, action string) *plannerExecutionStateRecoveryTarget {
+	return &plannerExecutionStateRecoveryTarget{
+		Category: category,
+		Label:    label,
+		Href:     href,
+		Action:   action,
+		GroupKey: plannerRecoveryGroupKey(category, href),
+	}
+}
+
+func plannerRecoveryGroupKey(category string, href string) string {
+	groupCategory := strings.ToLower(strings.TrimSpace(category))
+	target := strings.TrimSpace(href)
+	if groupCategory == "browser" {
+		groupCategory = "connector"
+	}
+	if groupCategory == "model" {
+		groupCategory = "provider"
+	}
+	if groupCategory == "" && target != "" {
+		switch {
+		case strings.HasPrefix(target, "/settings/providers"):
+			groupCategory = "provider"
+		case strings.HasPrefix(target, "/settings/connectors") || strings.HasPrefix(target, "/packs/browser"):
+			groupCategory = "connector"
+		case strings.HasPrefix(target, "/packs/computer-use"):
+			groupCategory = "sandbox"
+		case strings.HasPrefix(target, "/approvals"):
+			groupCategory = "approval"
+		case strings.HasPrefix(target, "/skills"):
+			groupCategory = "skill"
+		case strings.HasPrefix(target, "/tools"):
+			groupCategory = "tool"
+		case strings.Contains(target, "#dependency-view"):
+			groupCategory = "dependency"
+		}
+	}
+	if groupCategory == "" || target == "" {
+		return ""
+	}
+	return groupCategory + "|" + target
+}
+
+func plannerRecoveryTextMentionsApproval(text string) bool {
+	for _, term := range []string{
+		"approval required",
+		"requires approval",
+		"pending approval",
+		"blocked by approval",
+		"human approval",
+		"trust gate",
+		"policy gate",
+		"policy approval",
+		"policy denied",
+		"需要审批",
+		"等待审批",
+		"审批",
+		"策略门",
+		"信任门",
+	} {
+		if strings.Contains(text, term) {
+			return true
+		}
+	}
+	return false
+}
+
+func plannerRecoveryTextMentionsSandbox(text string) bool {
+	for _, term := range []string{"desktop sandbox", "computer use", "sandbox unavailable", "sandbox not available", "沙箱不可用", "桌面沙箱", "桌面自动化"} {
+		if strings.Contains(text, term) {
+			return true
+		}
+	}
+	return false
+}
+
+func plannerRecoveryTextMentionsBrowser(text string) bool {
+	for _, term := range []string{"browser", "extension", "pairing", "pair ", "chrome", "浏览器", "扩展", "配对"} {
+		if strings.Contains(text, term) {
+			return true
+		}
+	}
+	return false
+}
+
+func plannerStepUsesProviderRuntime(step planner.PlanStep) bool {
+	skill := strings.ToLower(strings.TrimSpace(step.Skill))
+	return skill == "llm" ||
+		skill == "model" ||
+		strings.Contains(skill, "llm_") ||
+		strings.Contains(skill, "model_") ||
+		strings.Contains(skill, "provider")
+}
+
+func plannerRecoveryTextConnectorID(text string) (string, bool) {
+	for _, item := range []struct {
+		terms []string
+		id    string
+	}{
+		{terms: []string{"github"}, id: "github"},
+		{terms: []string{"gmail"}, id: "gmail"},
+		{terms: []string{"google_calendar", "google calendar", "calendar"}, id: "google_calendar"},
+		{terms: []string{"slack"}, id: "slack"},
+		{terms: []string{"notion"}, id: "notion"},
+		{terms: []string{"linear"}, id: "linear"},
+		{terms: []string{"jira"}, id: "jira"},
+	} {
+		for _, term := range item.terms {
+			if strings.Contains(text, term) {
+				return item.id, true
+			}
+		}
+	}
+	if strings.Contains(text, "connector") ||
+		strings.Contains(text, "oauth") ||
+		strings.Contains(text, "credential") ||
+		strings.Contains(text, "cookie") ||
+		strings.Contains(text, "allowlist") ||
+		strings.Contains(text, "allow list") ||
+		strings.Contains(text, "allowlisted") ||
+		strings.Contains(text, "连接器") ||
+		strings.Contains(text, "凭证") ||
+		strings.Contains(text, "白名单") {
+		return "", true
+	}
+	return "", false
+}
+
+func plannerRecoveryTextMentionsProvider(text string) bool {
+	providerTerm := strings.Contains(text, "provider") ||
+		strings.Contains(text, "model") ||
+		strings.Contains(text, "llm") ||
+		strings.Contains(text, "openai") ||
+		strings.Contains(text, "qwen") ||
+		strings.Contains(text, "moonshot") ||
+		strings.Contains(text, "api key") ||
+		strings.Contains(text, "apikey") ||
+		strings.Contains(text, "模型") ||
+		strings.Contains(text, "供应商") ||
+		strings.Contains(text, "密钥")
+	if !providerTerm {
+		return false
+	}
+	return strings.Contains(text, "401") ||
+		strings.Contains(text, "403") ||
+		strings.Contains(text, "402") ||
+		strings.Contains(text, "429") ||
+		strings.Contains(text, "unauthorized") ||
+		strings.Contains(text, "forbidden") ||
+		strings.Contains(text, "quota") ||
+		strings.Contains(text, "rate limit") ||
+		strings.Contains(text, "balance") ||
+		strings.Contains(text, "billing") ||
+		strings.Contains(text, "fallback") ||
+		strings.Contains(text, "eof") ||
+		strings.Contains(text, "unavailable") ||
+		strings.Contains(text, "failed") ||
+		strings.Contains(text, "auth") ||
+		strings.Contains(text, "认证") ||
+		strings.Contains(text, "余额") ||
+		strings.Contains(text, "额度") ||
+		strings.Contains(text, "限流")
+}
+
+func plannerProviderRecoveryHref(text string) string {
+	if providerID := plannerRecoveryTextProviderID(text); providerID != "" {
+		return "/settings/providers?focus=" + url.QueryEscape(providerID)
+	}
+	return "/settings/providers?tab=providers"
+}
+
+func plannerRecoveryTextProviderID(text string) string {
+	if match := plannerProviderIDHintPattern.FindStringSubmatch(text); len(match) > 1 && plannerIsSpecificProviderID(match[1]) {
+		return strings.ToLower(match[1])
+	}
+	for _, token := range plannerProviderTokenPattern.FindAllString(text, -1) {
+		if plannerIsSpecificProviderID(token) {
+			return strings.ToLower(token)
+		}
+	}
+	return ""
+}
+
+func plannerIsSpecificProviderID(token string) bool {
+	value := strings.ToLower(strings.TrimSpace(token))
+	if value == "" || value == "provider" || value == "model" || value == "llm" {
+		return false
+	}
+	if !strings.ContainsAny(value, "-_:") {
+		return false
+	}
+	for _, family := range []string{"openai", "qwen", "moonshot", "kimi", "deepseek", "minimax", "gemini", "google", "anthropic", "claude", "ollama", "tori", "local"} {
+		if strings.Contains(value, family) {
+			return true
+		}
+	}
+	return false
+}
+
+func plannerRecoveryTextMentionsDependency(text string) bool {
+	return strings.Contains(text, "dependency") ||
+		strings.Contains(text, "depend") ||
+		strings.Contains(text, "no ready steps") ||
+		strings.Contains(text, "依赖")
+}
+
+func plannerRecoveryTextMentionsSkill(text string) bool {
+	return strings.Contains(text, "unknown skill") ||
+		strings.Contains(text, "skill ") && strings.Contains(text, "not installed") ||
+		strings.Contains(text, "missing skill") ||
+		strings.Contains(text, "skill \"") ||
+		strings.Contains(text, "未知技能") ||
+		strings.Contains(text, "缺失技能") ||
+		strings.Contains(text, "技能不可用")
+}
+
+func plannerRecoveryTextMentionsTool(text string) bool {
+	return strings.Contains(text, "allowed tool surface") ||
+		strings.Contains(text, "unknown tool") ||
+		strings.Contains(text, "missing tool") ||
+		strings.Contains(text, "tool not") ||
+		strings.Contains(text, "tool unavailable") ||
+		strings.Contains(text, "unsupported tool") ||
+		strings.Contains(text, "工具不可用") ||
+		strings.Contains(text, "缺失工具") ||
+		strings.Contains(text, "未知工具") ||
+		strings.Contains(text, "未找到工具") ||
+		strings.Contains(text, "所需工具暂时不可用")
 }
 
 func plannerCheckpointFailureAnalysis(errors []string, failedTools []string) (pattern, recommendation string) {
@@ -1086,6 +1449,9 @@ func plannerCheckpointFailureBucket(raw string) string {
 
 func sanitizePlannerResumeJobForResponse(job plannerCheckpointResumePlanJob) plannerCheckpointResumePlanJob {
 	job.TenantID = ""
+	if job.PrimaryTarget == nil {
+		job.PrimaryTarget = plannerResumePrimaryRecoveryTarget(job.PlanID, job.Error, job.Result, plannerCheckpointPlan{})
+	}
 	job.Error = plannerCheckpointDisplayError(job.Error)
 	job.FriendlyError = plannerCheckpointDisplayError(job.FriendlyError)
 	if job.Result != nil {
@@ -1161,6 +1527,7 @@ func unsupportedCheckpointActionMessage() string {
 func summarizePlannerCheckpoint(cp planner.LongHorizonCheckpoint, includeSnapshot bool) plannerCheckpointSummary {
 	item := plannerCheckpointSummary{
 		PlanID:      cp.PlanID,
+		SessionID:   cp.SessionID,
 		TaskID:      cp.TaskID,
 		Goal:        truncateStr(cp.Goal, 240),
 		Status:      cp.Status,

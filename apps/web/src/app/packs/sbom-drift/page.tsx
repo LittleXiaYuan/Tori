@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Button, Card, Chip, Input, Label, Spinner, TextArea, TextField } from "@heroui/react";
+import { Button, Card, Chip, Input, Label, Spinner, TextField } from "@heroui/react";
 import { AlertTriangle, ClipboardList, Download, FileJson, GitCompare, PackageSearch, RefreshCw, Send, ShieldCheck } from "lucide-react";
 import PageHeader from "@/components/page-header";
+import { JsonViewer } from "@/components/json-viewer";
 import { showToast } from "@/components/toast-provider";
 import { formatErrorMessage } from "@/lib/error-utils";
 import { chatPromptHref } from "@/lib/pack-action-links";
+import { PackAbout, type PackBoundaryItem } from "@/components/packs/pack-page-kit";
 import { createSBOMDriftClient as createSBOMDriftPackClient, type SBOMDriftBaselineArtifactSourcePlan, type SBOMDriftCIBaselineWriteback, type SBOMDriftCIGatePlan, type SBOMDriftCIWorkflowWritebackPlan, type SBOMDriftCycloneDXDocument, type SBOMDriftDiff, type SBOMDriftSnapshotSummary, type SBOMDriftStatusResponse as SBOMDriftStatus } from "yunque-client/sbom-drift";
 import { createYunqueSDKClientOptions } from "@/lib/sdk-client";
 
@@ -27,45 +29,11 @@ function defaultSnapshotId() {
   return `baseline-${new Date().toISOString().slice(0, 10).replaceAll("-", "")}`;
 }
 
-const userFacingSteps = [
-  {
-    title: "1. 建一个依赖基线",
-    body: "保存当前 Go/npm 依赖快照，作为以后发版或升级前的对比点。",
-  },
-  {
-    title: "2. 看依赖漂移",
-    body: "对比当前工作树，找出新增、移除、版本变化和风险等级。",
-  },
-  {
-    title: "3. 生成 CI 交接计划",
-    body: "把漂移报告、CycloneDX 和 CI gate 计划导出给后续流水线审核。",
-  },
-];
-
-const boundaryItems = [
-  "不会修改 GitHub Actions 或 CI 配置。",
-  "不会联网拉取漏洞库或执行 govulncheck。",
-  "不会把计划结果写成真实发布阻断。",
-  "不会替代正式供应链安全扫描。",
-];
-
-const workflowLoopItems = [
-  {
-    title: "1. 保留基线",
-    body: "把发版前依赖状态保存成快照，后续变化才有比较对象。",
-  },
-  {
-    title: "2. 带回 Chat",
-    body: "让云雀解释新增依赖、版本漂移和风险等级，再拆出处理任务。",
-  },
-  {
-    title: "3. 看发布依据",
-    body: "CycloneDX、证据包和 CI gate 计划是评审材料，不会直接阻断发布。",
-  },
-  {
-    title: "4. 继续补能力",
-    body: "如果需要更多语言或漏洞源，把真实漂移报告交给小羽继续扩展。",
-  },
+const sbomBoundaries: PackBoundaryItem[] = [
+  { key: "ci", label: "不改 CI 配置", detail: "不会修改 GitHub Actions 或 CI 配置。" },
+  { key: "net", label: "不联网扫描", detail: "不会联网拉取漏洞库或执行 govulncheck。" },
+  { key: "block", label: "不阻断发布", detail: "不会把计划结果写成真实发布阻断。" },
+  { key: "replace", label: "不替代扫描", detail: "不会替代正式供应链安全扫描。" },
 ];
 
 export default function SBOMDriftPackPage() {
@@ -265,39 +233,27 @@ export default function SBOMDriftPackPage() {
 
   return (
     <div className="page-root space-y-6 animate-fade-in-up">
-      <PageHeader icon={<ShieldCheck size={20} />} title="SBOM 依赖漂移" />
+      <PageHeader
+        icon={<ShieldCheck size={20} />}
+        title="SBOM 依赖漂移"
+        actions={<div className="flex flex-wrap gap-2">
+          <Link href={chatPromptHref("请根据 SBOM Drift 最新漂移报告，解释新增依赖和版本变化的风险，并把需要处理的项拆成任务。")}>
+            <Button size="sm" className="btn-accent"><Send size={14} /> 带回 Chat</Button>
+          </Link>
+          <Link href="/missions"><Button size="sm" variant="outline"><ClipboardList size={14} /> 看任务</Button></Link>
+        </div>}
+      />
 
-      <Card className="section-card overflow-hidden p-0">
-        <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="p-5">
-            <div className="flex flex-wrap items-center gap-2">
-              <Chip size="sm" style={{ background: "rgba(245,158,11,0.12)", color: "var(--yunque-warning)" }}>实验中</Chip>
-              <Chip size="sm" variant="soft">可保存基线</Chip>
-              <Chip size="sm" variant="soft">CI 只生成计划</Chip>
-            </div>
-            <div className="mt-3 text-base font-semibold" style={{ color: "var(--yunque-text)" }}>
-              这个能力包现在适合做什么
-            </div>
-            <div className="mt-2 max-w-3xl text-sm leading-6" style={{ color: "var(--yunque-text-secondary)" }}>
-              它用于在发版、升级依赖或接入第三方包之前，先记录依赖基线，再对比当前工作树的变化。当前可以保存快照、生成漂移报告、导出 CycloneDX 和证据包；CI gate / workflow 写回仍是交接计划，不会直接改你的仓库或阻断发布。
-            </div>
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
-              {userFacingSteps.map((item) => (
-                <div key={item.title} className="rounded-lg p-3" style={{ background: "var(--yunque-bg-hover)", border: "1px solid var(--yunque-border)" }}>
-                  <div className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>{item.title}</div>
-                  <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>{item.body}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="p-5" style={{ background: "rgba(245,158,11,0.08)", borderLeft: "1px solid var(--yunque-border)" }}>
-            <div className="mb-3 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>当前不会做什么</div>
-            <div className="space-y-2 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
-              {boundaryItems.map((item) => <div key={item}>{item}</div>)}
-            </div>
-          </div>
-        </div>
-      </Card>
+      <PackAbout
+        title="关于 SBOM 依赖漂移"
+        chips={<>
+          <Chip size="sm" color="warning">实验中</Chip>
+          <Chip size="sm" variant="soft">可保存基线</Chip>
+          <Chip size="sm" variant="soft">CI 只生成计划</Chip>
+        </>}
+        description="发版或升级依赖前先记录基线，再对比当前工作树的变化：保存快照、生成漂移报告、导出 CycloneDX 与证据包；CI gate / workflow 写回只生成交接计划，不改仓库、不阻断发布。"
+        boundaries={sbomBoundaries}
+      />
 
       <Card className="section-card p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -327,41 +283,6 @@ export default function SBOMDriftPackPage() {
         </div>
       </Card>
 
-      <Card className="section-card p-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>从依赖漂移到发布判断</div>
-            <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
-              SBOM Drift 不是只列依赖清单，而是把发版前的变化变成可解释风险、可下载证据和可交给任务中心处理的清单。
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Link href={chatPromptHref("请根据 SBOM Drift 最新漂移报告，解释新增依赖和版本变化的风险，并把需要处理的项拆成任务。")}>
-              <Button size="sm" className="btn-accent">
-                <Send size={13} /> 带回 Chat
-              </Button>
-            </Link>
-            <Link href="/missions">
-              <Button size="sm" variant="outline">
-                <ClipboardList size={13} /> 看任务
-              </Button>
-            </Link>
-          </div>
-        </div>
-        <div className="mt-3 grid gap-2 md:grid-cols-4">
-          {workflowLoopItems.map((item) => (
-            <div key={item.title} className="rounded-md border p-3" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-surface)" }}>
-              <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>{item.title}</div>
-              <div className="mt-2 text-[11px] leading-5" style={{ color: "var(--yunque-text-muted)" }}>{item.body}</div>
-            </div>
-          ))}
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2 text-xs">
-          <Link href="/trace"><Button size="sm" variant="ghost">核对执行轨迹</Button></Link>
-          <Link href="/packs/studio?packId=yunque.pack.sbom-drift"><Button size="sm" variant="ghost">让小羽继续改</Button></Link>
-        </div>
-      </Card>
-
       {error && (
         <Card className="p-4" style={{ background: "rgba(239,68,68,0.06)" }}>
           <div className="flex items-center gap-2 text-sm" style={{ color: "var(--yunque-danger)" }}><AlertTriangle size={16} />{error}</div>
@@ -370,9 +291,9 @@ export default function SBOMDriftPackPage() {
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
         <Card className="section-card p-4"><div className="kpi-label">快照数量</div><div className="kpi-value">{status?.snapshot_count ?? snapshots.length}</div></Card>
-        <Card className="section-card p-4"><div className="kpi-label">扫描器</div><div className="kpi-value text-lg">{status?.scanner_ready ? "ready" : "shell"}</div></Card>
-        <Card className="section-card p-4"><div className="kpi-label">CycloneDX / CI / Vuln</div><div className="kpi-value text-lg">{status?.cyclonedx_ready && status?.ci_gate_plan_ready && status?.govulncheck_plan_ready ? "plan" : "pending"}</div></Card>
-        <Card className="section-card p-4"><div className="kpi-label">Baseline Store</div><div className="kpi-value text-lg">{status?.ci_baseline_store?.record_count ?? 0}</div></Card>
+        <Card className="section-card p-4"><div className="kpi-label">扫描器</div><div className="mt-1 text-sm font-medium" style={{ color: "var(--yunque-text)" }}>{status?.scanner_ready ? "已就绪" : "未就绪"}</div></Card>
+        <Card className="section-card p-4"><div className="kpi-label">CycloneDX / CI / Vuln</div><div className="mt-1 text-sm font-medium" style={{ color: "var(--yunque-text)" }}>{status?.cyclonedx_ready && status?.ci_gate_plan_ready && status?.govulncheck_plan_ready ? "计划就绪" : "待接通"}</div></Card>
+        <Card className="section-card p-4"><div className="kpi-label">Baseline Store</div><div className="kpi-value">{status?.ci_baseline_store?.record_count ?? 0}</div></Card>
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[360px_1fr]">
@@ -428,10 +349,7 @@ export default function SBOMDriftPackPage() {
                   <Chip size="sm" style={{ background: tone.bg, color: tone.fg }}>risk: {diff.risk_level}</Chip>
                   <span>{diff.added.length} added / {diff.changed.length} changed / {diff.removed.length} removed</span>
                 </div>
-                <TextField value={JSON.stringify(diff, null, 2)} onChange={() => undefined}>
-                  <Label>SBOM drift JSON</Label>
-                  <TextArea rows={14} aria-label="SBOM Drift JSON" className="font-mono text-xs" readOnly />
-                </TextField>
+                <JsonViewer title="SBOM drift JSON" value={diff} rows={14} />
               </Card>
             ) : (
               <div className="rounded-xl border border-dashed p-6 text-center text-sm" style={{ borderColor: "var(--yunque-border)", color: "var(--yunque-text-muted)" }}>选择或创建一个基线后，可以生成与当前工作树的依赖漂移报告。</div>
@@ -465,10 +383,11 @@ export default function SBOMDriftPackPage() {
                   <Button variant="outline" isPending={busy === "ciWorkflowPlan"} onPress={planCIWorkflowWriteback}>生成 Workflow Handoff</Button>
                 </div>
               )}
-              <TextField value={JSON.stringify({ cyclonedx: cycloneDX, ci_gate_plan: ciGatePlan, baseline_artifact_source_plan: artifactSourcePlan, ci_baseline_writeback: ciBaselineWriteback, ci_workflow_writeback_plan: ciWorkflowPlan }, null, 2)} onChange={() => undefined}>
-                <Label>CycloneDX 与 CI Gate JSON</Label>
-                <TextArea rows={12} aria-label="SBOM CycloneDX and CI Gate JSON" className="font-mono text-xs" readOnly />
-              </TextField>
+              <JsonViewer
+                title="CycloneDX 与 CI Gate JSON"
+                value={{ cyclonedx: cycloneDX, ci_gate_plan: ciGatePlan, baseline_artifact_source_plan: artifactSourcePlan, ci_baseline_writeback: ciBaselineWriteback, ci_workflow_writeback_plan: ciWorkflowPlan }}
+                rows={12}
+              />
               <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
                 artifact baseline source plan 只描述未来制品仓库 baseline 拉取契约，不联网、不读凭据、不覆盖快照；baseline store 只写 pack-local JSON handoff；workflow handoff plan 只消费该记录并生成 CI writer / release blocker 契约。当前不会修改 GitHub Actions、不会执行 govulncheck、不会拉取漏洞库，也不会真实阻断 release。
               </div>

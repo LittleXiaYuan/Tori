@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Sparkles, Check, X, ChevronDown, ListChecks, Code2 } from "lucide-react";
+import { Sparkles, Check, X, ChevronDown, ListChecks, Code2, Terminal } from "lucide-react";
 import type { AgentEvent } from "@/components/execution-trace";
 import { useI18n } from "@/lib/i18n";
 
@@ -211,13 +211,34 @@ export function TaskPlanCard({ events, isLive }: { events: AgentEvent[]; isLive:
               <div className="task-plan-detail__title">{active.title}</div>
               {active.detail && <div className="task-plan-detail__desc">{active.detail}</div>}
               {showActions && (
-                <div className="task-plan-detail__actions">
-                  {subActions.map((a) => (
-                    <div key={a.key} className="task-plan-action" data-failed={a.failed ? "true" : "false"}>
-                      {a.failed ? <X size={12} /> : <Code2 size={12} />}
-                      <span className="task-plan-action__text">{a.text}</span>
+                <div className="mt-3 rounded-lg border border-default-200 shadow-sm" style={{ background: "#0a0a0c" }}>
+                  <div className="p-0 overflow-hidden">
+                    <div className="flex items-center gap-2 px-3 py-2 border-b border-default-200/50" style={{ background: "#111115" }}>
+                      <Terminal size={14} className="text-default-500" />
+                      <span className="text-xs font-medium text-default-600">执行过程日志</span>
+                      <span className="ml-auto flex gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-danger-500 opacity-80" />
+                        <span className="w-2.5 h-2.5 rounded-full bg-warning-500 opacity-80" />
+                        <span className="w-2.5 h-2.5 rounded-full bg-success-500 opacity-80" />
+                      </span>
                     </div>
-                  ))}
+                    <div className="max-h-[200px] overflow-y-auto p-3 font-mono text-[12px] leading-relaxed">
+                      {subActions.map((a) => (
+                        <div key={a.key} className="flex gap-2 mb-1.5 opacity-90 break-words whitespace-pre-wrap">
+                          <span className="text-default-600 shrink-0 select-none">➜</span>
+                          <span className={a.failed ? "text-danger-400" : "text-success-400"} style={{ wordBreak: 'break-all' }}>
+                            {a.text}
+                          </span>
+                        </div>
+                      ))}
+                      {isLive && (
+                        <div className="flex gap-2 mt-2 opacity-70 animate-pulse">
+                          <span className="text-default-600 shrink-0">➜</span>
+                          <span className="w-2 h-4 bg-default-400" />
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
               {!active.detail && !showActions && (

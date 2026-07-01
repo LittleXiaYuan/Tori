@@ -1,4 +1,4 @@
-/** Shared task status color map — used across missions, task-run, workflows */
+/** Shared task status color map — used across missions, task detail, workflows */
 export const STATUS_COLORS: Record<string, string> = {
   running: "var(--yunque-accent)",
   active: "var(--yunque-success)",

@@ -9,7 +9,7 @@ describe("nav capability layering", () => {
     expect(easyIds).toEqual(DEFAULT_NAV_ITEM_IDS);
     expect(easyItems).toHaveLength(DEFAULT_NAV_ITEM_IDS.size);
     expect(easyItems.some((item) => item.layer === "lab" || item.layer === "control-plane")).toBe(false);
-    expect(easyItems.every((item) => item.layer === "core" || item.id === "nav-packs")).toBe(true);
+    expect(easyItems.every((item) => item.layer === "core")).toBe(true);
   });
 
   it("requires all default-visible items to be declared explicitly", () => {
@@ -21,13 +21,15 @@ describe("nav capability layering", () => {
     expect(filterNavItemsByProfile(NAV_ITEMS, "full")).toEqual(NAV_ITEMS);
   });
 
-  it("keeps packs as the default extension entry and demotes skills/plugins to advanced surfaces", () => {
+  it("keeps packs discoverable without making extensions part of the default rail", () => {
     const packs = NAV_ITEMS.find((item) => item.id === "nav-packs");
+    const cognis = NAV_ITEMS.find((item) => item.id === "nav-cognis");
     const skills = NAV_ITEMS.find((item) => item.id === "nav-skills");
     const plugins = NAV_ITEMS.find((item) => item.id === "nav-plugins");
 
     expect(packs?.layer).toBe("pack");
-    expect(packs?.defaultVisible).toBe(true);
+    expect(packs?.defaultVisible).toBeUndefined();
+    expect(cognis?.defaultVisible).toBeUndefined();
     expect(skills?.layer).toBe("lab");
     expect(skills?.defaultVisible).toBeUndefined();
     expect(plugins?.layer).toBe("control-plane");

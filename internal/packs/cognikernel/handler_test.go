@@ -338,6 +338,85 @@ func TestCogniKernelRouterOwnsRegistryLifecycle(t *testing.T) {
 	}
 }
 
+func TestCogniKernelRouterOwnsUpdate(t *testing.T) {
+	api := &fakeCogniAPI{}
+	registry := cogni.NewRegistry()
+	dir := t.TempDir()
+	if err := registry.Add(&cogni.Declaration{
+		ID:          "reviewer",
+		DisplayName: "Reviewer",
+		Description: "original",
+		Activation:  cogni.ActivationRules{Keywords: []string{"review"}, MinScore: 0.3},
+	}, "api"); err != nil {
+		t.Fatalf("seed cogni: %v", err)
+	}
+	router := NewRouterWithDeps(api, fakeRuntimeReporter{}, Dependencies{
+		RegistryProvider:  fakeDependencyProvider{registry: registry},
+		DirectoryProvider: fakeDependencyProvider{dir: dir},
+	})
+
+	// Full update replaces description + activation and persists to disk.
+	body, _ := json.Marshal(cogni.Declaration{
+		ID:          "reviewer",
+		DisplayName: "Reviewer",
+		Description: "updated",
+		Activation:  cogni.ActivationRules{Keywords: []string{"review", "audit"}, MinScore: 0.6},
+	})
+	req := httptest.NewRequest(http.MethodPut, "/v1/cognis/reviewer", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	router.ServeCogniKernel(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("update status=%d body=%s", w.Code, w.Body.String())
+	}
+	decl, ok := registry.Get("reviewer")
+	if !ok || decl.Description != "updated" || decl.Activation.MinScore != 0.6 {
+		t.Fatalf("registry not updated: %#v", decl)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "reviewer.json")); err != nil {
+		t.Fatalf("updated declaration should be persisted: %v", err)
+	}
+
+	// Partial body merges onto the current declaration: omitted fields persist.
+	req = httptest.NewRequest(http.MethodPut, "/v1/cognis/reviewer", bytes.NewReader([]byte(`{"description":"partial"}`)))
+	w = httptest.NewRecorder()
+	router.ServeCogniKernel(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("partial update status=%d body=%s", w.Code, w.Body.String())
+	}
+	decl, _ = registry.Get("reviewer")
+	if decl.Description != "partial" || len(decl.Activation.Keywords) != 2 {
+		t.Fatalf("partial update should preserve omitted fields: %#v", decl)
+	}
+
+	// An id in the body that disagrees with the path is rejected.
+	req = httptest.NewRequest(http.MethodPut, "/v1/cognis/reviewer", bytes.NewReader([]byte(`{"id":"other"}`)))
+	w = httptest.NewRecorder()
+	router.ServeCogniKernel(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("mismatched id status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	// Invalid field values fail validation.
+	req = httptest.NewRequest(http.MethodPut, "/v1/cognis/reviewer", bytes.NewReader([]byte(`{"activation":{"min_score":2}}`)))
+	w = httptest.NewRecorder()
+	router.ServeCogniKernel(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("invalid min_score status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	// Updating an unknown id is a 404, not an implicit create.
+	req = httptest.NewRequest(http.MethodPut, "/v1/cognis/missing", bytes.NewReader([]byte(`{"description":"x"}`)))
+	w = httptest.NewRecorder()
+	router.ServeCogniKernel(w, req)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("missing cogni status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	if api.called != 0 {
+		t.Fatalf("update should not delegate to API adapter, called=%d", api.called)
+	}
+}
+
 func TestCogniKernelRouterOwnsReload(t *testing.T) {
 	api := &fakeCogniAPI{}
 	registry := cogni.NewRegistry()

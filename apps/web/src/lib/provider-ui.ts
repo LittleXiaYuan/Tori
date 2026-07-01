@@ -31,7 +31,7 @@ export interface NormalizedProviderTestResult {
 }
 
 export const modeConfig: Record<ProviderModeType, { label: string; desc: string; color: string }> = {
-  local: { label: "自带 Key", desc: "直连你自己的模型服务", color: "#3b82f6" },
+  local: { label: "自带 Key", desc: "直连你自己的模型服务", color: "var(--yunque-accent)" },
   tori: { label: "Tori 中转", desc: "统一代理与账号绑定", color: "#8b5cf6" },
   hybrid: { label: "智能混合", desc: "直连优先，失败回退", color: "#22c55e" },
 };
@@ -56,7 +56,7 @@ export const presetColors: Record<string, string> = {
 export const capMeta: Record<string, { label: string; color: string; icon: string }> = {
   vision: { label: "视觉", color: "#a855f7", icon: "👁" },
   reasoning: { label: "推理", color: "#f59e0b", icon: "🧠" },
-  function_calling: { label: "工具", color: "#3b82f6", icon: "🔧" },
+  function_calling: { label: "工具", color: "var(--yunque-accent)", icon: "🔧" },
   structured_output: { label: "结构化", color: "#06b6d4", icon: "📋" },
   long_context: { label: "长文本", color: "#10b981", icon: "📜" },
   web_search: { label: "搜索", color: "#ef4444", icon: "🔍" },

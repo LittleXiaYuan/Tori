@@ -1,0 +1,8 @@
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="云雀 Yunque">
+  <!-- Lark in upward flight (solid, no gradient) -->
+  <path d="M22 80 C42 56 60 52 78 62 C62 58 50 70 50 86 C62 74 78 76 88 86 C70 78 60 90 58 102 C52 90 36 84 22 80 Z"
+        fill="#36E0C8"/>
+  <!-- Motion trail: weight in flow (self-evolving) -->
+  <path d="M30 92 C46 88 64 88 84 96" stroke="#36E0C8" stroke-width="3.4" stroke-linecap="round" opacity="0.55"/>
+  <path d="M40 100 C52 98 66 99 80 104" stroke="#36E0C8" stroke-width="2.6" stroke-linecap="round" opacity="0.32"/>
+</svg>

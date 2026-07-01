@@ -100,7 +100,7 @@ func detectEmotionHeuristic(message string) emotion.Result {
 	}
 
 	// Angry
-	if containsAnyEmotion(lower, []string{"生气", "愤怒", "烦死", "气死", "讨厌", "angry", "mad", "annoyed", "frustrated"}) {
+	if containsAnyEmotion(lower, []string{"生气", "愤怒", "烦死", "气死", "气人", "讨厌", "angry", "mad", "annoyed", "frustrated"}) {
 		return emotion.Result{
 			Emotion:    emotion.EmotionAngry,
 			Confidence: 0.7,

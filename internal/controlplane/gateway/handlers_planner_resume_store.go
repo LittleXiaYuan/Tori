@@ -41,8 +41,9 @@ func (g *Gateway) savePlannerResumeJob(job plannerCheckpointResumePlanJob) {
 	}
 }
 
-func (g *Gateway) reservePlannerResumeJob(planID, taskID, tenantID, action string) (plannerCheckpointResumePlanJob, bool) {
+func (g *Gateway) reservePlannerResumeJob(planID, sessionID, taskID, tenantID, action string) (plannerCheckpointResumePlanJob, bool) {
 	planID = strings.TrimSpace(planID)
+	sessionID = strings.TrimSpace(sessionID)
 	tenantID = strings.TrimSpace(tenantID)
 	action = normalizeCheckpointAction(action)
 	if err := g.loadPlannerResumeJobs(); err != nil {
@@ -55,6 +56,7 @@ func (g *Gateway) reservePlannerResumeJob(planID, taskID, tenantID, action strin
 		Action:    action,
 		TenantID:  tenantID,
 		PlanID:    planID,
+		SessionID: sessionID,
 		TaskID:    strings.TrimSpace(taskID),
 		StartedAt: now.Format(time.RFC3339),
 	}

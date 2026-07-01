@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { Card, Button, Spinner, Chip, Tooltip, TextField, Input, Label, Switch } from "@heroui/react";
 import { api, type PluginMeta } from "@/lib/api";
 import { Puzzle, Plus, Trash2, Save, FileCode, Search, Zap, Box, Terminal, ChevronUp, RefreshCw, FolderOpen, File, ExternalLink } from "lucide-react";
+import { confirmAction } from "@/components/confirm-dialog";
 import { showToast } from "@/components/toast-provider";
 import PageHeader from "@/components/page-header";
 import { useApiData } from "@/lib/use-api-data";
@@ -84,6 +85,13 @@ export default function PluginsPage() {
   };
 
   const deletePlugin = async (name: string) => {
+    const confirmed = await confirmAction({
+      title: "删除插件",
+      body: `确定删除插件「${name}」吗？相关脚本和配置将被移除。`,
+      confirmLabel: "删除",
+      tone: "danger",
+    });
+    if (!confirmed) return;
     await api.deletePlugin(name);
     showToast("已删除插件", "success");
     refresh();
@@ -358,13 +366,13 @@ export default function PluginsPage() {
                     {p.source !== "builtin" && (
                       <>
                         <Tooltip delay={0}>
-                          <Button isIconOnly variant="ghost" size="sm" onPress={async () => { try { await api.openPluginFolder(p.name); } catch {} }}>
+                          <Button isIconOnly aria-label={`打开插件目录 ${p.name}`} variant="ghost" size="sm" onPress={async () => { try { await api.openPluginFolder(p.name); } catch {} }}>
                             <ExternalLink size={13} style={{ color: "var(--yunque-text-muted)" }} />
                           </Button>
                           <Tooltip.Content>打开目录</Tooltip.Content>
                         </Tooltip>
                         <Tooltip delay={0}>
-                          <Button isIconOnly variant="ghost" size="sm" onPress={() => loadPluginFiles(p.name)}>
+                          <Button isIconOnly aria-label={`浏览插件文件 ${p.name}`} variant="ghost" size="sm" onPress={() => loadPluginFiles(p.name)}>
                             <FolderOpen size={13} style={{ color: expandedPlugin === p.name ? "var(--yunque-accent)" : "var(--yunque-text-muted)" }} />
                           </Button>
                           <Tooltip.Content>浏览文件</Tooltip.Content>
@@ -376,7 +384,7 @@ export default function PluginsPage() {
                     </Switch>
                     {p.source !== "builtin" && (
                       <Tooltip delay={0}>
-                        <Button isIconOnly variant="ghost" size="sm" onPress={() => deletePlugin(p.name)}
+                        <Button isIconOnly aria-label={`删除插件 ${p.name}`} variant="ghost" size="sm" onPress={() => deletePlugin(p.name)}
                           style={{ color: "var(--yunque-danger)" }}>
                           <Trash2 size={13} />
                         </Button>

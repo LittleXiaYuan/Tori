@@ -23,7 +23,6 @@
     "src/backup.ts",
     "src/packs.test.ts",
     "src/packs.ts",
-    "src/airi.ts",
     "src/planner-recovery.ts",
     "src/planner.ts",
     "src/planner-read.ts",

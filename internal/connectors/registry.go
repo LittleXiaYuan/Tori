@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -67,7 +68,19 @@ type ConnectorInstance struct {
 	ConnectedAt *time.Time      `json:"connected_at,omitempty"`
 	UserInfo    string          `json:"user_info,omitempty"` // display name or email
 	Error       string          `json:"error,omitempty"`
+	LastEvent   *ConnectorEvent `json:"last_event,omitempty"`
 	Credentials *Credentials    `json:"-"` // not serialized to listing responses
+}
+
+// ConnectorEvent is a UI-safe audit crumb for the latest connector lifecycle or
+// action event. It intentionally excludes credentials and request parameters.
+type ConnectorEvent struct {
+	Kind        string    `json:"kind"`
+	ConnectorID string    `json:"connector_id"`
+	ActionID    string    `json:"action_id,omitempty"`
+	Status      string    `json:"status"`
+	Message     string    `json:"message,omitempty"`
+	At          time.Time `json:"at"`
 }
 
 // Credentials stores the authentication tokens (encrypted on disk).
@@ -187,6 +200,7 @@ func (r *Registry) ListInstances() []ConnectorInstance {
 				ConnectedAt: inst.ConnectedAt,
 				UserInfo:    inst.UserInfo,
 				Error:       inst.Error,
+				LastEvent:   cloneConnectorEvent(inst.LastEvent),
 			})
 		} else {
 			result = append(result, ConnectorInstance{
@@ -215,6 +229,7 @@ func (r *Registry) ConnectWithKey(ctx context.Context, connID, key string) error
 			ConnectorID: connID,
 			Status:      StatusError,
 			Error:       err.Error(),
+			LastEvent:   newConnectorEvent(connID, "", "connect", "error", err.Error()),
 		})
 		return err
 	}
@@ -229,6 +244,7 @@ func (r *Registry) ConnectWithKey(ctx context.Context, connID, key string) error
 			ConnectorID: connID,
 			Status:      StatusError,
 			Error:       msg,
+			LastEvent:   newConnectorEvent(connID, "", "connect", "error", msg),
 		})
 		return errors.New(msg)
 	}
@@ -240,6 +256,7 @@ func (r *Registry) ConnectWithKey(ctx context.Context, connID, key string) error
 		ConnectedAt: &now,
 		UserInfo:    userInfo,
 		Credentials: newCreds,
+		LastEvent:   newConnectorEvent(connID, "", "connect", "ok", userInfo),
 	}
 	r.setInstance(connID, inst)
 	r.saveCreds(connID, newCreds)
@@ -269,6 +286,7 @@ func (r *Registry) ConnectOAuth2(ctx context.Context, connID string, creds *Cred
 		ConnectedAt: &now,
 		UserInfo:    userInfo,
 		Credentials: creds,
+		LastEvent:   newConnectorEvent(connID, "", "oauth2_connect", "ok", userInfo),
 	}
 	r.setInstance(connID, inst)
 	r.saveCreds(connID, creds)
@@ -290,6 +308,7 @@ func (r *Registry) Disconnect(ctx context.Context, connID string) error {
 	r.setInstance(connID, &ConnectorInstance{
 		ConnectorID: connID,
 		Status:      StatusDisconnected,
+		LastEvent:   newConnectorEvent(connID, "", "disconnect", "ok", ""),
 	})
 	r.deleteCreds(connID)
 	slog.Info("connector disconnected", "id", connID)
@@ -318,6 +337,7 @@ func (r *Registry) Execute(ctx context.Context, connID, actionID string, params 
 				ConnectorID: connID,
 				Status:      StatusError,
 				Error:       "token refresh failed: " + err.Error(),
+				LastEvent:   newConnectorEvent(connID, actionID, "refresh", "error", err.Error()),
 			})
 			return nil, fmt.Errorf("token refresh failed: %w", err)
 		}
@@ -325,7 +345,13 @@ func (r *Registry) Execute(ctx context.Context, connID, actionID string, params 
 		r.saveCreds(connID, newCreds)
 	}
 
-	return handler.Execute(ctx, inst.Credentials, actionID, params)
+	result, err := handler.Execute(ctx, inst.Credentials, actionID, params)
+	if err != nil {
+		r.recordEvent(connID, newConnectorEvent(connID, actionID, "execute", "error", err.Error()))
+		return nil, err
+	}
+	r.recordEvent(connID, newConnectorEvent(connID, actionID, "execute", "ok", ""))
+	return result, nil
 }
 
 // LoadPersisted loads saved credentials from disk on startup.
@@ -363,6 +389,7 @@ func (r *Registry) LoadPersisted(ctx context.Context) {
 			ConnectedAt: &now,
 			UserInfo:    userInfo,
 			Credentials: creds,
+			LastEvent:   newConnectorEvent(connID, "", "restore", "ok", userInfo),
 		})
 		slog.Info("connector restored from disk", "id", connID, "user", userInfo)
 	}
@@ -373,7 +400,52 @@ func (r *Registry) LoadPersisted(ctx context.Context) {
 func (r *Registry) setInstance(connID string, inst *ConnectorInstance) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if inst.LastEvent == nil {
+		if prev, ok := r.instances[connID]; ok {
+			inst.LastEvent = cloneConnectorEvent(prev.LastEvent)
+		}
+	}
 	r.instances[connID] = inst
+}
+
+func (r *Registry) recordEvent(connID string, event *ConnectorEvent) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	inst, ok := r.instances[connID]
+	if !ok || inst == nil {
+		inst = &ConnectorInstance{ConnectorID: connID, Status: StatusDisconnected}
+	}
+	cp := *inst
+	cp.LastEvent = cloneConnectorEvent(event)
+	r.instances[connID] = &cp
+}
+
+func newConnectorEvent(connID, actionID, kind, status, message string) *ConnectorEvent {
+	return &ConnectorEvent{
+		Kind:        kind,
+		ConnectorID: connID,
+		ActionID:    actionID,
+		Status:      status,
+		Message:     truncateConnectorEventMessage(message),
+		At:          time.Now(),
+	}
+}
+
+func cloneConnectorEvent(event *ConnectorEvent) *ConnectorEvent {
+	if event == nil {
+		return nil
+	}
+	cp := *event
+	return &cp
+}
+
+func truncateConnectorEventMessage(message string) string {
+	message = strings.TrimSpace(message)
+	if len([]rune(message)) <= 180 {
+		return message
+	}
+	runes := []rune(message)
+	return string(runes[:180]) + "..."
 }
 
 func (r *Registry) saveCreds(connID string, creds *Credentials) {

@@ -13,6 +13,16 @@ import { PackDlcHost } from "@/lib/pack-dlc-host";
 import { eventPathsFromPermissions } from "@/lib/pack-bridge";
 import { chatPromptHref } from "@/lib/pack-action-links";
 import { packBoundarySummary, packDeliveryProfile, packExamples, packFeatureFlags, packReadiness, packUsability, packVerificationSteps, riskProfileForPack } from "@/lib/pack-presentation";
+import {
+  PackHero,
+  PackBoundaryGrid,
+  PackStepsGrid,
+  PackInfoAccordion,
+  PackKeyValue,
+  PackSectionTitle,
+  type PackBoundaryItem,
+  type Tone,
+} from "@/components/packs/pack-page-kit";
 
 const dlcBoundaryItems = [
   "独立界面拿不到云雀本地登录态或宿主 token。",
@@ -24,13 +34,6 @@ const dlcBoundaryItems = [
 
 function packCenterFocusHref(packId?: string): string {
   return packId ? `/packs?q=${encodeURIComponent(packId)}` : "/packs";
-}
-
-function deliveryColor(tone: ReturnType<typeof packDeliveryProfile>["tone"]): "success" | "default" | "warning" | "danger" {
-  if (tone === "success") return "success";
-  if (tone === "warning") return "warning";
-  if (tone === "danger") return "danger";
-  return "default";
 }
 
 function displayDeliveryLabel(label?: string, level?: string): string {
@@ -73,23 +76,29 @@ export default function PackRuntimeRouteClientPage() {
 
   if (error) {
     return (
-      <div className="page-root space-y-5 animate-fade-in-up">
+      <div className="page-root space-y-6 animate-fade-in-up">
         <PageHeader icon={<Boxes size={20} />} title="能力包入口同步失败" description="无法从已启用能力包列表加载入口，请回能力包中心刷新状态。" />
-        <Card className="section-card p-5 text-sm" style={{ color: "var(--yunque-danger)" }}>{error}</Card>
+        <Card variant="secondary">
+          <Card.Content className="text-sm text-danger">{error}</Card.Content>
+        </Card>
       </div>
     );
   }
 
   if (!match) {
     return (
-      <div className="page-root space-y-5 animate-fade-in-up">
+      <div className="page-root space-y-6 animate-fade-in-up">
         <PageHeader icon={<PackageOpen size={20} />} title="能力包入口未启用" description="这个入口还没有在已启用能力包中声明，请先安装并启用对应能力。" />
-        <Card className="section-card p-6 space-y-3">
-          <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>未找到可打开的能力包页面</div>
-          <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>
-            当前路径 <code>{pathname}</code> 需要先安装并启用对应能力包。云雀不会为未启用能力暴露页面入口，避免把可选能力写死进主系统。
-          </div>
-          <Link href="/packs" className="btn-accent inline-flex w-fit items-center rounded-xl px-4 py-2 text-sm">返回能力包中心</Link>
+        <Card variant="secondary">
+          <Card.Header>
+            <Card.Title className="text-base">未找到可打开的能力包页面</Card.Title>
+            <Card.Description className="text-sm leading-6 text-muted">
+              当前路径 <code className="font-mono">{pathname}</code> 需要先安装并启用对应能力包。云雀不会为未启用能力暴露页面入口，避免把可选能力写死进主系统。
+            </Card.Description>
+          </Card.Header>
+          <Card.Footer>
+            <Link href="/packs"><Button className="btn-accent" size="sm"><Boxes size={14} /> 返回能力包中心</Button></Link>
+          </Card.Footer>
         </Card>
       </div>
     );
@@ -129,206 +138,164 @@ export default function PackRuntimeRouteClientPage() {
       : `让 ${manifest.name} 更像一个用户能直接理解和使用的能力包，补齐用途、入口、示例、权限边界和回滚说明。`;
   const studioHref = `/packs/studio?packId=${encodeURIComponent(manifest.id)}&goal=${encodeURIComponent(studioGoal)}`;
 
+  // Keep only the two signals a user actually decides on: can I use it, and is
+  // it risky. Readiness/delivery are polish-meta, surfaced via the studio path.
+  const heroChips = (
+    <>
+      <Chip size="sm" color={usability.kind === "experimental" ? "warning" : usability.kind === "actionable" ? "success" : "default"}>{usability.label}</Chip>
+      <Chip size="sm" color={risk.level === "high" ? "danger" : risk.level === "medium" ? "warning" : "success"}>{risk.label}</Chip>
+      {flags.isIframeBundle && <Chip size="sm" variant="soft">独立界面包</Chip>}
+      {flags.hasWasm && <Chip size="sm" variant="soft">WASM</Chip>}
+    </>
+  );
+
+  // Terse: only name what's missing, and only when something is. No prose tail.
+  const heroNote = readiness.missing.length > 0
+    ? <span className="text-warning">还缺：{readiness.missing.join("、")}</span>
+    : null;
+
+  const heroActions = (
+    <>
+      {usability.primaryActionPath && usability.primaryActionPath !== pathname && (
+        <Link href={usability.primaryActionPath}><Button size="sm" className="btn-accent"><ExternalLink size={14} /> 打开入口</Button></Link>
+      )}
+      <Link href={chatPromptHref(usagePrompt)}><Button size="sm" variant="outline"><MessageSquare size={14} /> 问云雀怎么用</Button></Link>
+      <Link href={`/packs/detail?id=${encodeURIComponent(manifest.id)}`}><Button size="sm" variant="outline"><ShieldCheck size={14} /> 权限与详情</Button></Link>
+      <Link href={studioHref}><Button size="sm" variant="ghost"><Wrench size={14} /> 交给小羽打磨</Button></Link>
+    </>
+  );
+
+  const boundaryItems: PackBoundaryItem[] = boundarySummary.map((item) => ({
+    key: item.key,
+    label: item.label,
+    detail: item.detail,
+    tone: (item.tone === "danger" ? "danger" : item.tone === "warning" ? "warning" : "neutral") as Tone,
+  }));
+
+  const infoSections = [
+    {
+      key: "verify",
+      icon: <Wrench size={16} />,
+      title: "如何验收与继续打磨",
+      body: (
+        <div className="flex flex-col gap-3">
+          <PackStepsGrid steps={verificationSteps.map((s) => ({ key: s.key, label: s.label, detail: s.detail }))} />
+          <div className="text-sm leading-6 text-muted">
+            <span className="font-semibold text-foreground">验收：</span>回中心看状态、详情复查权限{usability.primaryActionPath ? "，再打开入口复验。" : "。"}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "sync",
+      icon: <Route size={16} />,
+      title: "入口同步详情",
+      body: (
+        <div className="flex flex-col gap-1">
+          <PackKeyValue label="当前路径">{pathname}</PackKeyValue>
+          <PackKeyValue label="声明组件">{match.component}</PackKeyValue>
+          <div className="flex flex-wrap items-baseline gap-2 py-1">
+            <span className="text-xs text-muted">菜单入口</span>
+            <span className="flex flex-wrap gap-1">{(manifest.frontend?.menus || []).map((menu) => <code key={menu.key} className="font-mono text-xs text-foreground">{menu.label}:{menu.path}</code>)}</span>
+          </div>
+          <div className="flex flex-wrap items-baseline gap-2 py-1">
+            <span className="text-xs text-muted">后端路由</span>
+            <span className="flex flex-wrap gap-1">{(manifest.backend?.routeSpecs?.length ? manifest.backend.routeSpecs : manifest.backend?.routes || []).map((item) => <code key={typeof item === "string" ? item : `${item.method}:${item.path}`} className="font-mono text-xs text-foreground">{formatBackendRouteSpec(item)}</code>)}</span>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "assets",
+      icon: <ExternalLink size={16} />,
+      title: "界面资源与安装包",
+      body: (
+        <div className="flex flex-col gap-1">
+          <PackKeyValue label="资源类型">{assets?.type || "builtin"}</PackKeyValue>
+          <PackKeyValue label="资源入口">{assets?.entry || distribution?.frontendUrl || "-"}</PackKeyValue>
+          <PackKeyValue label="远程前端">{distribution?.frontendUrl || "-"}</PackKeyValue>
+          <PackKeyValue label="能力包">{distribution?.packageUrl || "-"}</PackKeyValue>
+          <PackKeyValue label="SHA-256">{distribution?.sha256 || pack.artifacts?.sha256 || "-"}</PackKeyValue>
+        </div>
+      ),
+    },
+    {
+      key: "meta",
+      icon: <Boxes size={16} />,
+      title: "能力包元数据",
+      body: (
+        <div className="flex flex-col gap-1">
+          <PackKeyValue label="能力包">{manifest.id}</PackKeyValue>
+          <PackKeyValue label="版本">{manifest.version}</PackKeyValue>
+          <PackKeyValue label="上一版本">{pack.previousVersion || "-"}</PackKeyValue>
+          <PackKeyValue label="前端组件">{match.component}</PackKeyValue>
+          <PackKeyValue label="状态">{pack.status}</PackKeyValue>
+        </div>
+      ),
+    },
+    {
+      key: "sdk",
+      icon: <TerminalSquare size={16} />,
+      title: "开发者 SDK 能力",
+      body: entries.length > 0 ? (
+        <div className="flex flex-wrap gap-2">
+          {entries.map((entry) => (
+            <code key={`${entry.language}:${entry.importPath}`} className="rounded-lg bg-surface-secondary px-3 py-2 font-mono text-xs text-accent">
+              {packSdkImportSnippet(entry.language, entry.importPath)}
+            </code>
+          ))}
+        </div>
+      ) : (
+        <span className="text-muted">该能力包尚未声明开发者 SDK 入口。</span>
+      ),
+    },
+  ];
+
   return (
-    <div className="page-root space-y-5 animate-fade-in-up">
+    <div className="page-root space-y-6 animate-fade-in-up">
       <PageHeader
         icon={<Boxes size={20} />}
         title={match.title || manifest.name}
         description={isIframeBundle
           ? "这个能力包提供独立界面，已在沙箱中动态加载。"
           : "这是能力包声明同步出来的通用入口；没有专属页面时，先展示用途、入口、权限和可继续打磨的路径。"}
-        actions={<Link href={packCenterFocusHref(manifest.id)} className="inline-flex items-center rounded-xl px-4 py-2 text-sm" style={{ border: "1px solid var(--yunque-border)", color: "var(--yunque-text)" }}>回中心定位</Link>}
+        actions={<Link href={packCenterFocusHref(manifest.id)}><Button size="sm" variant="outline"><Boxes size={14} /> 回中心定位</Button></Link>}
       />
 
-      <Card className="section-card p-5">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0 max-w-3xl">
-            <div className="mb-2 flex flex-wrap items-center gap-2">
-              <Chip size="sm" color={usability.kind === "experimental" ? "warning" : usability.kind === "actionable" ? "success" : "default"}>
-                {usability.label}
-              </Chip>
-              <Chip size="sm" color={readiness.level === "complete" ? "success" : readiness.level === "needs_context" ? "warning" : "danger"}>
-                {readiness.label}
-              </Chip>
-              <Chip size="sm" color={deliveryColor(delivery.tone)}>
-                {deliveryLabel}
-              </Chip>
-              <Chip size="sm" color={risk.level === "high" ? "danger" : risk.level === "medium" ? "warning" : "success"}>
-                {risk.label}
-              </Chip>
-              {flags.isIframeBundle && <Chip size="sm" variant="soft">独立界面包</Chip>}
-              {flags.hasWasm && <Chip size="sm" variant="soft">WASM</Chip>}
-            </div>
-            <div className="text-base font-semibold" style={{ color: "var(--yunque-text)" }}>这个能力包能帮你做什么</div>
-            <div className="mt-2 text-sm leading-6" style={{ color: "var(--yunque-text-secondary)" }}>
-              {manifest.description || usability.description}
-            </div>
-            <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
-              {usability.description}
-              {usability.limitation ? ` 当前限制：${usability.limitation}` : ""}
-            </div>
-            <div className="mt-3 rounded-lg px-3 py-2 text-xs leading-5" style={{ background: "var(--yunque-bg-hover)", color: "var(--yunque-text-secondary)" }}>
-              交付状态：{deliveryLabel}。{delivery.description} 下一步：{delivery.nextStep}
-            </div>
-            <div className="mt-3 grid gap-2 md:grid-cols-3">
-              {(examples.length > 0 ? examples : ["还没有写清使用示例，可以交给小羽打磨。"]).map((example) => (
-                <div key={example} className="rounded-lg px-3 py-2 text-xs leading-5" style={{ background: "var(--yunque-bg-hover)", color: "var(--yunque-text-secondary)" }}>
-                  {example}
-                </div>
-              ))}
-            </div>
-            {readiness.missing.length > 0 && (
-              <div className="mt-3 rounded-lg px-3 py-2 text-xs leading-5" style={{ background: "rgba(245,158,11,0.10)", color: "var(--yunque-warning)" }}>
-                还缺：{readiness.missing.join("、")}。这不会阻止启用，但会让用户更难判断它该怎么用。
-              </div>
-            )}
-          </div>
-          <div className="flex w-full flex-wrap gap-2 lg:w-auto lg:max-w-xs">
-            {usability.primaryActionPath && usability.primaryActionPath !== pathname && (
-              <Link href={usability.primaryActionPath}>
-                <Button size="sm" className="btn-accent">
-                  <ExternalLink size={13} /> 打开入口
-                </Button>
-              </Link>
-            )}
-            <Link href={chatPromptHref(usagePrompt)}>
-              <Button size="sm" variant="outline">
-                <MessageSquare size={13} /> 问云雀怎么用
-              </Button>
-            </Link>
-            <Link href={`/packs/detail?id=${encodeURIComponent(manifest.id)}`}>
-              <Button size="sm" variant="outline">
-                <ShieldCheck size={13} /> 权限与详情
-              </Button>
-            </Link>
-            <Link href={studioHref}>
-              <Button size="sm" variant="ghost">
-                <Wrench size={13} /> 交给小羽打磨
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </Card>
+      <PackHero
+        chips={heroChips}
+        title="这个能力包能帮你做什么"
+        description={manifest.description || usability.description}
+        note={heroNote}
+        examples={examples}
+        actions={heroActions}
+      />
 
-      <Card className="section-card p-5">
-        <div className="mb-3 flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
-          <ShieldCheck size={15} style={{ color: "var(--yunque-primary)" }} />
-          启用前边界
-        </div>
-        <div className="grid gap-3 md:grid-cols-2">
-          {boundarySummary.map((item) => (
-            <div
-              key={item.key}
-              className="rounded-lg border px-3 py-2 text-xs leading-5"
-              style={{
-                borderColor: item.tone === "danger" ? "rgba(239,68,68,0.24)" : item.tone === "warning" ? "rgba(245,158,11,0.24)" : "var(--yunque-border)",
-                background: item.tone === "danger" ? "rgba(239,68,68,0.07)" : item.tone === "warning" ? "rgba(245,158,11,0.08)" : "var(--yunque-bg-hover)",
-                color: "var(--yunque-text-secondary)",
-              }}
-            >
-              <div className="mb-1 font-semibold" style={{ color: item.tone === "danger" ? "var(--yunque-danger)" : item.tone === "warning" ? "var(--yunque-warning)" : "var(--yunque-text)" }}>
-                {item.label}
-              </div>
-              {item.detail}
-            </div>
-          ))}
-        </div>
-      </Card>
-
-      <Card className="section-card p-5">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0 max-w-3xl">
-            <div className="mb-2 flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
-              <Wrench size={15} style={{ color: "var(--yunque-accent)" }} />
-              从当前入口继续改包
-            </div>
-            <div className="text-sm leading-6" style={{ color: "var(--yunque-text-secondary)" }}>
-              你现在打开的是 <code>{pathname}</code>。如果这个能力看起来像空壳、说明不清或入口不顺，可以先看权限与来源，再交给小羽只读检查 yqpack、打磨用途和验收路径。
-            </div>
-            <div className="mt-3 grid gap-2 md:grid-cols-3">
-              {verificationSteps.map((step, idx) => (
-                <div
-                  key={step.key}
-                  className="rounded-lg border px-3 py-2 text-xs leading-5"
-                  style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-bg-hover)", color: "var(--yunque-text-secondary)" }}
-                >
-                  <div className="mb-1 flex items-center gap-2 font-semibold" style={{ color: "var(--yunque-text)" }}>
-                    <span
-                      className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px]"
-                      style={{ background: "rgba(59,130,246,0.12)", color: "var(--yunque-primary)" }}
-                    >
-                      {idx + 1}
-                    </span>
-                    {step.label}
-                  </div>
-                  {step.detail}
-                </div>
-              ))}
-            </div>
-            <div className="mt-3 rounded-lg border px-3 py-2 text-xs leading-5" style={{ borderColor: "rgba(59,130,246,0.22)", background: "rgba(59,130,246,0.07)", color: "var(--yunque-text-secondary)" }}>
-              <span className="font-semibold" style={{ color: "var(--yunque-text)" }}>验收出口：</span>
-              回中心确认状态，进详情复查权限{usability.primaryActionPath ? "，再打开入口复验。" : "；这个包没有独立入口，需从 Chat、任务、记忆或知识流程触发并观察结果。"}
-            </div>
-          </div>
-          <div className="flex w-full flex-wrap gap-2 lg:w-auto lg:max-w-xs">
-            <Link href={`/packs/detail?id=${encodeURIComponent(manifest.id)}`}>
-              <Button size="sm" variant="outline">
-                <ShieldCheck size={13} /> 看权限与来源
-              </Button>
-            </Link>
-            <Link href={studioHref}>
-              <Button size="sm" className="btn-accent">
-                <Wrench size={13} /> 让小羽改这个包
-              </Button>
-            </Link>
-            <Link href={packCenterFocusHref(manifest.id)}>
-              <Button size="sm" variant="ghost">
-                <PackageOpen size={13} /> 回中心筛选
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </Card>
+      <PackBoundaryGrid title="启用前边界" icon={<ShieldCheck size={15} />} items={boundaryItems} />
 
       {isIframeBundle && (
-        <Card className="section-card overflow-hidden p-0">
-          <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_320px]">
-            <div className="p-5">
-              <div className="flex flex-wrap items-center gap-2">
-                <Chip size="sm" style={{ background: "rgba(56,189,248,0.12)", color: "#38bdf8" }}>
-                  独立界面包
-                </Chip>
-                <Chip size="sm" variant="soft">沙箱隔离</Chip>
-                <Chip size="sm" variant="soft">按声明路由调用</Chip>
-              </div>
-              <div className="mt-3 text-base font-semibold" style={{ color: "var(--yunque-text)" }}>
-                这个能力界面来自能力包本身
-              </div>
-              <div className="mt-2 max-w-3xl text-sm leading-6" style={{ color: "var(--yunque-text-secondary)" }}>
-                它不是写死在云雀主前端里的页面，而是随能力包一起下载的独立界面。
-                启用后，云雀只负责加载沙箱、注入主题和转发白名单内的调用；界面内容、交互和升级都由该能力包提供。
-              </div>
-              {manifest.metadata?.limitation && (
-                <div className="mt-3 rounded-lg p-3 text-xs leading-5" style={{ background: "rgba(245,158,11,0.10)", color: "var(--yunque-warning)" }}>
-                  {manifest.metadata.limitation}
-                </div>
-              )}
+        <Card variant="secondary">
+          <Card.Header className="gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Chip size="sm" variant="soft">独立界面包</Chip>
+              <Chip size="sm" variant="soft">沙箱隔离</Chip>
+              <Chip size="sm" variant="soft">按声明路由调用</Chip>
             </div>
-            <div className="p-5" style={{ background: "rgba(34,197,94,0.06)", borderLeft: "1px solid var(--yunque-border)" }}>
-              <div className="mb-3 flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
-                <ShieldCheck size={16} style={{ color: "var(--yunque-success)" }} />
-                沙箱边界
-              </div>
-              <div className="space-y-2">
-                {dlcBoundaryItems.map((item) => (
-                  <div key={item} className="text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
-                    {item}
-                  </div>
-                ))}
+            <Card.Title className="text-base">这个能力界面来自能力包本身</Card.Title>
+            <Card.Description className="max-w-3xl text-sm leading-6 text-muted">
+              它不是写死在云雀主前端里的页面，而是随能力包一起下载的独立界面。启用后，云雀只负责加载沙箱、注入主题和转发白名单内的调用；界面内容、交互和升级都由该能力包提供。
+            </Card.Description>
+          </Card.Header>
+          <Card.Content className="flex flex-col gap-4">
+            {manifest.metadata?.limitation && (
+              <div className="rounded-xl bg-surface-secondary px-4 py-3 text-sm leading-6 text-warning">{manifest.metadata.limitation}</div>
+            )}
+            <div className="rounded-xl bg-surface-secondary px-4 py-3">
+              <PackSectionTitle icon={<ShieldCheck size={15} />} tone="success">沙箱边界</PackSectionTitle>
+              <div className="mt-2 flex flex-col gap-1.5 text-sm leading-6 text-muted">
+                {dlcBoundaryItems.map((item) => <div key={item}>{item}</div>)}
               </div>
             </div>
-          </div>
-          <div className="px-5 pb-5">
             <PackDlcHost
               packId={manifest.id}
               entry={assets?.entry}
@@ -337,77 +304,17 @@ export default function PackRuntimeRouteClientPage() {
               allowedNavPaths={(manifest.frontend?.routes || []).map((r) => r.path)}
               allowedEventPaths={eventPathsFromPermissions(manifest.backend?.permissions)}
             />
-          </div>
+          </Card.Content>
         </Card>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <Card className="section-card p-4">
-          <div className="kpi-label">能力包</div>
-          <div className="text-sm font-mono mt-1" style={{ color: "var(--yunque-text)" }}>{manifest.id}</div>
-          <Chip size="sm" className="mt-3" style={{ background: "rgba(34,197,94,0.10)", color: "var(--yunque-success)" }}>{pack.status}</Chip>
-        </Card>
-        <Card className="section-card p-4">
-          <div className="kpi-label">版本</div>
-          <div className="kpi-value">{manifest.version}</div>
-          <div className="kpi-sub">previous: {pack.previousVersion || "-"}</div>
-        </Card>
-        <Card className="section-card p-4">
-          <div className="kpi-label">前端组件</div>
-          <div className="text-sm font-mono mt-1" style={{ color: "var(--yunque-text)" }}>{match.component}</div>
-          <div className="kpi-sub">asset: {assets?.entry || "-"}</div>
-        </Card>
-      </div>
+      <PackInfoAccordion sections={infoSections} />
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        <Card className="section-card p-5 space-y-3">
-          <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
-            <Route size={15} /> 入口同步详情
-          </div>
-          <div className="text-xs space-y-2" style={{ color: "var(--yunque-text-muted)" }}>
-            <div>当前路径：<code>{pathname}</code></div>
-            <div>声明组件：<code>{match.component}</code></div>
-            <div>菜单入口：{(manifest.frontend?.menus || []).map((menu) => <code key={menu.key} className="mx-1">{menu.label}:{menu.path}</code>)}</div>
-            <div>后端路由：{(manifest.backend?.routeSpecs?.length ? manifest.backend.routeSpecs : manifest.backend?.routes || []).map((item) => <code key={typeof item === "string" ? item : `${item.method}:${item.path}`} className="mx-1">{formatBackendRouteSpec(item)}</code>)}</div>
-          </div>
-        </Card>
-
-        <Card className="section-card p-5 space-y-3">
-          <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
-            <ExternalLink size={15} /> 界面资源与安装包
-          </div>
-          <div className="text-xs space-y-2" style={{ color: "var(--yunque-text-muted)" }}>
-            <div>资源类型：<code>{assets?.type || "builtin"}</code></div>
-            <div>资源入口：<code>{assets?.entry || distribution?.frontendUrl || "-"}</code></div>
-            <div>远程前端：<code>{distribution?.frontendUrl || "-"}</code></div>
-            <div>能力包：<code>{distribution?.packageUrl || "-"}</code></div>
-            <div>SHA-256：<code>{distribution?.sha256 || pack.artifacts?.sha256 || "-"}</code></div>
-          </div>
-        </Card>
-      </div>
-
-      <Card className="section-card p-5 space-y-3">
-        <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
-          <TerminalSquare size={15} /> 开发者 SDK 能力
-        </div>
-        {entries.length > 0 ? (
-          <div className="flex flex-wrap gap-2">
-            {entries.map((entry) => (
-              <code key={`${entry.language}:${entry.importPath}`} className="rounded-lg px-3 py-2 text-xs" style={{ background: "rgba(0,111,238,0.10)", color: "var(--yunque-accent)" }}>
-                {packSdkImportSnippet(entry.language, entry.importPath)}
-              </code>
-            ))}
-          </div>
-        ) : (
-          <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>该能力包尚未声明开发者 SDK 入口。</div>
-        )}
-      </Card>
-
-      <Card className="section-card p-5 flex items-start gap-3">
-        <ShieldCheck size={16} className="mt-0.5 shrink-0" style={{ color: "var(--yunque-success)" }} />
-        <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>
-          技术说明：这个页面只读取已启用能力包返回的 manifest，不把新功能硬编码进主导航。后续某个能力包提供独立前端包或专属页面时，可以覆盖同一路径；未覆盖前，仍可通过这个通用入口查看菜单、路由、界面资源和 SDK 能力。
-        </div>
+      <Card variant="transparent">
+        <Card.Content className="flex items-start gap-3 text-sm leading-6 text-muted">
+          <ShieldCheck size={16} className="mt-0.5 shrink-0 text-success" />
+          <span>技术说明：这个页面只读取已启用能力包返回的 manifest，不把新功能硬编码进主导航。后续某个能力包提供独立前端包或专属页面时，可以覆盖同一路径；未覆盖前，仍可通过这个通用入口查看菜单、路由、界面资源和 SDK 能力。</span>
+        </Card.Content>
       </Card>
     </div>
   );

@@ -5,7 +5,7 @@
   "description": "本地技能市场：搜索、热门/高评分排序与统计概览。",
   "requiresCore": ">=0.1.0",
   "optional": true,
-  "defaultState": "enabled",
+  "defaultState": "disabled",
   "backend": {
     "capabilities": [
       "market.skills.search",

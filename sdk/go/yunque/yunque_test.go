@@ -29,52 +29,6 @@ func TestBreakerHelpers(t *testing.T) {
 	}
 }
 
-func TestAiriHelpers(t *testing.T) {
-	var seen []string
-	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
-		seen = append(seen, r.Method+" "+r.URL.String())
-		w.Header().Set("Content-Type", "application/json")
-		switch r.URL.Path {
-		case "/v1/ext/airi/status":
-			_, _ = w.Write([]byte(`{"plugin":"airi","connected":false}`))
-		case "/v1/ext/airi/models":
-			_, _ = w.Write([]byte(`{"object":"list","data":[{"id":"yunque-airi"}]}`))
-		case "/v1/ext/airi/chat/completions":
-			var body AiriChatCompletionRequest
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-				t.Fatal(err)
-			}
-			if body.Model != "yunque-airi" || body.Stream {
-				t.Fatalf("unexpected Airi body: %+v", body)
-			}
-			_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"hi"}}]}`))
-		default:
-			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
-		}
-	})
-
-	status, err := Airi.Status(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-	models, err := Airi.Models(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-	reply, err := Airi.ChatCompletions(context.Background(), AiriChatCompletionRequest{Model: "yunque-airi", Stream: true, Messages: []AiriChatMessage{{Role: "user", Content: "hi"}}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	streamReq := Airi.StreamRequest(AiriChatCompletionRequest{Messages: []AiriChatMessage{{Role: "user", Content: "hi"}}})
-	items := Airi.ParseStream("data: {\"choices\":[{\"delta\":{\"content\":\"hi\"}}]}\n\ndata: [DONE]\n\n")
-	if status["plugin"] != "airi" || models.Data[0].ID != "yunque-airi" || reply["choices"] == nil || !streamReq.Stream || len(items) != 2 || items[1].Kind != "done" || NewAgentKit().Airi != Airi {
-		t.Fatalf("unexpected Airi results: status=%+v models=%+v reply=%+v items=%+v", status, models, reply, items)
-	}
-	if len(seen) != 3 {
-		t.Fatalf("expected 3 requests, got %d: %v", len(seen), seen)
-	}
-}
-
 func TestBackupHelpers(t *testing.T) {
 	var seen []string
 	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {

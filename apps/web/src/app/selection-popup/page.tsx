@@ -23,24 +23,18 @@ function SelectionPopupInner() {
   }, [params]);
 
   useEffect(() => {
-    const tauri = (
-      window as unknown as {
-        __TAURI__?: {
-          event?: {
-            listen: (name: string, cb: (e: { payload: string }) => void) => Promise<() => void>;
-          };
-        };
-      }
-    ).__TAURI__;
-    if (!tauri?.event?.listen) return;
-
     let unlisten: (() => void) | undefined;
-    void tauri.event.listen("yunque:selection-text", (e) => {
-      const payload = typeof e.payload === "string" ? e.payload : String(e.payload ?? "");
-      if (payload.trim()) setText(payload.trim());
-    }).then((fn) => {
-      unlisten = fn;
-    });
+    void import("@tauri-apps/api/event")
+      .then(({ listen }) => listen<string>("yunque:selection-text", (e) => {
+        const payload = typeof e.payload === "string" ? e.payload : String(e.payload ?? "");
+        if (payload.trim()) setText(payload.trim());
+      }))
+      .then((fn) => {
+        unlisten = fn;
+      })
+      .catch((err) => {
+        console.warn("[selection-popup] tauri listen yunque:selection-text failed", err);
+      });
 
     return () => unlisten?.();
   }, []);

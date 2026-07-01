@@ -10,7 +10,7 @@
  * 通过 `data-active` 在当前路径上高亮。
  */
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { NAV_ITEMS, NAV_GROUP_ORDER, type NavGroup, type NavItem, filterNavItemsByEnabledPacks, groupNavItems, navItemLabel } from "@/lib/nav-items";
 import { useI18n } from "@/lib/i18n";
@@ -39,18 +39,53 @@ export default function AccountRailFlyout({ open, extItems = [], enabledPackIds,
   const router = useRouter();
   const pathname = usePathname();
   const { locale, t } = useI18n();
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   // Nav is fully pack-driven: core items always show; pack-owned items show only
   // when their pack is enabled. The 轻松/完整 profile toggle has been retired.
-  const grouped = useMemo(
-    () => groupNavItems(
-      filterNavItemsByEnabledPacks([...NAV_ITEMS, ...extItems], enabledPackIds ?? new Set<string>()),
-    ),
-    [extItems, enabledPackIds],
-  );
+  const { grouped, advancedFamilies, advancedCount } = useMemo(() => {
+    const visible = filterNavItemsByEnabledPacks([...NAV_ITEMS, ...extItems], enabledPackIds ?? new Set<string>());
+    const primary = visible.filter((item) => item.layer !== "lab" && item.layer !== "control-plane");
+    const advanced = visible.filter((item) => item.layer === "lab" || item.layer === "control-plane");
+    // Advanced items group by family (a pack's metadata.group label); core
+    // advanced items (workflows / skills…) without a family fall under 其他.
+    const families = new Map<string, NavItem[]>();
+    for (const item of advanced) {
+      const key = item.familyLabel || "其他";
+      const bucket = families.get(key);
+      if (bucket) bucket.push(item);
+      else families.set(key, [item]);
+    }
+    const advancedFamilies = [...families.entries()]
+      .sort(([a], [b]) => (a === "其他" ? 1 : b === "其他" ? -1 : a.localeCompare(b, "zh-Hans-CN")))
+      .map(([label, items]) => ({ label, items }));
+    return {
+      grouped: groupNavItems(primary),
+      advancedFamilies,
+      advancedCount: advanced.length,
+    };
+  }, [extItems, enabledPackIds]);
   const isZh = locale === "zh";
   const groupLabel = (g: NavGroup) => (isZh ? g : GROUP_LABEL_EN[g]);
   const title = isZh ? "全部功能" : "All features";
+  const renderItem = (it: NavItem) => {
+    const active = pathname === it.href || (pathname?.startsWith(it.href + "/") ?? false);
+    return (
+      <button
+        key={it.id}
+        type="button"
+        className="account-rail-flyout-item"
+        data-active={active || undefined}
+        onClick={() => {
+          router.push(it.href);
+          onPick?.();
+        }}
+      >
+        <span className="account-rail-flyout-item-icon">{it.icon}</span>
+        <span className="account-rail-flyout-item-label">{navItemLabel(it, t)}</span>
+      </button>
+    );
+  };
 
   return (
     <aside
@@ -82,28 +117,36 @@ export default function AccountRailFlyout({ open, extItems = [], enabledPackIds,
             <section key={g} className="account-rail-flyout-group">
               <h3 className="account-rail-flyout-group-title">{groupLabel(g)}</h3>
               <div className="account-rail-flyout-list">
-                {items.map((it) => {
-                  const active = pathname === it.href || (pathname?.startsWith(it.href + "/") ?? false);
-                  return (
-                    <button
-                      key={it.id}
-                      type="button"
-                      className="account-rail-flyout-item"
-                      data-active={active || undefined}
-                      onClick={() => {
-                        router.push(it.href);
-                        onPick?.();
-                      }}
-                    >
-                      <span className="account-rail-flyout-item-icon">{it.icon}</span>
-                      <span className="account-rail-flyout-item-label">{navItemLabel(it, t)}</span>
-                    </button>
-                  );
-                })}
+                {items.map(renderItem)}
               </div>
             </section>
           );
         })}
+        {advancedCount > 0 && (
+          <section className="account-rail-flyout-group account-rail-flyout-group--advanced">
+            <button
+              type="button"
+              className="account-rail-flyout-advanced-trigger"
+              aria-expanded={advancedOpen}
+              onClick={() => setAdvancedOpen((value) => !value)}
+            >
+              <span>{isZh ? "高级入口" : "Advanced"}</span>
+              <span className="account-rail-flyout-advanced-count">{advancedCount}</span>
+            </button>
+            {advancedOpen && (
+              <div className="account-rail-flyout-advanced-body">
+                {advancedFamilies.map(({ label, items }) => (
+                  <div key={label} className="account-rail-flyout-advanced-section">
+                    <h4 className="account-rail-flyout-group-title">{label}</h4>
+                    <div className="account-rail-flyout-list">
+                      {items.map(renderItem)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
       </div>
     </aside>
   );

@@ -139,6 +139,7 @@ func (p *Planner) emitCognitiveLoadEvent(req PlanRequest, a CognitiveLoadAssessm
 	}
 	evt := observe.NewEvent(req.TraceID, observe.DomainPlanner, observe.EventPlan, "认知负荷较高，切换为长程规划执行")
 	evt.Meta.TenantID = req.TenantID
+	evt.Meta.SessionID = req.SessionID
 	evt.Meta.TaskID = req.TaskID
 	evt.Detail = a
 	req.StepCallback(evt)

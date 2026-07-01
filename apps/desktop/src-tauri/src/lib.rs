@@ -1,7 +1,7 @@
 mod selection_accessibility;
 
 use std::process::{Child, Command};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -13,6 +13,15 @@ use tauri_plugin_clipboard_manager::ClipboardExt;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
 static HOOK_SUPPRESS_UNTIL_MS: AtomicU64 = AtomicU64::new(0);
+
+// Global selection assistant (the drag-to-select popup that can appear over
+// ANY app). Default OFF: a system-wide overlay with no off switch is a
+// hostile default, so the WH_MOUSE_LL hook is not even installed until the
+// user opts in via Settings. `SELECTION_ENABLED` gates the hook callback at
+// runtime; `SELECTION_HOOK_INSTALLED` ensures we only install the OS hook +
+// capture worker once (lazily, on first enable).
+static SELECTION_ENABLED: AtomicBool = AtomicBool::new(false);
+static SELECTION_HOOK_INSTALLED: AtomicBool = AtomicBool::new(false);
 
 fn hook_now_ms() -> u64 {
     SystemTime::now()
@@ -57,7 +66,7 @@ const GRACEFUL_POLL: Duration = Duration::from_millis(200);
 #[cfg(windows)]
 const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
 
-// Event names — kept in one place so the loader HTML and main frontend
+// Event names - kept in one place so the loader HTML and main frontend
 // can rely on a stable contract.
 const EVT_STATUS: &str = "backend:status";
 const EVT_READY: &str = "backend:ready";
@@ -958,8 +967,80 @@ fn try_schedule_global_selection(anchor: (i32, i32), target_hwnd: isize) {
     }
 }
 
-// State shared with the low-level mouse hook callback (an `extern "system"`
-// fn that can't capture, so it reads/writes these statics).
+#[derive(Serialize, Deserialize, Default)]
+struct SelectionPref {
+    enabled: bool,
+}
+
+fn selection_pref_path(handle: &AppHandle) -> Option<std::path::PathBuf> {
+    handle
+        .path()
+        .app_data_dir()
+        .ok()
+        .map(|d| d.join("data").join("selection_assistant.json"))
+}
+
+/// Read the persisted on/off state for the global selection assistant.
+/// Missing / unreadable file means OFF — the privacy-respecting default.
+fn read_selection_pref(handle: &AppHandle) -> bool {
+    let Some(path) = selection_pref_path(handle) else {
+        return false;
+    };
+    std::fs::read_to_string(&path)
+        .ok()
+        .and_then(|s| serde_json::from_str::<SelectionPref>(&s).ok())
+        .map(|p| p.enabled)
+        .unwrap_or(false)
+}
+
+fn write_selection_pref(handle: &AppHandle, enabled: bool) {
+    let Some(path) = selection_pref_path(handle) else {
+        return;
+    };
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    match serde_json::to_string(&SelectionPref { enabled }) {
+        Ok(json) => {
+            if let Err(e) = std::fs::write(&path, json) {
+                log::error!("write selection pref failed: {e}");
+            }
+        }
+        Err(e) => log::error!("serialise selection pref failed: {e}"),
+    }
+}
+
+/// Install the OS-level capture pipeline exactly once. Safe to call repeatedly;
+/// only the first call (after the user opts in) actually starts the worker and
+/// the WH_MOUSE_LL hook.
+fn ensure_selection_capture_installed(handle: &AppHandle) {
+    if SELECTION_HOOK_INSTALLED.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    start_selection_capture_worker(handle.clone());
+    register_global_selection_listener(handle);
+    prewarm_selection_popup(handle);
+}
+
+#[tauri::command]
+fn get_selection_assistant_enabled() -> bool {
+    SELECTION_ENABLED.load(Ordering::Relaxed)
+}
+
+#[tauri::command]
+fn set_selection_assistant_enabled(app: AppHandle, enabled: bool) {
+    SELECTION_ENABLED.store(enabled, Ordering::SeqCst);
+    write_selection_pref(&app, enabled);
+    if enabled {
+        ensure_selection_capture_installed(&app);
+    } else {
+        // Hook stays in the chain but no-ops; clear any popup already showing.
+        hide_selection_popup_window(&app);
+    }
+    log::info!("selection assistant {}", if enabled { "enabled" } else { "disabled" });
+}
+
+
 #[cfg(windows)]
 static HOOK_DRAG_START: Mutex<Option<(i32, i32)>> = Mutex::new(None);
 #[cfg(windows)]
@@ -981,6 +1062,13 @@ unsafe extern "system" fn selection_mouse_proc(
     use windows_sys::Win32::UI::WindowsAndMessaging::{
         CallNextHookEx, HC_ACTION, MSLLHOOKSTRUCT, WM_LBUTTONDOWN, WM_LBUTTONUP,
     };
+
+    // Runtime kill-switch: when the user has the selection assistant turned
+    // off we leave the hook in the chain but do nothing, so toggling off is
+    // instant and doesn't require tearing down the hook thread.
+    if !SELECTION_ENABLED.load(Ordering::Relaxed) {
+        return CallNextHookEx(std::ptr::null_mut(), code, wparam, lparam);
+    }
 
     if code == HC_ACTION as i32 {
         match wparam as u32 {
@@ -1367,6 +1455,8 @@ pub fn run() {
             hide_selection_popup,
             selection_popup_dismiss,
             apply_window_theme,
+            get_selection_assistant_enabled,
+            set_selection_assistant_enabled,
         ])
         .setup(|app| {
             let handle = app.handle().clone();
@@ -1436,13 +1526,18 @@ pub fn run() {
             }
 
             register_selection_shortcut(&handle);
-            start_selection_capture_worker(handle.clone());
-            register_global_selection_listener(&handle);
-            let prewarm_handle = handle.clone();
-            tauri::async_runtime::spawn(async move {
-                tokio::time::sleep(Duration::from_secs(3)).await;
-                prewarm_selection_popup(&prewarm_handle);
-            });
+            // Global drag-to-select assistant: OFF unless the user opted in.
+            // When off we install nothing (no WH_MOUSE_LL hook, no worker, no
+            // prewarmed popup) — Settings flips it on at runtime.
+            let selection_enabled = read_selection_pref(&handle);
+            SELECTION_ENABLED.store(selection_enabled, Ordering::SeqCst);
+            if selection_enabled {
+                let sel_handle = handle.clone();
+                tauri::async_runtime::spawn(async move {
+                    tokio::time::sleep(Duration::from_secs(3)).await;
+                    ensure_selection_capture_installed(&sel_handle);
+                });
+            }
             tauri::async_runtime::spawn(async move {
                 launch_backend(&handle).await;
             });

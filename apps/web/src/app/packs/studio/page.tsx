@@ -222,8 +222,8 @@ function buildDeliverySummary(params: {
     "## 产品验收入口",
     `- 能力包中心：${centerHref}（聚焦这个包，确认来源、版本、安装/启用状态和侧栏入口）`,
     detailHref
-      ? `- 权限与来源详情：${detailHref}（复查权限、风险、入口、回滚和小羽打磨建议）`
-      : "- 权限与来源详情：尚未选择能力包，无法生成详情链接。",
+      ? `- 权限与详情：${detailHref}（复查权限、风险、入口、回滚和小羽打磨建议）`
+      : "- 权限与详情：尚未选择能力包，无法生成详情链接。",
     openPath
       ? `- 打开入口复验：${openPath}（按用户主路径触发一次，确认结果、产物或状态变化可见）`
       : "- 打开入口复验：此包没有独立入口，应从 Chat、任务、记忆或知识流程触发并观察效果。",
@@ -1644,7 +1644,7 @@ export default function PackStudioPage() {
                 <div className="mt-2 rounded-md border px-3 py-2 text-xs" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-bg-hover)", color: "var(--yunque-text-secondary)" }}>
                   当前阶段：{currentWorkflowStep?.title || "等待开始"} · 下一步：{currentWorkflowStep?.action || "先选择能力包"}。小羽只生成计划和草稿，不会自动应用改动。
                 </div>
-                <div className="mt-2 rounded-md border px-3 py-2 text-xs leading-5" style={{ borderColor: "rgba(59,130,246,0.16)", background: "rgba(59,130,246,0.06)", color: "var(--yunque-text-secondary)" }}>
+                <div className="mt-2 rounded-md border px-3 py-2 text-xs leading-5" style={{ borderColor: "var(--yunque-border-accent)", background: "var(--yunque-accent-soft)", color: "var(--yunque-text-secondary)" }}>
                   {contextStatusDetail}
                 </div>
                 {inspectionSyncState && (
@@ -1757,7 +1757,7 @@ export default function PackStudioPage() {
             <div className="text-sm" style={{ color: "var(--yunque-text-muted)" }}>还没有可分析的能力包。</div>
           ) : filteredCandidates.length === 0 ? (
             <div className="rounded-md border p-4 text-sm" style={{ borderColor: "var(--yunque-border)", color: "var(--yunque-text-muted)" }}>
-              没有匹配的能力包。可以清除搜索，或切换来源筛选。
+              没有匹配的能力包。可以清除搜索，或切换来源信任。
             </div>
           ) : (
             <>
@@ -1777,7 +1777,7 @@ export default function PackStudioPage() {
                       className="rounded-md border p-3 text-left transition-colors"
                       style={{
                         borderColor: active ? "var(--yunque-accent)" : "var(--yunque-border)",
-                        background: active ? "rgba(59,130,246,0.08)" : "var(--yunque-surface)",
+                        background: active ? "var(--yunque-accent-soft)" : "var(--yunque-surface)",
                       }}
                     >
                       <div className="flex items-center justify-between gap-2">
@@ -1786,7 +1786,7 @@ export default function PackStudioPage() {
                       </div>
                       <div className="mt-1 truncate text-xs" style={{ color: "var(--yunque-text-muted)" }}>{candidate.manifest.id}</div>
                       <div className="mt-2 flex flex-wrap gap-1">
-                        <Chip size="sm" style={{ background: "rgba(59,130,246,0.08)", color: "var(--yunque-primary)" }}>{usability.label}</Chip>
+                        <Chip size="sm" style={{ background: "var(--yunque-accent-soft)", color: "var(--yunque-primary)" }}>{usability.label}</Chip>
                         <Chip size="sm" color={deliveryChipColor(delivery.tone)}>{displayDeliveryLabel(delivery.label, delivery.level)}</Chip>
                         {readiness.missing.length > 0 && <Chip size="sm" variant="soft">缺 {readiness.missing.length} 项</Chip>}
                         <Chip size="sm" variant="soft">v{candidate.manifest.version}</Chip>
@@ -1968,7 +1968,7 @@ export default function PackStudioPage() {
                       className="rounded-md border p-3"
                       style={{
                         borderColor: active ? "var(--yunque-accent)" : "var(--yunque-border)",
-                        background: active ? "rgba(59,130,246,0.08)" : "var(--yunque-surface)",
+                        background: active ? "var(--yunque-accent-soft)" : "var(--yunque-surface)",
                       }}
                     >
                       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -2022,9 +2022,9 @@ export default function PackStudioPage() {
                         </div>
                       )}
                       {pack.handoffLinks && (
-                        <div className="mt-2 rounded border px-2 py-2 text-[11px] leading-5" style={{ borderColor: "rgba(59,130,246,0.18)", background: "rgba(59,130,246,0.06)", color: "var(--yunque-text-secondary)" }}>
-                          <span className="font-medium" style={{ color: "var(--yunque-text)" }}>验收出口：</span>
-                          回中心确认状态，进详情复查权限{openHref ? "，再打开入口复验。" : "；此包没有独立入口，需从 Chat、任务、记忆或知识流程复验。"}
+                        <div className="mt-2 rounded border px-2 py-2 text-[11px] leading-5" style={{ borderColor: "var(--yunque-border-accent)", background: "var(--yunque-accent-soft)", color: "var(--yunque-text-secondary)" }}>
+                          <span className="font-medium" style={{ color: "var(--yunque-text)" }}>验收：</span>
+                          中心看状态，详情复查权限{openHref ? "，再打开入口复验。" : "；没有独立入口时，从 Chat、任务、记忆或知识流程触发。"}
                         </div>
                       )}
                       {pack.missing.length > 0 && (
@@ -2119,9 +2119,9 @@ export default function PackStudioPage() {
                   跳到当前操作 <ArrowRight size={12} />
                 </a>
               )}
-              <div className="mt-3 rounded border px-2 py-2 text-[11px] leading-5" style={{ borderColor: "rgba(59,130,246,0.20)", background: "rgba(59,130,246,0.06)", color: "var(--yunque-text-secondary)" }}>
-                <span className="font-medium" style={{ color: "var(--yunque-text)" }}>最终验收出口：</span>
-                回中心确认状态，进详情复查权限{workflowOpenPath ? "，再打开入口复验。" : "；没有独立入口时，从 Chat、任务、记忆或知识流程复验。"}
+              <div className="mt-3 rounded border px-2 py-2 text-[11px] leading-5" style={{ borderColor: "var(--yunque-border-accent)", background: "var(--yunque-accent-soft)", color: "var(--yunque-text-secondary)" }}>
+                <span className="font-medium" style={{ color: "var(--yunque-text)" }}>最终验收：</span>
+                中心看状态，详情复查权限{workflowOpenPath ? "，再打开入口复验。" : "；没有独立入口时，从 Chat、任务、记忆或知识流程触发。"}
                 <div className="mt-1 flex flex-wrap gap-2">
                   <a href={workflowCenterHref} className="inline-flex items-center gap-1 font-medium" style={{ color: "var(--yunque-accent)" }}>
                     能力包中心 <ArrowRight size={10} />
@@ -2146,7 +2146,7 @@ export default function PackStudioPage() {
                   className="rounded-md border px-2 py-2"
                   style={{
                     borderColor: step.key === currentWorkflowStep?.key ? "var(--yunque-accent)" : "var(--yunque-border)",
-                    background: step.key === currentWorkflowStep?.key ? "rgba(59,130,246,0.08)" : "var(--yunque-surface)",
+                    background: step.key === currentWorkflowStep?.key ? "var(--yunque-accent-soft)" : "var(--yunque-surface)",
                   }}
                 >
                   <div className="flex items-center justify-between gap-2">
@@ -2277,7 +2277,7 @@ export default function PackStudioPage() {
                 </div>
               )}
               {boundarySummary.length > 0 && (
-                <div className="mt-3 rounded-md border p-3 text-xs" style={{ borderColor: "rgba(59,130,246,0.18)", background: "rgba(59,130,246,0.06)" }}>
+                <div className="mt-3 rounded-md border p-3 text-xs" style={{ borderColor: "var(--yunque-border-accent)", background: "var(--yunque-accent-soft)" }}>
                   <div className="mb-2 text-xs font-medium" style={{ color: "var(--yunque-text)" }}>启用前边界</div>
                   <div className="grid gap-2 md:grid-cols-2">
                     {boundarySummary.map((item) => (
@@ -2965,7 +2965,7 @@ export default function PackStudioPage() {
                                   {postInstallBusy === "rollback" ? <Spinner size="sm" /> : <RotateCcw size={14} />} 回滚
                                 </Button>
                                 <Link href={`/packs/detail?id=${encodeURIComponent(installedRepack.manifest.id)}`}>
-                                  <Button size="sm" variant="ghost">查看权限与来源 <ArrowRight size={14} /></Button>
+                                  <Button size="sm" variant="ghost">权限与详情 <ArrowRight size={14} /></Button>
                                 </Link>
                                 <Link href={packCenterFocusHref(installedRepack.manifest.id)}>
                                   <Button size="sm" variant="ghost">回中心管理 <ArrowRight size={14} /></Button>

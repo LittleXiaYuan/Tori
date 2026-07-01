@@ -51,12 +51,16 @@ vi.mock("lucide-react", () => {
     MessageCircle: Icon,
     Monitor: Icon,
     Package: Icon,
+    Plus: Icon,
     RefreshCw: Icon,
     Rocket: Icon,
     Search: Icon,
     Server: Icon,
+    Settings: Icon,
+    Sparkles: Icon,
     TrendingDown: Icon,
     TrendingUp: Icon,
+    XCircle: Icon,
     Zap: Icon,
   };
 });
@@ -90,24 +94,24 @@ describe("DashboardPage", () => {
     apiMock.checkSetup.mockResolvedValue({ setup_needed: false });
   });
 
-  it("opens as an action-first workspace instead of an architecture console", async () => {
+  it("opens as a greeting workspace that falls back to starter scenarios", async () => {
+    // The cogni-kernel pack client is not mocked here, so cogniPack.list()
+    // rejects → the dashboard degrades to the scenarios fallback (the common
+    // case when the cogni-kernel pack is disabled).
     render(<DashboardPage />);
 
-    expect(await screen.findByRole("heading", { name: "工作台" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "从一句话开始，交付一个可验收结果" })).toBeInTheDocument();
-    expect(screen.getByRole("list", { name: "云雀工作闭环" })).toBeInTheDocument();
-    expect(screen.getByText("开口")).toBeInTheDocument();
-    expect(screen.getByText("执行")).toBeInTheDocument();
-    expect(screen.getByText("验收")).toBeInTheDocument();
-    expect(screen.getByText("沉淀")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /开始对话/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /查看任务中心/ })).toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: /整理知识/ }).length).toBeGreaterThan(0);
-    expect(screen.getByRole("heading", { name: "常用开始方式" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "运行概况" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "你好" })).toBeInTheDocument();
+    expect(screen.getByText("说一句话，云雀帮你规划和执行。")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "常用场景" })).toBeInTheDocument();
 
-    const text = document.body.textContent || "";
-    expect(text).not.toMatch(/\bPack\b|Cogni|微内核|WASM|DLC/);
+    // Starter scenarios from DASHBOARD_SCENARIOS render as action cards.
+    expect(screen.getByRole("button", { name: /写周报/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /整理知识/ })).toBeInTheDocument();
+
+    // Primary action + quick links route to concrete user surfaces.
+    expect(screen.getByRole("button", { name: /开始对话/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /任务中心/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /知识库/ })).toBeInTheDocument();
   });
 
   it("keeps setup and scenario actions routed to the concrete user paths", async () => {
@@ -115,15 +119,15 @@ describe("DashboardPage", () => {
 
     render(<DashboardPage />);
 
-    expect(await screen.findByRole("button", { name: /去配置模型/ })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /去配置/ })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /去配置模型/ }));
+    fireEvent.click(screen.getByRole("button", { name: /去配置/ }));
     expect(routerMock.push).toHaveBeenCalledWith("/setup");
 
     fireEvent.click(screen.getByRole("button", { name: /开始对话/ }));
     expect(routerMock.push).toHaveBeenCalledWith("/chat");
 
-    fireEvent.click(screen.getByRole("button", { name: /查看任务中心/ }));
+    fireEvent.click(screen.getByRole("button", { name: /任务中心/ }));
     expect(routerMock.push).toHaveBeenCalledWith("/missions");
 
     fireEvent.click(screen.getByRole("button", { name: /写周报/ }));

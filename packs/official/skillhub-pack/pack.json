@@ -5,7 +5,7 @@
   "description": "远程技能生态：搜索、详情、安装、更新、回滚与安全策略检查。",
   "requiresCore": ">=0.1.0",
   "optional": true,
-  "defaultState": "enabled",
+  "defaultState": "disabled",
   "backend": {
     "capabilities": [
       "skillhub.search",

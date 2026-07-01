@@ -1,6 +1,7 @@
 package connectorspack
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -9,6 +10,28 @@ import (
 
 	"yunque-agent/internal/connectors"
 )
+
+type fakePackConnectorHandler struct{}
+
+func (h *fakePackConnectorHandler) Connect(_ context.Context, creds *connectors.Credentials) (*connectors.Credentials, error) {
+	return creds, nil
+}
+
+func (h *fakePackConnectorHandler) Disconnect(_ context.Context, _ *connectors.Credentials) error {
+	return nil
+}
+
+func (h *fakePackConnectorHandler) Execute(_ context.Context, _ *connectors.Credentials, actionID string, _ map[string]any) (any, error) {
+	return map[string]any{"action": actionID}, nil
+}
+
+func (h *fakePackConnectorHandler) Refresh(_ context.Context, creds *connectors.Credentials) (*connectors.Credentials, error) {
+	return creds, nil
+}
+
+func (h *fakePackConnectorHandler) Validate(_ context.Context, _ *connectors.Credentials) (bool, string, error) {
+	return true, "demo-user", nil
+}
 
 func TestConnectorsPackRoutesDeclareManifestSurface(t *testing.T) {
 	handler := New(nil)
@@ -93,7 +116,15 @@ func TestConnectorsPackReadsRegistryFromProviderAtRequestTime(t *testing.T) {
 		Icon:        "plug",
 		Category:    "test",
 		AuthType:    "token",
+		Actions:     []connectors.ActionDef{{ID: "ping", Name: "Ping"}},
 	})
+	registry.RegisterHandler("demo", &fakePackConnectorHandler{})
+	if err := registry.ConnectWithKey(context.Background(), "demo", "secret"); err != nil {
+		t.Fatalf("connect demo: %v", err)
+	}
+	if _, err := registry.Execute(context.Background(), "demo", "ping", nil); err != nil {
+		t.Fatalf("execute demo: %v", err)
+	}
 	rec = httptest.NewRecorder()
 	list(rec, httptest.NewRequest(http.MethodGet, "/api/connectors", nil))
 	if rec.Code != http.StatusOK {
@@ -107,6 +138,12 @@ func TestConnectorsPackReadsRegistryFromProviderAtRequestTime(t *testing.T) {
 	}
 	if len(body.Connectors) != 1 || body.Connectors[0]["id"] != "demo" {
 		t.Fatalf("expected provider-backed connector listing, got %#v", body.Connectors)
+	}
+	if body.Connectors[0]["allowlist_count"] != float64(1) {
+		t.Fatalf("expected allowlist count in connector listing, got %#v", body.Connectors[0])
+	}
+	if body.Connectors[0]["last_event"] == nil {
+		t.Fatalf("expected last event in connector listing, got %#v", body.Connectors[0])
 	}
 }
 

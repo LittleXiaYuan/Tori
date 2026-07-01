@@ -45,6 +45,9 @@ import {
   formatPackInstallError,
   groupPackPermissions,
   packDeliveryProfile,
+  packGroupKey,
+  packGroupLabel,
+  PACK_GROUP_UNGROUPED,
   packInstallChecklist,
   packInstallTroubleshooting,
   packExamples,
@@ -143,45 +146,8 @@ const READINESS_FILTER_LABELS: Record<ReadinessFilter, string> = {
   needs_context: "需补说明",
   needs_entry: "需补入口",
 };
-// Display names for manifest metadata.group keys. Groups cluster related packs
-// into collapsible sections in the catalog so a 60-card flat list reads as a
-// handful of families. Unmapped keys fall back to the raw key via packGroupLabel.
-const PACK_GROUP_LABELS: Record<string, string> = {
-  "security-lab": "安全实验室",
-  "inner-world": "内在世界",
-  "automation-lab": "自动化实验",
-  automation: "自动化",
-  memory: "记忆",
-  cogni: "认知 Cogni",
-  work: "工作与任务",
-  extensions: "扩展与插件",
-  intelligence: "智能与知识",
-  knowledge: "知识",
-  integration: "集成",
-  governance: "治理",
-  collaboration: "协作",
-  runtime: "运行时",
-  "agent-runtime": "智能体运行时",
-  "control-plane": "控制面",
-  communication: "通讯",
-  chat: "聊天",
-  cognition: "认知",
-  perception: "感知",
-  skills: "技能",
-  developer: "开发者",
-  desktop: "桌面",
-  ops: "运维",
-  overview: "总览",
-};
-const PACK_GROUP_UNGROUPED = "__ungrouped__";
-function packGroupKey(manifest: PackManifest): string {
-  const g = manifest.metadata?.group;
-  return typeof g === "string" && g.trim() ? g.trim() : PACK_GROUP_UNGROUPED;
-}
-function packGroupLabel(key: string): string {
-  if (key === PACK_GROUP_UNGROUPED) return "其他";
-  return PACK_GROUP_LABELS[key] || key;
-}
+// Group display names + helpers (packGroupKey / packGroupLabel / PACK_GROUP_UNGROUPED)
+// are shared with the sidebar flyout — imported from pack-presentation above.
 const SORT_MODE_LABELS: Record<SortMode, string> = {
   name: "按名称",
   kind: "按类型",
@@ -1081,13 +1047,15 @@ export default function PacksPageOptimized() {
         return false;
       }
     } else if (!advancedVisible && !options?.installedStatus) {
-      // Default "all" view hides catalog packs with NO user-facing entry —— 没有任何可点
-      // 入口（primaryActionPath / menus / routes）的包是"后厨的锅碗瓢盆"：它们在使用中
-      // 被云雀自动调用（聊天时检索记忆、自动调度任务），用户不需要在能力包中心看到。
-      // 判据按"有无入口"而非 usability 标签——很多 infrastructure 包其实挂着 /chat、
-      // /knowledge、/settings 等入口（documents/files/graph/scheduler…），那些要保留。
-      // 仅对未安装的目录包生效：用户已安装的包永远保留（否则装了却找不到、无法停用）；
-      // 打开「显示高级」或维护模式（advancedVisible）也会显示全部。
+      // Default "all" view is for ordinary users: show only packs they'd
+      // actually open and use. Two things are hidden (both revealed by the
+      // 「显示高级」toggle / maintenance mode, and never hidden for installed
+      // packs so users can always find & disable what they installed):
+      //   1. infrastructure / documented packs —— 内核"内脏"（graph / retrieval /
+      //      scheduler / files / state…）。它们在使用中被云雀自动调用，普通用户
+      //      不需要、也看不懂，不该摆在能力包中心台面上。
+      //   2. packs with NO user-facing entry at all —— 连入口都没有的纯后台件。
+      if (usability.kind === "infrastructure" || usability.kind === "documented") return false;
       const entryPath = usability.primaryActionPath || manifest.frontend?.menus?.[0]?.path || manifest.frontend?.routes?.[0]?.path;
       if (!entryPath) return false;
     }

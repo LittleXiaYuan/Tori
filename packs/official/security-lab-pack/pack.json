@@ -1,0 +1,50 @@
+{
+  "id": "yunque.pack.security-lab",
+  "name": "Security Lab Pack",
+  "version": "0.1.0",
+  "description": "安全实验室：把护栏 fuzz、Skill 异常、SBOM 漂移与混沌探针聚合到一个标签页面板的表现层能力包。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "disabled",
+  "frontend": {
+    "menus": [
+      {
+        "key": "security-lab",
+        "label": "安全实验室",
+        "path": "/packs/security-lab",
+        "icon": "shield-alert",
+        "order": 95
+      }
+    ],
+    "routes": [
+      {
+        "path": "/packs/security-lab",
+        "component": "security/SecurityLabPackPage",
+        "title": "安全实验室"
+      }
+    ],
+    "assets": {
+      "type": "builtin",
+      "entry": "security/SecurityLabPackPage"
+    }
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "group": "security-lab",
+    "sync": "presentation-aggregator",
+    "aggregates": "yunque.pack.guardrail-fuzzer,yunque.pack.skill-anomaly,yunque.pack.sbom-drift,yunque.pack.chaos-probe",
+    "descriptionStyle": "one-line-plus-three-examples",
+    "example1": "在一个面板里切换护栏 fuzz、Skill 异常、SBOM 漂移与混沌探针。",
+    "example2": "复用四个安全/运维探测器的原有能力，无需逐个打开独立页面。",
+    "example3": "作为安全实验入口，统一查看对抗测试与韧性治理结果。",
+    "usability": "experimental",
+    "primaryActionLabel": "打开安全实验室",
+    "primaryActionPath": "/packs/security-lab",
+    "usageSurface": "安全实验室标签页面板（护栏 Fuzz、Skill 异常、SBOM 漂移、混沌探针）",
+    "limitation": "这是表现层聚合，本身不提供后端能力；四个子探测器各自的后端模块与路由保持独立运行。"
+  },
+  "status": "alpha"
+}

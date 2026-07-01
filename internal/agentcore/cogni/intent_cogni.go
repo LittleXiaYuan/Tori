@@ -159,8 +159,14 @@ func detectIntent(message string) string {
 		}
 	}
 
-	// Chat intent (casual conversation, emotional topics)
-	if containsAny(lower, []string{"聊", "心情", "感觉", "情绪", "陪", "能不能", "可以吗", "吗", "呢", "啊", "哦"}) {
+	// Chat intent: genuine casual/emotional conversation or a greeting.
+	// Deliberately does NOT match bare interrogative particles (吗/呢/啊/哦) or
+	// polite hedges (能不能/可以吗) on their own — those show up in plenty of task
+	// requests ("整理一下这个文件吗"), and letting them win here wrongly downgrades
+	// the task to chat, which strips its tools/skills. Require a real
+	// chat/emotional/greeting signal instead; an ambiguous question falls through
+	// to file/complex, which do not restrict resources.
+	if containsAny(lower, []string{"聊", "心情", "感觉", "情绪", "陪", "唠嗑", "倾诉", "你好", "在吗", "嗨", "哈喽"}) {
 		return "chat"
 	}
 

@@ -12,7 +12,7 @@ import type {
   ConversationInfo,
   TaskInfo, GapRecord, GapStats, StateGoal,
   StateSnapshot, ExperienceItem, ExperienceOutcome, ExperienceStats, TaskTemplate,
-  PluginUITab, QQAnalysis, LLMMessage, ThreadState, TaskThreadInfo, TaskWorkingMemory,
+  PluginUITab, LLMMessage, ThreadState, TaskThreadInfo, TaskWorkingMemory,
   CostTaskSummary, CostUsageEvent, CostBreakdown,
   TriggerItem, TriggerDef, TriggerRun, TriggerLogEvent, TriggerEventPayload,
   ApprovalRequest, ApprovalRule,
@@ -261,8 +261,8 @@ export const api = {
 
   // Bots
   getBots: () => fetcher<BotsResponse>("/v1/bots"),
-  createBot: (name: string, description: string) =>
-    fetcher<BotInfo>("/v1/bots", { method: "POST", body: JSON.stringify({ name, description }) }),
+  createBot: (name: string, description: string, system_prompt?: string) =>
+    fetcher<BotInfo>("/v1/bots", { method: "POST", body: JSON.stringify({ name, description, system_prompt }) }),
   getBot: (id: string) => fetcher<BotInfo>(`/v1/bots/detail?id=${id}`),
   updateBot: (id: string, data: Partial<BotInfo>) =>
     fetcher<BotInfo>(`/v1/bots/detail?id=${id}`, { method: "PUT", body: JSON.stringify(data) }),
@@ -625,18 +625,6 @@ export const api = {
   pluginUITabs: () =>
     fetcher<{ tabs: PluginUITab[] }>("/v1/plugins/ui"),
 
-  // QQ Chat Analyzer (ext plugin)
-  qqUpload: (content: string, filename?: string) =>
-    fetcher<QQAnalysis>("/v1/ext/qqchat/upload", { method: "POST", body: JSON.stringify({ content, filename }) }),
-  qqAnalyses: () =>
-    fetcher<{ analyses: QQAnalysis[] }>("/v1/ext/qqchat/analyses"),
-  qqAnalysis: (id: string) =>
-    fetcher<QQAnalysis>(`/v1/ext/qqchat/analysis?id=${encodeURIComponent(id)}`),
-  qqRoleplay: (id: string, persona: string, message: string) =>
-    fetcher<{ persona: string; reply: string }>("/v1/ext/qqchat/roleplay", { method: "POST", body: JSON.stringify({ id, persona, message }) }),
-  qqDelete: (id: string) =>
-    fetcher<{ status: string }>(`/v1/ext/qqchat/delete?id=${encodeURIComponent(id)}`, { method: "DELETE" }),
-
   // Mission NL Parse
   missionParse: (description: string) =>
     fetcher<{ type: string; name: string; description: string; config: Record<string, unknown>; confidence: number; explanation: string }>("/v1/missions/parse", {
@@ -987,7 +975,7 @@ export const api = {
   connectorList: () =>
     fetcher<{ connectors: ConnectorView[] }>("/api/connectors"),
   connectorDetail: (id: string) =>
-    fetcher<{ connector: ConnectorDef; supported: boolean; status: string; user_info: string; error: string }>(
+    fetcher<{ connector: ConnectorDef; supported: boolean; status: string; user_info: string; error: string; allowed_actions?: string[]; last_event?: ConnectorView["last_event"] }>(
       `/api/connectors/detail?id=${encodeURIComponent(id)}`
     ),
   connectorConnect: (connectorId: string, token: string) =>

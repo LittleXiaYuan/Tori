@@ -23,6 +23,57 @@ if (typeof (Blob.prototype as { stream?: unknown }).stream !== "function") {
   });
 }
 
+// React Aria's shared element transitions call `getAnimations()`, which jsdom
+// does not implement. Returning an empty list matches the non-animated test env.
+if (typeof (Element.prototype as { getAnimations?: unknown }).getAnimations !== "function") {
+  Object.defineProperty(Element.prototype, "getAnimations", {
+    configurable: true,
+    writable: true,
+    value: () => [],
+  });
+}
+
+// HeroUI Pro components (e.g. sheet's use-scale-background) call
+// window.matchMedia, which jsdom does not implement. Provide a minimal
+// always-non-matching stub so they can mount in tests.
+if (typeof window !== "undefined" && typeof window.matchMedia !== "function") {
+  Object.defineProperty(window, "matchMedia", {
+    configurable: true,
+    writable: true,
+    value: (query: string): MediaQueryList => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    }) as MediaQueryList,
+  });
+}
+
+// jsdom implements neither ResizeObserver nor IntersectionObserver; several
+// Pro components (charts, segment indicator, drop-zone) observe layout.
+if (typeof globalThis.ResizeObserver === "undefined") {
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver;
+}
+if (typeof globalThis.IntersectionObserver === "undefined") {
+  globalThis.IntersectionObserver = class {
+    root = null;
+    rootMargin = "";
+    thresholds = [];
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+    takeRecords() { return []; }
+  } as unknown as typeof IntersectionObserver;
+}
+
 afterEach(() => {
   cleanup();
 });

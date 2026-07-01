@@ -1,4 +1,4 @@
-import type { PackInstallRequest, PackManifest } from "yunque-client/packs";
+import type { PackBackendRouteAuditEntry, PackInstallRequest, PackManifest } from "yunque-client/packs";
 
 export type PackPermissionGroupKey =
   | "read"
@@ -93,6 +93,38 @@ export type PackBoundarySummaryItem = {
   label: string;
   detail: string;
   tone: "safe" | "warning" | "danger";
+};
+
+export type PackManifestAuditIssue = {
+  key:
+    | "static-pack-route"
+    | "missing-route-specs"
+    | "capability-without-permission"
+    | "permission-without-capability"
+    | "iframe-without-whitelist"
+    | "runtime-route-missing"
+    | "runtime-method-mismatch"
+    | "runtime-route-undeclared"
+    | "runtime-route-audit-unavailable"
+    | "runtime-route-issue";
+  label: string;
+  detail: string;
+  tone: "warning" | "danger";
+};
+
+export type PackManifestAudit = {
+  level: "clear" | "watch" | "blocked";
+  label: string;
+  description: string;
+  issues: PackManifestAuditIssue[];
+  summary: {
+    capabilities: number;
+    permissions: number;
+    routeSpecs: number;
+    rawRoutes: number;
+    frontendEntries: number;
+    runtimeIssues: number;
+  };
 };
 
 type EntryLike = {
@@ -211,6 +243,153 @@ export function packSafeOpenPath(manifest: PackManifest, candidate?: string): st
   return STATIC_PACK_PAGE_PATHS.has(normalized) ? raw : undefined;
 }
 
+function isUnknownStaticPackPath(path?: string): boolean {
+  const normalized = normalizeOpenPath(path);
+  if (!normalized.startsWith("/packs/")) return false;
+  if (normalized.startsWith("/packs/detail") || normalized.startsWith("/packs/studio")) return false;
+  return !STATIC_PACK_PAGE_PATHS.has(normalized);
+}
+
+function runtimeRouteIssue(entry: PackBackendRouteAuditEntry): PackManifestAuditIssue | null {
+  if (entry.status === "ok") return null;
+  const method = entry.method || entry.methods?.[0] || "ANY";
+  const route = `${method} ${entry.path}`;
+
+  if (entry.status === "missing") {
+    return {
+      key: "runtime-route-missing",
+      label: "运行路由未挂载",
+      detail: `${route} 已在 manifest 声明，但当前后端没有挂载；启用后能力调用会失败。`,
+      tone: "danger",
+    };
+  }
+  if (entry.status === "method-mismatch") {
+    return {
+      key: "runtime-method-mismatch",
+      label: "运行方法不匹配",
+      detail: `${route} 的 manifest method 与后端挂载 method 不一致；能力门禁可能误判可用性。`,
+      tone: "danger",
+    };
+  }
+  if (entry.status === "undeclared") {
+    return {
+      key: "runtime-route-undeclared",
+      label: "运行路由未声明",
+      detail: `${route} 已被后端挂载，但没有出现在 manifest routeSpecs；请补声明或移除挂载，避免越权入口。`,
+      tone: "danger",
+    };
+  }
+  if (entry.status === "registry-unavailable") {
+    return {
+      key: "runtime-route-audit-unavailable",
+      label: "运行审计不可用",
+      detail: `${entry.pack_name || entry.pack_id} 当前无法完成 route audit；先刷新或检查 Pack Runtime registry。`,
+      tone: "warning",
+    };
+  }
+  return {
+    key: "runtime-route-issue",
+    label: "运行路由异常",
+    detail: `${route} 的运行态审计状态为 ${entry.status}；请进工坊或后端日志确认声明与挂载是否一致。`,
+    tone: entry.mounted && !entry.declared ? "danger" : "warning",
+  };
+}
+
+export function packManifestAudit(
+  manifest: PackManifest,
+  runtimeEntries: readonly PackBackendRouteAuditEntry[] = [],
+): PackManifestAudit {
+  const backend = manifest.backend || {};
+  const frontend = manifest.frontend || {};
+  const metadata = manifest.metadata || {};
+  const capabilities = backend.capabilities || [];
+  const permissions = backend.permissions || [];
+  const routeSpecs = backend.routeSpecs || [];
+  const rawRoutes = backend.routes || [];
+  const frontendPaths = [
+    ...(frontend.menus || []).map((menu) => menu.path),
+    ...(frontend.routes || []).map((route) => route.path),
+    metadata.primaryActionPath,
+  ].filter((path): path is string => typeof path === "string" && path.trim().length > 0);
+  const issues: PackManifestAuditIssue[] = [];
+
+  const unknownPackPaths = [...new Set(frontendPaths.filter(isUnknownStaticPackPath))];
+  if (unknownPackPaths.length > 0) {
+    issues.push({
+      key: "static-pack-route",
+      label: "入口可能 404",
+      detail: `这些 /packs 子路由没有静态页面：${unknownPackPaths.join("、")}。请补页面、改到详情页，或改成 Chat/任务入口。`,
+      tone: "danger",
+    });
+  }
+
+  if (rawRoutes.length > 0 && routeSpecs.length === 0) {
+    issues.push({
+      key: "missing-route-specs",
+      label: "缺 routeSpecs",
+      detail: "后端只声明了 routes，缺少 method/path/description 白名单；能力门禁、iframe bridge 和 route audit 很难准确验收。",
+      tone: "danger",
+    });
+  }
+
+  if (capabilities.length > 0 && permissions.length === 0) {
+    issues.push({
+      key: "capability-without-permission",
+      label: "能力缺权限边界",
+      detail: "声明了可调度能力，但没有说明会读取、写入、联网或触达哪些资源；启用前用户难以判断风险。",
+      tone: "warning",
+    });
+  }
+
+  if (permissions.length > 0 && capabilities.length === 0) {
+    issues.push({
+      key: "permission-without-capability",
+      label: "权限缺能力声明",
+      detail: "声明了权限但没有对应 capability；用户会看到风险，却不知道云雀会在什么任务中使用它。",
+      tone: "warning",
+    });
+  }
+
+  if (String(frontend.assets?.type || "").toLowerCase() === "iframe-bundle" && routeSpecs.length === 0) {
+    issues.push({
+      key: "iframe-without-whitelist",
+      label: "iframe 缺白名单",
+      detail: "独立界面包应明确 backend.routeSpecs，方便 host bridge 默认拒绝未声明调用并给用户留下审计线索。",
+      tone: "warning",
+    });
+  }
+
+  for (const entry of runtimeEntries.filter((item) => item.pack_id === manifest.id)) {
+    const issue = runtimeRouteIssue(entry);
+    if (issue) issues.push(issue);
+  }
+
+  const level = issues.some((issue) => issue.tone === "danger")
+    ? "blocked"
+    : issues.length > 0
+      ? "watch"
+      : "clear";
+
+  return {
+    level,
+    label: level === "clear" ? "审计清晰" : level === "watch" ? "需要复核" : "阻塞验收",
+    description: level === "clear"
+      ? "入口、后端声明和能力边界没有发现明显结构性缺口。"
+      : level === "watch"
+        ? "能力基本可读，但仍有权限、白名单或说明边界需要复核。"
+        : "存在可能导致入口不可用或能力门禁无法验收的问题，建议先进工坊修复。",
+    issues,
+    summary: {
+      capabilities: capabilities.length,
+      permissions: permissions.length,
+      routeSpecs: routeSpecs.length,
+      rawRoutes: rawRoutes.length,
+      frontendEntries: frontendPaths.length,
+      runtimeIssues: runtimeEntries.filter((entry) => entry.pack_id === manifest.id && entry.status !== "ok").length,
+    },
+  };
+}
+
 export function packExamples(manifest: PackManifest, limit = 3): string[] {
   const metadata = manifest.metadata || {};
   return ["example1", "example2", "example3", "example4", "example5"]
@@ -264,6 +443,47 @@ export function packUsability(manifest: PackManifest): PackUsability {
     primaryActionPath,
     limitation,
   };
+}
+
+// Display names for manifest metadata.group keys. Groups cluster related packs
+// into a handful of families — shared by the catalog (collapsible sections) and
+// the sidebar flyout (family sub-headers). Unmapped keys fall back to the raw
+// key via packGroupLabel.
+export const PACK_GROUP_LABELS: Record<string, string> = {
+  "security-lab": "安全实验室",
+  "inner-world": "内在世界",
+  "automation-lab": "自动化实验",
+  automation: "自动化",
+  memory: "记忆",
+  cogni: "认知 Cogni",
+  work: "工作与任务",
+  extensions: "扩展与插件",
+  intelligence: "智能与知识",
+  knowledge: "知识",
+  integration: "集成",
+  governance: "治理",
+  collaboration: "协作",
+  runtime: "运行时",
+  "agent-runtime": "智能体运行时",
+  "control-plane": "控制面",
+  communication: "通讯",
+  chat: "聊天",
+  cognition: "认知",
+  perception: "感知",
+  skills: "技能",
+  developer: "开发者",
+  desktop: "桌面",
+  ops: "运维",
+  overview: "总览",
+};
+export const PACK_GROUP_UNGROUPED = "__ungrouped__";
+export function packGroupKey(manifest: PackManifest): string {
+  const g = manifest.metadata?.group;
+  return typeof g === "string" && g.trim() ? g.trim() : PACK_GROUP_UNGROUPED;
+}
+export function packGroupLabel(key: string): string {
+  if (key === PACK_GROUP_UNGROUPED) return "其他";
+  return PACK_GROUP_LABELS[key] || key;
 }
 
 export function packReadiness(manifest: PackManifest): PackReadiness {

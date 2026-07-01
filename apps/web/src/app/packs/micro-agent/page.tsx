@@ -8,6 +8,7 @@ import PageHeader from "@/components/page-header";
 import { formatErrorMessage } from "@/lib/error-utils";
 import { chatPromptHref, taskDetailHref, traceTaskHref } from "@/lib/pack-action-links";
 import { microAgentTaskPrompt, microAgentTraceSummaryPrompt, previewTracePayload } from "@/lib/micro-agent-pack-actions";
+import { PackAbout, PackStepsGrid, type PackBoundaryItem, type PackStep } from "@/components/packs/pack-page-kit";
 import {
   createMicroAgentPackClient,
   type AgentEntry,
@@ -16,26 +17,17 @@ import {
 
 const microClient = createMicroAgentPackClient();
 
-const userFacingSteps = [
-  {
-    title: "1. 查看已注册微代理",
-    body: "确认哪些领域提示会常驻或按触发词注入到任务里。",
-  },
-  {
-    title: "2. 试一条触发消息",
-    body: "输入消息，预览会激活哪些微代理，再决定是否用它开始任务。",
-  },
-  {
-    title: "3. 回放任务推理",
-    body: "输入 task_id 查看 ReAct 轨迹，并把轨迹交给 Chat 总结。",
-  },
+const userFacingSteps: PackStep[] = [
+  { key: "view", label: "查看已注册微代理", detail: "确认哪些领域提示会常驻或按触发词注入到任务里。" },
+  { key: "trigger", label: "试一条触发消息", detail: "输入消息，预览会激活哪些微代理，再决定是否用它开始任务。" },
+  { key: "replay", label: "回放任务推理", detail: "输入 task_id 查看 ReAct 轨迹，并把轨迹交给 Chat 总结。" },
 ];
 
-const boundaryItems = [
-  "不会自动执行微代理内容。",
-  "不会绕过 Chat 或任务确认直接开工。",
-  "不会把禁用的微代理注入上下文。",
-  "不会修改 data/microagents 下的源文件。",
+const boundaryItems: PackBoundaryItem[] = [
+  { key: "exec", label: "不自动执行", detail: "不会自动执行微代理内容。" },
+  { key: "confirm", label: "不绕过确认", detail: "不会绕过 Chat 或任务确认直接开工。" },
+  { key: "disabled", label: "不注入禁用项", detail: "不会把禁用的微代理注入上下文。" },
+  { key: "source", label: "不改源文件", detail: "不会修改 data/microagents 下的源文件。" },
 ];
 
 function formatTimestamp(iso: string): string {
@@ -59,12 +51,12 @@ function ColumnHeader({
 }) {
   return (
     <div className="flex items-center gap-2 mb-3">
-      <span style={{ color: "var(--yunque-accent)" }}>{icon}</span>
-      <span className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
+      <span className="text-accent">{icon}</span>
+      <span className="text-sm font-semibold text-foreground">
         {title}
       </span>
       {hint ? (
-        <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+        <span className="text-xs text-muted">
           {hint}
         </span>
       ) : null}
@@ -74,10 +66,7 @@ function ColumnHeader({
 
 function EmptyState({ text }: { text: string }) {
   return (
-    <div
-      className="text-xs px-3 py-6 text-center rounded-md"
-      style={{ color: "var(--yunque-text-muted)", background: "rgba(255,255,255,0.02)" }}
-    >
+    <div className="text-xs px-3 py-6 text-center rounded-xl text-muted bg-surface-secondary">
       {text}
     </div>
   );
@@ -87,18 +76,12 @@ function AgentCard({ agent, highlighted }: { agent: AgentEntry; highlighted?: bo
   const scopeColor: "accent" | "success" | "default" =
     agent.scope === "global" ? "accent" : agent.scope === "repo" ? "success" : "default";
   return (
-    <div
-      className="rounded-md px-3 py-2 text-sm"
-      style={{
-        background: highlighted ? "rgba(56,189,248,0.06)" : "rgba(255,255,255,0.02)",
-        border: `1px solid ${highlighted ? "var(--yunque-accent)" : "var(--yunque-border)"}`,
-      }}
-    >
+    <div className={`rounded-xl px-3 py-2 text-sm bg-surface-secondary border ${highlighted ? "border-accent" : "border-border"}`}>
       <div className="flex items-center gap-2 mb-1 flex-wrap">
         <Chip size="sm" color={scopeColor}>
           {agent.scope}
         </Chip>
-        <span className="font-semibold" style={{ color: "var(--yunque-text)" }}>
+        <span className="font-semibold text-foreground">
           {agent.name}
         </span>
         {!agent.enabled ? (
@@ -111,26 +94,20 @@ function AgentCard({ agent, highlighted }: { agent: AgentEntry; highlighted?: bo
         ) : (
           <Chip size="sm">常驻</Chip>
         )}
-        <span className="text-xs ml-auto" style={{ color: "var(--yunque-text-muted)" }}>
+        <span className="text-xs ml-auto text-muted">
           优先级 {agent.priority}
         </span>
       </div>
       {agent.description ? (
-        <div className="text-xs mb-1" style={{ color: "var(--yunque-text-muted)" }}>
+        <div className="text-xs mb-1 text-muted">
           {agent.description}
         </div>
       ) : null}
       <details>
-        <summary
-          className="text-xs cursor-pointer"
-          style={{ color: "var(--yunque-text-muted)" }}
-        >
+        <summary className="text-xs cursor-pointer text-muted">
           查看内容（{agent.content.length} 字）
         </summary>
-        <pre
-          className="text-xs mt-1 whitespace-pre-wrap break-words"
-          style={{ color: "var(--yunque-text)" }}
-        >
+        <pre className="text-xs mt-1 whitespace-pre-wrap break-words text-foreground">
           {agent.content}
         </pre>
       </details>
@@ -158,7 +135,7 @@ function AgentsColumn({
     <Card className="section-card p-4">
       <ColumnHeader icon={<Bot size={16} />} title="微代理" hint={`${agents.length} 个已注册`} />
       {loading ? (
-        <div className="flex items-center gap-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+        <div className="flex items-center gap-2 text-xs text-muted">
           <Spinner size="sm" /> 加载中…
         </div>
       ) : agents.length === 0 ? (
@@ -202,7 +179,7 @@ function ResolveColumn({
         </Button>
       </div>
       {loading ? (
-        <div className="flex items-center gap-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+        <div className="flex items-center gap-2 text-xs text-muted">
           <Spinner size="sm" /> 加载中…
         </div>
       ) : matched.length === 0 ? (
@@ -246,7 +223,7 @@ function TraceColumn({
         </Button>
       </div>
       {loading ? (
-        <div className="flex items-center gap-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+        <div className="flex items-center gap-2 text-xs text-muted">
           <Spinner size="sm" /> 加载中…
         </div>
       ) : entries.length === 0 ? (
@@ -288,22 +265,21 @@ function TraceColumn({
             return (
               <div
                 key={e.id}
-                className="rounded-md px-3 py-2 text-sm"
-                style={{ background: "rgba(255,255,255,0.02)", border: "1px solid var(--yunque-border)" }}
+                className="rounded-xl px-3 py-2 text-sm bg-surface-secondary border border-border"
               >
                 <div className="flex items-center gap-2 mb-1 flex-wrap">
                   <Chip size="sm" color={color}>
                     {kind}
                   </Chip>
-                  <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+                  <span className="text-xs text-muted">
                     {e.actor}
                   </span>
-                  <span className="text-xs ml-auto" style={{ color: "var(--yunque-text-muted)" }}>
+                  <span className="text-xs ml-auto text-muted">
                     {formatTimestamp(e.created_at)}
                   </span>
                 </div>
                 {summary ? (
-                  <div className="text-xs" style={{ color: "var(--yunque-text)" }}>
+                  <div className="text-xs text-foreground">
                     {summary}
                   </div>
                 ) : null}
@@ -378,50 +354,30 @@ export default function MicroAgentPackPage() {
     <div className="page-root space-y-6 animate-fade-in-up">
       <PageHeader icon={<Bot size={20} />} title="微代理" />
 
-      <Card className="section-card overflow-hidden p-0">
-        <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="p-5">
-            <div className="flex flex-wrap items-center gap-2">
-              <Chip size="sm" style={{ background: "rgba(34,197,94,0.10)", color: "var(--yunque-success)" }}>可直接使用</Chip>
-              <Chip size="sm" variant="soft">可试触发</Chip>
-              <Chip size="sm" variant="soft">可回放轨迹</Chip>
-            </div>
-            <div className="mt-3 text-base font-semibold" style={{ color: "var(--yunque-text)" }}>
-              这个能力包现在适合做什么
-            </div>
-            <div className="mt-2 max-w-3xl text-sm leading-6" style={{ color: "var(--yunque-text-secondary)" }}>
-              它用于查看哪些轻量专家提示会参与任务，并在真正发起前预览触发结果。当前可以查看微代理内容、模拟消息触发、用匹配到的微代理开始任务，也可以按 task_id 回放推理轨迹。
-            </div>
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
-              {userFacingSteps.map((item) => (
-                <div key={item.title} className="rounded-lg p-3" style={{ background: "var(--yunque-bg-hover)", border: "1px solid var(--yunque-border)" }}>
-                  <div className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>{item.title}</div>
-                  <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>{item.body}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="p-5" style={{ background: "rgba(245,158,11,0.08)", borderLeft: "1px solid var(--yunque-border)" }}>
-            <div className="mb-3 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>当前不会做什么</div>
-            <div className="space-y-2 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
-              {boundaryItems.map((item) => <div key={item}>{item}</div>)}
-            </div>
-          </div>
-        </div>
-      </Card>
+      <PackAbout
+        chips={<>
+          <Chip size="sm" color="success">可直接使用</Chip>
+          <Chip size="sm" variant="soft">可试触发</Chip>
+          <Chip size="sm" variant="soft">可回放轨迹</Chip>
+        </>}
+        description="它用于查看哪些轻量专家提示会参与任务，并在真正发起前预览触发结果。当前可以查看微代理内容、模拟消息触发、用匹配到的微代理开始任务，也可以按 task_id 回放推理轨迹。"
+        boundaries={boundaryItems}
+      />
 
-      <Card className="section-card p-4 text-sm" style={{ color: "var(--yunque-text-muted)" }}>
-        微代理是按需注入的领域提示。Agent 收到消息时会按触发词激活相应的微代理；ReAct 引擎记录每一步的推理轨迹，支持事后回放。
+      <Card variant="default">
+        <Card.Content className="flex flex-col gap-4">
+          <PackStepsGrid steps={userFacingSteps} columns={3} />
+          <div className="text-sm leading-6 text-muted">
+            微代理是按需注入的领域提示。Agent 收到消息时会按触发词激活相应的微代理；ReAct 引擎记录每一步的推理轨迹，支持事后回放。
+          </div>
+        </Card.Content>
       </Card>
 
       {error ? (
-        <Card className="p-4" style={{ background: "rgba(239,68,68,0.05)" }}>
-          <div className="flex items-center gap-2">
-            <AlertTriangle size={16} style={{ color: "var(--yunque-danger)" }} />
-            <span className="text-sm" style={{ color: "var(--yunque-danger)" }}>
-              {error}
-            </span>
-          </div>
+        <Card variant="secondary">
+          <Card.Content className="flex items-center gap-2 text-sm text-danger">
+            <AlertTriangle size={16} /> {error}
+          </Card.Content>
         </Card>
       ) : null}
 

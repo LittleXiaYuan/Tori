@@ -1512,7 +1512,6 @@ pub struct AgentKit {
     pub embeddings: EmbeddingsClient,
     pub search: SearchClient,
     pub router: RouterClient,
-    pub airi: AiriClient,
     pub settings: SettingsClient,
     pub system: SystemClient,
     pub auth: AuthClient,
@@ -1628,7 +1627,6 @@ impl AgentKit {
             embeddings: EmbeddingsClient::new(base_url.clone(), token.as_ref())?,
             search: SearchClient::new(base_url.clone(), token.as_ref())?,
             router: RouterClient::new(base_url.clone(), token.as_ref())?,
-            airi: AiriClient::new(base_url.clone(), token.as_ref())?,
             settings: SettingsClient::new(base_url.clone(), token.as_ref())?,
             system: SystemClient::new(base_url.clone(), token.as_ref())?,
             auth: AuthClient::new(base_url.clone(), token.as_ref())?,
@@ -1740,7 +1738,6 @@ impl AgentKit {
             embeddings: EmbeddingsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             search: SearchClient::new_with_client(base_url.clone(), plugin_http.clone()),
             router: RouterClient::new_with_client(base_url.clone(), plugin_http.clone()),
-            airi: AiriClient::new_with_client(base_url.clone(), plugin_http.clone()),
             settings: SettingsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             system: SystemClient::new_with_client(base_url.clone(), plugin_http.clone()),
             auth: AuthClient::new_with_client(base_url.clone(), plugin_http.clone()),
@@ -4610,119 +4607,6 @@ fn iterate_proposals_query(query: &IterateProposalsQuery) -> String {
     }
 }
 
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
-pub struct AiriModel {
-    pub id: String,
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub object: String,
-    #[serde(default, skip_serializing_if = "is_default")]
-    pub created: i64,
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub owned_by: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
-pub struct AiriModelsResponse {
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub object: String,
-    #[serde(default)]
-    pub data: Vec<AiriModel>,
-}
-
-pub type AiriStatusResponse = serde_json::Value;
-pub type AiriChatCompletionResponse = serde_json::Value;
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
-pub struct AiriChatMessage {
-    pub role: String,
-    pub content: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
-pub struct AiriChatCompletionRequest {
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub model: String,
-    pub messages: Vec<AiriChatMessage>,
-    #[serde(default, skip_serializing_if = "is_default")]
-    pub stream: bool,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum AiriStreamItem {
-    Chunk(AiriChatCompletionResponse),
-    Done,
-}
-
-/// Lightweight Airi bridge SDK client over `/v1/ext/airi/*`.
-#[derive(Debug, Clone)]
-pub struct AiriClient {
-    base_url: String,
-    http: reqwest::Client,
-}
-
-impl AiriClient {
-    pub fn new(base_url: impl Into<String>, token: impl AsRef<str>) -> Result<Self, reqwest::Error> {
-        let token = token.as_ref();
-        let mut headers = HeaderMap::new();
-        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
-        if !token.is_empty() {
-            let value = format!("Bearer {token}");
-            if let Ok(value) = HeaderValue::from_str(&value) {
-                headers.insert(AUTHORIZATION, value);
-            }
-        }
-        Ok(Self::new_with_client(
-            base_url,
-            reqwest::Client::builder().default_headers(headers).build()?,
-        ))
-    }
-
-    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
-        Self { base_url: trim_base_url(base_url.into()), http }
-    }
-
-    pub fn url(&self, path: &str) -> String { format!("{}{}", self.base_url, path) }
-
-    pub async fn status(&self) -> Result<AiriStatusResponse, reqwest::Error> {
-        self.http.get(self.url("/v1/ext/airi/status")).send().await?.error_for_status()?.json().await
-    }
-
-    pub async fn models(&self) -> Result<AiriModelsResponse, reqwest::Error> {
-        self.http.get(self.url("/v1/ext/airi/models")).send().await?.error_for_status()?.json().await
-    }
-
-    pub async fn chat_completions(&self, request: &AiriChatCompletionRequest) -> Result<AiriChatCompletionResponse, reqwest::Error> {
-        let mut body = request.clone();
-        body.stream = false;
-        self.http.post(self.url("/v1/ext/airi/chat/completions")).json(&body).send().await?.error_for_status()?.json().await
-    }
-
-    pub fn stream_request(&self, request: &AiriChatCompletionRequest) -> AiriChatCompletionRequest {
-        let mut body = request.clone();
-        body.stream = true;
-        body
-    }
-
-    pub fn parse_stream(&self, text: &str) -> Vec<AiriStreamItem> { parse_airi_stream(text) }
-}
-
-pub fn parse_airi_stream(text: &str) -> Vec<AiriStreamItem> {
-    text.replace("\r\n", "\n")
-        .split("\n\n")
-        .filter_map(|frame| {
-            let data = frame
-                .lines()
-                .filter_map(|line| line.strip_prefix("data:"))
-                .map(str::trim_start)
-                .collect::<Vec<_>>()
-                .join("\n");
-            if data.is_empty() { return None; }
-            if data == "[DONE]" { return Some(AiriStreamItem::Done); }
-            serde_json::from_str(&data).ok().map(AiriStreamItem::Chunk)
-        })
-        .collect()
-}
 
 /// Small Rust helper over self-iteration proposal review and manual cycle endpoints.
 #[derive(Debug, Clone)]
@@ -10562,29 +10446,6 @@ mod tests {
     fn breaker_client_trims_base_url() {
         let breaker = BreakerClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
         assert_eq!(breaker.inner.url("/api/breaker/reset"), "http://localhost:9090/api/breaker/reset");
-    }
-
-    #[test]
-    fn airi_stream_parser_reads_chunks_and_done() {
-        let items = parse_airi_stream("data: {\"choices\":[{\"delta\":{\"content\":\"hi\"}}]}\n\ndata: [DONE]\n\n");
-        assert_eq!(items.len(), 2);
-        match &items[0] {
-            AiriStreamItem::Chunk(chunk) => assert_eq!(chunk["choices"][0]["delta"]["content"], "hi"),
-            AiriStreamItem::Done => panic!("expected chunk"),
-        }
-        assert_eq!(items[1], AiriStreamItem::Done);
-    }
-
-    #[test]
-    fn airi_stream_request_forces_stream_flag() {
-        let client = AiriClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
-        assert_eq!(client.url("/v1/ext/airi/status"), "http://localhost:9090/v1/ext/airi/status");
-        let req = client.stream_request(&AiriChatCompletionRequest {
-            model: "yunque-airi".to_string(),
-            messages: vec![AiriChatMessage { role: "user".to_string(), content: "hi".to_string() }],
-            stream: false,
-        });
-        assert!(req.stream);
     }
 
     #[test]

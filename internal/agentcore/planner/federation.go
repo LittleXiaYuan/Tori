@@ -110,6 +110,8 @@ func (p *Planner) executeFederationDelegate(ctx context.Context, args map[string
 		evt := observe.NewEvent(req.TraceID, observe.DomainPlanner, observe.EventPlan,
 			fmt.Sprintf("🌐 正在联邦网络中寻找合适的Agent处理 [%s]...", intentName))
 		evt.Meta.TenantID = req.TenantID
+		evt.Meta.SessionID = req.SessionID
+		evt.Meta.TaskID = req.TaskID
 		req.StepCallback(evt)
 	}
 
@@ -123,6 +125,8 @@ func (p *Planner) executeFederationDelegate(ctx context.Context, args map[string
 		evt := observe.NewEvent(req.TraceID, observe.DomainPlanner, observe.EventToolResult,
 			fmt.Sprintf("远程Agent [%s] 完成任务 (模型: %s)", result.DelegatedTo, result.ModelUsed))
 		evt.Meta.TenantID = req.TenantID
+		evt.Meta.SessionID = req.SessionID
+		evt.Meta.TaskID = req.TaskID
 		req.StepCallback(evt)
 	}
 

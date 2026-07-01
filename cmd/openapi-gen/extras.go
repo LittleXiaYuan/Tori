@@ -48,6 +48,7 @@ func extraPaths() []extraEndpoint {
 
 		// ── Cognis by id ──────────────────────────────────────────
 		{"/v1/cognis/{id}", "get", "cognis", "Fetch one Cogni declaration", "get_cogni_by_id"},
+		{"/v1/cognis/{id}", "put", "cognis", "Update one Cogni declaration (full or partial body merged onto the current declaration)", "update_cogni"},
 		{"/v1/cognis/{id}", "delete", "cognis", "Remove one Cogni declaration", "delete_cogni"},
 		{"/v1/cognis/{id}/enable", "post", "cognis", "Enable a Cogni", "enable_cogni"},
 		{"/v1/cognis/{id}/disable", "post", "cognis", "Disable a Cogni", "disable_cogni"},

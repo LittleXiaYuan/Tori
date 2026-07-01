@@ -218,7 +218,7 @@ func NewRouterWithDeps(source DependencySource, reporter RuntimeStateReporter, d
 func (r *Router) Routes() []packruntime.BackendRoute {
 	routes := []packruntime.BackendRoute{
 		{Methods: []string{http.MethodGet, http.MethodPost}, Path: CollectionRoute, Handler: r.ServeCogniKernel},
-		{Methods: []string{http.MethodGet, http.MethodPost, http.MethodDelete}, Path: SubResourceRoute, Handler: r.ServeCogniKernel},
+		{Methods: []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete}, Path: SubResourceRoute, Handler: r.ServeCogniKernel},
 		{Methods: []string{http.MethodGet}, Path: FederationRoute, Handler: r.HandleFederationStatus},
 		{Methods: []string{http.MethodGet, http.MethodPost}, Path: FederationPeersRoute, Handler: r.HandleFederationPeers},
 		{Methods: []string{http.MethodPost}, Path: FederationDiscoverRoute, Handler: r.HandleFederationDiscover},
@@ -401,6 +401,8 @@ func (r *Router) HandleByID(w http.ResponseWriter, req *http.Request, id string)
 			"declaration": decl,
 			"enabled":     registry.IsEnabled(id),
 		})
+	case http.MethodPut:
+		r.HandleUpdate(w, req, id)
 	case http.MethodDelete:
 		if !registry.Remove(id) {
 			apperror.WriteCode(w, apperror.CodeNotFound, "cogni not found: "+id)
@@ -408,7 +410,68 @@ func (r *Router) HandleByID(w http.ResponseWriter, req *http.Request, id string)
 		}
 		writeJSON(w, map[string]any{"status": "removed", "id": id})
 	default:
-		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET or DELETE")
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET, PUT, or DELETE")
+	}
+}
+
+// HandleUpdate replaces an existing Cogni declaration. The request body may be
+// a full or partial declaration: it is decoded onto a copy of the current
+// declaration, so any field the client omits keeps its existing value. The id
+// in the body (if present) must match the path id. Persisting the updated
+// declaration to disk and re-registering it (which fires Registry change hooks)
+// makes the edit durable and live without a manual reload.
+func (r *Router) HandleUpdate(w http.ResponseWriter, req *http.Request, id string) {
+	registry := r.cogniRegistry()
+	if registry == nil {
+		apperror.WriteCode(w, apperror.CodeInternal, "cogni registry not configured")
+		return
+	}
+	existing, ok := registry.Get(id)
+	if !ok {
+		apperror.WriteCode(w, apperror.CodeNotFound, "cogni not found: "+id)
+		return
+	}
+
+	merged := *existing
+	if err := json.NewDecoder(req.Body).Decode(&merged); err != nil {
+		apperror.WriteCode(w, apperror.CodeBadRequest, "invalid JSON body: "+err.Error())
+		return
+	}
+	if strings.TrimSpace(merged.ID) == "" {
+		merged.ID = id
+	}
+	if merged.ID != id {
+		apperror.WriteCode(w, apperror.CodeBadRequest, "id in body ("+merged.ID+") does not match path ("+id+")")
+		return
+	}
+	if err := merged.Validate(); err != nil {
+		apperror.WriteCode(w, apperror.CodeBadRequest, err.Error())
+		return
+	}
+	if err := registry.Add(&merged, "api"); err != nil {
+		apperror.WriteCode(w, apperror.CodeBadRequest, err.Error())
+		return
+	}
+	r.persistDeclaration(&merged)
+	writeJSON(w, map[string]any{"status": "updated", "id": id})
+}
+
+// persistDeclaration writes a declaration to the configured Cogni directory so
+// the edit survives a restart. A missing directory is treated as "memory-only"
+// and is not an error; disk failures are logged but do not fail the request,
+// since the in-memory registry already holds the authoritative live copy.
+func (r *Router) persistDeclaration(decl *cogni.Declaration) {
+	dir := r.cogniDirectory()
+	if dir == "" {
+		return
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		slog.Warn("cogni: failed to create directory", "dir", dir, "err", err)
+		return
+	}
+	savePath := filepath.Join(dir, decl.ID+".json")
+	if err := cogni.SaveDeclaration(decl, savePath); err != nil {
+		slog.Warn("cogni: failed to save updated declaration", "id", decl.ID, "path", savePath, "err", err)
 	}
 }
 
@@ -1458,6 +1521,7 @@ func RouteSpecs() []packruntime.BackendRouteSpec {
 		{Method: http.MethodPost, Path: "/v1/cognis", Description: "Create an inline Cogni declaration."},
 		{Method: http.MethodGet, Path: "/v1/cognis/", Description: "Read one Cogni declaration or its sub-resources."},
 		{Method: http.MethodPost, Path: "/v1/cognis/", Description: "Run Cogni mutations such as reload, enable, disable, verify, generate, import, evolve, experience record, workflow run, federation update, or routing."},
+		{Method: http.MethodPut, Path: "/v1/cognis/", Description: "Update one Cogni declaration (full or partial body merged onto the current declaration)."},
 		{Method: http.MethodDelete, Path: "/v1/cognis/", Description: "Remove one Cogni declaration."},
 		{Method: http.MethodPost, Path: "/v1/cognis/reload", Description: "Reload Cogni declarations from disk."},
 		{Method: http.MethodGet, Path: "/v1/cognis/traces", Description: "List recent per-turn Cogni evaluation traces."},

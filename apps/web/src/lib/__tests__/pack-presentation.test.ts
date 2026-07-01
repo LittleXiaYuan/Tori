@@ -12,6 +12,7 @@ import {
   packInstallChecklist,
   packInstallTroubleshooting,
   packFeatureFlags,
+  packManifestAudit,
   packReadiness,
   packUsageExplanation,
   packUsability,
@@ -353,6 +354,105 @@ describe("pack-presentation", () => {
     expect(packReadiness(missingEntry)).toMatchObject({
       level: "needs_entry",
       missing: ["打开/使用入口", "后端能力声明"],
+    });
+  });
+
+  it("audits pack route and capability declarations before users hit broken entries", () => {
+    const broken: PackManifest = {
+      id: "yunque.pack.custom",
+      name: "Custom Pack",
+      version: "0.1.0",
+      metadata: {
+        primaryActionPath: "/packs/custom",
+      },
+      frontend: {
+        routes: [{ path: "/packs/custom", component: "CustomPage" }],
+        assets: { type: "iframe-bundle", entry: "index.html" },
+      },
+      backend: {
+        capabilities: ["custom.run"],
+        routes: ["/v1/custom/run"],
+      },
+    };
+
+    const audit = packManifestAudit(broken);
+
+    expect(audit.level).toBe("blocked");
+    expect(audit.label).toBe("阻塞验收");
+    expect(audit.summary).toMatchObject({
+      capabilities: 1,
+      permissions: 0,
+      routeSpecs: 0,
+      rawRoutes: 1,
+      frontendEntries: 2,
+    });
+    expect(audit.issues.map((issue) => issue.key)).toEqual([
+      "static-pack-route",
+      "missing-route-specs",
+      "capability-without-permission",
+      "iframe-without-whitelist",
+    ]);
+    expect(audit.issues[0]?.detail).toContain("/packs/custom");
+  });
+
+  it("passes known pack routes with explicit routeSpecs and permissions", () => {
+    const manifest: PackManifest = {
+      id: "yunque.pack.backup",
+      name: "Backup",
+      version: "0.1.0",
+      metadata: {
+        primaryActionPath: "/packs/backup",
+      },
+      frontend: {
+        routes: [{ path: "/packs/backup", component: "BackupPage" }],
+      },
+      backend: {
+        capabilities: ["backup.info"],
+        permissions: ["backup:read"],
+        routes: ["/v1/backup/info"],
+        routeSpecs: [{ method: "GET", path: "/v1/backup/info", description: "Read backup status" }],
+      },
+    };
+
+    expect(packManifestAudit(manifest)).toMatchObject({
+      level: "clear",
+      label: "审计清晰",
+      issues: [],
+    });
+  });
+
+  it("merges runtime backend route audit issues into pack manifest audit", () => {
+    const manifest: PackManifest = {
+      id: "yunque.pack.backup",
+      name: "Backup",
+      version: "0.1.0",
+      backend: {
+        capabilities: ["backup.info"],
+        permissions: ["backup:read"],
+        routeSpecs: [{ method: "GET", path: "/v1/backup/info" }],
+      },
+    };
+
+    const audit = packManifestAudit(manifest, [{
+      pack_id: "yunque.pack.backup",
+      pack_name: "Backup",
+      enabled: true,
+      status: "missing",
+      declared: true,
+      mounted: false,
+      method: "GET",
+      path: "/v1/backup/info",
+    }]);
+
+    expect(audit).toMatchObject({
+      level: "blocked",
+      label: "阻塞验收",
+      summary: { runtimeIssues: 1 },
+    });
+    expect(audit.issues.at(-1)).toMatchObject({
+      key: "runtime-route-missing",
+      label: "运行路由未挂载",
+      tone: "danger",
     });
   });
 

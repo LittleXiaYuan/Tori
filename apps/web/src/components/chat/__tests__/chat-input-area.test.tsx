@@ -1,14 +1,50 @@
 import { render, screen } from "@testing-library/react";
-import { createRef } from "react";
-import { describe, expect, it, vi } from "vitest";
+import React, { createRef } from "react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ChatInputArea } from "../chat-input-area";
 import type { ChatInputAreaProps } from "../chat-input-area";
+import { I18nProvider } from "@/lib/i18n";
 
 vi.mock("@heroui/react", () => {
   const Tooltip = ({ children }: { children: React.ReactNode }) => <>{children}</>;
   Tooltip.Trigger = ({ children }: { children: React.ReactNode }) => <>{children}</>;
   Tooltip.Content = ({ children }: { children: React.ReactNode }) => <span>{children}</span>;
+  const Dropdown = ({ children }: { children: React.ReactNode }) => <div>{children}</div>;
+  Dropdown.Popover = ({ children }: { children: React.ReactNode }) => <div>{children}</div>;
+  Dropdown.Menu = ({
+    children,
+    onAction,
+  }: {
+    children: React.ReactNode;
+    onAction?: (key: string) => void;
+  }) => (
+    <div>
+      {React.Children.map(children, (child) => {
+        if (!React.isValidElement<{ id?: string; children?: React.ReactNode }>(child)) return child;
+        const id = child.props.id;
+        return React.cloneElement(child, {
+          onClick: () => id && onAction?.(id),
+        } as Partial<React.HTMLAttributes<HTMLElement>>);
+      })}
+    </div>
+  );
+  Dropdown.Item = ({
+    children,
+    onClick,
+  }: {
+    children: React.ReactNode;
+    onClick?: () => void;
+  }) => <button type="button" onClick={onClick}>{children}</button>;
+  // Popover + toggle primitives are used by the nested AdvancedOptionsPopup.
+  // The composer tests don't exercise the popup internals, so pass-through
+  // renderers are enough to let the tree mount.
+  const Popover = ({ children }: { children: React.ReactNode }) => <div>{children}</div>;
+  Popover.Trigger = ({ children }: { children: React.ReactNode }) => <>{children}</>;
+  Popover.Content = ({ children }: { children: React.ReactNode }) => <div>{children}</div>;
+  Popover.Dialog = ({ children }: { children: React.ReactNode }) => <div>{children}</div>;
+  const ToggleButtonGroup = ({ children }: { children: React.ReactNode }) => <div>{children}</div>;
+  const ToggleButton = ({ children }: { children: React.ReactNode }) => <button type="button">{children}</button>;
   return {
     Button: ({
       children,
@@ -27,7 +63,12 @@ vi.mock("@heroui/react", () => {
     }) => (
       <button type="button" onClick={onPress} disabled={isDisabled} {...props}>{children}</button>
     ),
+    Dropdown,
+    Label: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
     Tooltip,
+    Popover,
+    ToggleButtonGroup,
+    ToggleButton,
   };
 });
 
@@ -40,6 +81,12 @@ vi.mock("lucide-react", () => ({
   Plug: () => <svg data-testid="plug-icon" />,
   Sparkles: () => <svg data-testid="sparkles-icon" />,
   Monitor: () => <svg data-testid="monitor-icon" />,
+  Plus: () => <svg data-testid="plus-icon" />,
+  // Used by the nested AdvancedOptionsPopup rendered inside the input area.
+  SlidersHorizontal: () => <svg data-testid="sliders-icon" />,
+  Zap: () => <svg data-testid="zap-icon" />,
+  MessageCircle: () => <svg data-testid="message-circle-icon" />,
+  Cpu: () => <svg data-testid="cpu-icon" />,
 }));
 
 vi.mock("@/components/slash-command-menu", () => ({
@@ -71,7 +118,6 @@ function baseProps(): ChatInputAreaProps {
     availableModels: [],
     currentModel: "demo",
     currentModelId: "demo",
-    airiAvailable: false,
     thinkingLevel: "auto",
     isRecording: false,
     inputRef: createRef<HTMLTextAreaElement>(),
@@ -99,6 +145,22 @@ function baseProps(): ChatInputAreaProps {
 }
 
 describe("ChatInputArea attachments", () => {
+  beforeEach(() => {
+    localStorage.setItem("yunque_locale", "zh");
+  });
+
+  it("names the composer textarea and exposes keyboard hints as its description", () => {
+    render(
+      <I18nProvider>
+        <ChatInputArea {...baseProps()} />
+      </I18nProvider>,
+    );
+
+    const composer = screen.getByRole("textbox", { name: "消息输入区" });
+    expect(composer).toBeInTheDocument();
+    expect(composer).toHaveAccessibleDescription("Enter 发送·⇧↵ 换行");
+  });
+
   it("shows actionable document status without parser implementation badge", () => {
     render(<ChatInputArea {...baseProps()} pendingFiles={[{
       id: "doc",

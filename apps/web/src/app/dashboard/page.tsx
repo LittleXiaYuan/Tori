@@ -1,144 +1,80 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Button } from "@heroui/react";
+import { api, type VersionInfo } from "@/lib/api";
 import {
-  Button, Chip, Tooltip, Table, ProgressBar,
-} from "@heroui/react";
-import {
-  api,
-  type MetricsSnapshot,
-  type VersionInfo,
-  type SkillInfo,
-  type CostSummary,
-  type SystemInfo as SysInfo,
-} from "@/lib/api";
-import {
-  Activity, Zap, Clock, Package, AlertTriangle, Server,
-  ArrowRight, RefreshCw, TrendingUp, TrendingDown,
-  DollarSign, BarChart3, Rocket,
-  MessageCircle, CheckCircle2, BookOpen, Brain, ClipboardCheck,
+  MessageCircle, ArrowRight, Rocket, Zap,
+  BookOpen, Brain, CheckCircle2, XCircle, Plus,
+  Sparkles, Settings,
 } from "lucide-react";
 import { usePolling } from "@/lib/use-polling";
 import { DashboardSkeleton } from "@/components/skeleton-loader";
-import { formatErrorMessage } from "@/lib/error-utils";
 import { DASHBOARD_SCENARIOS, scenarioChatHref } from "@/lib/product-scenarios";
+import { createCogniKernelPackClient } from "@/lib/cogni-kernel-pack-client";
+import type {
+  CogniEntryStatus,
+  CogniHealthMetrics,
+} from "@/lib/api-types/cogni";
 
-/* ── helpers ───────────────────────────────────── */
+const cogniPack = createCogniKernelPackClient();
 
-function formatUptime(seconds: number): string {
-  const d = Math.floor(seconds / 86400);
-  const h = Math.floor((seconds % 86400) / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  if (d > 0) return `${d}天 ${h}小时`;
-  if (h > 0) return `${h}小时 ${m}分`;
-  return `${m}分钟`;
+const COGNI_GRID_LIMIT = 7; // 7 cogni cards + 1 "create" tile = 8 cells (fits 4x2 grid cleanly)
+
+type CogniState =
+  | { kind: "loading" }
+  | { kind: "unavailable" }
+  | { kind: "ready"; entries: CogniEntryStatus[]; health: Record<string, CogniHealthMetrics> };
+
+function statusDotColor(entry: CogniEntryStatus, health: CogniHealthMetrics | undefined): string {
+  if (!entry.enabled) return "var(--yunque-text-muted)";
+  if (entry.load_error) return "var(--yunque-danger)";
+  switch (health?.status) {
+    case "healthy": return "var(--yunque-success)";
+    case "warn": return "var(--yunque-warning)";
+    case "unhealthy": return "var(--yunque-danger)";
+    case "idle":
+    default:
+      return "var(--yunque-text-muted)";
+  }
 }
 
-/* ── Mini charts ────────────────────────────────── */
-
-function BarChart({ data, labels, color = "var(--yunque-accent)", height = 100 }: {
-  data: number[]; labels?: string[]; color?: string; height?: number;
-}) {
-  if (!data.length) return (
-    <div className="empty-box" style={{ padding: "var(--sp-8) var(--sp-4)" }}>
-      <BarChart3 size={20} style={{ opacity: 0.3 }} />
-      <span style={{ fontSize: "var(--text-sm)" }}>运行任务后可查看技能调用分布</span>
-    </div>
-  );
-  const max = Math.max(...data, 1);
-  const barW = Math.min(24, Math.floor(220 / data.length));
-  const gap = Math.max(2, Math.floor(barW * 0.25));
-  return (
-    <div className="flex items-end justify-center" style={{ height, gap: gap + "px" }}>
-      {data.map((v, i) => {
-        const h = Math.max(3, (v / max) * (height - 16));
-        return (
-          <Tooltip key={i} delay={0}>
-            <div className="flex flex-col items-center" style={{ width: barW }}>
-              <div
-                style={{
-                  width: barW, height: h,
-                  background: color,
-                  borderRadius: "var(--radius-sm) var(--radius-sm) 0 0",
-                  opacity: 0.6 + (v / max) * 0.4,
-                  transition: "height 0.4s var(--ease-out)",
-                }}
-              />
-              {labels?.[i] && (
-                <span style={{ fontSize: "var(--text-2xs)", color: "var(--yunque-text-muted)", marginTop: 3, maxWidth: barW + gap }} className="truncate">{labels[i]}</span>
-              )}
-            </div>
-            <Tooltip.Content>{`${labels?.[i] || `#${i + 1}`}: ${v}`}</Tooltip.Content>
-          </Tooltip>
-        );
-      })}
-    </div>
-  );
+function statusLabel(entry: CogniEntryStatus, health: CogniHealthMetrics | undefined): string {
+  if (!entry.enabled) return "未启用";
+  if (entry.load_error) return "加载失败";
+  if (!health) return "等待运行数据";
+  const activations = health.activations || 0;
+  const last = health.last_seen_at ? timeAgo(health.last_seen_at) : "尚未激活";
+  return `${activations} 次激活 · ${last}`;
 }
 
-/* ── KPI Card ──────────────────────────────────── */
-
-function KPICard({ label, value, icon, accent, change, sub }: {
-  label: string; value: string | number; icon: React.ReactNode;
-  accent: string; change?: number; sub?: string;
-}) {
-  return (
-    <div
-      className="section-card hover-lift"
-      style={{ padding: "var(--card-pad-sm) var(--card-pad)" }}
-    >
-      <div className="flex items-start justify-between">
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <div className="kpi-label" style={{ marginBottom: "var(--sp-2)", display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{
-              color: accent,
-              display: "flex",
-              filter: `drop-shadow(0 0 4px ${accent})`,
-            }}>{icon}</span>
-            {label}
-          </div>
-          <div className="kpi-value">{value}</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: "var(--sp-1)" }}>
-            {typeof change === "number" && change !== 0 && (
-              <span style={{
-                fontSize: "var(--text-2xs)", fontWeight: 600,
-                color: change > 0 ? "var(--yunque-success)" : "var(--yunque-danger)",
-                display: "flex", alignItems: "center", gap: 2,
-              }}>
-                {change > 0 ? <TrendingUp size={9} /> : <TrendingDown size={9} />}
-                {change > 0 ? "+" : ""}{(change ?? 0).toFixed(1)}%
-              </span>
-            )}
-            {sub && <span className="kpi-sub">{sub}</span>}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+function timeAgo(iso: string): string {
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return "—";
+  const seconds = Math.max(1, Math.round((Date.now() - t) / 1000));
+  if (seconds < 60) return `${seconds}s 前`;
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes}min 前`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 48) return `${hours}h 前`;
+  const days = Math.round(hours / 24);
+  return `${days}d 前`;
 }
-
-/* ── PAGE ──────────────────────────────────────── */
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [metrics, setMetrics] = useState<MetricsSnapshot | null>(null);
   const [version, setVersion] = useState<VersionInfo | null>(null);
   const [serviceOnline, setServiceOnline] = useState(false);
-  const [serviceUptime, setServiceUptime] = useState(0);
-  const [skills, setSkills] = useState<SkillInfo[]>([]);
-  const [costSummary, setCostSummary] = useState<CostSummary | null>(null);
-  const [sysInfo, setSysInfo] = useState<SysInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [setupNeeded, setSetupNeeded] = useState(false);
+  const [cogniState, setCogniState] = useState<CogniState>({ kind: "loading" });
 
   const load = useCallback(async () => {
-    let online = false;
     try {
       const health = await api.healthz();
-      online = true;
       setServiceOnline(true);
-      setServiceUptime(Number((health as { uptime_sec?: number })?.uptime_sec || 0));
       setVersion(prev => prev || {
         version: health.version || "",
         git_commit: "",
@@ -149,82 +85,64 @@ export default function DashboardPage() {
       });
     } catch {
       setServiceOnline(false);
-      setServiceUptime(0);
     }
-
     try {
-      const [m, v, s, cost, sys] = await Promise.all([
-        api.metrics().catch(() => null),
-        api.version().catch(() => null),
-        api.skills().catch(() => ({ skills: [] })),
-        api.costSummary().catch(() => null),
-        api.systemInfo().catch(() => null),
-      ]);
-      setMetrics(m);
+      const v = await api.version().catch(() => null);
       if (v) setVersion(v);
-      setSkills(s.skills || []);
-      setCostSummary(cost);
-      setSysInfo(sys);
-      if (m || v || s.skills?.length || cost || sys) setServiceOnline(true);
-    } catch {
-      setServiceOnline(online);
-    }
+    } catch { /* ignore */ }
     try {
       const chk = await api.checkSetup();
       setSetupNeeded(chk.setup_needed);
     } catch { /* ignore */ }
+    // The /v1/cognis routes are gated by the cogni-kernel pack; absence is the
+    // expected fallback, not an error — degrade to scenarios silently.
+    try {
+      const list = await cogniPack.list();
+      setCogniState({
+        kind: "ready",
+        entries: list.cognis || [],
+        health: list.health || {},
+      });
+    } catch {
+      setCogniState({ kind: "unavailable" });
+    }
     setLoading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);
-  usePolling(load, 8000);
+  usePolling(load, 15000);
 
-  /* derived (null-safe) */
-  const reqTotal = metrics?.requests_total ?? 0;
-  const reqSuccess = metrics?.requests_success ?? 0;
-  const tokenTotal = metrics?.tokens_total ?? 0;
-  const tokensIn = metrics?.tokens_in ?? 0;
-  const tokensOut = metrics?.tokens_out ?? 0;
-  const avgMs = metrics?.request_latency?.avg_ms ?? 0;
-  const p99Ms = metrics?.request_latency?.p99_ms ?? 0;
-  const uptime = metrics?.uptime ?? serviceUptime;
-  const successRate = reqTotal > 0 ? (reqSuccess / reqTotal * 100) : 0;
+  const cogniSummary = useMemo(() => {
+    if (cogniState.kind !== "ready") return null;
+    const total = cogniState.entries.length;
+    const enabled = cogniState.entries.filter(e => e.enabled).length;
+    return { total, enabled };
+  }, [cogniState]);
 
-  const skillMetrics = metrics?.skills ?? [];
-  const barData = useMemo(() => skillMetrics.map(s => s.total), [skillMetrics]);
-  const barLabels = useMemo(() => skillMetrics.map(s => s.name?.slice(0, 6) ?? ""), [skillMetrics]);
-  const workspaceSteps = [
-    { label: "开口", desc: "从对话说明目标", icon: <MessageCircle size={14} /> },
-    { label: "执行", desc: "需要时生成任务并跟进", icon: <Zap size={14} /> },
-    { label: "验收", desc: "查看产物、文件和结论", icon: <ClipboardCheck size={14} /> },
-    { label: "沉淀", desc: "把偏好与资料写入记忆/知识", icon: <Brain size={14} /> },
-  ];
-
-  if (loading) {
-    return <DashboardSkeleton />;
-  }
+  if (loading) return <DashboardSkeleton />;
 
   return (
     <div className="page-root animate-fade-in-up">
 
-      {/* ── Header ── */}
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">工作台</h1>
-          <div className="page-subtitle" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span>把今天的目标交给云雀，从对话推进到结果</span>
-            <span className={`status-dot ${serviceOnline ? "status-dot--online" : "status-dot--offline"}`} />
-            {serviceOnline ? "运行中" : "离线"}
-            {version ? ` · v${version.version}` : ""}
-            {uptime > 0 ? ` · ${formatUptime(uptime)}` : ""}
-          </div>
-        </div>
-        <Tooltip delay={0}>
-          <Button isIconOnly variant="ghost" size="sm" onPress={() => { setLoading(true); load(); }}>
-            <RefreshCw size={14} />
-          </Button>
-          <Tooltip.Content>刷新</Tooltip.Content>
-        </Tooltip>
+      {/* ── Greeting ── */}
+      <div style={{ textAlign: "center", padding: "var(--sp-8) 0 var(--sp-4)" }}>
+        <h1 className="page-title" style={{ fontSize: "var(--text-2xl)", textAlign: "center" }}>
+          {cogniSummary && cogniSummary.total > 0 ? "云雀正在为你工作" : "你好"}
+        </h1>
+        <p style={{
+          fontSize: "var(--text-base)", color: "var(--yunque-text-muted)",
+          marginTop: "var(--sp-3)", lineHeight: 1.6,
+        }}>
+          {cogniSummary && cogniSummary.total > 0
+            ? `${cogniSummary.enabled} 个 Cogni 启用，共 ${cogniSummary.total} 个声明`
+            : "说一句话，云雀帮你规划和执行。"}
+          <span style={{ marginLeft: 8, display: "inline-flex", alignItems: "center", gap: 4 }}>
+            {serviceOnline
+              ? <><CheckCircle2 size={13} style={{ color: "var(--yunque-success)" }} /> <span style={{ fontSize: "var(--text-sm)", color: "var(--yunque-text-muted)" }}>服务在线{version ? ` · v${version.version}` : ""}</span></>
+              : <><XCircle size={13} style={{ color: "var(--yunque-danger)" }} /> <span style={{ fontSize: "var(--text-sm)", color: "var(--yunque-text-muted)" }}>服务离线</span></>
+            }
+          </span>
+        </p>
       </div>
 
       {/* ── Setup Banner ── */}
@@ -234,292 +152,321 @@ export default function DashboardPage() {
           style={{
             borderLeft: "3px solid var(--yunque-warning)",
             background: "var(--yunque-warning-muted)",
-            display: "flex", alignItems: "flex-start", gap: "var(--sp-4)",
+            display: "flex", alignItems: "center", gap: "var(--sp-4)",
             padding: "var(--card-pad-sm) var(--card-pad)",
           }}
         >
-          <Rocket size={20} style={{ color: "var(--yunque-warning)", marginTop: 2, flexShrink: 0 }} />
+          <Rocket size={20} style={{ color: "var(--yunque-warning)", flexShrink: 0 }} />
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: "var(--text-md)", fontWeight: 600, color: "var(--yunque-text)" }}>欢迎使用云雀 Agent</div>
-            <p style={{ fontSize: "var(--text-sm)", color: "var(--yunque-text-secondary)", marginTop: "var(--sp-1)" }}>
-              请先配置大模型 (LLM) 接入，对话、任务、反思等核心功能才能正常工作。
-            </p>
-            <div style={{ display: "flex", gap: "var(--sp-3)", marginTop: "var(--sp-3)" }}>
-              <Button size="sm" onPress={() => router.push("/setup")} style={{ background: "var(--yunque-warning)", color: "#000", fontWeight: 600 }}>
-                <Rocket size={13} /> 去配置模型
-              </Button>
+            <div style={{ fontSize: "var(--text-md)", fontWeight: 600, color: "var(--yunque-text)" }}>
+              请先配置大模型接入
             </div>
+            <p style={{ fontSize: "var(--text-sm)", color: "var(--yunque-text-secondary)", marginTop: "var(--sp-1)" }}>
+              配置后才能正常对话和执行任务。
+            </p>
           </div>
+          <Button size="sm" onPress={() => router.push("/setup")} style={{ background: "var(--yunque-warning)", color: "#000", fontWeight: 600 }}>
+            去配置
+          </Button>
         </div>
       )}
 
-      {/* ── Action first workspace ── */}
-      <section className="section-card dashboard-action-hero" aria-labelledby="dashboard-action-title">
-        <div className="dashboard-action-hero__copy">
-          <div className="dashboard-action-hero__eyebrow">今日行动</div>
-          <h2 id="dashboard-action-title" className="dashboard-action-hero__title">从一句话开始，交付一个可验收结果</h2>
-          <p className="dashboard-action-hero__desc">
-            云雀会优先从 Chat 承接目标；需要执行时进入任务中心，完成后把产物、知识和记忆留在你能找回的位置。
-          </p>
-          <div className="dashboard-action-hero__actions">
-            <Button onPress={() => router.push("/chat")} size="md">
-              <MessageCircle size={15} /> 开始对话
-            </Button>
-            <Button variant="secondary" onPress={() => router.push("/missions")} size="md">
-              <Zap size={15} /> 查看任务中心
-            </Button>
-            <Button variant="ghost" onPress={() => router.push("/knowledge")} size="md">
-              <BookOpen size={15} /> 整理知识
-            </Button>
-          </div>
-        </div>
-        <ol className="dashboard-workflow" aria-label="云雀工作闭环">
-          {workspaceSteps.map((step) => (
-            <li key={step.label} className="dashboard-workflow__item">
-              <span className="dashboard-workflow__icon" aria-hidden>{step.icon}</span>
-              <span>
-                <span className="dashboard-workflow__label">{step.label}</span>
-                <span className="dashboard-workflow__desc">{step.desc}</span>
-              </span>
-            </li>
-          ))}
-        </ol>
-      </section>
+      {/* ── Cogni instances (or fallback) ── */}
+      {cogniState.kind === "ready" && cogniState.entries.length > 0 ? (
+        <CogniGridSection
+          entries={cogniState.entries}
+          health={cogniState.health}
+          onOpen={(id) => router.push(`/cognis?id=${encodeURIComponent(id)}`)}
+          onCreate={() => router.push("/cognis")}
+        />
+      ) : cogniState.kind === "ready" ? (
+        <CogniEmptySection onCreate={() => router.push("/cognis")} />
+      ) : (
+        <ScenariosFallbackSection
+          cogniPackAvailable={cogniState.kind !== "unavailable"}
+          onScenario={(prompt) => router.push(scenarioChatHref(prompt))}
+        />
+      )}
 
-      <section className="dashboard-scenarios" aria-labelledby="dashboard-scenarios-title">
-        <div className="dashboard-section-head">
-          <div>
-            <h2 id="dashboard-scenarios-title" className="dashboard-section-title">常用开始方式</h2>
-            <p className="dashboard-section-desc">不用先理解功能分类，直接选一个目标进入对话。</p>
-          </div>
-          <Button variant="ghost" size="sm" onPress={() => router.push("/chat")}>
-            去对话 <ArrowRight size={12} />
-          </Button>
-        </div>
-        <ul className="dashboard-scenario-grid">
-          {DASHBOARD_SCENARIOS.map((a) => (
-            <li key={a.id}>
-              <button
-                type="button"
-                onClick={() => router.push(scenarioChatHref(a.prompt))}
-                className="dashboard-scenario-card"
-              >
-                <span className="dashboard-scenario-card__icon" aria-hidden>{a.icon}</span>
-                <span className="dashboard-scenario-card__body">
-                  <span className="dashboard-scenario-card__title">{a.label}</span>
-                  <span className="dashboard-scenario-card__desc">{a.description}</span>
-                </span>
-                <ArrowRight size={12} aria-hidden className="dashboard-scenario-card__arrow" />
-              </button>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      {/* ── KPI Strip ── */}
-      <div className="dashboard-section-head" style={{ marginTop: "var(--sp-2)" }}>
-        <div>
-          <h2 className="dashboard-section-title">运行概况</h2>
-          <p className="dashboard-section-desc">这些数据用来判断云雀是否稳定，不需要先读懂它们才能开始使用。</p>
-        </div>
-      </div>
-      <div className="kpi-grid">
-        <KPICard
-          label="请求"
-          value={reqTotal.toLocaleString()}
-          icon={<Activity size={13} />}
-          accent="var(--yunque-accent)"
-          change={successRate > 0 ? successRate - 100 : undefined}
-          sub={`成功率 ${successRate.toFixed(1)}%`}
-        />
-        <KPICard
-          label="令牌消耗"
-          value={tokenTotal.toLocaleString()}
-          icon={<Zap size={13} />}
-          accent="var(--yunque-warning)"
-          sub={`输入 ${tokensIn.toLocaleString()} / 输出 ${tokensOut.toLocaleString()}`}
-        />
-        <KPICard
-          label="延迟"
-          value={avgMs > 0 ? `${avgMs.toFixed(0)}ms` : "—"}
-          icon={<Clock size={13} />}
-          accent="var(--yunque-success)"
-          sub={p99Ms > 0 ? `P99 ${p99Ms.toFixed(0)}ms` : undefined}
-        />
-        <KPICard
-          label="技能"
-          value={skills.length}
-          icon={<Package size={13} />}
-          accent="#a78bfa"
-          sub="已注册"
-        />
+      {/* ── Primary action ── */}
+      <div style={{ display: "flex", justifyContent: "center", padding: "var(--sp-2) 0" }}>
+        <Button
+          size="lg"
+          onPress={() => router.push("/chat")}
+          style={{
+            paddingInline: 32,
+            fontSize: "var(--text-md)",
+            fontWeight: 600,
+            gap: 8,
+          }}
+        >
+          <MessageCircle size={18} /> 开始对话
+        </Button>
       </div>
 
-      {/* ── Main content: 2/3 chart + 1/3 info ── */}
-      <div className="main-grid">
-
-        {/* Left: Charts */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-6)" }}>
-          {/* Bar chart */}
-          <div className="section-card">
-            <div className="section-title" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <BarChart3 size={12} /> 技能调用分布
-            </div>
-            <BarChart data={barData} labels={barLabels} color="var(--yunque-accent)" height={100} />
-          </div>
-
-          {/* Skills table */}
-          {skillMetrics.length > 0 ? (
-            <div className="section-card" style={{ padding: "var(--card-pad-sm) var(--card-pad)" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--sp-3)" }}>
-                <div className="section-title" style={{ margin: 0, display: "flex", alignItems: "center", gap: 6 }}>
-                  <Package size={12} /> 技能指标
-                </div>
-                <Button variant="ghost" size="sm" onPress={() => router.push("/skills")} style={{ fontSize: "var(--text-xs)" }}>
-                  查看全部 <ArrowRight size={11} />
-                </Button>
-              </div>
-              <Table.ScrollContainer>
-                <Table.Content aria-label="技能指标" className="min-w-[400px]">
-                  <Table.Header>
-                    <Table.Column isRowHeader>名称</Table.Column>
-                    <Table.Column>调用</Table.Column>
-                    <Table.Column>成功率</Table.Column>
-                    <Table.Column>延迟</Table.Column>
-                  </Table.Header>
-                  <Table.Body>
-                    {skillMetrics.slice(0, 6).map((sk) => (
-                      <Table.Row key={sk.name}>
-                        <Table.Cell>
-                          <span style={{ fontSize: "var(--text-sm)", fontWeight: 500, color: "var(--yunque-text)" }}>{sk.name}</span>
-                        </Table.Cell>
-                        <Table.Cell>
-                          <span style={{ fontSize: "var(--text-sm)", color: "var(--yunque-text-secondary)", fontVariantNumeric: "tabular-nums" }}>{(sk.total ?? 0).toLocaleString()}</span>
-                        </Table.Cell>
-                        <Table.Cell>
-                          <div className="flex items-center gap-2">
-                            <ProgressBar
-                              value={sk.success_rate ?? 0}
-                              maxValue={100}
-                              aria-label="成功率"
-                              className="h-1 max-w-[48px]"
-                              style={{ "--progressbar-fill-color": (sk.success_rate ?? 0) >= 90 ? "var(--yunque-success)" : (sk.success_rate ?? 0) >= 70 ? "var(--yunque-warning)" : "var(--yunque-danger)" } as any}
-                            >
-                              <ProgressBar.Track>
-                                <ProgressBar.Fill />
-                              </ProgressBar.Track>
-                            </ProgressBar>
-                            <span style={{ fontSize: "var(--text-2xs)", color: "var(--yunque-text-muted)" }}>{(sk.success_rate ?? 0).toFixed(0)}%</span>
-                          </div>
-                        </Table.Cell>
-                        <Table.Cell>
-                          <span style={{ fontSize: "var(--text-sm)", color: "var(--yunque-text-muted)", fontVariantNumeric: "tabular-nums" }}>{(sk.latency?.avg_ms ?? 0).toFixed(0)}ms</span>
-                        </Table.Cell>
-                      </Table.Row>
-                    ))}
-                  </Table.Body>
-                </Table.Content>
-              </Table.ScrollContainer>
-            </div>
-          ) : (
-            <div className="section-card">
-              <div className="empty-box" style={{ padding: "var(--sp-8) var(--sp-4)" }}>
-                <Package size={24} style={{ opacity: 0.2 }} />
-                <span style={{ fontSize: "var(--text-sm)", fontWeight: 500 }}>暂无技能指标</span>
-                <span style={{ fontSize: "var(--text-xs)" }}>开始对话或运行任务后，技能数据将自动出现</span>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Right sidebar: stacked info cards */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-4)" }}>
-
-          {/* Cost */}
-          <div className="section-card" style={{ padding: "var(--card-pad-sm)" }}>
-            <div className="section-title" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <DollarSign size={11} /> 成本
-            </div>
-            {costSummary ? (
-              <>
-                <div className="kpi-value" style={{ fontSize: "var(--text-xl)", marginBottom: "var(--sp-3)" }}>
-                  ${(costSummary.total_cost_usd ?? 0).toFixed(4)}
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-                  {[
-                    { k: "调用次数", v: (costSummary.total_calls ?? 0).toLocaleString() },
-                    { k: "均价/次", v: `$${(costSummary.avg_cost_per_call ?? 0).toFixed(4)}` },
-                  ].map(r => (
-                    <div key={r.k} className="info-row">
-                      <span style={{ color: "var(--yunque-text-muted)" }}>{r.k}</span>
-                      <span style={{ fontWeight: 500, color: "var(--yunque-text)", fontVariantNumeric: "tabular-nums" }}>{r.v}</span>
-                    </div>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <div style={{ fontSize: "var(--text-sm)", color: "var(--yunque-text-muted)", padding: "var(--sp-4) 0", textAlign: "center" }}>产生调用后显示</div>
-            )}
-          </div>
-
-          {/* Recent Errors */}
-          <div className="section-card" style={{ padding: "var(--card-pad-sm)" }}>
-            <div className="section-title" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <AlertTriangle size={11} /> 最近错误
-              {(metrics?.recent_errors?.length ?? 0) > 0 && (
-                <Chip size="sm" className="badge-danger" style={{ fontSize: "var(--text-2xs)", marginLeft: "auto" }}>
-                  {metrics!.recent_errors.length}
-                </Chip>
-              )}
-            </div>
-            {(metrics?.recent_errors?.length ?? 0) > 0 ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-2)" }}>
-                {metrics!.recent_errors.slice(0, 3).map((e, i) => (
-                  <div key={i} style={{
-                    display: "flex", alignItems: "center", gap: 8,
-                    padding: "6px 8px", borderRadius: "var(--radius-sm)",
-                    background: "var(--yunque-surface-2)",
-                  }}>
-                    <span style={{ fontSize: "var(--text-2xs)", color: "var(--yunque-text-secondary)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{formatErrorMessage(e.message, "任务暂时没有完成，已保留现场。")}</span>
-                    <span style={{ fontSize: "var(--text-2xs)", fontWeight: 600, color: "var(--yunque-danger)" }}>{e.count}×</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "var(--sp-3) 0", justifyContent: "center" }}>
-                <CheckCircle2 size={13} style={{ color: "var(--yunque-success)" }} />
-                <span style={{ fontSize: "var(--text-sm)", color: "var(--yunque-text-muted)" }}>无错误</span>
-              </div>
-            )}
-          </div>
-
-          {/* System info */}
-          <div className="section-card" style={{ padding: "var(--card-pad-sm)" }}>
-            <div className="section-title" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <Server size={11} /> 系统
-            </div>
-            {sysInfo ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-                {[
-                  { k: "内存", v: `${(sysInfo.memory_mb ?? 0).toLocaleString()} MB` },
-                  { k: "Goroutines", v: (sysInfo.goroutines ?? 0).toLocaleString() },
-                  { k: "CPU", v: `${sysInfo.cpu_count ?? 0} 核` },
-                  { k: "版本", v: version?.version || "" },
-                  { k: "平台", v: version ? `${version.os}/${version.arch}` : "" },
-                ].filter(r => r.v).map(r => (
-                  <div key={r.k} className="info-row">
-                    <span style={{ color: "var(--yunque-text-muted)" }}>{r.k}</span>
-                    <span style={{ fontWeight: 500, color: "var(--yunque-text)", fontVariantNumeric: "tabular-nums", fontFamily: "var(--font-sans)" }}>{r.v}</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div style={{ fontSize: "var(--text-sm)", color: "var(--yunque-text-muted)", padding: "var(--sp-4) 0", textAlign: "center" }}>{loading ? "加载中…" : "系统信息不可用"}</div>
-            )}
-          </div>
-        </div>
-      </div>
-
+      {/* ── Quick links ── */}
+      <nav
+        aria-label="快捷入口"
+        style={{
+          display: "flex", justifyContent: "center", gap: "var(--sp-3)",
+          padding: "var(--sp-4) 0 var(--sp-8)",
+          flexWrap: "wrap",
+        }}
+      >
+        <Button variant="ghost" size="sm" onPress={() => router.push("/missions")} style={{ gap: 6 }}>
+          <Zap size={14} /> 任务中心
+        </Button>
+        <Button variant="ghost" size="sm" onPress={() => router.push("/knowledge")} style={{ gap: 6 }}>
+          <BookOpen size={14} /> 知识库
+        </Button>
+        <Button variant="ghost" size="sm" onPress={() => router.push("/memory")} style={{ gap: 6 }}>
+          <Brain size={14} /> 记忆
+        </Button>
+        <Button variant="ghost" size="sm" onPress={() => window.dispatchEvent(new CustomEvent("yunque:open-settings"))} style={{ gap: 6 }}>
+          <Settings size={14} /> 设置
+        </Button>
+      </nav>
     </div>
+  );
+}
+
+interface CogniGridSectionProps {
+  entries: CogniEntryStatus[];
+  health: Record<string, CogniHealthMetrics>;
+  onOpen: (id: string) => void;
+  onCreate: () => void;
+}
+
+function CogniGridSection({ entries, health, onOpen, onCreate }: CogniGridSectionProps) {
+  // Sort: enabled first, then by recent activation (healthy → idle), then by display name.
+  const sorted = useMemo(() => {
+    const arr = [...entries];
+    arr.sort((a, b) => {
+      if (a.enabled !== b.enabled) return a.enabled ? -1 : 1;
+      const ha = health[a.id];
+      const hb = health[b.id];
+      const ta = ha?.last_seen_at ? Date.parse(ha.last_seen_at) : 0;
+      const tb = hb?.last_seen_at ? Date.parse(hb.last_seen_at) : 0;
+      if (ta !== tb) return tb - ta;
+      return (a.display_name || a.id).localeCompare(b.display_name || b.id);
+    });
+    return arr;
+  }, [entries, health]);
+
+  const visible = sorted.slice(0, COGNI_GRID_LIMIT);
+  const hidden = sorted.length - visible.length;
+
+  return (
+    <section aria-labelledby="dashboard-cogni-title" style={{ marginTop: "var(--sp-4)" }}>
+      <div style={{
+        display: "flex", alignItems: "baseline", justifyContent: "space-between",
+        marginBottom: "var(--sp-3)", gap: "var(--sp-2)",
+      }}>
+        <h2
+          id="dashboard-cogni-title"
+          style={{
+            fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--yunque-text-muted)",
+            textTransform: "uppercase", letterSpacing: "0.06em",
+          }}
+        >
+          你的 Cogni
+        </h2>
+        <Link
+          href="/cognis"
+          style={{
+            fontSize: "var(--text-sm)", color: "var(--yunque-text-muted)",
+            display: "inline-flex", alignItems: "center", gap: 4,
+          }}
+        >
+          全部 {hidden > 0 ? `(+${hidden})` : ""} <ArrowRight size={12} />
+        </Link>
+      </div>
+      <ul
+        className="dashboard-scenario-grid"
+        style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}
+      >
+        {visible.map((entry) => (
+          <li key={entry.id}>
+            <CogniCard
+              entry={entry}
+              health={health[entry.id]}
+              onOpen={() => onOpen(entry.id)}
+            />
+          </li>
+        ))}
+        <li>
+          <button
+            type="button"
+            onClick={onCreate}
+            className="dashboard-scenario-card"
+            style={{
+              borderStyle: "dashed",
+              alignItems: "center",
+              justifyContent: "center",
+              minHeight: 96,
+            }}
+          >
+            <span className="dashboard-scenario-card__icon" aria-hidden>
+              <Plus size={18} />
+            </span>
+            <span className="dashboard-scenario-card__body" style={{ textAlign: "left" }}>
+              <span className="dashboard-scenario-card__title">新建 Cogni</span>
+              <span className="dashboard-scenario-card__desc">用一句话描述助手要做什么</span>
+            </span>
+          </button>
+        </li>
+      </ul>
+    </section>
+  );
+}
+
+interface CogniCardProps {
+  entry: CogniEntryStatus;
+  health: CogniHealthMetrics | undefined;
+  onOpen: () => void;
+}
+
+function CogniCard({ entry, health, onOpen }: CogniCardProps) {
+  const dotColor = statusDotColor(entry, health);
+  const meta = statusLabel(entry, health);
+  const dim = !entry.enabled;
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="dashboard-scenario-card"
+      style={{ opacity: dim ? 0.65 : 1, minHeight: 96 }}
+      aria-label={`打开 ${entry.display_name || entry.id}`}
+    >
+      <span
+        aria-hidden
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: 32, height: 32, flexShrink: 0,
+          borderRadius: "var(--radius-md)",
+          background: "var(--yunque-bg-subtle, rgba(255,255,255,0.04))",
+          position: "relative",
+        }}
+      >
+        <Sparkles size={14} style={{ color: "var(--yunque-text-muted)" }} />
+        <span
+          aria-hidden
+          style={{
+            position: "absolute", right: -2, top: -2,
+            width: 8, height: 8, borderRadius: "50%",
+            background: dotColor,
+            boxShadow: "0 0 0 2px var(--yunque-card)",
+          }}
+        />
+      </span>
+      <span className="dashboard-scenario-card__body">
+        <span
+          className="dashboard-scenario-card__title"
+          style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+        >
+          {entry.display_name || entry.id}
+        </span>
+        <span
+          className="dashboard-scenario-card__desc"
+          style={{
+            display: "-webkit-box",
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
+          }}
+        >
+          {entry.description || meta}
+        </span>
+        {entry.description && (
+          <span
+            style={{
+              display: "block",
+              marginTop: 4,
+              fontSize: "var(--text-xs)",
+              color: "var(--yunque-text-muted)",
+            }}
+          >
+            {meta}
+          </span>
+        )}
+      </span>
+      <ArrowRight size={12} aria-hidden className="dashboard-scenario-card__arrow" />
+    </button>
+  );
+}
+
+function CogniEmptySection({ onCreate }: { onCreate: () => void }) {
+  return (
+    <section style={{ marginTop: "var(--sp-4)" }}>
+      <div
+        className="section-card"
+        style={{
+          display: "flex", flexDirection: "column", alignItems: "center",
+          gap: "var(--sp-3)", padding: "var(--sp-6) var(--sp-4)", textAlign: "center",
+        }}
+      >
+        <Sparkles size={28} style={{ color: "var(--yunque-text-muted)" }} />
+        <div style={{ fontSize: "var(--text-md)", fontWeight: 600, color: "var(--yunque-text)" }}>
+          你还没有 Cogni 实例
+        </div>
+        <p style={{ fontSize: "var(--text-sm)", color: "var(--yunque-text-muted)", maxWidth: 420 }}>
+          Cogni 把"何时激活、注入什么上下文、暴露哪些工具"写成可验证的声明。
+          用一句话描述目标，云雀会帮你生成第一个。
+        </p>
+        <Button onPress={onCreate} style={{ gap: 6 }}>
+          <Plus size={14} /> 新建 Cogni
+        </Button>
+      </div>
+    </section>
+  );
+}
+
+interface ScenariosFallbackProps {
+  cogniPackAvailable: boolean;
+  onScenario: (prompt: string) => void;
+}
+
+function ScenariosFallbackSection({ cogniPackAvailable, onScenario }: ScenariosFallbackProps) {
+  return (
+    <section aria-labelledby="dashboard-scenarios-title" style={{ marginTop: "var(--sp-4)" }}>
+      <h2
+        id="dashboard-scenarios-title"
+        style={{
+          fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--yunque-text-muted)",
+          textTransform: "uppercase", letterSpacing: "0.06em",
+          marginBottom: "var(--sp-4)", textAlign: "center",
+        }}
+      >
+        常用场景
+      </h2>
+      <ul className="dashboard-scenario-grid" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
+        {DASHBOARD_SCENARIOS.map((a) => (
+          <li key={a.id}>
+            <button
+              type="button"
+              onClick={() => onScenario(a.prompt)}
+              className="dashboard-scenario-card"
+            >
+              <span className="dashboard-scenario-card__icon" aria-hidden>{a.icon}</span>
+              <span className="dashboard-scenario-card__body">
+                <span className="dashboard-scenario-card__title">{a.label}</span>
+                <span className="dashboard-scenario-card__desc">{a.description}</span>
+              </span>
+              <ArrowRight size={12} aria-hidden className="dashboard-scenario-card__arrow" />
+            </button>
+          </li>
+        ))}
+      </ul>
+      {!cogniPackAvailable && (
+        <p style={{
+          marginTop: "var(--sp-4)", textAlign: "center",
+          fontSize: "var(--text-xs)", color: "var(--yunque-text-muted)",
+        }}>
+          想让云雀按声明运行而不是单次回答？<Link href="/packs?focus=cogni-kernel" style={{ color: "var(--yunque-accent)" }}>启用 Cogni 内核 →</Link>
+        </p>
+      )}
+    </section>
   );
 }

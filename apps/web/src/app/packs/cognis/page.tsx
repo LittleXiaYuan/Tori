@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Button, Card, Chip } from "@heroui/react";
 import { BrainCircuit, ExternalLink, Route, ShieldCheck } from "lucide-react";
 import PageHeader from "@/components/page-header";
+import { PackAbout, PackSectionTitle, type PackBoundaryItem } from "@/components/packs/pack-page-kit";
 
 const kernelActions = [
   {
@@ -20,12 +21,12 @@ const kernelActions = [
   },
 ];
 
-const boundaryItems = [
-  "不会替代能力包本身的安装、权限授权或启用流程。",
-  "不会假装已经吞掉 Skill 或 MCP 生态；第一阶段是兼容、组织和减少无效上下文。",
-  "不会直接执行本机电脑控制、联网写入或高风险动作。",
-  "不会绕过 Pack Runtime 门禁；能力包停用后 Cogni 只能看到受限状态。",
-  "更适合作为底层运行治理包，普通用户优先从 /cognis 管理 Cogni。",
+const boundaryItems: PackBoundaryItem[] = [
+  { key: "install", label: "不替代安装授权", detail: "不会替代能力包本身的安装、权限授权或启用流程。" },
+  { key: "ecosystem", label: "不吞 Skill / MCP", detail: "不会假装已经吞掉 Skill 或 MCP 生态；第一阶段是兼容、组织和减少无效上下文。" },
+  { key: "exec", label: "不执行高风险动作", detail: "不会直接执行本机电脑控制、联网写入或高风险动作。" },
+  { key: "gate", label: "不绕过门禁", detail: "不会绕过 Pack Runtime 门禁；能力包停用后 Cogni 只能看到受限状态。" },
+  { key: "audience", label: "面向底层治理", detail: "更适合作为底层运行治理包，普通用户优先从 /cognis 管理 Cogni。" },
 ];
 
 const relationItems = [
@@ -45,7 +46,7 @@ const relationItems = [
 
 export default function PacksCognisPage() {
   return (
-    <div className="page-root space-y-5 animate-fade-in-up">
+    <div className="page-root space-y-6 animate-fade-in-up">
       <PageHeader
         icon={<BrainCircuit size={20} />}
         title="Cogni 内核"
@@ -59,68 +60,67 @@ export default function PacksCognisPage() {
         )}
       />
 
-      <Card className="section-card overflow-hidden p-0">
-        <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="p-5">
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-              <Chip size="sm" color="success">默认启用</Chip>
-              <Chip size="sm" variant="soft">基础能力</Chip>
-              <Chip size="sm" variant="soft">Cogni / Planner</Chip>
-            </div>
-            <div className="text-base font-semibold" style={{ color: "var(--yunque-text)" }}>
-              这个能力包现在能做什么
-            </div>
-            <div className="mt-2 max-w-3xl text-sm leading-6" style={{ color: "var(--yunque-text-secondary)" }}>
-              它不是一个单独给用户日常操作的应用，而是 Cogni 的运行内核：负责声明注册、路由选择、健康检查、运行轨迹和能力包状态门禁。Cogni 不是能力包的替代品，它更像模型侧的能力目录和选择层；你真正管理 Cogni 的入口在「我的 Cogni」页面。
-            </div>
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
-              {kernelActions.map((item) => (
-                <div key={item.title} className="rounded-lg p-3" style={{ background: "var(--yunque-bg-hover)", border: "1px solid var(--yunque-border)" }}>
-                  <div className="mb-2 flex items-center gap-2 text-sm font-medium" style={{ color: "var(--yunque-text)" }}>
-                    <Route size={14} style={{ color: "var(--yunque-accent)" }} />
-                    {item.title}
-                  </div>
-                  <div className="text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>{item.desc}</div>
+      <PackAbout
+        chips={<>
+          <Chip size="sm" color="success">默认启用</Chip>
+          <Chip size="sm" variant="soft">基础能力</Chip>
+          <Chip size="sm" variant="soft">Cogni / Planner</Chip>
+        </>}
+        description="它不是一个单独给用户日常操作的应用，而是 Cogni 的运行内核：负责声明注册、路由选择、健康检查、运行轨迹和能力包状态门禁。Cogni 不是能力包的替代品，它更像模型侧的能力目录和选择层；你真正管理 Cogni 的入口在「我的 Cogni」页面。"
+        boundaries={boundaryItems}
+      />
+
+      <Card variant="default">
+        <Card.Header className="flex-row items-center gap-2">
+          <PackSectionTitle icon={<Route size={15} />} tone="accent">这个能力包现在能做什么</PackSectionTitle>
+        </Card.Header>
+        <Card.Content>
+          <div className="grid gap-3 md:grid-cols-3">
+            {kernelActions.map((item) => (
+              <div key={item.title} className="rounded-xl bg-surface-secondary px-4 py-3 text-sm leading-6 text-muted">
+                <div className="mb-1.5 flex items-center gap-2 font-semibold text-foreground">
+                  <Route size={14} className="text-accent" />
+                  {item.title}
                 </div>
-              ))}
-            </div>
+                <div className="text-xs leading-5 text-muted">{item.desc}</div>
+              </div>
+            ))}
           </div>
-          <div className="p-5" style={{ background: "rgba(245,158,11,0.06)", borderLeft: "1px solid var(--yunque-border)" }}>
-            <div className="mb-3 flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
-              <ShieldCheck size={16} style={{ color: "var(--yunque-warning)" }} />
-              当前边界
-            </div>
-            <div className="space-y-2 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
-              {boundaryItems.map((item) => <div key={item}>{item}</div>)}
-            </div>
-          </div>
-        </div>
+        </Card.Content>
       </Card>
 
-      <Card className="section-card p-4">
-        <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>Pack / Cogni / Skill / MCP 的关系</div>
-        <dl className="mt-3 grid gap-3 md:grid-cols-3">
-          {relationItems.map((item) => (
-            <div key={item.term} className="rounded-lg p-3" style={{ background: "var(--yunque-bg-hover)", border: "1px solid var(--yunque-border)" }}>
-              <dt className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>{item.term}</dt>
-              <dd className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>{item.desc}</dd>
-            </div>
-          ))}
-        </dl>
+      <Card variant="default">
+        <Card.Header className="flex-row items-center gap-2">
+          <PackSectionTitle icon={<ShieldCheck size={15} />} tone="accent">Pack / Cogni / Skill / MCP 的关系</PackSectionTitle>
+        </Card.Header>
+        <Card.Content>
+          <dl className="grid gap-3 md:grid-cols-3">
+            {relationItems.map((item) => (
+              <div key={item.term} className="rounded-xl bg-surface-secondary px-4 py-3">
+                <dt className="text-sm font-medium text-foreground">{item.term}</dt>
+                <dd className="mt-1 text-xs leading-5 text-muted">{item.desc}</dd>
+              </div>
+            ))}
+          </dl>
+        </Card.Content>
       </Card>
 
-      <Card className="section-card p-4">
-        <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>下一步去哪</div>
-        <div className="mt-2 text-sm leading-6" style={{ color: "var(--yunque-text-secondary)" }}>
-          想创建或编辑 Cogni，请打开「我的 Cogni」；想看具体能力包是否可用，请回到能力包中心或对应功能页。这个页面只解释 Cogni Kernel 与能力包、Planner 的关系。
-        </div>
-        <div className="mt-3">
-          <Link href="/cognis">
-            <Button variant="outline" size="sm">
-              打开 Cogni 管理
-            </Button>
-          </Link>
-        </div>
+      <Card variant="default">
+        <Card.Header className="flex-row items-center gap-2">
+          <PackSectionTitle tone="accent">下一步去哪</PackSectionTitle>
+        </Card.Header>
+        <Card.Content className="flex flex-col gap-3">
+          <div className="text-sm leading-6 text-muted">
+            想创建或编辑 Cogni，请打开「我的 Cogni」；想看具体能力包是否可用，请回到能力包中心或对应功能页。这个页面只解释 Cogni Kernel 与能力包、Planner 的关系。
+          </div>
+          <div>
+            <Link href="/cognis">
+              <Button variant="outline" size="sm">
+                打开 Cogni 管理
+              </Button>
+            </Link>
+          </div>
+        </Card.Content>
       </Card>
     </div>
   );

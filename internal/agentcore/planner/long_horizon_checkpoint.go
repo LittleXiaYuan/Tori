@@ -24,6 +24,7 @@ import (
 type LongHorizonCheckpoint struct {
 	PlanID       string     `json:"plan_id"`
 	TenantID     string     `json:"tenant_id,omitempty"`
+	SessionID    string     `json:"session_id,omitempty"`
 	TaskID       string     `json:"task_id,omitempty"`
 	Goal         string     `json:"goal,omitempty"`
 	Status       string     `json:"status"`
@@ -41,12 +42,13 @@ type LongHorizonCheckpoint struct {
 
 func buildLongHorizonCheckpoint(req PlanRequest, pl *plan.Plan, errText string) LongHorizonCheckpoint {
 	if pl == nil {
-		return LongHorizonCheckpoint{TaskID: req.TaskID, Error: errText, UpdatedAt: time.Now().UTC()}
+		return LongHorizonCheckpoint{TenantID: req.TenantID, SessionID: req.SessionID, TaskID: req.TaskID, Error: errText, UpdatedAt: time.Now().UTC()}
 	}
 	completed, total := pl.Progress()
 	cp := LongHorizonCheckpoint{
 		PlanID:       pl.ID,
 		TenantID:     req.TenantID,
+		SessionID:    req.SessionID,
 		TaskID:       req.TaskID,
 		Goal:         truncate(extractGoal(req), 500),
 		Status:       string(pl.Status),
@@ -319,6 +321,7 @@ func (p *Planner) emitLongHorizonCheckpoint(req PlanRequest, pl *plan.Plan, errT
 	}
 	evt := observe.NewEvent(req.TraceID, observe.DomainPlanner, observe.EventPlan, summary)
 	evt.Meta.TenantID = req.TenantID
+	evt.Meta.SessionID = req.SessionID
 	evt.Meta.TaskID = req.TaskID
 	evt.Detail = friendlyLongHorizonCheckpoint(cp)
 	req.StepCallback(evt)

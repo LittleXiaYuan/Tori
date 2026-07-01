@@ -128,8 +128,9 @@ func (g *Gateway) handleWSChat(ctx context.Context, ws *wsConn, tenantID string,
 	msgs = g.augmentMessagesForIntent(msgs, tenantID)
 
 	result, err := g.planner.Run(ctx, planner.PlanRequest{
-		Messages: msgs,
-		TenantID: tenantID,
+		Messages:  msgs,
+		TenantID:  tenantID,
+		SessionID: msg.Session,
 	})
 	if err != nil {
 		ws.sendJSON(wsReply{Type: "error", Content: friendlyChatPipelineError(err)})

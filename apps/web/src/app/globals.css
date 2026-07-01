@@ -946,6 +946,11 @@ body {
 }
 
 .tabs { border-color: var(--yunque-border) !important; }
+/* Tab strips with many tabs (e.g. the browser pack's 9 tabs) must scroll
+   horizontally instead of squishing each tab until its label wraps one glyph
+   per line. Keep tabs on a single line and let the strip overflow-scroll. */
+.tabs { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; }
+.tab { white-space: nowrap; flex-shrink: 0; }
 .tab[data-selected] { color: var(--yunque-accent) !important; }
 .switch__thumb { transition: transform 0.2s ease !important; }
 .chip { transition: all var(--duration-fast) ease; font-size: var(--text-xs) !important; }
@@ -993,6 +998,14 @@ button, [role="button"] { border-radius: var(--radius-md); }
   gap: var(--section-gap);
   background: transparent;
 }
+/* Direct sections must keep their natural height. .page-root is a fixed-height
+   flex column; a card with overflow:hidden gets a flex auto-min-size of 0, so
+   when total content exceeds the viewport those cards get squished and clip
+   their text. Pinning flex-shrink lets .page-root scroll instead of squishing. */
+.page-root > * {
+  flex-shrink: 0;
+}
+
 .page-root-full {
   padding: 0;
   width: 100%;

@@ -7,6 +7,7 @@ import { Sparkles, Compass, Brain, MoonStar, AlertTriangle, Send, ClipboardList,
 import PageHeader from "@/components/page-header";
 import { formatErrorMessage } from "@/lib/error-utils";
 import { chatPromptHref } from "@/lib/pack-action-links";
+import { PackAbout, PackSectionTitle, PackStepsGrid, type PackBoundaryItem, type PackStep } from "@/components/packs/pack-page-kit";
 import {
   createInnerLifePackClient,
   type CuriosityQuestion,
@@ -15,45 +16,24 @@ import {
 
 const innerLife = createInnerLifePackClient();
 
-const useCaseCards = [
-  {
-    title: "把好奇心变成任务",
-    desc: "看到一个待探索问题后，可以直接让云雀继续调研、拆成任务，或沉淀到知识库。",
-  },
-  {
-    title: "把反思变成改进",
-    desc: "反思记录用于回看一次对话哪里做得好、哪里卡住，再把经验写进下一次提示。",
-  },
-  {
-    title: "把夜游变成缺口清单",
-    desc: "夜间周期会汇总事实、想法和技能缺口，适合第二天挑选值得补的能力。",
-  },
+const useCaseSteps: PackStep[] = [
+  { key: "curiosity", label: "把好奇心变成任务", detail: "看到一个待探索问题后，可以直接让云雀继续调研、拆成任务，或沉淀到知识库。" },
+  { key: "reflection", label: "把反思变成改进", detail: "反思记录用于回看一次对话哪里做得好、哪里卡住，再把经验写进下一次提示。" },
+  { key: "dreaming", label: "把夜游变成缺口清单", detail: "夜间周期会汇总事实、想法和技能缺口，适合第二天挑选值得补的能力。" },
 ];
 
-const boundaryItems = [
-  "不会替你自动执行任务、发送消息或修改文件；它只整理可继续处理的线索。",
-  "不会把夜游记录当成事实结论，重要内容仍需要你在 Chat 或知识库里确认。",
-  "不会持续占用前台注意力；空闲探索、反思和夜游结果都可以稍后再看。",
-  "如果相关能力包停用，这里只显示已有记录或空态引导。",
+const boundaryItems: PackBoundaryItem[] = [
+  { key: "exec", label: "不自动执行", detail: "不会替你自动执行任务、发送消息或修改文件；它只整理可继续处理的线索。" },
+  { key: "facts", label: "不当成结论", detail: "不会把夜游记录当成事实结论，重要内容仍需要你在 Chat 或知识库里确认。" },
+  { key: "attention", label: "不占用注意力", detail: "不会持续占用前台注意力；空闲探索、反思和夜游结果都可以稍后再看。" },
+  { key: "gated", label: "停用即受限", detail: "如果相关能力包停用，这里只显示已有记录或空态引导。" },
 ];
 
-const workflowLoopItems = [
-  {
-    title: "1. 选一条线索",
-    body: "从好奇心、反思或夜游里挑一个值得继续的问题，不把它当结论。",
-  },
-  {
-    title: "2. 带回 Chat",
-    body: "让云雀把线索拆成任务、调研问题或知识整理请求。",
-  },
-  {
-    title: "3. 看结果位置",
-    body: "任务进度在任务中心，确认后的事实再沉淀到记忆或知识。",
-  },
-  {
-    title: "4. 继续补能力",
-    body: "如果这个包还不够好，回工坊让小羽基于真实体验继续改。",
-  },
+const workflowLoopItems: PackStep[] = [
+  { key: "pick", label: "选一条线索", detail: "从好奇心、反思或夜游里挑一个值得继续的问题，不把它当结论。" },
+  { key: "chat", label: "带回 Chat", detail: "让云雀把线索拆成任务、调研问题或知识整理请求。" },
+  { key: "result", label: "看结果位置", detail: "任务进度在任务中心，确认后的事实再沉淀到记忆或知识。" },
+  { key: "extend", label: "继续补能力", detail: "如果这个包还不够好，回工坊让小羽基于真实体验继续改。" },
 ];
 
 function formatTimestamp(iso: string): string {
@@ -98,12 +78,12 @@ function ColumnHeader({
 }) {
   return (
     <div className="flex items-center gap-2 mb-3">
-      <span style={{ color: "var(--yunque-accent)" }}>{icon}</span>
-      <span className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
+      <span className="text-accent">{icon}</span>
+      <span className="text-sm font-semibold text-foreground">
         {title}
       </span>
       {hint ? (
-        <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+        <span className="text-xs text-muted">
           {hint}
         </span>
       ) : null}
@@ -113,10 +93,7 @@ function ColumnHeader({
 
 function EmptyState({ text, action }: { text: string; action?: React.ReactNode }) {
   return (
-    <div
-      className="text-xs px-3 py-6 text-center rounded-md"
-      style={{ color: "var(--yunque-text-muted)", background: "rgba(255,255,255,0.02)" }}
-    >
+    <div className="text-xs px-3 py-6 text-center rounded-xl text-muted bg-surface-secondary">
       <div>{text}</div>
       {action ? <div className="mt-3 flex justify-center">{action}</div> : null}
     </div>
@@ -128,7 +105,7 @@ function CuriosityColumn({ items, loading }: { items: CuriosityQuestion[]; loadi
     <Card className="section-card p-4">
       <ColumnHeader icon={<Compass size={16} />} title="好奇心" hint="待探索的问题" />
       {loading ? (
-        <div className="flex items-center gap-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+        <div className="flex items-center gap-2 text-xs text-muted">
           <Spinner size="sm" /> 加载中…
         </div>
       ) : items.length === 0 ? (
@@ -147,20 +124,19 @@ function CuriosityColumn({ items, loading }: { items: CuriosityQuestion[]; loadi
           {items.map((q, idx) => (
             <div
               key={`${q.question}-${idx}`}
-              className="rounded-md px-3 py-2 text-sm"
-              style={{ background: "rgba(255,255,255,0.02)", border: "1px solid var(--yunque-border)" }}
+              className="rounded-xl px-3 py-2 text-sm bg-surface-secondary border border-border"
             >
               <div className="flex items-center gap-2 mb-1">
                 <Chip size="sm">
                   {q.category}
                 </Chip>
-                <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+                <span className="text-xs text-muted">
                   优先级 {q.priority.toFixed(2)}
                 </span>
               </div>
-              <div style={{ color: "var(--yunque-text)" }}>{q.question}</div>
+              <div className="text-foreground">{q.question}</div>
               {q.context ? (
-                <div className="text-xs mt-1" style={{ color: "var(--yunque-text-muted)" }}>
+                <div className="text-xs mt-1 text-muted">
                   {q.context}
                 </div>
               ) : null}
@@ -184,7 +160,7 @@ function ReflectionColumn({ items, loading }: { items: TimelineEntry[]; loading:
     <Card className="section-card p-4">
       <ColumnHeader icon={<Brain size={16} />} title="反思" hint="对话后的自我评估" />
       {loading ? (
-        <div className="flex items-center gap-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+        <div className="flex items-center gap-2 text-xs text-muted">
           <Spinner size="sm" /> 加载中…
         </div>
       ) : items.length === 0 ? (
@@ -207,8 +183,7 @@ function ReflectionColumn({ items, loading }: { items: TimelineEntry[]; loading:
             return (
               <div
                 key={e.id}
-                className="rounded-md px-3 py-2 text-sm"
-                style={{ background: "rgba(255,255,255,0.02)", border: "1px solid var(--yunque-border)" }}
+                className="rounded-xl px-3 py-2 text-sm bg-surface-secondary border border-border"
               >
                 <div className="flex items-center gap-2 mb-1">
                   {quality !== null ? (
@@ -219,12 +194,12 @@ function ReflectionColumn({ items, loading }: { items: TimelineEntry[]; loading:
                   <Chip size="sm" color={satisfied ? "success" : "default"}>
                     {satisfied ? "满意" : "未满意"}
                   </Chip>
-                  <span className="text-xs ml-auto" style={{ color: "var(--yunque-text-muted)" }}>
+                  <span className="text-xs ml-auto text-muted">
                     {formatTimestamp(e.created_at)}
                   </span>
                 </div>
                 {intent ? (
-                  <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+                  <div className="text-xs text-muted">
                     {intent}
                   </div>
                 ) : null}
@@ -242,7 +217,7 @@ function DreamingColumn({ items, loading }: { items: TimelineEntry[]; loading: b
     <Card className="section-card p-4">
       <ColumnHeader icon={<MoonStar size={16} />} title="夜游" hint="夜间梦境周期" />
       {loading ? (
-        <div className="flex items-center gap-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+        <div className="flex items-center gap-2 text-xs text-muted">
           <Spinner size="sm" /> 加载中…
         </div>
       ) : items.length === 0 ? (
@@ -266,15 +241,14 @@ function DreamingColumn({ items, loading }: { items: TimelineEntry[]; loading: b
             return (
               <div
                 key={e.id}
-                className="rounded-md px-3 py-2 text-sm"
-                style={{ background: "rgba(255,255,255,0.02)", border: "1px solid var(--yunque-border)" }}
+                className="rounded-xl px-3 py-2 text-sm bg-surface-secondary border border-border"
               >
                 <div className="flex items-center gap-2 mb-1 flex-wrap">
                   <Chip size="sm">探索 {explorations}</Chip>
                   <Chip size="sm">事实 {facts}</Chip>
                   <Chip size="sm">想法 {thoughts}</Chip>
                   <Chip size="sm">技能 {skills}</Chip>
-                  <span className="text-xs ml-auto" style={{ color: "var(--yunque-text-muted)" }}>
+                  <span className="text-xs ml-auto text-muted">
                     {formatTimestamp(e.created_at)}
                   </span>
                 </div>
@@ -331,56 +305,44 @@ export default function InnerLifePackPage() {
       />
 
 
-      <Card className="section-card overflow-hidden p-0">
-        <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_260px]">
-          <div className="p-5">
-            <div className="mb-4">
-              <div className="text-base font-semibold" style={{ color: "var(--yunque-text)" }}>这个能力包有什么用</div>
-              <div className="mt-2 max-w-3xl text-sm leading-6" style={{ color: "var(--yunque-text-secondary)" }}>
-                它不是给你看“云雀在想什么”而已，而是把空闲探索、任务复盘和夜间学习整理成下一步可执行线索。
-              </div>
+      <PackAbout
+        chips={<>
+          <Chip size="sm" color="success">可直接使用</Chip>
+          <Chip size="sm" variant="soft">整理线索</Chip>
+          <Chip size="sm" variant="soft">可带回 Chat</Chip>
+        </>}
+        description="它不是给你看“云雀在想什么”而已，而是把空闲探索、任务复盘和夜间学习整理成下一步可执行线索。"
+        boundaries={boundaryItems}
+      />
+
+      <Card variant="default">
+        <Card.Header className="flex-row items-center gap-2">
+          <PackSectionTitle icon={<Sparkles size={15} />} tone="accent">这个能力包有什么用</PackSectionTitle>
+        </Card.Header>
+        <Card.Content className="flex flex-col gap-4">
+          <PackStepsGrid steps={useCaseSteps} columns={3} />
+          <div className="grid grid-cols-3 gap-3">
+            <div className="rounded-xl bg-surface-secondary px-4 py-3">
+              <div className="text-2xl font-semibold text-foreground">{pendingQuestions.length}</div>
+              <div className="text-xs text-muted">待探索问题</div>
             </div>
-            <div className="grid gap-3 md:grid-cols-3">
-              {useCaseCards.map((item) => (
-                <div key={item.title} className="rounded-lg p-3" style={{ background: "var(--yunque-bg-hover)", border: "1px solid var(--yunque-border)" }}>
-                  <div className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>{item.title}</div>
-                  <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>{item.desc}</div>
-                </div>
-              ))}
+            <div className="rounded-xl bg-surface-secondary px-4 py-3">
+              <div className="text-2xl font-semibold text-foreground">{reflections.length}</div>
+              <div className="text-xs text-muted">反思记录</div>
             </div>
-          </div>
-          <div className="p-5" style={{ background: "rgba(59,130,246,0.05)", borderLeft: "1px solid var(--yunque-border)" }}>
-            <div className="grid grid-cols-3 gap-2 lg:grid-cols-1">
-              <div>
-                <div className="text-2xl font-semibold" style={{ color: "var(--yunque-text)" }}>{pendingQuestions.length}</div>
-                <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>待探索问题</div>
-              </div>
-              <div>
-                <div className="text-2xl font-semibold" style={{ color: "var(--yunque-text)" }}>{reflections.length}</div>
-                <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>反思记录</div>
-              </div>
-              <div>
-                <div className="text-2xl font-semibold" style={{ color: "var(--yunque-text)" }}>{dreams.length}</div>
-                <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>夜游记录</div>
-              </div>
-            </div>
-            <div className="mt-5 border-t pt-4" style={{ borderColor: "var(--yunque-border)" }}>
-              <div className="mb-2 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>当前边界</div>
-              <div className="space-y-2 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
-                {boundaryItems.map((item) => <div key={item}>{item}</div>)}
-              </div>
+            <div className="rounded-xl bg-surface-secondary px-4 py-3">
+              <div className="text-2xl font-semibold text-foreground">{dreams.length}</div>
+              <div className="text-xs text-muted">夜游记录</div>
             </div>
           </div>
-        </div>
+        </Card.Content>
       </Card>
 
-      <Card className="section-card p-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>从线索到行动的闭环</div>
-            <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
-              内在生活的价值不在于“看见内部状态”，而在于把线索变成下一次对话、任务、记忆或知识。
-            </div>
+      <Card variant="default">
+        <Card.Header className="flex-row flex-wrap items-start justify-between gap-3">
+          <div className="flex flex-col gap-1">
+            <PackSectionTitle icon={<Compass size={15} />} tone="accent">从线索到行动的闭环</PackSectionTitle>
+            <span className="text-xs leading-5 text-muted">内在生活的价值不在于“看见内部状态”，而在于把线索变成下一次对话、任务、记忆或知识。</span>
           </div>
           <div className="flex flex-wrap gap-2">
             <Link href={chatPromptHref("请从内在生活里挑一条最值得继续的线索，帮我拆成一个可执行任务，并说明结果应该沉淀到记忆还是知识库。")}>
@@ -394,30 +356,22 @@ export default function InnerLifePackPage() {
               </Button>
             </Link>
           </div>
-        </div>
-        <div className="mt-3 grid gap-2 md:grid-cols-4">
-          {workflowLoopItems.map((item) => (
-            <div key={item.title} className="rounded-md border p-3" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-surface)" }}>
-              <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>{item.title}</div>
-              <div className="mt-2 text-[11px] leading-5" style={{ color: "var(--yunque-text-muted)" }}>{item.body}</div>
-            </div>
-          ))}
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2 text-xs">
-          <Link href="/memory"><Button size="sm" variant="ghost">沉淀到记忆</Button></Link>
-          <Link href="/knowledge"><Button size="sm" variant="ghost">沉淀到知识</Button></Link>
-          <Link href="/packs/studio?packId=yunque.pack.inner-life"><Button size="sm" variant="ghost">让小羽继续改</Button></Link>
-        </div>
+        </Card.Header>
+        <Card.Content className="flex flex-col gap-3">
+          <PackStepsGrid steps={workflowLoopItems} columns={4} />
+          <div className="flex flex-wrap gap-2">
+            <Link href="/memory"><Button size="sm" variant="ghost">沉淀到记忆</Button></Link>
+            <Link href="/knowledge"><Button size="sm" variant="ghost">沉淀到知识</Button></Link>
+            <Link href="/packs/studio?packId=yunque.pack.inner-life"><Button size="sm" variant="ghost">让小羽继续改</Button></Link>
+          </div>
+        </Card.Content>
       </Card>
 
       {error ? (
-        <Card className="p-4" style={{ background: "rgba(239,68,68,0.05)" }}>
-          <div className="flex items-center gap-2">
-            <AlertTriangle size={16} style={{ color: "var(--yunque-danger)" }} />
-            <span className="text-sm" style={{ color: "var(--yunque-danger)" }}>
-              {error}
-            </span>
-          </div>
+        <Card variant="secondary">
+          <Card.Content className="flex items-center gap-2 text-sm text-danger">
+            <AlertTriangle size={16} /> {error}
+          </Card.Content>
         </Card>
       ) : null}
 

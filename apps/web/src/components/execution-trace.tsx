@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import type { ReactNode } from "react";
+import Link from "next/link";
 import {
   Brain, Wrench, CheckCircle2, XCircle, RefreshCw,
   MessageCircle, Settings2, ClipboardList, Lock, LockOpen,
   Ban, MapPin, ChevronDown, ChevronRight, Plus, Minus,
 } from "lucide-react";
 import { formatErrorMessage } from "@/lib/error-utils";
+import { resolvePlannerRecoveryTargetFromDetail } from "@/lib/planner-recovery-target";
 
 /** Mirrors observe.AgentEvent from the Go backend. */
 export interface AgentEvent {
@@ -62,12 +64,12 @@ function domainIcon(domain: string, type: string) {
 function domainColor(domain: string, type: string): string {
   if (domain === "planner") {
     switch (type) {
-      case "thinking": return "#60a5fa";
+      case "thinking": return "var(--yunque-accent)";
       case "tool_start": return "#fbbf24";
       case "tool_result":
         return type.includes("fail") ? "#f87171" : "#34d399";
       case "reflect": return "#a78bfa";
-      default: return "#60a5fa";
+      default: return "var(--yunque-accent)";
     }
   }
   if (domain === "workflow") {
@@ -228,17 +230,29 @@ function CheckpointDetailCard({ detail, onRecoveryPrompt }: { detail: Record<str
   const error = asString(detail.error);
   const hint = asString(detail.resume_hint);
   const recoverable = detail.recoverable === true || Boolean(error);
+  const planId = asString(detail.plan_id);
   const snapshot = Array.isArray(detail.plan_snapshot) ? detail.plan_snapshot.filter(isRecord).slice(0, 4) : [];
   return (
     <div className="mt-1.5 rounded-lg p-2.5 space-y-2" style={{ background: "rgba(167,139,250,0.08)", border: "1px solid rgba(167,139,250,0.18)" }}>
       <div className="grid grid-cols-2 gap-2">
         <DetailPill label="进度" value={`${completed}/${total}`} tone={completed === total && total > 0 ? "good" : "default"} />
         <DetailPill label="状态" value={status} tone={error ? "bad" : "default"} />
-        <DetailPill label="Plan ID" value={asString(detail.plan_id) ?? "—"} />
+        <DetailPill label="Plan ID" value={planId ?? "—"} />
         <DetailPill label="已用步骤" value={asNumber(detail.steps_used) ?? 0} />
       </div>
       {error && <div className="text-[11px]" style={{ color: "#f87171" }}>失败原因：{displayTraceText(error, "任务暂时没有顺利完成，已保留现场。")}</div>}
       {hint && <div className="text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>{displayTraceText(hint)}</div>}
+      {planId && (
+        <Link
+          href={`/planner-checkpoint?plan_id=${encodeURIComponent(planId)}`}
+          className="inline-flex w-fit items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium"
+          style={{ background: "rgba(167,139,250,0.14)", color: "#c4b5fd", border: "1px solid rgba(167,139,250,0.28)" }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          详情页
+          <ChevronRight size={11} aria-hidden />
+        </Link>
+      )}
       {snapshot.length > 0 && (
         <div className="space-y-1.5">
           {snapshot.map((step, idx) => (
@@ -420,6 +434,7 @@ function FailureRecoveryDetailCard({ detail, onRecoveryPrompt }: { detail: Recor
   const failurePattern = displayTraceText(asString(detail.failure_pattern));
   const recommendation = displayTraceText(asString(detail.recommendation));
   const nextStep = displayTraceText(asString(detail.next_step));
+  const recoveryTarget = resolvePlannerRecoveryTargetFromDetail(detail);
   return (
     <div className="mt-1.5 rounded-lg p-2.5 space-y-2" style={{ background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.2)" }}>
       <div className="grid grid-cols-2 gap-2">
@@ -433,6 +448,17 @@ function FailureRecoveryDetailCard({ detail, onRecoveryPrompt }: { detail: Recor
       {tried.length > 0 && <div className="text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>已获得结果：{tried.slice(0, 3).join("；")}</div>}
       {ruledOut.length > 0 && <div className="text-[11px]" style={{ color: "#fbbf24" }}>已暂时排除：{ruledOut.slice(0, 3).join("；")}</div>}
       {nextStep && <div className="text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>{nextStep}</div>}
+      {recoveryTarget && (
+        <Link
+          href={recoveryTarget.href}
+          className="inline-flex w-fit items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium"
+          style={{ background: "rgba(251,191,36,0.12)", color: "#fcd34d", border: "1px solid rgba(251,191,36,0.25)" }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {recoveryTarget.label}
+          <ChevronRight size={11} aria-hidden />
+        </Link>
+      )}
       {onRecoveryPrompt && (
         <div className="flex flex-wrap gap-1.5 pt-1">
           <button type="button" className="rounded-full px-2.5 py-1 text-[11px] font-medium" style={{ background: "rgba(251,191,36,0.12)", color: "#fcd34d", border: "1px solid rgba(251,191,36,0.25)" }} onClick={(e) => { e.stopPropagation(); onRecoveryPrompt(buildFailureRecoveryPrompt(detail, "continue")); }}>

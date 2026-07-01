@@ -29,6 +29,7 @@ func (p *Planner) emitModelFallbackEvent(req PlanRequest, model string, attempt 
 	}
 	evt := observe.NewEvent(req.TraceID, observe.DomainPlanner, observe.EventPlan, modelFallbackSummary(model))
 	evt.Meta.TenantID = req.TenantID
+	evt.Meta.SessionID = req.SessionID
 	evt.Meta.TaskID = req.TaskID
 	detail := ModelFallbackDetail{Model: model, Attempt: attempt}
 	if err != nil {
@@ -55,6 +56,8 @@ func (p *Planner) modelReasoningEvents(req PlanRequest) ModelReasoningEventFunc 
 	return func(summary string, detail map[string]any) {
 		evt := observe.NewEvent(req.TraceID, observe.DomainPlanner, observe.EventThinking, summary)
 		evt.Meta.TenantID = req.TenantID
+		evt.Meta.SessionID = req.SessionID
+		evt.Meta.TaskID = req.TaskID
 		evt.Detail = detail
 		req.StepCallback(evt)
 	}

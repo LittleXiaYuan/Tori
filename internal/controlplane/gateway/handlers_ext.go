@@ -59,6 +59,17 @@ func (g *Gateway) handleConversationMessages(w http.ResponseWriter, r *http.Requ
 		json.NewEncoder(w).Encode(map[string]any{"messages": msgs, "count": len(msgs)})
 	case http.MethodDelete:
 		g.convStore.Delete(sessionID)
+		if g.taskStore != nil {
+			tenantID := tenantFromCtx(r.Context())
+			tasks := g.taskStore.List(tenantID, 0)
+			for _, t := range tasks {
+				if t.Constraints != nil && t.Constraints.Extra != nil {
+					if sid, ok := t.Constraints.Extra["session_id"].(string); ok && sid == sessionID {
+						g.taskStore.Delete(t.ID)
+					}
+				}
+			}
+		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{"status": "deleted"})
 	default:

@@ -160,6 +160,7 @@ func (r *Runner) Resume(ctx context.Context, taskID string) error {
 	}
 	t.Status = StatusPending
 	t.Error = ""
+	t.RecoveryHint = nil
 	t.FinishedAt = nil
 	r.store.Update(t)
 	r.emit("task_resumed", taskID, fmt.Sprintf("resumed from %s", t.Status))
@@ -181,6 +182,7 @@ func (r *Runner) Restart(ctx context.Context, taskID string) error {
 	t.Steps = nil
 	t.Status = StatusPending
 	t.Error = ""
+	t.RecoveryHint = nil
 	t.StartedAt = nil
 	t.FinishedAt = nil
 	t.Artifacts = nil
@@ -250,6 +252,7 @@ func (r *Runner) Run(ctx context.Context, taskID string) error {
 			// Update error message (lifecycle doesn't handle this)
 			t, _ = r.store.Get(taskID)
 			t.Error = fmt.Sprintf("planning failed: %v", err)
+			t.RecoveryHint = InferRecoveryHint(t, "runner:planning")
 			r.store.Update(t)
 			return err
 		}
@@ -436,6 +439,7 @@ func (r *Runner) Run(ctx context.Context, taskID string) error {
 			if firstErr != nil {
 				t.Status = StatusFailed
 				t.Error = fmt.Sprintf("parallel group failed: %v", firstErr)
+				t.RecoveryHint = InferRecoveryHint(t, "runner:parallel")
 				errNow := time.Now()
 				t.FinishedAt = &errNow
 				r.store.Update(t)
@@ -482,6 +486,7 @@ func (r *Runner) markDependencyBlocked(t *Task, step *Step, missing []int) error
 	}
 	t.Status = StatusInterrupted
 	t.Error = fmt.Sprintf("步骤 %d 等待依赖步骤完成：%s", step.ID, formatStepIDs(missing))
+	t.RecoveryHint = InferRecoveryHint(t, "runner:dependency")
 	step.Status = StepPending
 	r.store.Update(t)
 	r.emit("task_interrupted", t.ID, t.Error)
@@ -505,6 +510,7 @@ func (r *Runner) markCancelled(t *Task) error {
 	now := time.Now()
 	t.Status = StatusCancelled
 	t.Error = "cancelled by user"
+	t.RecoveryHint = nil
 	t.FinishedAt = &now
 	// Mark any running/pending steps as skipped
 	for i := range t.Steps {
@@ -521,6 +527,7 @@ func (r *Runner) markCancelled(t *Task) error {
 func (r *Runner) markPaused(t *Task) error {
 	t.Status = StatusPaused
 	t.Error = ""
+	t.RecoveryHint = nil
 	// Mark any running steps back to pending
 	for i := range t.Steps {
 		if t.Steps[i].Status == StepRunning || t.Steps[i].Status == StepRetrying {

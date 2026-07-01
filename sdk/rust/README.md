@@ -805,23 +805,6 @@ The lightweight Modes SDK exposes persona modes, current-mode reads, and mode sw
 
 The lightweight Interactions SDK exposes emotion history, sticker mappings, user instructions, emoji reactions, and sticker sending helpers for external plugin UIs, front-end admin pages, CLIs, sidecars, and automation scripts without importing the full platform client. It maps directly to `/v1/emotion/*`, `/v1/instructions*`, `/v1/react`, and `/v1/sticker/send`; Agent Kit also exposes this surface as `kit.interactions` / `kit.Interactions`.
 
-### Lightweight Airi Bridge helper
-
-`AiriClient` exposes the Airi desktop pet bridge for Rust CLIs, sidecars, and automation binaries without coupling callers to the full generated client. It maps to `/v1/ext/airi/status`, `/v1/ext/airi/models`, and OpenAI-compatible `/v1/ext/airi/chat/completions`; Agent Kit also exposes it as `AgentKit::airi`.
-
-```rust
-use yunque_client::{AiriChatCompletionRequest, AiriChatMessage, AiriClient};
-
-let airi = AiriClient::new("http://localhost:9090", "<token>")?;
-let status = airi.status().await?;
-let models = airi.models().await?;
-let reply = airi.chat_completions(&AiriChatCompletionRequest {
-    model: "yunque-airi".to_string(),
-    messages: vec![AiriChatMessage { role: "user".to_string(), content: "你好".to_string() }],
-    ..Default::default()
-}).await?;
-```
-
 ### Lightweight Breaker helper
 
 `BreakerClient` exposes `/api/breaker/reset` for Rust CLIs, sidecars, and automation binaries that need to reset LLM provider circuit breakers without coupling to the full generated client. Agent Kit also exposes it as `AgentKit::breaker`.

@@ -58,6 +58,7 @@ export interface QuickAction {
 export interface InterfacePreferences {
   profileMode: ProfileMode;
   chatDensity: "cozy" | "compact";
+  fontSize: "small" | "default" | "large";
   showOnboarding: boolean;
   zenModeEnabled: boolean;
   floatingWidgetEnabled: boolean;
@@ -105,6 +106,7 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   interface: {
     profileMode: "easy",
     chatDensity: "cozy",
+    fontSize: "default",
     showOnboarding: true,
     zenModeEnabled: false,
     floatingWidgetEnabled: true,

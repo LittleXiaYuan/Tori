@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@heroui/react";
+import Link from "next/link";
 import { AlertTriangle, Home, RefreshCw } from "lucide-react";
 import { formatErrorMessage } from "@/lib/error-utils";
 import { useI18n } from "@/lib/i18n";
@@ -25,9 +26,13 @@ export default function Error({ error, reset }: { error: Error & { digest?: stri
         <Button size="sm" className="gap-1.5 rounded-lg btn-accent" onPress={reset}>
           <RefreshCw size={14} /> {t("error.retry")}
         </Button>
-        <Button size="sm" variant="ghost" className="gap-1.5 rounded-lg" onPress={() => { window.location.href = "/"; }}>
+        <Link
+          href="/"
+          className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium"
+          style={{ color: "var(--yunque-text-muted)", border: "1px solid var(--yunque-border)" }}
+        >
           <Home size={14} /> {t("error.home")}
-        </Button>
+        </Link>
       </div>
     </div>
   );

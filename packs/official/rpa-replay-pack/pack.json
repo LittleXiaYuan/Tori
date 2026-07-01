@@ -112,6 +112,7 @@
     "rollback": true
   },
   "metadata": {
+    "group": "automation-lab",
     "blueprint": "docs/spec/pack-runtime-blueprint.md",
     "stage": "pack-shell-before-executor",
     "sync": "backend-registry-drives-frontend",

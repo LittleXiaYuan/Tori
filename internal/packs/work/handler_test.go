@@ -2,6 +2,7 @@ package workpack
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -28,6 +29,15 @@ func (f *fakeGW) WorkMemManager() *task.WorkingMemoryManager { return nil }
 func (f *fakeGW) ThreadManager() *task.ThreadManager         { return nil }
 func (f *fakeGW) ProjectStore() *orchestrator.ProjectStore   { return nil }
 func (f *fakeGW) WorkflowHandler() *workflowapi.Handler      { return nil }
+
+type wiredGW struct {
+	*fakeGW
+	store *task.JSONStore
+}
+
+func (w *wiredGW) TaskStore() task.Store           { return w.store }
+func (w *wiredGW) TaskRunner() *task.Runner        { return &task.Runner{} }
+func (w *wiredGW) TenantOf(context.Context) string { return "t1" }
 
 func routeFor(h *Handler, path string) http.HandlerFunc {
 	for _, r := range h.Routes() {
@@ -103,5 +113,89 @@ func TestWorkPackV2AndDeshell(t *testing.T) {
 	proj(rec4, httptest.NewRequest(http.MethodGet, "/v1/projects", nil))
 	if rec4.Code != http.StatusServiceUnavailable {
 		t.Fatalf("native /v1/projects nil-store = %d, want 503", rec4.Code)
+	}
+}
+
+func TestTaskDeleteRemovesTaskFromCollection(t *testing.T) {
+	store := task.NewStore(t.TempDir())
+	keep, err := store.Create(task.CreateRequest{Title: "keep", Description: "keep task", TenantID: "t1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	remove, err := store.Create(task.CreateRequest{Title: "remove", Description: "remove task", TenantID: "t1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := NewHandler(&wiredGW{fakeGW: &fakeGW{}, store: store})
+	route := routeFor(h, "/v1/tasks")
+	if route == nil {
+		t.Fatal("missing /v1/tasks route")
+	}
+
+	rec := httptest.NewRecorder()
+	route(rec, httptest.NewRequest(http.MethodDelete, "/v1/tasks?id="+remove.ID, nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("delete status=%d body=%s", rec.Code, rec.Body.String())
+	}
+
+	rec = httptest.NewRecorder()
+	route(rec, httptest.NewRequest(http.MethodGet, "/v1/tasks", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	var got []task.Task
+	if err := json.NewDecoder(rec.Body).Decode(&got); err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].ID != keep.ID {
+		t.Fatalf("expected only kept task after delete, got %#v", got)
+	}
+	if _, ok := store.Get(remove.ID); ok {
+		t.Fatal("deleted task still exists in store")
+	}
+}
+
+func TestTaskListAddsRecoveryHintForFailedTasks(t *testing.T) {
+	store := task.NewStore(t.TempDir())
+	created, err := store.Create(task.CreateRequest{Title: "weekly report", Description: "export weekly report", TenantID: "t1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	created.Status = task.StatusFailed
+	created.Error = "browser connector credential expired"
+	if err := store.Update(created); err != nil {
+		t.Fatal(err)
+	}
+
+	h := NewHandler(&wiredGW{fakeGW: &fakeGW{}, store: store})
+	route := routeFor(h, "/v1/tasks")
+	if route == nil {
+		t.Fatal("missing /v1/tasks route")
+	}
+
+	rec := httptest.NewRecorder()
+	route(rec, httptest.NewRequest(http.MethodGet, "/v1/tasks", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	var got []task.Task
+	if err := json.NewDecoder(rec.Body).Decode(&got); err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("expected one task, got %#v", got)
+	}
+	hint := got[0].RecoveryHint
+	if hint == nil {
+		t.Fatal("expected recovery hint")
+	}
+	if hint.Category != "connector" {
+		t.Fatalf("category=%q, want connector", hint.Category)
+	}
+	if hint.PrimaryAction.Href != "/packs/browser" {
+		t.Fatalf("href=%q, want /packs/browser", hint.PrimaryAction.Href)
+	}
+	if hint.GroupKey != "connector|/packs/browser" {
+		t.Fatalf("group_key=%q, want connector|/packs/browser", hint.GroupKey)
 	}
 }

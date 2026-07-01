@@ -105,7 +105,7 @@ function buildCommittedPlanSteps(events: AgentEvent[]): TaskStep[] {
 }
 
 const agentMeta: Record<string, { icon: React.ElementType; label: string; color: string }> = {
-  browser_exec:  { icon: Globe,    label: "浏览器操作", color: "#3b82f6" },
+  browser_exec:  { icon: Globe,    label: "浏览器操作", color: "var(--yunque-accent)" },
   file_exec:     { icon: FileText, label: "文件处理",   color: "#f59e0b" },
   code_exec:     { icon: Code2,    label: "代码执行",   color: "#8b5cf6" },
   research_exec: { icon: Search,   label: "信息搜集",   color: "#10b981" },
@@ -189,7 +189,7 @@ function buildSteps(events: AgentEvent[]): TaskStep[] {
 function statusIcon(status: string) {
   switch (status) {
     case "done":    return <CheckCircle2 size={14} style={{ color: "#34d399" }} />;
-    case "running": return <Loader2 size={14} className="animate-spin" style={{ color: "#60a5fa" }} />;
+    case "running": return <Loader2 size={14} className="animate-spin" style={{ color: "var(--yunque-accent)" }} />;
     case "error":   return <XCircle size={14} style={{ color: "#f87171" }} />;
     default:        return <Circle size={14} style={{ color: "var(--yunque-text-muted)", opacity: 0.4 }} />;
   }
@@ -219,6 +219,7 @@ export function TaskProgressPanel({ events, isLive }: TaskProgressPanelProps) {
         className="flex items-center justify-between w-full px-4 py-2.5 cursor-pointer hover:opacity-80 transition-opacity"
         style={{ borderBottom: collapsed ? "none" : "1px solid var(--yunque-border)", background: "transparent" }}
         onClick={() => setCollapsed((c) => !c)}
+        aria-expanded={!collapsed}
       >
         <div className="flex items-center gap-2">
           {collapsed ? <ChevronRight size={14} style={{ color: "var(--yunque-text-muted)" }} /> : <ChevronDown size={14} style={{ color: "var(--yunque-text-muted)" }} />}
@@ -272,7 +273,7 @@ export function TaskProgressPanel({ events, isLive }: TaskProgressPanelProps) {
                           {step.subSteps.slice(-4).map((sub) => (
                             <div key={sub.id} className="flex items-center gap-1.5 text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
                               {sub.status === "running" ? (
-                                <Loader2 size={10} className="animate-spin shrink-0" style={{ color: "#60a5fa" }} />
+                                <Loader2 size={10} className="animate-spin shrink-0" style={{ color: "var(--yunque-accent)" }} />
                               ) : (
                                 <CheckCircle2 size={10} className="shrink-0" style={{ color: "#34d399" }} />
                               )}
@@ -292,7 +293,7 @@ export function TaskProgressPanel({ events, isLive }: TaskProgressPanelProps) {
             <div className="h-1 rounded-full overflow-hidden" style={{ background: "var(--yunque-border)" }}>
               <div
                 className="h-full rounded-full transition-all duration-500"
-                style={{ width: `${total > 0 ? (done / total) * 100 : 0}%`, background: "linear-gradient(90deg, #34d399, #3b82f6)" }}
+                style={{ width: `${total > 0 ? (done / total) * 100 : 0}%`, background: "linear-gradient(90deg, #34d399, var(--yunque-accent))" }}
               />
             </div>
           </div>

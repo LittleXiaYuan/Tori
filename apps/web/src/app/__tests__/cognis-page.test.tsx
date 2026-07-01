@@ -1,9 +1,10 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import CognisPage from "../cognis/page";
 
 vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(""),
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn(), back: vi.fn() }),
 }));
 
 const cogniPackMock = vi.hoisted(() => ({
@@ -48,7 +49,13 @@ describe("CognisPage", () => {
   it("states the formal delivery boundary for Cogni", async () => {
     render(<CognisPage />);
 
-    expect(await screen.findByText("Cogni 的正式交付口径")).toBeInTheDocument();
+    // The delivery boundary and usage notes are collapsible sections, collapsed
+    // by default. Their toggle labels are always present; expand both to assert
+    // the boundary copy is reachable.
+    const deliveryToggle = await screen.findByText("Cogni 的正式交付口径");
+    expect(deliveryToggle).toBeInTheDocument();
+    fireEvent.click(deliveryToggle);
+
     expect(screen.getByText(/模型能力组织层/)).toBeInTheDocument();
     expect(screen.getByText("现在可稳定交付")).toBeInTheDocument();
     expect(screen.getByText("Beta 继续观察")).toBeInTheDocument();
@@ -56,7 +63,11 @@ describe("CognisPage", () => {
     expect(screen.getByText("创建、导入、导出、启用和停用 Cogni 声明。")).toBeInTheDocument();
     expect(screen.getByText("Planner 自动选择 Cogni 的命中质量。")).toBeInTheDocument();
     expect(screen.getByText("自主执行高风险动作或本机电脑控制。")).toBeInTheDocument();
-    expect(screen.getByText("云雀如何使用它")).toBeInTheDocument();
+
+    const usageToggle = screen.getByText("云雀如何使用它");
+    expect(usageToggle).toBeInTheDocument();
+    fireEvent.click(usageToggle);
+
     expect(screen.getByText("能力包扩展云雀底座：提供路由、界面、权限、WASM/DLC 或后端能力。")).toBeInTheDocument();
     expect(screen.getByText("Cogni 增设模型侧能力声明：告诉模型何时选择 Skill、MCP、能力包、记忆和工作流。")).toBeInTheDocument();
     expect(screen.getByText("如果某个能力包被禁用，Cogni 只能看到受限状态，不能绕过 Pack Runtime。")).toBeInTheDocument();

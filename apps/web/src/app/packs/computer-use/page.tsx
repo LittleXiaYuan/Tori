@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Button, Card, Chip, Input, Label, Spinner, TextArea, TextField } from "@heroui/react";
+import { Button, Card, Chip, Label, ListBox, Select, Spinner, TextArea } from "@heroui/react";
 import { Camera, ClipboardList, MonitorCog, Play, RotateCcw, Send, ShieldAlert, ShieldCheck } from "lucide-react";
 import PageHeader from "@/components/page-header";
 import { showToast } from "@/components/toast-provider";
 import { createYunqueSDKClientOptions } from "@/lib/sdk-client";
 import { formatErrorMessage } from "@/lib/error-utils";
 import { chatPromptHref } from "@/lib/pack-action-links";
+import { PackAbout, PackSectionTitle, PackStepsGrid, type PackBoundaryItem, type PackStep } from "@/components/packs/pack-page-kit";
 
 const sdkOptions = createYunqueSDKClientOptions();
 
@@ -77,23 +78,23 @@ const surfaceCards: Array<{
   },
 ];
 
-const workflowLoopItems = [
-  {
-    title: "1. 生成计划",
-    body: "把目标拆成界面、只读证据、权限和阻塞原因，先让用户看懂它准备怎么做。",
-  },
-  {
-    title: "2. 带回 Chat",
-    body: "让云雀解释计划、补充缺失信息，或把可执行部分拆成需要人工确认的任务。",
-  },
-  {
-    title: "3. 核对证据",
-    body: "浏览器截图和计划结果只作为证据，不代表云雀已经控制了电脑。",
-  },
-  {
-    title: "4. 继续交给小羽改",
-    body: "如果用户需要云桌面、审批或站点适配，把缺口带进工坊继续补能力。",
-  },
+const workflowSteps: PackStep[] = [
+  { key: "plan", label: "生成计划", detail: "把目标拆成界面、只读证据、权限和阻塞原因，先让用户看懂它准备怎么做。" },
+  { key: "chat", label: "带回 Chat", detail: "让云雀解释计划、补充缺失信息，或把可执行部分拆成需要人工确认的任务。" },
+  { key: "evidence", label: "核对证据", detail: "浏览器截图和计划结果只作为证据，不代表云雀已经控制了电脑。" },
+  { key: "improve", label: "继续交给小羽改", detail: "如果用户需要云桌面、审批或站点适配，把缺口带进工坊继续补能力。" },
+];
+
+const boundaryItems: PackBoundaryItem[] = [
+  { key: "control", label: "不控制本机", detail: "不会移动鼠标、敲键盘、运行命令、写文件或控制本机桌面。", tone: "warning" },
+  { key: "execute", label: "不自动执行", detail: "执行器、权限策略和人工审批运行时还没有开放，当前只规划。", tone: "warning" },
+];
+
+const surfaceOptions = [
+  { id: "auto", label: "自动选择", description: "让后端按当前能力状态选择安全界面" },
+  { id: "browser", label: "浏览器截图", description: "只读浏览器页面与截图证据" },
+  { id: "desktop_sandbox", label: "云桌面规划", description: "隔离桌面环境，当前仅规划" },
+  { id: "local_desktop", label: "本机桌面规划", description: "当前关闭真实执行，仅生成计划" },
 ];
 
 const explainGate = (gate: string) => {
@@ -181,51 +182,23 @@ export default function ComputerUsePackPage() {
         actions={<Button variant="ghost" onPress={loadStatus}><RotateCcw size={14} /> 刷新状态</Button>}
       />
 
-      <Card className="section-card overflow-hidden p-0">
-        <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="p-5">
-            <div className="text-base font-semibold" style={{ color: "var(--yunque-text)" }}>这个能力包现在能做什么</div>
-            <div className="mt-2 max-w-3xl text-sm leading-6" style={{ color: "var(--yunque-text-secondary)" }}>
-              它是云雀 Computer Use 的第一层：先把目标变成可审阅计划，确认要看哪个界面、需要什么权限、为什么暂不执行；浏览器连接后还能读取一张只读截图作为证据。
-            </div>
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
-              <div className="rounded-lg p-3" style={{ background: "var(--yunque-bg-hover)", border: "1px solid var(--yunque-border)" }}>
-                <div className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>1. 先规划</div>
-                <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>把“帮我操作电脑”拆成界面、步骤、权限和阻塞原因。</div>
-              </div>
-              <div className="rounded-lg p-3" style={{ background: "var(--yunque-bg-hover)", border: "1px solid var(--yunque-border)" }}>
-                <div className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>2. 再取证</div>
-                <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>浏览器连接器可用时，只读取当前页面截图，不点击、不输入。</div>
-              </div>
-              <div className="rounded-lg p-3" style={{ background: "var(--yunque-bg-hover)", border: "1px solid var(--yunque-border)" }}>
-                <div className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>3. 后审批</div>
-                <div className="mt-2 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>未来真实执行必须经过权限策略、人工确认和执行器接入。</div>
-              </div>
-            </div>
-          </div>
-          <div className="p-5" style={{ background: "rgba(245,158,11,0.06)", borderLeft: "1px solid var(--yunque-border)" }}>
-            <div className="mb-3 flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
-              <ShieldAlert size={16} style={{ color: "var(--yunque-warning)" }} />
-              当前边界
-            </div>
-            <div className="space-y-2 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
-              <div>可以：生成电脑使用计划、读取浏览器截图证据。</div>
-              <div>不会：移动鼠标、敲键盘、运行命令、写文件或控制本机桌面。</div>
-              <div>原因：执行器、权限策略和人工审批运行时还没有开放。</div>
-            </div>
-          </div>
-        </div>
-      </Card>
+      <PackAbout
+        chips={<>
+          <Chip size="sm" color="success">可直接使用</Chip>
+          <Chip size="sm" variant="soft">规划电脑操作</Chip>
+          <Chip size="sm" variant="soft">浏览器只读取证</Chip>
+        </>}
+        description="云雀 Computer Use 的第一层：先把“帮我操作电脑”的目标变成可审阅计划，确认要看哪个界面、需要什么权限、为什么暂不执行；浏览器连接后还能读取一张只读截图作为证据。真实执行需先经过权限策略、人工确认和执行器接入。"
+        boundaries={boundaryItems}
+      />
 
-      <Card className="section-card p-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
-              从电脑使用计划到可验证任务
-            </div>
-            <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
-              Computer Use 现在先帮你把“让云雀操作电脑”的目标变成可审阅计划和只读证据，再交给 Chat、任务中心和小羽决定下一步，而不是直接接管本机。
-            </div>
+      <Card variant="default">
+        <Card.Header className="flex-row flex-wrap items-start justify-between gap-3">
+          <div className="flex flex-col gap-1">
+            <PackSectionTitle icon={<MonitorCog size={15} />} tone="accent">从电脑使用计划到可验证任务</PackSectionTitle>
+            <span className="text-xs leading-5 text-muted">
+              Computer Use 先帮你把“让云雀操作电脑”的目标变成可审阅计划和只读证据，再交给 Chat、任务中心和小羽决定下一步，而不是直接接管本机。
+            </span>
           </div>
           <div className="flex flex-wrap gap-2">
             <Link href={chatPromptHref("请检查 Computer Use 当前生成的计划和浏览器截图证据，指出哪些步骤可以安全推进、哪些需要人工确认，并把下一步拆成任务。")}>
@@ -239,19 +212,14 @@ export default function ComputerUsePackPage() {
               </Button>
             </Link>
           </div>
-        </div>
-        <div className="mt-3 grid gap-2 md:grid-cols-4">
-          {workflowLoopItems.map((item) => (
-            <div key={item.title} className="rounded-md border p-3" style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-surface)" }}>
-              <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>{item.title}</div>
-              <div className="mt-2 text-[11px] leading-5" style={{ color: "var(--yunque-text-muted)" }}>{item.body}</div>
-            </div>
-          ))}
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2 text-xs">
-          <Link href="/trace"><Button size="sm" variant="ghost">核对执行轨迹</Button></Link>
-          <Link href="/packs/studio?packId=yunque.pack.computer-use"><Button size="sm" variant="ghost">让小羽继续改</Button></Link>
-        </div>
+        </Card.Header>
+        <Card.Content className="flex flex-col gap-3">
+          <PackStepsGrid steps={workflowSteps} columns={4} />
+          <div className="flex flex-wrap gap-2 text-xs">
+            <Link href="/trace"><Button size="sm" variant="ghost">核对执行轨迹</Button></Link>
+            <Link href="/packs/studio?packId=yunque.pack.computer-use"><Button size="sm" variant="ghost">让小羽继续改</Button></Link>
+          </div>
+        </Card.Content>
       </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -263,128 +231,152 @@ export default function ComputerUsePackPage() {
               ? Boolean(surface?.available)
               : Boolean(surface?.available);
           return (
-            <Card key={item.key} className="section-card p-4">
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>{item.title}</div>
-                <Chip size="sm" style={{ background: ready ? "rgba(34,197,94,0.10)" : "rgba(245,158,11,0.12)", color: ready ? "var(--yunque-success)" : "var(--yunque-warning)" }}>
-                  {ready ? item.readyLabel : item.unavailableLabel}
-                </Chip>
-              </div>
-              <div className="text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>{item.desc}</div>
-              {surface?.status ? <div className="mt-2 text-[11px] font-mono" style={{ color: "var(--yunque-text-secondary)" }}>{surface.status}</div> : null}
+            <Card key={item.key} variant="default">
+              <Card.Content className="p-4">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <div className="text-sm font-semibold text-foreground">{item.title}</div>
+                  <Chip size="sm" color={ready ? "success" : "warning"}>
+                    {ready ? item.readyLabel : item.unavailableLabel}
+                  </Chip>
+                </div>
+                <div className="text-xs leading-5 text-muted">{item.desc}</div>
+                {surface?.status ? <div className="mt-2 font-mono text-[11px] text-muted">{surface.status}</div> : null}
+              </Card.Content>
             </Card>
           );
         })}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <Card className="section-card p-4 space-y-3">
-          <div>
-            <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>生成计划</div>
-            <div className="mt-1 text-xs" style={{ color: "var(--yunque-text-muted)" }}>先让云雀说明准备怎么做，而不是直接动你的电脑。</div>
-          </div>
-          <TextField value={surface} onChange={setSurface} className="max-w-xs">
-            <Label>目标界面</Label>
-            <Input placeholder="auto / browser / desktop_sandbox" />
-          </TextField>
-          <div>
-            <Label>你想让云雀做什么</Label>
-            <TextArea value={goal} onChange={(event) => setGoal(event.target.value)} rows={3} />
-          </div>
-          <Button className="btn-accent w-fit" isDisabled={!goal.trim() || busy} onPress={createPlan}>
-            {busy ? <Spinner size="sm" /> : <Play size={14} />} 生成计划
-          </Button>
+        <Card variant="default">
+          <Card.Content className="flex flex-col gap-3 p-4">
+            <div>
+              <div className="text-sm font-semibold text-foreground">生成计划</div>
+              <div className="mt-1 text-xs text-muted">先让云雀说明准备怎么做，而不是直接动你的电脑。</div>
+            </div>
+            <Select
+              selectedKey={surface}
+              onSelectionChange={(key) => setSurface(String(key))}
+              className="max-w-xs"
+            >
+              <Label>目标界面</Label>
+              <Select.Trigger><Select.Value /><Select.Indicator /></Select.Trigger>
+              <Select.Popover>
+                <ListBox>
+                  {surfaceOptions.map((option) => (
+                    <ListBox.Item key={option.id} id={option.id} textValue={option.label}>
+                      <div className="flex flex-col">
+                        <span>{option.label}</span>
+                        <span className="text-xs text-muted">{option.description}</span>
+                      </div>
+                    </ListBox.Item>
+                  ))}
+                </ListBox>
+              </Select.Popover>
+            </Select>
+            <div>
+              <Label>你想让云雀做什么</Label>
+              <TextArea value={goal} onChange={(event) => setGoal(event.target.value)} rows={3} />
+            </div>
+            <Button className="btn-accent w-fit" isDisabled={!goal.trim() || busy} onPress={createPlan}>
+              {busy ? <Spinner size="sm" /> : <Play size={14} />} 生成计划
+            </Button>
+          </Card.Content>
         </Card>
 
-        <Card className="section-card p-4 space-y-3">
-          <div>
-            <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
-              <Camera size={15} /> 浏览器截图证据
-            </div>
-            <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
-              只在浏览器连接器已连接时可用；这一步只读取截图，不会点击、输入或改变页面。
-            </div>
-          </div>
-          <Button variant="outline" isPending={screenshotLoading} onPress={captureBrowserScreenshot}>
-            <Camera size={14} /> 读取截图
-          </Button>
-          {screenshot?.screenshot ? (
+        <Card variant="default">
+          <Card.Content className="flex flex-col gap-3 p-4">
             <div>
-              <img src={`data:image/png;base64,${screenshot.screenshot}`} alt="浏览器截图证据" className="w-full rounded-md" style={{ border: "1px solid var(--yunque-border)" }} />
-              <div className="mt-2 text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>{screenshot.timestamp || "刚刚读取"} · 只读证据</div>
+              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                <Camera size={15} /> 浏览器截图证据
+              </div>
+              <div className="mt-1 text-xs leading-5 text-muted">
+                只在浏览器连接器已连接时可用；这一步只读取截图，不会点击、输入或改变页面。
+              </div>
             </div>
-          ) : (
-            <div className="rounded-md border border-dashed p-6 text-center text-xs" style={{ borderColor: "var(--yunque-border)", color: "var(--yunque-text-muted)" }}>
-              还没有截图证据。连接浏览器后可读取当前页面。
-            </div>
-          )}
+            <Button variant="outline" isPending={screenshotLoading} onPress={captureBrowserScreenshot}>
+              <Camera size={14} /> 读取截图
+            </Button>
+            {screenshot?.screenshot ? (
+              <div>
+                <img src={`data:image/png;base64,${screenshot.screenshot}`} alt="浏览器截图证据" className="w-full rounded-md border border-border" />
+                <div className="mt-2 text-[11px] text-muted">{screenshot.timestamp || "刚刚读取"} · 只读证据</div>
+              </div>
+            ) : (
+              <div className="rounded-md border border-dashed border-border p-6 text-center text-xs text-muted">
+                还没有截图证据。连接浏览器后可读取当前页面。
+              </div>
+            )}
+          </Card.Content>
         </Card>
       </div>
 
       {plan && (
-        <Card className="section-card p-4 space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>计划结果</div>
-              <div className="text-xs mt-1" style={{ color: "var(--yunque-text-muted)" }}>{plan.status}</div>
-            </div>
-            <Chip size="sm" style={{ background: plan.execution_ready ? "rgba(34,197,94,0.10)" : "rgba(245,158,11,0.12)", color: plan.execution_ready ? "var(--yunque-success)" : "var(--yunque-warning)" }}>
-              {plan.execution_ready ? "可执行" : "仅计划"}
-            </Chip>
-          </div>
-
-          {(plan.blocked_by?.length ?? 0) > 0 && (
-            <div className="rounded-md p-3" style={{ background: "rgba(245,158,11,0.10)" }}>
-              <div className="flex items-center gap-2 text-sm font-medium" style={{ color: "var(--yunque-warning)" }}>
-                <ShieldAlert size={14} /> 为什么还不能自动执行
+        <Card variant="default">
+          <Card.Content className="flex flex-col gap-4 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold text-foreground">计划结果</div>
+                <div className="mt-1 text-xs text-muted">{plan.status}</div>
               </div>
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                {plan.blocked_by?.map((item) => <Chip key={item} size="sm" variant="soft">{item}</Chip>)}
-              </div>
+              <Chip size="sm" color={plan.execution_ready ? "success" : "warning"}>
+                {plan.execution_ready ? "可执行" : "仅计划"}
+              </Chip>
             </div>
-          )}
 
-          <div className="space-y-2">
-            {(plan.steps || []).map((step) => (
-              <div key={step.index} className="rounded-md p-3 border" style={{ borderColor: "var(--yunque-border)" }}>
-                <div className="flex items-center gap-2 text-sm" style={{ color: "var(--yunque-text)" }}>
-                  <ShieldCheck size={14} style={{ color: "var(--yunque-success)" }} />
-                  <span>{step.index}. {step.description}</span>
-                  <Chip size="sm" variant="soft">{step.surface}</Chip>
-                  {step.read_only && <Chip size="sm" style={{ background: "rgba(34,197,94,0.10)", color: "var(--yunque-success)" }}>只读</Chip>}
+            {(plan.blocked_by?.length ?? 0) > 0 && (
+              <div className="rounded-md bg-warning/10 p-3">
+                <div className="flex items-center gap-2 text-sm font-medium text-warning">
+                  <ShieldAlert size={14} /> 为什么还不能自动执行
                 </div>
                 <div className="mt-2 flex flex-wrap gap-1.5">
-                  <Chip size="sm" variant="soft">动作：{step.action}</Chip>
-                  <Chip size="sm" variant="soft">权限：{step.permission}</Chip>
-                  <Chip size="sm" variant="soft">执行器：{step.executor}</Chip>
+                  {plan.blocked_by?.map((item) => <Chip key={item} size="sm" variant="soft">{item}</Chip>)}
                 </div>
               </div>
-            ))}
-          </div>
+            )}
 
-          {(plan.gates?.length ?? 0) > 0 && (
-            <div className="grid gap-2 md:grid-cols-2">
-              {plan.gates?.map((gate) => (
-                <div key={gate.gate} className="rounded-md border p-3" style={{ borderColor: "var(--yunque-border)" }}>
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <div className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>{explainGate(gate.gate)}</div>
-                    <Chip size="sm" style={{ background: gate.allows_execute ? "rgba(34,197,94,0.10)" : "rgba(245,158,11,0.12)", color: gate.allows_execute ? "var(--yunque-success)" : "var(--yunque-warning)" }}>
-                      {gate.allows_execute ? "允许执行" : "暂不执行"}
-                    </Chip>
+            <div className="flex flex-col gap-2">
+              {(plan.steps || []).map((step) => (
+                <div key={step.index} className="rounded-md border border-border p-3">
+                  <div className="flex items-center gap-2 text-sm text-foreground">
+                    <ShieldCheck size={14} className="text-success" />
+                    <span>{step.index}. {step.description}</span>
+                    <Chip size="sm" variant="soft">{step.surface}</Chip>
+                    {step.read_only && <Chip size="sm" color="success">只读</Chip>}
                   </div>
-                  <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>
-                    {gate.human_approval ? "需要人工确认" : "无需人工确认"} · {gate.policy_enforced ? "策略已启用" : "策略未启用"}
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    <Chip size="sm" variant="soft">动作：{step.action}</Chip>
+                    <Chip size="sm" variant="soft">权限：{step.permission}</Chip>
+                    <Chip size="sm" variant="soft">执行器：{step.executor}</Chip>
                   </div>
                 </div>
               ))}
             </div>
-          )}
 
-          {(plan.notes?.length ?? 0) > 0 && (
-            <div className="text-xs space-y-1" style={{ color: "var(--yunque-text-muted)" }}>
-              {plan.notes?.map((note) => <div key={note}>• {note}</div>)}
-            </div>
-          )}
+            {(plan.gates?.length ?? 0) > 0 && (
+              <div className="grid gap-2 md:grid-cols-2">
+                {plan.gates?.map((gate) => (
+                  <div key={gate.gate} className="rounded-md border border-border p-3">
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <div className="text-sm font-medium text-foreground">{explainGate(gate.gate)}</div>
+                      <Chip size="sm" color={gate.allows_execute ? "success" : "warning"}>
+                        {gate.allows_execute ? "允许执行" : "暂不执行"}
+                      </Chip>
+                    </div>
+                    <div className="text-xs text-muted">
+                      {gate.human_approval ? "需要人工确认" : "无需人工确认"} · {gate.policy_enforced ? "策略已启用" : "策略未启用"}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {(plan.notes?.length ?? 0) > 0 && (
+              <div className="flex flex-col gap-1 text-xs text-muted">
+                {plan.notes?.map((note) => <div key={note}>• {note}</div>)}
+              </div>
+            )}
+          </Card.Content>
         </Card>
       )}
     </div>

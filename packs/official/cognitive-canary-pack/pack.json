@@ -122,6 +122,8 @@
     "rollback": true
   },
   "metadata": {
+    "group": "inner-world",
+    "catalogHidden": "true",
     "blueprint": "doc/COGNITIVE-CANARY.md",
     "stage": "pack-shell-before-shadow-traffic",
     "risk": "cognitive-governance",

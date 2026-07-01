@@ -485,12 +485,7 @@ func (g *Gateway) MountPluginRoutes() {
 	handlers := g.pluginReg.AllHTTPHandlers()
 	for path, handler := range handlers {
 		slog.Info("mounted plugin route", "path", path)
-		if strings.HasPrefix(path, "/v1/ext/airi/") {
-			// Airi acts as an external OpenAI client and does not use Yunque JWTs
-			g.mux.HandleFunc(path, handler)
-		} else {
-			g.mux.HandleFunc(path, g.requireAuth(handler))
-		}
+		g.mux.HandleFunc(path, g.requireAuth(handler))
 	}
 	if len(handlers) > 0 {
 		slog.Info("plugin routes mounted", "count", len(handlers))

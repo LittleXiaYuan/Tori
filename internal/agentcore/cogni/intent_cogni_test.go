@@ -142,7 +142,14 @@ func TestDetectIntent(t *testing.T) {
 		{"navigate to example.com", "browser"},
 		{"今天心情不好", "chat"},
 		{"能陪我聊聊吗", "chat"},
+		{"你好呀", "chat"},
 		{"做一个完整的系统", "complex"},
+		// Bare interrogative particles must NOT hijack a task into chat: a real
+		// signal keeps its intent instead of being downgraded (which would strip
+		// tools/skills). "...吗" on a file request stays file; a hedged question
+		// with no task/chat signal falls through to complex (no restriction).
+		{"整理一下这些文件吗", "file"},
+		{"这个能不能用", "complex"},
 	}
 
 	for _, tt := range tests {

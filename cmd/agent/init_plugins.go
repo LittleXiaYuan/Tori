@@ -21,10 +21,8 @@ import (
 	"yunque-agent/pkg/plugin"
 	"yunque-agent/pkg/safego"
 	"yunque-agent/pkg/skills"
-	"yunque-agent/plugins/airi"
 	"yunque-agent/plugins/education"
 	"yunque-agent/plugins/general"
-	"yunque-agent/plugins/qqchat"
 
 	"yunque-agent/internal/ledgercore"
 )
@@ -100,16 +98,6 @@ func initPlugins(app *agentrt.App) error {
 	}
 	app.PluginReg.Register(generalPlugin)
 	app.PluginReg.Register(education.New())
-
-	// QQ Chat Analyzer plugin
-	qqPlugin := qqchat.New(cfg.DataDir, llmChatFunc(app.LLMClient, DefaultLLMTemperature))
-	qqPlugin.LoadPersisted()
-	app.PluginReg.Register(qqPlugin)
-
-	// Airi Bridge Plugin → connects to Airi server-runtime as a native module
-	airiPlugin := airi.New(app)
-	app.PluginReg.Register(airiPlugin)
-	airiPlugin.StartBridge() // auto-checks AIRI_ENABLED internally
 
 	// Plugin state manager
 	pluginStateMgr := plugin.NewPluginStateManager(cfg.DataPath("plugin_state"))
@@ -276,9 +264,6 @@ func initPlugins(app *agentrt.App) error {
 
 	return nil
 }
-
-// llmCallForPlugin is the signature expected by qqchat.New.
-// This is handled by llmChatFunc in llmhelper.go.
 
 func splitConfiguredPaths(raw string) []string {
 	var out []string

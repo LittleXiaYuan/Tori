@@ -354,6 +354,11 @@ func (g *Gateway) SetEgressGuard(eg *guardrails.EgressGuard) { g.egressGuard = e
 // SetSanitizer attaches the unified input sanitizer middleware.
 func (g *Gateway) SetSanitizer(s *guardrails.Sanitizer) { g.sanitizer = s }
 
+// Sanitizer exposes the unified input sanitizer (#39: handoff input sanitization).
+// Returns nil when no sanitizer is attached — callers must guard against nil
+// and fall back to unsanitized behavior to preserve prior execution semantics.
+func (g *Gateway) Sanitizer() *guardrails.Sanitizer { return g.sanitizer }
+
 // SetSkillInstaller attaches the skill installer for SkillHub API.
 func (g *Gateway) SetSkillInstaller(si *skillmarket.Installer) { g.skillInstaller = si }
 

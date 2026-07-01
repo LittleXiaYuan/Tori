@@ -65,12 +65,14 @@ describe("cogni-kernel-pack-client", () => {
     const spy = vi
       .spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(new Response(JSON.stringify({ status: "ok", id: "reviewer" }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ status: "updated", id: "reviewer" }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ status: "ok", id: "reviewer" }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ status: "ok", id: "reviewer" }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ status: "ok", id: "reviewer" }), { status: 200 }));
 
     const client = createCogniKernelPackClient();
     await client.add({ id: "reviewer" });
+    await client.update("reviewer", { id: "reviewer", description: "updated" });
     await client.setEnabled("reviewer", false);
     await client.remove("reviewer");
     await client.reload();
@@ -78,12 +80,15 @@ describe("cogni-kernel-pack-client", () => {
     expect(spy.mock.calls[0]?.[0]).toBe("/v1/cognis");
     expect((spy.mock.calls[0]?.[1] as RequestInit).method).toBe("POST");
     expect(JSON.parse(String((spy.mock.calls[0]?.[1] as RequestInit).body))).toEqual({ id: "reviewer" });
-    expect(spy.mock.calls[1]?.[0]).toBe("/v1/cognis/reviewer/disable");
-    expect((spy.mock.calls[1]?.[1] as RequestInit).method).toBe("POST");
-    expect(spy.mock.calls[2]?.[0]).toBe("/v1/cognis/reviewer");
-    expect((spy.mock.calls[2]?.[1] as RequestInit).method).toBe("DELETE");
-    expect(spy.mock.calls[3]?.[0]).toBe("/v1/cognis/reload");
-    expect((spy.mock.calls[3]?.[1] as RequestInit).method).toBe("POST");
+    expect(spy.mock.calls[1]?.[0]).toBe("/v1/cognis/reviewer");
+    expect((spy.mock.calls[1]?.[1] as RequestInit).method).toBe("PUT");
+    expect(JSON.parse(String((spy.mock.calls[1]?.[1] as RequestInit).body))).toEqual({ id: "reviewer", description: "updated" });
+    expect(spy.mock.calls[2]?.[0]).toBe("/v1/cognis/reviewer/disable");
+    expect((spy.mock.calls[2]?.[1] as RequestInit).method).toBe("POST");
+    expect(spy.mock.calls[3]?.[0]).toBe("/v1/cognis/reviewer");
+    expect((spy.mock.calls[3]?.[1] as RequestInit).method).toBe("DELETE");
+    expect(spy.mock.calls[4]?.[0]).toBe("/v1/cognis/reload");
+    expect((spy.mock.calls[4]?.[1] as RequestInit).method).toBe("POST");
   });
 
   it("runs workflow, confirms experience pattern and triggers evolution", async () => {

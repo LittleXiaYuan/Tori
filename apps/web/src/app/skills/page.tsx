@@ -2,12 +2,13 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { api, type SkillInfo, type SkillHubItem, type SkillHubInstalledItem, type DynamicSkillDef } from "@/lib/api";
-import { Card, Button, Spinner, Tabs, Chip, SearchField, Tooltip, Badge } from "@heroui/react";
+import { Card, Button, Spinner, Tabs, Chip, SearchField, Tooltip, Badge, Label } from "@heroui/react";
 import {
   Package, Download, Trash2, Star, Wrench, Check, RefreshCw, Globe, HardDrive, TrendingUp, GitFork, FolderSearch, ArrowUpDown,
 } from "lucide-react";
 import { showToast } from "@/components/toast-provider";
 import EmptyState from "@/components/empty-state";
+import PageHeader from "@/components/page-header";
 
 type TabKey = "installed" | "market" | "dynamic";
 type HubSource = "" | "clawhub" | "torihub";
@@ -116,26 +117,55 @@ export default function SkillsPage() {
 
   const sourceFilters: { key: HubSource; label: string; icon?: React.ReactNode }[] = [
     { key: "", label: "全部" },
-    { key: "clawhub", label: "ClawHub", icon: <Globe size={11} /> },
-    { key: "torihub", label: "ToriHub", icon: <HardDrive size={11} /> },
+    { key: "clawhub", label: "ClawHub", icon: <Globe aria-hidden="true" size={11} /> },
+    { key: "torihub", label: "ToriHub", icon: <HardDrive aria-hidden="true" size={11} /> },
   ];
 
   return (
     <div className="page-root space-y-5 animate-fade-in-up" style={{ color: "var(--yunque-text)" }}>
-      <div className="flex items-center justify-between">
-        <h1 className="page-title flex items-center gap-2"><Package size={20} /> 技能</h1>
-        <div className="flex items-center gap-1">
+      <PageHeader
+        icon={<Package aria-hidden="true" size={20} />}
+        title="技能"
+        description="修复缺失技能，扫描目录或安装社区技能。"
+        actions={
+          <>
           <Tooltip delay={0}>
-            <Button variant="ghost" size="sm" isPending={scanning} onPress={handleScanSkills}><FolderSearch size={14} /></Button>
+            <Button isIconOnly aria-label="扫描本地技能目录" variant="ghost" size="sm" isPending={scanning} onPress={handleScanSkills}>
+              <FolderSearch aria-hidden="true" size={14} />
+            </Button>
             <Tooltip.Content>扫描 data/skills/ 目录</Tooltip.Content>
           </Tooltip>
           <Tooltip delay={0}>
-            <Button variant="ghost" size="sm" onPress={() => { refreshInstalled(); }}><RefreshCw size={14} /></Button>
+            <Button isIconOnly aria-label="刷新技能" variant="ghost" size="sm" onPress={() => { refreshInstalled(); }}>
+              <RefreshCw aria-hidden="true" size={14} />
+            </Button>
             <Tooltip.Content>刷新</Tooltip.Content>
           </Tooltip>
-        </div>
-      </div>
+          </>
+        }
+      />
 
+      <section
+        aria-label="技能恢复入口"
+        className="flex flex-col gap-3 rounded-lg border p-3 md:flex-row md:items-center md:justify-between"
+        style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-card)" }}
+      >
+        <div className="min-w-0">
+          <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>缺技能？</div>
+          <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>扫描本地，找不到再装或审核。</div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="secondary" isPending={scanning} onPress={handleScanSkills}>
+            <FolderSearch aria-hidden="true" size={13} /> 扫描本地
+          </Button>
+          <Button size="sm" variant="ghost" onPress={() => setTab("market")}>
+            <Download aria-hidden="true" size={13} /> 去市场
+          </Button>
+          <Button size="sm" variant="ghost" onPress={() => setTab("dynamic")}>
+            <Check aria-hidden="true" size={13} /> 待审核 {dynamicSkills.length}
+          </Button>
+        </div>
+      </section>
 
       <Tabs selectedKey={tab} onSelectionChange={(k) => setTab(k as TabKey)}>
         <Tabs.ListContainer>
@@ -188,9 +218,10 @@ export default function SkillsPage() {
           <div className="space-y-4">
             <div className="flex items-center gap-3 flex-wrap">
               <SearchField className="flex-1 min-w-[200px]" name="installed-search" value={installedFilter} onChange={setInstalledFilter}>
+                <Label>找技能</Label>
                 <SearchField.Group>
                   <SearchField.SearchIcon />
-                  <SearchField.Input placeholder="搜索已安装技能..." />
+                  <SearchField.Input placeholder="名称或描述" />
                   <SearchField.ClearButton />
                 </SearchField.Group>
               </SearchField>
@@ -198,10 +229,12 @@ export default function SkillsPage() {
                 className="flex gap-1 p-1 rounded-full border shrink-0"
                 style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-card)" }}
               >
-                <ArrowUpDown size={11} style={{ color: "var(--yunque-text-muted)", margin: "auto 4px" }} />
+                <ArrowUpDown aria-hidden="true" size={11} style={{ color: "var(--yunque-text-muted)", margin: "auto 4px" }} />
                 {sortOptions.map(({ key, label }) => (
                   <button
                     key={key}
+                    type="button"
+                    aria-current={sortKey === key ? "true" : undefined}
                     onClick={() => setSortKey(key)}
                     className="px-2.5 py-1 rounded-full text-[11px] font-medium transition-all"
                     style={{
@@ -219,6 +252,8 @@ export default function SkillsPage() {
                   style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-card)" }}
                 >
                   <button
+                    type="button"
+                    aria-current={!installedCatFilter ? "true" : undefined}
                     onClick={() => setInstalledCatFilter("")}
                     className="px-3 py-1 rounded-full text-[11px] font-medium transition-all"
                     style={{
@@ -231,6 +266,8 @@ export default function SkillsPage() {
                   {skillCategories.map((cat) => (
                     <button
                       key={cat.id}
+                      type="button"
+                      aria-current={installedCatFilter === cat.id ? "true" : undefined}
                       onClick={() => setInstalledCatFilter(installedCatFilter === cat.id ? "" : cat.id)}
                       className="px-3 py-1 rounded-full text-[11px] font-medium transition-all"
                       style={{
@@ -260,8 +297,8 @@ export default function SkillsPage() {
                       )}
                       {hubInstalled.find((h) => h.slug === s.name) && (
                         <Tooltip delay={0}>
-                          <Button isIconOnly variant="ghost" size="sm" onPress={() => handleUninstall(s.name)}>
-                            <Trash2 size={13} />
+                          <Button isIconOnly aria-label={`卸载技能 ${s.name}`} variant="ghost" size="sm" onPress={() => handleUninstall(s.name)}>
+                            <Trash2 aria-hidden="true" size={13} />
                           </Button>
                           <Tooltip.Content>卸载</Tooltip.Content>
                         </Tooltip>
@@ -302,6 +339,8 @@ export default function SkillsPage() {
               {sourceFilters.map(({ key, label, icon }) => (
                 <button
                   key={key}
+                  type="button"
+                  aria-current={source === key ? "true" : undefined}
                   onClick={() => { setSource(key); setResults([]); setQuery(""); }}
                   className="px-3 py-1 rounded-full text-[11px] font-medium transition-all flex items-center gap-1.5"
                   style={{
@@ -330,9 +369,10 @@ export default function SkillsPage() {
           {/* Search */}
           <div className="flex gap-2 items-end">
             <SearchField className="flex-1" name="skill-search" value={query} onChange={setQuery} onSubmit={handleSearch}>
+              <Label>搜索市场</Label>
               <SearchField.Group>
                 <SearchField.SearchIcon />
-                <SearchField.Input placeholder="搜索技能.." />
+                <SearchField.Input placeholder="关键词" />
                 <SearchField.ClearButton />
               </SearchField.Group>
             </SearchField>
@@ -344,11 +384,15 @@ export default function SkillsPage() {
             className="flex gap-2 items-center p-3 rounded-lg border"
             style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-card)" }}
           >
-            <GitFork size={16} style={{ color: "var(--yunque-text-muted)", flexShrink: 0 }} />
+            <GitFork aria-hidden="true" size={16} style={{ color: "var(--yunque-text-muted)", flexShrink: 0 }} />
+            <label htmlFor="skill-github-slug" className="text-xs font-medium whitespace-nowrap" style={{ color: "var(--yunque-text-muted)" }}>
+              GitHub
+            </label>
             <input
+              id="skill-github-slug"
               className="flex-1 bg-transparent text-sm outline-none"
               style={{ color: "var(--yunque-text)" }}
-              placeholder="从 GitHub 安装: owner/repo"
+              placeholder="owner/repo"
               value={githubSlug}
               onChange={(e) => setGithubSlug(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleGithubInstall()}
@@ -360,7 +404,7 @@ export default function SkillsPage() {
               onPress={handleGithubInstall}
               className="btn-accent shrink-0"
             >
-              <Download size={12} /> 安装
+              <Download aria-hidden="true" size={12} /> 安装
             </Button>
           </div>
 
@@ -381,7 +425,7 @@ export default function SkillsPage() {
                   <span className="font-medium truncate flex-1" style={{ fontSize: "var(--text-base)" }}>{item.name}</span>
                   <div className="flex items-center gap-1.5 shrink-0">
                     <Chip style={{ background: "rgba(245,158,11,0.1)", color: "#f59e0b", fontSize: "var(--text-2xs)" }}>
-                      <Star size={11} className="mr-0.5" /> {item.rating || 0}
+                      <Star aria-hidden="true" size={11} className="mr-0.5" /> {item.rating || 0}
                     </Chip>
                     <Chip
                       size="sm"
@@ -391,7 +435,7 @@ export default function SkillsPage() {
                         fontSize: "var(--text-2xs)",
                       }}
                     >
-                      {item.source === "clawhub" ? <Globe size={10} /> : <HardDrive size={10} />}
+                      {item.source === "clawhub" ? <Globe aria-hidden="true" size={10} /> : <HardDrive aria-hidden="true" size={10} />}
                       {item.source}
                     </Chip>
                   </div>
@@ -409,7 +453,7 @@ export default function SkillsPage() {
                       color: item.installed ? "var(--yunque-success)" : "#fff",
                     }}
                   >
-                    {item.installed ? <><Check size={12} /> 已安装</> : <><Download size={12} /> 安装</>}
+                    {item.installed ? <><Check aria-hidden="true" size={12} /> 已安装</> : <><Download aria-hidden="true" size={12} /> 安装</>}
                   </Button>
                 </Card.Content>
               </Card>
@@ -434,7 +478,7 @@ export default function SkillsPage() {
             <Card key={ds.name} className="section-card hover-lift transition-all duration-200">
               <Card.Header className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <TrendingUp size={14} style={{ color: "#22c55e" }} />
+                  <TrendingUp aria-hidden="true" size={14} style={{ color: "#22c55e" }} />
                   <span className="text-sm font-medium">{ds.name}</span>
                   <Chip style={{
                     background: ds.approval_status === "approved" ? "rgba(34,197,94,0.1)" : "rgba(245,158,11,0.1)",
@@ -446,7 +490,7 @@ export default function SkillsPage() {
                 </div>
                 {ds.approval_status !== "approved" && (
                   <Button size="sm" onPress={() => handleApprove(ds.name)} className="btn-accent">
-                    <Check size={12} /> {"批准"}
+                    <Check aria-hidden="true" size={12} /> {"批准"}
                   </Button>
                 )}
               </Card.Header>

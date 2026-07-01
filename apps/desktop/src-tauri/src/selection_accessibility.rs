@@ -18,6 +18,9 @@ pub struct SelectionReader {
 }
 
 #[cfg(windows)]
+const MAX_SELECTION_TEXT_CHARS: usize = 8_192;
+
+#[cfg(windows)]
 impl SelectionReader {
     /// Build the UI Automation client. Must be called on the thread that will
     /// own it (it initializes COM as MTA on that thread).
@@ -41,13 +44,17 @@ impl SelectionReader {
 
         let mut merged = String::new();
         for range in ranges {
-            if let Ok(chunk) = range.get_text(-1) {
-                merged.push_str(&chunk);
+            if let Ok(chunk) = range.get_text(MAX_SELECTION_TEXT_CHARS as i32) {
+                let remaining = MAX_SELECTION_TEXT_CHARS.saturating_sub(merged.chars().count());
+                if remaining == 0 {
+                    break;
+                }
+                merged.extend(chunk.chars().take(remaining));
             }
         }
 
         let trimmed = merged.trim().to_string();
-        if trimmed.len() >= 2 {
+        if trimmed.chars().count() >= 2 {
             Some(trimmed)
         } else {
             None

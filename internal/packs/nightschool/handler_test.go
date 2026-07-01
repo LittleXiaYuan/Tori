@@ -16,8 +16,8 @@ func TestNightSchoolIsV2ModuleWithLifecycle(t *testing.T) {
 	if h.PackID() != PackID {
 		t.Fatalf("PackID = %q, want %q", h.PackID(), PackID)
 	}
-	if got := len(h.Routes()); got != 3 {
-		t.Fatalf("Routes len = %d, want 3", got)
+	if got := len(h.Routes()); got != 4 {
+		t.Fatalf("Routes len = %d, want 4", got)
 	}
 
 	if err := h.Init(nil); err != nil {

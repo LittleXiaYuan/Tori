@@ -25,8 +25,9 @@ export function ensureApiBase(): Promise<void> {
       if (typeof port === "number" && port > 0) {
         // Only adopt the absolute backend base in the PACKAGED desktop app,
         // whose webview origin (tauri.localhost / tauri://localhost) is
-        // whitelisted by the backend's ALLOWED_ORIGINS. Using `localhost` here
-        // matches capabilities.remote.urls and the CSP connect-src.
+        // whitelisted by the backend's ALLOWED_ORIGINS. Use 127.0.0.1 instead
+        // of localhost so Windows does not try IPv6 ::1 before the Go
+        // backend's IPv4 listener.
         //
         // Under `tauri dev` the window is served by next dev
         // (http://localhost:3001), NOT the backend port. Overriding BASE there
@@ -40,7 +41,7 @@ export function ensureApiBase(): Promise<void> {
           window.location.protocol === "tauri:" ||
           window.location.hostname === "tauri.localhost";
         if (packaged) {
-          BASE = `http://localhost:${port}`;
+          BASE = `http://127.0.0.1:${port}`;
         }
       }
     } catch {

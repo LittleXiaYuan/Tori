@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Card, Button, Spinner, Chip, Tooltip, TextField, Input, Label } from "@heroui/react";
+import { Card, Button, Tooltip } from "@heroui/react";
 import { api } from "@/lib/api";
-import { Terminal, Send, Trash2, Square, Plus, FolderOpen, Play, XCircle, RefreshCw } from "lucide-react";
+import { Terminal, Send, Plus, FolderOpen, Play, XCircle, RefreshCw } from "lucide-react";
 import { showToast } from "@/components/toast-provider";
 import PageHeader from "@/components/page-header";
 import { formatErrorMessage } from "@/lib/error-utils";
@@ -24,6 +24,7 @@ export default function ToolsPage() {
   const [bgMode, setBgMode] = useState(false);
   const [loading, setLoading] = useState(false);
   const outputRef = useRef<HTMLDivElement>(null);
+  const commandInputRef = useRef<HTMLInputElement>(null);
 
   const addSession = () => {
     const newSession: ToolSession = {
@@ -130,19 +131,38 @@ export default function ToolsPage() {
   return (
     <div className="page-root flex flex-col animate-fade-in-up" style={{ minHeight: "calc(100vh - var(--yunque-sidebar-width, 0px))" }}>
       <PageHeader
-        icon={<Terminal size={20} />}
+        icon={<Terminal aria-hidden="true" size={20} />}
         title="工具执行"
+        description="验证命令、后台会话和输出。"
         actions={
           <Tooltip delay={0}>
-            <Button isIconOnly variant="ghost" size="sm" onPress={addSession}
+            <Button isIconOnly aria-label="新建工具会话" variant="ghost" size="sm" onPress={addSession}
               style={{ color: "var(--yunque-text-muted)" }}>
-              <Plus size={16} />
+              <Plus aria-hidden="true" size={16} />
             </Button>
             <Tooltip.Content>新会话</Tooltip.Content>
           </Tooltip>
         }
       />
 
+      <section
+        aria-label="工具恢复入口"
+        className="mb-3 flex flex-col gap-3 rounded-lg border p-3 md:flex-row md:items-center md:justify-between"
+        style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-card)" }}
+      >
+        <div className="min-w-0">
+          <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>工具失败？</div>
+          <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>新会话隔离，直接复现命令。</div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="secondary" onPress={addSession}>
+            <Plus aria-hidden="true" size={13} /> 新会话
+          </Button>
+          <Button size="sm" variant="ghost" onPress={() => commandInputRef.current?.focus()}>
+            <Terminal aria-hidden="true" size={13} /> 输命令
+          </Button>
+        </div>
+      </section>
 
       {/* Session tabs */}
       {sessions.length > 1 && (
@@ -158,7 +178,7 @@ export default function ToolsPage() {
                 background: i === activeIdx ? "rgba(0,111,238,0.08)" : "transparent",
               }}
             >
-              <Terminal size={12} /> #{i + 1}
+              <Terminal aria-hidden="true" size={12} /> #{i + 1}
               {s.running && <span className="animate-pulse-dot ml-1" style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--yunque-success)", display: "inline-block" }} />}
             </Button>
           ))}
@@ -168,40 +188,48 @@ export default function ToolsPage() {
       {/* CWD and options */}
       <div className="flex items-center gap-3 mb-3">
         <div className="flex items-center gap-2 flex-1 px-3 py-1.5 rounded-lg" style={{ background: "rgba(255,255,255,0.04)" }}>
-          <FolderOpen size={13} style={{ color: "var(--yunque-text-muted)" }} />
+          <FolderOpen aria-hidden="true" size={13} style={{ color: "var(--yunque-text-muted)" }} />
+          <label htmlFor="tools-cwd-input" className="text-xs font-medium whitespace-nowrap" style={{ color: "var(--yunque-text-muted)" }}>
+            工作目录
+          </label>
           <input
+            id="tools-cwd-input"
             value={cwd}
             onChange={(e) => setCwd(e.target.value)}
-            placeholder="CWD (optional)"
+            placeholder="可选路径"
             className="flex-1 bg-transparent text-xs font-mono outline-none"
             style={{ color: "var(--yunque-text)" }}
           />
         </div>
-        <button
-          onClick={() => setBgMode(!bgMode)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+        <Button
+          type="button"
+          aria-pressed={bgMode}
+          variant="ghost"
+          size="sm"
+          onPress={() => setBgMode(!bgMode)}
+          className="gap-1.5"
           style={{
             background: bgMode ? "rgba(0,111,238,0.12)" : "rgba(255,255,255,0.04)",
             color: bgMode ? "var(--yunque-accent)" : "var(--yunque-text-muted)",
           }}
         >
-          <Play size={11} /> BG
-        </button>
+          <Play aria-hidden="true" size={11} /> 后台
+        </Button>
         {currentSession?.running && currentSession?.sessionId && (
           <>
             <Tooltip delay={0}>
-              <Button isIconOnly variant="ghost" size="sm" onPress={pollSession}
+              <Button isIconOnly aria-label="刷新当前工具会话输出" variant="ghost" size="sm" onPress={pollSession}
                 style={{ color: "var(--yunque-accent)" }}>
-                <RefreshCw size={14} />
+                <RefreshCw aria-hidden="true" size={14} />
               </Button>
-              <Tooltip.Content>Poll</Tooltip.Content>
+              <Tooltip.Content>刷新输出</Tooltip.Content>
             </Tooltip>
             <Tooltip delay={0}>
-              <Button isIconOnly variant="ghost" size="sm" onPress={killSession}
+              <Button isIconOnly aria-label="终止当前工具会话" variant="ghost" size="sm" onPress={killSession}
                 style={{ color: "var(--yunque-danger)" }}>
-                <XCircle size={14} />
+                <XCircle aria-hidden="true" size={14} />
               </Button>
-              <Tooltip.Content>Kill</Tooltip.Content>
+              <Tooltip.Content>终止</Tooltip.Content>
             </Tooltip>
           </>
         )}
@@ -223,8 +251,13 @@ export default function ToolsPage() {
 
         {/* Input */}
         <div className="p-3 flex items-center gap-2" style={{ borderTop: "1px solid var(--yunque-border)" }}>
+          <label htmlFor="tools-command-input" className="text-xs font-medium whitespace-nowrap" style={{ color: "var(--yunque-text-muted)" }}>
+            命令
+          </label>
           <span className="text-sm font-mono" style={{ color: "var(--yunque-accent)" }}>$</span>
           <input
+            id="tools-command-input"
+            ref={commandInputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") executeCommand(); }}
@@ -234,10 +267,10 @@ export default function ToolsPage() {
             disabled={loading}
           />
           <Tooltip delay={0}>
-            <Button isIconOnly variant="ghost" size="sm" onPress={executeCommand}
+            <Button isIconOnly aria-label="执行命令" variant="ghost" size="sm" onPress={executeCommand}
               isPending={loading}
               style={{ color: "var(--yunque-accent)" }}>
-              <Send size={14} />
+              <Send aria-hidden="true" size={14} />
             </Button>
             <Tooltip.Content>{"执行"}</Tooltip.Content>
           </Tooltip>

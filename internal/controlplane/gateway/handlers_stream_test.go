@@ -762,6 +762,43 @@ func TestFriendlyAgentEventForStreamSanitizesNestedDetail(t *testing.T) {
 	}
 }
 
+func TestFriendlyAgentEventForStreamPreservesPlannerFailureRecoveryTarget(t *testing.T) {
+	raw := `all fallback LLM clients failed (FC): EOF`
+	event := observe.NewEvent("trace-recovery-target", observe.DomainPlanner, observe.EventReflect, "检测到连续失败，正在切换执行策略")
+	event.Detail = planner.PlannerFailureSummary{
+		FailedCount:    2,
+		CompletedCount: 1,
+		RuledOut:       []string{"llm: " + raw},
+		NextStep:       raw,
+		Recoverable:    true,
+		PrimaryTarget: &planner.PlannerRecoveryTarget{
+			Category: "provider",
+			Label:    "检查模型供应商",
+			Href:     "/settings/providers?tab=providers",
+			Action:   "open_provider_settings",
+		},
+	}
+
+	got := friendlyAgentEventForStream(event)
+	detail, ok := got.Detail.(planner.PlannerFailureSummary)
+	if !ok {
+		t.Fatalf("expected planner failure summary, got %T", got.Detail)
+	}
+	if detail.PrimaryTarget == nil || detail.PrimaryTarget.Href != "/settings/providers?tab=providers" {
+		t.Fatalf("expected recovery target to be preserved, got %#v", detail.PrimaryTarget)
+	}
+	body, _ := json.Marshal(detail)
+	bodyText := strings.ToLower(string(body))
+	for _, banned := range []string{"all fallback", "eof"} {
+		if strings.Contains(bodyText, banned) {
+			t.Fatalf("planner failure summary should be friendly, found %q in %s", banned, string(body))
+		}
+	}
+	if !strings.Contains(string(body), "现场") {
+		t.Fatalf("expected friendly recovery wording in summary, got %s", string(body))
+	}
+}
+
 func TestStreamChat_SessionCreation(t *testing.T) {
 	gw, _ := newTestGateway()
 

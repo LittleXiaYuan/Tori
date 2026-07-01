@@ -400,10 +400,17 @@ describe("PacksPageOptimized", () => {
   });
 
   it("filters source and install state without hiding official release cards", async () => {
+    // Actionable usability so the card shows in the default catalog (infra
+    // kind is hidden by default now); this test is about source/install
+    // filtering, not the default-hide rule.
     const remoteDocsManifest = {
       ...documentsManifest,
       id: "yunque.pack.remote-docs",
       name: "Remote Docs Pack",
+      metadata: {
+        ...documentsManifest.metadata,
+        usability: "actionable",
+      },
     };
     packsClientMock.install.mockResolvedValueOnce({ ok: true });
     packsClientMock.releaseCatalog.mockResolvedValueOnce({
@@ -577,6 +584,13 @@ describe("PacksPageOptimized", () => {
           ...filesManifest,
           id: "yunque.pack.private-files",
           name: "Private Files Pack",
+          // Actionable so the card shows in the default catalog (infra kind is
+          // hidden by default now); this test is about the private source
+          // origin badge, not the default-hide rule.
+          metadata: {
+            ...filesManifest.metadata,
+            usability: "actionable",
+          },
         },
       }],
     });

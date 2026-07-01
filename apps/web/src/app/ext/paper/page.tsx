@@ -7,9 +7,10 @@ import {
   Loader2, AlertCircle, ChevronRight, BookOpen, Search,
   PenLine, Sparkles, FileDown, Trash2,
 } from "lucide-react";
-import { getAuthHeaders, getApiKey } from "@/lib/api";
+import { getAuthHeaders } from "@/lib/api";
 import { isSafeApiBase } from "@/lib/safe-url";
 import { formatErrorMessage } from "@/lib/error-utils";
+import { showErrorToast } from "@/components/toast-provider";
 
 interface TemplateResult {
   path: string; sections: number; fields: number;
@@ -86,11 +87,16 @@ export default function PaperPage() {
   const startGeneration = async () => {
     setStep(2); setPolling(true);
     try {
-      await fetch(`${BASE}/v1/ext/paper/generate`, {
+      const res = await fetch(`${BASE}/v1/ext/paper/generate`, {
         method: "POST", headers: { "Content-Type": "application/json", ...getAuthHeaders() },
         body: JSON.stringify({ title, template_path: templateResult?.path || "", cover_info: coverInfo, reference_count: 20, language: "zh" }),
       });
-    } catch { /* polling will catch errors */ }
+      if (!res.ok) throw new Error(await res.text());
+    } catch (e) {
+      setPolling(false);
+      setStatus({ phase: "generate", detail: "", done: false, error: formatErrorMessage(e, "启动生成失败") });
+      showErrorToast(e, "启动生成失败");
+    }
   };
 
   useEffect(() => {
@@ -106,11 +112,22 @@ export default function PaperPage() {
     return () => clearInterval(iv);
   }, [polling]);
 
-  const handleDownload = () => {
-    const key = getApiKey();
-    const a = document.createElement("a");
-    a.href = `${BASE}/v1/ext/paper/download${key ? `?key=${key}` : ""}`;
-    a.download = ""; a.click();
+  const handleDownload = async () => {
+    try {
+      const res = await fetch(`${BASE}/v1/ext/paper/download`, { headers: { ...getAuthHeaders() } });
+      if (!res.ok) throw new Error(await res.text());
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const cd = res.headers.get("Content-Disposition");
+      const filename = cd?.match(/filename\*=UTF-8''([^;]+)|filename="?([^"]+)"?/i);
+      a.download = decodeURIComponent(filename?.[1] || filename?.[2] || `${title || "paper"}.docx`);
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      showErrorToast(e, "下载论文失败");
+    }
   };
 
   const handleReset = () => { setStep(0); setTemplateFile(null); setTemplateResult(null); setTitle(""); setCoverInfo({}); setStatus(null); setPolling(false); setUploadError(""); };
@@ -261,11 +278,11 @@ export default function PaperPage() {
             {status?.result && (
               <div className="grid grid-cols-3 gap-3">
                 {[
-                  { label: "总字数", value: status.result.stats.total_words.toLocaleString(), color: "#8b5cf6" },
-                  { label: "章节数", value: String(status.result.stats.section_count), color: "#3b82f6" },
-                  { label: "参考文献", value: `${status.result.stats.reference_count} 篇`, color: "#22c55e" },
+                  { label: "总字数", value: status.result.stats.total_words.toLocaleString(), color: "#8b5cf6", bg: "rgba(139,92,246,0.08)", border: "rgba(139,92,246,0.30)" },
+                  { label: "章节数", value: String(status.result.stats.section_count), color: "var(--yunque-primary)", bg: "var(--yunque-accent-soft)", border: "var(--yunque-border-accent)" },
+                  { label: "参考文献", value: `${status.result.stats.reference_count} 篇`, color: "#22c55e", bg: "rgba(34,197,94,0.08)", border: "rgba(34,197,94,0.30)" },
                 ].map((s) => (
-                  <Card key={s.label} className="p-4 text-center" style={{ background: `${s.color}08`, borderColor: `${s.color}30` }}>
+                  <Card key={s.label} className="p-4 text-center" style={{ background: s.bg, borderColor: s.border }}>
                     <div className="kpi-value" style={{ color: s.color }}>{s.value}</div>
                     <div className="text-xs mt-1" style={{ color: "var(--yunque-text-muted)" }}>{s.label}</div>
                   </Card>
