@@ -1153,6 +1153,54 @@ export function ChatMessageList({
                     {files.map((f, i) => {
                       const ext = (f.name || f.path).split(".").pop()?.toLowerCase() || "";
                       const isDoc = ["pdf", "docx", "xlsx", "pptx", "doc", "xls", "ppt"].includes(ext);
+                      const isImage = ["png", "jpg", "jpeg", "webp", "gif"].includes(ext);
+                      const downloadHref = `/api/files/download?path=${encodeURIComponent(f.path)}`;
+                      const actionButtons = (
+                        <>
+                          {renderFilePreview(`preview:${msg.id}:${i}`, f)}
+                          <Tooltip delay={0}>
+                            <Button isIconOnly aria-label={`继续处理 ${f.name || f.path}`} variant="ghost" size="sm" onPress={() => onSend(continueFilePrompt(f))}>
+                              <Wand2 size={11} />
+                            </Button>
+                            <Tooltip.Content>继续处理</Tooltip.Content>
+                          </Tooltip>
+                          <Tooltip delay={0}>
+                            <Button isIconOnly aria-label={`派给 AI IDE ${f.name || f.path}`} variant="ghost" size="sm" onPress={() => onSend(dispatchToAIIDEPrompt(msg, f))}>
+                              <Cpu size={11} />
+                            </Button>
+                            <Tooltip.Content>派给 AI IDE</Tooltip.Content>
+                          </Tooltip>
+                          {renderShareMenu(`file:${msg.id}:${i}`, msg, shareFilePayload(msg, f), true)}
+                          <a
+                            href={downloadHref}
+                            download={f.name || f.path}
+                            aria-label={`下载 ${f.name || f.path}`}
+                            className="w-8 h-8 rounded-full flex items-center justify-center"
+                            style={{ background: "var(--yunque-accent-muted)" }}
+                          >
+                            <span style={{ color: "var(--yunque-accent)", fontSize: 16 }}>↗</span>
+                          </a>
+                        </>
+                      );
+                      if (isImage) {
+                        return (
+                          <div key={i} className="rounded-xl p-2" style={{ background: "var(--yunque-bg-muted)", border: "1px solid var(--yunque-border)" }}>
+                            <img
+                              src={downloadHref}
+                              alt={f.name || f.path}
+                              className="max-w-full max-h-[320px] rounded-lg object-contain cursor-pointer hover:opacity-90 transition-opacity"
+                              onClick={() => openExternal(downloadHref)}
+                            />
+                            <div className="flex items-center justify-between mt-2">
+                              <div className="text-[11px] truncate" style={{ color: "var(--yunque-text-muted)" }}>
+                                {f.name || f.path.split("/").pop() || f.path}
+                                {f.size != null && f.size > 0 ? `  ${(f.size / 1024).toFixed(1)} KB` : ""}
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0">{actionButtons}</div>
+                            </div>
+                          </div>
+                        );
+                      }
                       return (
                         <div key={i}
                           className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all hover:scale-[1.01]"
@@ -1164,31 +1212,7 @@ export function ChatMessageList({
                               {ext.toUpperCase()} {f.size != null && f.size > 0 ? `  ${f.size > 1024 * 1024 ? `${(f.size / 1024 / 1024).toFixed(1)} MB` : `${(f.size / 1024).toFixed(1)} KB`}` : ""}
                             </div>
                           </div>
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            {renderFilePreview(`preview:${msg.id}:${i}`, f)}
-                            <Tooltip delay={0}>
-                              <Button isIconOnly aria-label={`继续处理 ${f.name || f.path}`} variant="ghost" size="sm" onPress={() => onSend(continueFilePrompt(f))}>
-                                <Wand2 size={11} />
-                              </Button>
-                              <Tooltip.Content>继续处理</Tooltip.Content>
-                            </Tooltip>
-                            <Tooltip delay={0}>
-                              <Button isIconOnly aria-label={`派给 AI IDE ${f.name || f.path}`} variant="ghost" size="sm" onPress={() => onSend(dispatchToAIIDEPrompt(msg, f))}>
-                                <Cpu size={11} />
-                              </Button>
-                              <Tooltip.Content>派给 AI IDE</Tooltip.Content>
-                            </Tooltip>
-                            {renderShareMenu(`file:${msg.id}:${i}`, msg, shareFilePayload(msg, f), true)}
-                            <a
-                              href={`/api/files/download?path=${encodeURIComponent(f.path)}`}
-                              download={f.name || f.path}
-                              aria-label={`下载 ${f.name || f.path}`}
-                              className="w-8 h-8 rounded-full flex items-center justify-center"
-                              style={{ background: "var(--yunque-accent-muted)" }}
-                            >
-                              <span style={{ color: "var(--yunque-accent)", fontSize: 16 }}>↗</span>
-                            </a>
-                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">{actionButtons}</div>
                         </div>
                       );
                     })}

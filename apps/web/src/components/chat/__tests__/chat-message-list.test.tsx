@@ -505,4 +505,30 @@ describe("ChatMessageList file preview", () => {
     expect(screen.queryByText("document")).not.toBeInTheDocument();
     expect(screen.queryByText(/本地解析器|文档解析后端|MinerU|parser/i)).not.toBeInTheDocument();
   });
+
+  it("renders a generated image inline instead of a generic file row", () => {
+    render(<ChatMessageList {...props({
+      messages: [{
+        id: "assistant-image",
+        role: "assistant",
+        content: "已生成图片",
+        timestamp: Date.now(),
+        traceEvents: [{
+          id: "evt-image",
+          trace_id: "trace-image",
+          ts: new Date().toISOString(),
+          domain: "tool",
+          type: "tool_result",
+          summary: "image_generate done",
+          detail: { files: [{ name: "generated_cat.png", path: "generated_cat.png", size: 2048 }] },
+          meta: {},
+        }],
+      }],
+    })} />);
+
+    const img = screen.getByAltText("generated_cat.png");
+    expect(img.tagName).toBe("IMG");
+    expect(img.getAttribute("src")).toBe("/api/files/download?path=generated_cat.png");
+    expect(screen.queryByTestId("paperclip")).not.toBeInTheDocument();
+  });
 });
