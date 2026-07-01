@@ -4,8 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -431,6 +435,157 @@ func TestExecutionRuntimeServiceApplyToolResultForRequestSuccess(t *testing.T) {
 	detail, ok := events[0].Detail.(observe.ToolResultDetail)
 	if !ok || detail.Skill != "web_search" || detail.Result != "搜索完成" || detail.Error != "" {
 		t.Fatalf("unexpected tool result detail: %#v", events[0].Detail)
+	}
+}
+
+func TestExecutionRuntimeServiceApplyToolResultForRequestAttachesGeneratedFiles(t *testing.T) {
+	dir := t.TempDir()
+	imgPath := dir + string(filepath.Separator) + "generated_20260702_0.png"
+	if err := os.WriteFile(imgPath, []byte("fake-png-bytes"), 0644); err != nil {
+		t.Fatalf("write fixture file: %v", err)
+	}
+
+	var events []observe.AgentEvent
+	processed := NewExecutionRuntimeService(3).ApplyToolResultForRequest(ToolResultPostprocessRequest{
+		Request: PlanRequest{
+			TraceID: "trace-image",
+			StepCallback: func(evt observe.AgentEvent) {
+				events = append(events, evt)
+			},
+		},
+		SkillName: "image_generate",
+		Output:    "已生成 1 张图片:\n- " + imgPath + "\n\n优化后的提示词: a cat",
+	})
+	if !processed.Success {
+		t.Fatalf("expected success, got %#v", processed)
+	}
+	if len(events) != 1 {
+		t.Fatalf("expected 1 event, got %d", len(events))
+	}
+	detail, ok := events[0].Detail.(observe.ToolResultDetail)
+	if !ok {
+		t.Fatalf("unexpected detail type: %#v", events[0].Detail)
+	}
+	if len(detail.Files) != 1 {
+		t.Fatalf("expected 1 generated file, got %#v", detail.Files)
+	}
+	if detail.Files[0].Name != "generated_20260702_0.png" || detail.Files[0].Path != "generated_20260702_0.png" {
+		t.Fatalf("unexpected file entry: %#v", detail.Files[0])
+	}
+	if detail.Files[0].Size != int64(len("fake-png-bytes")) {
+		t.Fatalf("unexpected file size: %#v", detail.Files[0])
+	}
+}
+
+func TestExecutionRuntimeServiceApplyToolResultForRequestAttachesDocGenFiles(t *testing.T) {
+	dir := t.TempDir()
+
+	cases := []struct {
+		name      string
+		skill     string
+		buildPath func() string
+		output    func(path string) string
+		wantNames []string
+	}{
+		{
+			name:      "docx_create",
+			skill:     "docx_create",
+			buildPath: func() string { return filepath.Join(dir, "report.docx") },
+			output: func(p string) string {
+				return fmt.Sprintf("已生成 Word 文档: %s (1234 bytes, 5 块, engine=Go-OOXML(fast))", p)
+			},
+			wantNames: []string{"report.docx"},
+		},
+		{
+			name:      "xlsx_create",
+			skill:     "xlsx_create",
+			buildPath: func() string { return filepath.Join(dir, "sheet.xlsx") },
+			output:    func(p string) string { return fmt.Sprintf("已生成 Excel 表格: %s (200 bytes, 3行 × 2列)", p) },
+			wantNames: []string{"sheet.xlsx"},
+		},
+		{
+			name:      "pptx_create",
+			skill:     "pptx_create",
+			buildPath: func() string { return filepath.Join(dir, "deck.pptx") },
+			output: func(p string) string {
+				return fmt.Sprintf("已生成演示文稿: %s (500 bytes, 4 张幻灯片, engine=Go-OOXML)", p)
+			},
+			wantNames: []string{"deck.pptx"},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			path := tc.buildPath()
+			if err := os.WriteFile(path, []byte("fixture"), 0644); err != nil {
+				t.Fatalf("write fixture file: %v", err)
+			}
+			var events []observe.AgentEvent
+			processed := NewExecutionRuntimeService(3).ApplyToolResultForRequest(ToolResultPostprocessRequest{
+				Request: PlanRequest{
+					StepCallback: func(evt observe.AgentEvent) { events = append(events, evt) },
+				},
+				SkillName: tc.skill,
+				Output:    tc.output(path),
+			})
+			if !processed.Success {
+				t.Fatalf("expected success, got %#v", processed)
+			}
+			detail := events[0].Detail.(observe.ToolResultDetail)
+			gotNames := make([]string, len(detail.Files))
+			for i, f := range detail.Files {
+				gotNames[i] = f.Name
+			}
+			if !reflect.DeepEqual(gotNames, tc.wantNames) {
+				t.Fatalf("unexpected files for %s: got %v, want %v", tc.skill, gotNames, tc.wantNames)
+			}
+		})
+	}
+}
+
+func TestExecutionRuntimeServiceApplyToolResultForRequestAttachesMultipleSplitFiles(t *testing.T) {
+	dir := t.TempDir()
+	p1 := filepath.Join(dir, "part-a.xlsx")
+	p2 := filepath.Join(dir, "part-b.xlsx")
+	for _, p := range []string{p1, p2} {
+		if err := os.WriteFile(p, []byte("fixture"), 0644); err != nil {
+			t.Fatalf("write fixture file: %v", err)
+		}
+	}
+	var events []observe.AgentEvent
+	processed := NewExecutionRuntimeService(3).ApplyToolResultForRequest(ToolResultPostprocessRequest{
+		Request: PlanRequest{
+			StepCallback: func(evt observe.AgentEvent) { events = append(events, evt) },
+		},
+		SkillName: "xlsx_split",
+		Output:    fmt.Sprintf("已按第 1 列拆分为 2 个文件：\n%s\n%s", p1, p2),
+	})
+	if !processed.Success {
+		t.Fatalf("expected success, got %#v", processed)
+	}
+	detail := events[0].Detail.(observe.ToolResultDetail)
+	if len(detail.Files) != 2 || detail.Files[0].Name != "part-a.xlsx" || detail.Files[1].Name != "part-b.xlsx" {
+		t.Fatalf("unexpected files: %#v", detail.Files)
+	}
+}
+
+func TestExecutionRuntimeServiceApplyToolResultForRequestSkipsFilesForOtherSkills(t *testing.T) {
+	var events []observe.AgentEvent
+	processed := NewExecutionRuntimeService(3).ApplyToolResultForRequest(ToolResultPostprocessRequest{
+		Request: PlanRequest{
+			StepCallback: func(evt observe.AgentEvent) {
+				events = append(events, evt)
+			},
+		},
+		SkillName: "web_search",
+		Output:    "- not/a/generated/file/reference.png",
+	})
+	if !processed.Success {
+		t.Fatalf("expected success, got %#v", processed)
+	}
+	detail := events[0].Detail.(observe.ToolResultDetail)
+	if len(detail.Files) != 0 {
+		t.Fatalf("expected no files for unlisted skill, got %#v", detail.Files)
 	}
 }
 

@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -730,12 +733,68 @@ func (s *ExecutionRuntimeService) PartialPlanResultForRequest(req PartialPlanRes
 	}
 }
 
+// fileProducingSkills lists skills whose Output text embeds the path(s) of
+// file(s) they just wrote, which we surface to the frontend as structured
+// ToolResultDetail.Files so the "generated files" chat card (and inline image
+// preview) can render them without parsing free-form text. Each of these
+// skills' Output happens to include the full path as a bare token (e.g.
+// "已生成 Word 文档: data/output/report.docx (1234 bytes, ...)" or
+// "- data/output/generated_....png"), so one generic extension-anchored
+// pattern covers every one of them without per-skill format parsing.
+var fileProducingSkills = map[string]bool{
+	"image_generate": true,
+	"docx_create":    true,
+	"docx_edit":      true,
+	"docx_fill":      true,
+	"xlsx_create":    true,
+	"xlsx_edit":      true,
+	"xlsx_fill":      true,
+	"xlsx_split":     true,
+	"pptx_create":    true,
+	"pptx_edit":      true,
+	"pptx_fill":      true,
+	"pdf_create":     true,
+	"deck_create":    true,
+	"html_export":    true,
+	"zip_pack":       true,
+}
+
+var generatedFilePathToken = regexp.MustCompile(`(?i)[^\s:"'()]+\.(?:png|jpe?g|webp|gif|docx?|xlsx?|pptx?|pdf|html?|zip)`)
+
+// extractGeneratedFiles pulls file paths out of a known skill's Output text.
+// Only the basename is kept as FileEntry.Path: the files pack resolves paths
+// relative to its output directory, and these skills always write flat into
+// that same directory.
+func extractGeneratedFiles(skillName, output string) []observe.FileEntry {
+	if !fileProducingSkills[skillName] {
+		return nil
+	}
+	matches := generatedFilePathToken.FindAllString(output, -1)
+	if len(matches) == 0 {
+		return nil
+	}
+	files := make([]observe.FileEntry, 0, len(matches))
+	for _, m := range matches {
+		raw := strings.TrimSpace(m)
+		name := filepath.Base(raw)
+		var size int64
+		if info, err := os.Stat(raw); err == nil {
+			size = info.Size()
+		}
+		files = append(files, observe.FileEntry{Path: name, Name: name, Size: size})
+	}
+	return files
+}
+
 func emitToolResultEvent(req PlanRequest, skillName, output, friendlyError string, rawErr error) {
 	if req.StepCallback == nil {
 		return
 	}
 	trSummary := fmt.Sprintf("✅ [%s] 完成", skillName)
 	detail := observe.ToolResultDetail{Skill: skillName, Result: truncate(output, 200)}
+	if files := extractGeneratedFiles(skillName, output); len(files) > 0 {
+		detail.Files = files
+	}
 	if friendlyError != "" {
 		trSummary = fmt.Sprintf("⏸️ [%s] 暂未完成：%s", skillName, friendlyError)
 		detail = observe.ToolResultDetail{Skill: skillName, Error: friendlyError}
