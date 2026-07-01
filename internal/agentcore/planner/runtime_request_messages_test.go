@@ -92,6 +92,57 @@ func TestRuntimeRequestMessagesIncludesWorkspaceContext(t *testing.T) {
 	}
 }
 
+func TestRuntimeRequestMessagesIncludesSessionFilesContext(t *testing.T) {
+	p := NewPlanner(nil, skills.NewRegistry(), 8)
+
+	msgs, layers := p.BuildMessages(context.Background(), PlanRequest{
+		Messages: []llm.Message{{Role: "user", Content: "把刚才那张图改成雪山背景"}},
+		SessionFiles: []SessionFileRef{
+			{Path: "data/uploads/default/cat.png", Name: "cat.png", Kind: "uploaded"},
+			{Path: "data/output/report.docx", Name: "report.docx", Kind: "generated"},
+		},
+	})
+
+	foundSessionFiles := false
+	for _, msg := range msgs {
+		if msg.Role == "system" && strings.Contains(msg.Content, "[本次对话已有文件]") {
+			foundSessionFiles = true
+			if !strings.Contains(msg.Content, "cat.png") || !strings.Contains(msg.Content, "data/uploads/default/cat.png") {
+				t.Fatalf("session files context missing uploaded file: %q", msg.Content)
+			}
+			if !strings.Contains(msg.Content, "report.docx") || !strings.Contains(msg.Content, "data/output/report.docx") {
+				t.Fatalf("session files context missing generated file: %q", msg.Content)
+			}
+			if !strings.Contains(msg.Content, "用户上传") || !strings.Contains(msg.Content, "已生成") {
+				t.Fatalf("session files context should label file provenance: %q", msg.Content)
+			}
+		}
+	}
+	if !foundSessionFiles {
+		t.Fatalf("expected session files context system message, got %#v", msgs)
+	}
+	if !containsString(layers, "session_files") {
+		t.Fatalf("expected session_files layer marker, got %#v", layers)
+	}
+}
+
+func TestRuntimeRequestMessagesOmitsSessionFilesContextWhenEmpty(t *testing.T) {
+	p := NewPlanner(nil, skills.NewRegistry(), 8)
+
+	msgs, layers := p.BuildMessages(context.Background(), PlanRequest{
+		Messages: []llm.Message{{Role: "user", Content: "你好"}},
+	})
+
+	for _, msg := range msgs {
+		if strings.Contains(msg.Content, "[本次对话已有文件]") {
+			t.Fatalf("did not expect session files context with no files: %#v", msgs)
+		}
+	}
+	if containsString(layers, "session_files") {
+		t.Fatalf("did not expect session_files layer marker, got %#v", layers)
+	}
+}
+
 func containsString(values []string, want string) bool {
 	for _, value := range values {
 		if value == want {

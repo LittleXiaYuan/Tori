@@ -43,6 +43,83 @@ func AttachFilesToRich(rm *channelpkg.RichMessage, result *planner.PlanResult, s
 	return rm
 }
 
+// FileRef is a validated on-disk file reference extracted from planner
+// output text (Reply + PlanStep.Result) or explicit show_file actions.
+type FileRef struct {
+	Path string // absolute, on-disk, confirmed to exist
+	Name string
+	Size int64
+}
+
+// CollectGeneratedFileRefs scans planner output the same way AttachFilesToRich
+// does, but returns plain validated file references instead of building IM
+// rich-message components. Used to register files a chat turn produced into
+// the session file registry (see session_files.go) so later turns can reuse
+// them by path.
+func CollectGeneratedFileRefs(result *planner.PlanResult, searchRoots []string) []FileRef {
+	if result == nil {
+		return nil
+	}
+	seen := map[string]bool{}
+	var refs []FileRef
+	textBuf := strings.Builder{}
+	textBuf.WriteString(result.Reply)
+	for _, step := range result.Plan {
+		textBuf.WriteString("\n")
+		textBuf.WriteString(step.Result)
+	}
+	for _, s := range extractPaths(textBuf.String()) {
+		if ref, ok := resolveFileRef(s, seen, searchRoots); ok {
+			refs = append(refs, ref)
+		}
+	}
+	for _, a := range result.Actions {
+		if a.Kind != planner.ActionShowFile {
+			continue
+		}
+		var path string
+		switch fp := a.Payload.(type) {
+		case planner.FilePayload:
+			path = fp.Path
+		case map[string]any:
+			path, _ = fp["path"].(string)
+		}
+		if ref, ok := resolveFileRef(path, seen, searchRoots); ok {
+			refs = append(refs, ref)
+		}
+	}
+	return refs
+}
+
+func resolveFileRef(raw string, seen map[string]bool, roots []string) (FileRef, bool) {
+	if raw == "" || seen[raw] {
+		return FileRef{}, false
+	}
+	candidates := []string{raw}
+	if !filepath.IsAbs(raw) {
+		for _, root := range roots {
+			if root == "" {
+				continue
+			}
+			candidates = append(candidates, filepath.Join(root, raw))
+		}
+	}
+	for _, c := range candidates {
+		c = filepath.Clean(c)
+		if seen[c] {
+			continue
+		}
+		st, err := os.Stat(c)
+		if err != nil || st.IsDir() {
+			continue
+		}
+		seen[c] = true
+		seen[raw] = true
+		return FileRef{Path: c, Name: filepath.Base(c), Size: st.Size()}, true
+	}
+	return FileRef{}, false
+}
+
 func extractPaths(s string) []string {
 	found := pathLikePattern.FindAllString(s, -1)
 	out := make([]string, 0, len(found))

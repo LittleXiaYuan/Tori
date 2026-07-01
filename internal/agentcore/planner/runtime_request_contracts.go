@@ -17,28 +17,38 @@ type PlanRequest struct {
 	TeacherID         string
 	StudentID         string
 	TenantID          string
-	SessionID         string          // conversation/session correlation ID for trace replay and recovery grouping
-	ModelOverride     string          // pool key (e.g. "fast","smart","expert") — EXPLICIT caller override; suppresses LocalBrain classification
-	RoutedTier        string          // pool key chosen by the gateway smart router / thinking level — AUTOMATIC routing hint; lower precedence than ModelOverride and does NOT suppress classification (so the tool-free fast path can still fire)
-	IntentHint        string          // LocalBrain intent category (chat/code/search/tool/complex), set by applyRuntimeClassification; drives retrieval skipping and adaptive context budgets
-	EmotionHint       *emotion.Result // optional emotion detected from user input (STT or text analysis)
-	TaskID            string          // if set, this request is part of a task thread
-	TaskContext       string          // pre-rendered task working memory (injected by gateway)
-	IsGroup           bool            // true if this request comes from a group chat
-	GroupSystemPrompt string          // extra system prompt for group context
-	ChannelType       string          // source channel type (e.g. "telegram", "feishu")
-	ChatType          string          // chat type ("group", "private", etc.)
-	InboxContext      string          // buffered group inbox messages for context
-	StepCallback      StepCallback    // optional: called for each intermediate step (thinking, tool call, etc.)
-	OnReplyDelta      func(string)    // optional: called per-chunk to stream the final answer text live (true token streaming)
-	TraceID           string          // trace context ID for unified event protocol
-	ThinkingEnabled   *bool           // nil = model default; true/false = explicit override
-	DisableDelegation bool            // when true, buildFunctionDefs exposes direct skills instead of handoff tools
-	DisableTools      bool            // when true, skip all tools — pure chat mode
-	ClientOverride    *llm.Client     // if set, bypass pool and use this client directly (session-level provider override)
-	AllowedSkills     []string        // if non-empty, buildFunctionDefs restricts to exactly these skill names (user-picked tool whitelist)
-	WorkspacePaths    []string        // extra host dirs the conversation opened; merged into read-only file skills' allowed roots
-	ForceCogniIDs     []string        // chat `/智能体` pick: force-activate these Cognis this turn (behavior + tool surface + MCP tools), bypassing keyword scoring
+	SessionID         string           // conversation/session correlation ID for trace replay and recovery grouping
+	ModelOverride     string           // pool key (e.g. "fast","smart","expert") — EXPLICIT caller override; suppresses LocalBrain classification
+	RoutedTier        string           // pool key chosen by the gateway smart router / thinking level — AUTOMATIC routing hint; lower precedence than ModelOverride and does NOT suppress classification (so the tool-free fast path can still fire)
+	IntentHint        string           // LocalBrain intent category (chat/code/search/tool/complex), set by applyRuntimeClassification; drives retrieval skipping and adaptive context budgets
+	EmotionHint       *emotion.Result  // optional emotion detected from user input (STT or text analysis)
+	TaskID            string           // if set, this request is part of a task thread
+	TaskContext       string           // pre-rendered task working memory (injected by gateway)
+	IsGroup           bool             // true if this request comes from a group chat
+	GroupSystemPrompt string           // extra system prompt for group context
+	ChannelType       string           // source channel type (e.g. "telegram", "feishu")
+	ChatType          string           // chat type ("group", "private", etc.)
+	InboxContext      string           // buffered group inbox messages for context
+	StepCallback      StepCallback     // optional: called for each intermediate step (thinking, tool call, etc.)
+	OnReplyDelta      func(string)     // optional: called per-chunk to stream the final answer text live (true token streaming)
+	TraceID           string           // trace context ID for unified event protocol
+	ThinkingEnabled   *bool            // nil = model default; true/false = explicit override
+	DisableDelegation bool             // when true, buildFunctionDefs exposes direct skills instead of handoff tools
+	DisableTools      bool             // when true, skip all tools — pure chat mode
+	ClientOverride    *llm.Client      // if set, bypass pool and use this client directly (session-level provider override)
+	AllowedSkills     []string         // if non-empty, buildFunctionDefs restricts to exactly these skill names (user-picked tool whitelist)
+	WorkspacePaths    []string         // extra host dirs the conversation opened; merged into read-only file skills' allowed roots
+	SessionFiles      []SessionFileRef // files uploaded or generated earlier in this conversation, so the model can reference/reuse them (e.g. "edit that doc") without the user re-uploading
+	ForceCogniIDs     []string         // chat `/智能体` pick: force-activate these Cognis this turn (behavior + tool surface + MCP tools), bypassing keyword scoring
+}
+
+// SessionFileRef is a file uploaded by the user or generated by a skill
+// earlier in the same conversation, threaded into BuildMessages so the model
+// sees it on every turn without the gateway re-injecting it as history.
+type SessionFileRef struct {
+	Path string
+	Name string
+	Kind string // "uploaded" | "generated"
 }
 
 // EffectiveModelTier resolves the pool key to use for model selection: an

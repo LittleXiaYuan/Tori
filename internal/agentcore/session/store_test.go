@@ -1,6 +1,7 @@
 package session
 
 import (
+	"fmt"
 	"testing"
 
 	"yunque-agent/internal/agentcore/llm"
@@ -27,6 +28,60 @@ func TestAppendAndGet(t *testing.T) {
 	msgs := s.Get("s1")
 	if len(msgs) != 2 {
 		t.Fatalf("expected 2 messages, got %d", len(msgs))
+	}
+}
+
+func TestAddFilesAndFiles(t *testing.T) {
+	s := NewStore(50)
+	s.GetOrCreate("s1", "t1")
+	s.AddFiles("s1",
+		SessionFile{Path: "data/uploads/default/cat.png", Name: "cat.png", Kind: "uploaded"},
+		SessionFile{Path: "data/output/report.docx", Name: "report.docx", Kind: "generated", Skill: "docx_create", Size: 1234},
+	)
+	files := s.Files("s1")
+	if len(files) != 2 {
+		t.Fatalf("expected 2 files, got %d: %+v", len(files), files)
+	}
+	if files[1].Skill != "docx_create" || files[1].Size != 1234 {
+		t.Fatalf("unexpected generated file entry: %+v", files[1])
+	}
+}
+
+func TestAddFilesDedupesByPathRefreshingEntry(t *testing.T) {
+	s := NewStore(50)
+	s.GetOrCreate("s1", "t1")
+	s.AddFiles("s1", SessionFile{Path: "data/output/report.docx", Name: "report.docx", Kind: "generated", Size: 100})
+	s.AddFiles("s1", SessionFile{Path: "data/output/report.docx", Name: "report.docx", Kind: "generated", Size: 200})
+
+	files := s.Files("s1")
+	if len(files) != 1 {
+		t.Fatalf("expected re-adding the same path to update in place, got %d files: %+v", len(files), files)
+	}
+	if files[0].Size != 200 {
+		t.Fatalf("expected refreshed size 200, got %+v", files[0])
+	}
+}
+
+func TestAddFilesNoopForUnknownSession(t *testing.T) {
+	s := NewStore(50)
+	s.AddFiles("missing", SessionFile{Path: "data/output/x.png", Name: "x.png"})
+	if files := s.Files("missing"); files != nil {
+		t.Fatalf("expected no files for unknown session, got %+v", files)
+	}
+}
+
+func TestAddFilesEvictsOldestBeyondCap(t *testing.T) {
+	s := NewStore(50)
+	s.GetOrCreate("s1", "t1")
+	for i := 0; i < maxSessionFiles+5; i++ {
+		s.AddFiles("s1", SessionFile{Path: fmt.Sprintf("data/output/f%d.png", i), Name: fmt.Sprintf("f%d.png", i)})
+	}
+	files := s.Files("s1")
+	if len(files) != maxSessionFiles {
+		t.Fatalf("expected files capped at %d, got %d", maxSessionFiles, len(files))
+	}
+	if files[0].Name != "f5.png" {
+		t.Fatalf("expected oldest files evicted, got first entry %+v", files[0])
 	}
 }
 

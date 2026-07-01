@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"yunque-agent/internal/agentcore/llm"
@@ -29,7 +30,7 @@ func (s *ImageGenerateSkill) SetGenerator(gen llm.ImageGenerator) {
 
 func (s *ImageGenerateSkill) Name() string { return "image_generate" }
 func (s *ImageGenerateSkill) Description() string {
-	return "根据文字描述生成图片。输入 prompt (生图提示词，英文效果更好)，可选 size (如 1024x1024)、quality (standard/hd)。返回生成的图片文件路径。"
+	return "根据文字描述生成图片，或基于一张已有图片进行编辑/改图（如换背景、加元素）。输入 prompt (生图/改图提示词，英文效果更好)，可选 size (如 1024x1024)、quality (standard/hd)。若要编辑已有图片（比如用户刚上传的图，或你之前生成的图），传入 input_image_path（对话上下文里“本次对话已有文件”会给出可用的 path）。返回生成的图片文件路径。"
 }
 
 func (s *ImageGenerateSkill) Parameters() map[string]any {
@@ -38,7 +39,7 @@ func (s *ImageGenerateSkill) Parameters() map[string]any {
 		"properties": map[string]any{
 			"prompt": map[string]any{
 				"type":        "string",
-				"description": "Image generation prompt (English recommended for best results)",
+				"description": "Image generation/edit prompt (English recommended for best results)",
 			},
 			"size": map[string]any{
 				"type":        "string",
@@ -53,6 +54,10 @@ func (s *ImageGenerateSkill) Parameters() map[string]any {
 			"negative_prompt": map[string]any{
 				"type":        "string",
 				"description": "Negative prompt (what to avoid in the image)",
+			},
+			"input_image_path": map[string]any{
+				"type":        "string",
+				"description": "Path to an existing image to edit (from an earlier upload or generation in this conversation). Only supported by image-edit-capable providers (e.g. Gemini nano-banana); ignored otherwise.",
 			},
 		},
 		"required": []string{"prompt"},
@@ -78,7 +83,15 @@ func (s *ImageGenerateSkill) Execute(ctx context.Context, args map[string]any, e
 		ResponseFmt: "b64_json",
 	}
 
-	slog.Info("image_generate: calling provider", "prompt_len", len(prompt), "size", req.Size)
+	if rawPath := stringOr(args, "input_image_path", ""); rawPath != "" {
+		data, mime, err := s.resolveInputImage(rawPath)
+		if err != nil {
+			return "", err
+		}
+		req.InputImages = []llm.ImageInput{{Data: data, MimeType: mime}}
+	}
+
+	slog.Info("image_generate: calling provider", "prompt_len", len(prompt), "size", req.Size, "editing", len(req.InputImages) > 0)
 	resp, err := s.gen.GenerateImage(ctx, req)
 	if err != nil {
 		return "", fmt.Errorf("生图失败: %w", err)
@@ -143,6 +156,45 @@ func stringOr(args map[string]any, key, def string) string {
 		return v
 	}
 	return def
+}
+
+// resolveInputImage reads a reference image for edit-mode requests. Reads
+// are confined to the app's own data directory (outputDir's parent, e.g.
+// "data/" covering data/output, data/uploads, data/tasks) so the model can
+// only edit images this app already produced or received — not arbitrary
+// paths on the host filesystem.
+func (s *ImageGenerateSkill) resolveInputImage(rawPath string) (data []byte, mimeType string, err error) {
+	rawPath = strings.TrimSpace(rawPath)
+	abs, err := filepath.Abs(rawPath)
+	if err != nil {
+		return nil, "", fmt.Errorf("invalid input_image_path: %w", err)
+	}
+	dataRoot, err := filepath.Abs(filepath.Dir(s.outputDir))
+	if err != nil {
+		return nil, "", fmt.Errorf("invalid output directory: %w", err)
+	}
+	rel, err := filepath.Rel(dataRoot, abs)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return nil, "", fmt.Errorf("input_image_path 必须在应用数据目录内（如 data/output、data/uploads）")
+	}
+	data, err = os.ReadFile(abs)
+	if err != nil {
+		return nil, "", fmt.Errorf("读取参考图片失败: %w", err)
+	}
+	return data, mimeTypeFromExt(abs), nil
+}
+
+func mimeTypeFromExt(path string) string {
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".jpg", ".jpeg":
+		return "image/jpeg"
+	case ".webp":
+		return "image/webp"
+	case ".gif":
+		return "image/gif"
+	default:
+		return "image/png"
+	}
 }
 
 // Base64Preview returns base64 data URL for first artifact (for frontend display).
