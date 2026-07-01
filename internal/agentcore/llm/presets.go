@@ -82,7 +82,7 @@ var (
 	visionFC = []Capability{
 		CapVision, CapFunctionCalling, CapStructuredOutput, CapStreaming,
 	}
-	imageGen = []Capability{CapImageGen}
+	imageGen     = []Capability{CapImageGen}
 	imageGenEdit = []Capability{CapImageGen, CapImageEdit}
 )
 
@@ -143,6 +143,8 @@ func Presets() []ProviderPreset {
 					Capabilities: geminiAgent, ContextWindow: 1024},
 				{ID: "imagen-4.0-generate-001", Name: "Imagen 4.0", Type: ProviderTypeChat, Purpose: PurposeImage, Tier: "smart",
 					Capabilities: imageGen},
+				{ID: "gemini-2.5-flash-image", Name: "Gemini 2.5 Flash Image (nano banana)", Type: ProviderTypeChat, Purpose: PurposeImage, Tier: "smart",
+					Capabilities: imageGenEdit},
 			}},
 
 		// ── Mistral ──
