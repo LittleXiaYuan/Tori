@@ -76,6 +76,8 @@ jobs:
           workspaces: apps/desktop/src-tauri -> target
 
       - name: Install frontend dependencies
+        env:
+          HEROUI_AUTH_TOKEN: ${{ secrets.HEROUI_AUTH_TOKEN }}
         run: npm ci --prefer-offline --no-audit --no-fund
         working-directory: apps/web
 
@@ -93,6 +95,8 @@ jobs:
             go build -ldflags "-s -w" -o "${out}" ./cmd/agent
 
       - name: Build Tauri desktop bundle
+        env:
+          HEROUI_AUTH_TOKEN: ${{ secrets.HEROUI_AUTH_TOKEN }}
         run: npm run build
         working-directory: apps/desktop
 

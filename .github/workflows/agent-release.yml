@@ -62,6 +62,8 @@ jobs:
           cache: true
 
       - name: Build frontend (apps/web)
+        env:
+          HEROUI_AUTH_TOKEN: ${{ secrets.HEROUI_AUTH_TOKEN }}
         run: |
           set -euo pipefail
           cd apps/web

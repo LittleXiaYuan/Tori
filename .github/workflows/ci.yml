@@ -213,6 +213,8 @@ jobs:
           cache-dependency-path: apps/web/package-lock.json
 
       - name: npm ci
+        env:
+          HEROUI_AUTH_TOKEN: ${{ secrets.HEROUI_AUTH_TOKEN }}
         run: npm ci --prefer-offline --no-audit --no-fund
 
       - name: TypeScript typecheck
