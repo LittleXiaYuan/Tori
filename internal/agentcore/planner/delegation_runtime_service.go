@@ -4,9 +4,12 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
+	"yunque-agent/internal/agentcore/llm"
 	"yunque-agent/internal/agentcore/subagent"
+	"yunque-agent/internal/agentcore/task"
 	"yunque-agent/internal/observe"
 	"yunque-agent/pkg/opp"
 )
@@ -28,7 +31,28 @@ type FederationBridge interface {
 type DelegationRuntimeService struct {
 	handoffReg *subagent.HandoffRegistry
 	fedBridge  FederationBridge
+
+	// Async handoff execution (nil taskStore = feature off, sync path unchanged
+	// — this is what keeps every existing test passing without modification).
+	taskStore     task.Store
+	notifyFn      func(sessionID string, msg llm.Message)
+	broadcastFn   func(event, taskID, detail string)
+	sessionModeFn func(sessionID string) string
+
+	slotsMu sync.Mutex
+	slots   map[string]chan struct{} // sessionID -> concurrency semaphore
+
+	concurrencyXiaoyu int // max concurrent async handoffs per session in 小羽模式
+	concurrencyAPI    int // max concurrent async handoffs per session in API模式
 }
+
+// defaultHandoffConcurrencyXiaoyu/API are the out-of-the-box ceilings —
+// 小羽模式 stays sequential (matches today's one-thing-at-a-time feel), API模式
+// allows a Codex/Claude-Code-style burst of concurrent sub-agent tasks.
+const (
+	defaultHandoffConcurrencyXiaoyu = 1
+	defaultHandoffConcurrencyAPI    = 4
+)
 
 type HandoffExecutionHooks struct {
 	Metrics                SkillMetricsFunc
@@ -56,7 +80,69 @@ type HandoffExecutionResult struct {
 }
 
 func NewDelegationRuntimeService() *DelegationRuntimeService {
-	return &DelegationRuntimeService{}
+	return &DelegationRuntimeService{
+		slots:             make(map[string]chan struct{}),
+		concurrencyXiaoyu: defaultHandoffConcurrencyXiaoyu,
+		concurrencyAPI:    defaultHandoffConcurrencyAPI,
+	}
+}
+
+// SetHandoffConcurrency overrides the default per-session concurrency
+// ceilings for async handoffs. Values <= 0 are ignored (keep the default).
+func (s *DelegationRuntimeService) SetHandoffConcurrency(xiaoyu, api int) {
+	if s == nil {
+		return
+	}
+	if xiaoyu > 0 {
+		s.concurrencyXiaoyu = xiaoyu
+	}
+	if api > 0 {
+		s.concurrencyAPI = api
+	}
+}
+
+// sessionConcurrencyLimit resolves the async-handoff concurrency ceiling for
+// a session based on its 小羽/API mode.
+func (s *DelegationRuntimeService) sessionConcurrencyLimit(sessionID string) int {
+	mode := ""
+	if s.sessionModeFn != nil {
+		mode = s.sessionModeFn(sessionID)
+	}
+	if mode == "api" {
+		return s.concurrencyAPI
+	}
+	return s.concurrencyXiaoyu
+}
+
+// sessionSlot returns the semaphore channel for a session, creating it with
+// the session's current concurrency ceiling on first use.
+func (s *DelegationRuntimeService) sessionSlot(sessionID string) chan struct{} {
+	s.slotsMu.Lock()
+	defer s.slotsMu.Unlock()
+	if ch, ok := s.slots[sessionID]; ok {
+		return ch
+	}
+	ch := make(chan struct{}, s.sessionConcurrencyLimit(sessionID))
+	s.slots[sessionID] = ch
+	return ch
+}
+
+// releaseSessionSlot returns one token to the session semaphore and evicts the
+// channel from the map once it is idle (no in-flight handoffs). Without this,
+// s.slots would grow one channel per distinct session for the life of the
+// process — a slow but unbounded leak in a long-running local agent. Eviction
+// happens under slotsMu, and sessionSlot re-creates the channel on demand, so a
+// later handoff for the same session simply gets a fresh semaphore.
+func (s *DelegationRuntimeService) releaseSessionSlot(sessionID string, slot chan struct{}) {
+	s.slotsMu.Lock()
+	defer s.slotsMu.Unlock()
+	<-slot
+	// Only evict the map entry if it still points at this exact channel and no
+	// tokens are outstanding. Identity check guards against a racing goroutine
+	// that already evicted-and-recreated the entry.
+	if cur, ok := s.slots[sessionID]; ok && cur == slot && len(slot) == 0 {
+		delete(s.slots, sessionID)
+	}
 }
 
 func (s *DelegationRuntimeService) SetHandoffRegistry(reg *subagent.HandoffRegistry) {
@@ -85,6 +171,49 @@ func (s *DelegationRuntimeService) FederationBridge() FederationBridge {
 		return nil
 	}
 	return s.fedBridge
+}
+
+// SetHandoffTaskRuntime attaches a task store so handoff delegation runs as a
+// background task instead of blocking the calling chat turn. Call this from
+// cmd/agent wiring; leaving it unset (nil store) keeps the synchronous path,
+// which is what every existing delegation/handoff test relies on.
+func (s *DelegationRuntimeService) SetHandoffTaskRuntime(store task.Store) {
+	if s == nil {
+		return
+	}
+	s.taskStore = store
+}
+
+// SetHandoffAsyncNotifier wires how the async path reports results back to
+// the user: notifyFn appends a message to the conversation the delegation
+// started from, broadcastFn additionally pushes a "task.<event>" SSE event
+// (see broadcastTaskEvent in the gateway package) for any listener tracking
+// task lifecycle directly.
+func (s *DelegationRuntimeService) SetHandoffAsyncNotifier(notifyFn func(sessionID string, msg llm.Message), broadcastFn func(event, taskID, detail string)) {
+	if s == nil {
+		return
+	}
+	s.notifyFn = notifyFn
+	s.broadcastFn = broadcastFn
+}
+
+// SetSessionModeResolver wires the 小羽/API session mode lookup, used to pick
+// a per-session concurrency ceiling for async handoffs (小羽=1, api=higher).
+// An unset resolver treats every session as 小羽 mode (ceiling 1).
+func (s *DelegationRuntimeService) SetSessionModeResolver(fn func(sessionID string) string) {
+	if s == nil {
+		return
+	}
+	s.sessionModeFn = fn
+}
+
+// asyncCapable reports whether handoff delegation should run in the
+// background instead of blocking. Gated purely on wiring (a task store being
+// attached), not a request-level flag, so production gets the fix by default
+// while every test that constructs a bare DelegationRuntimeService keeps
+// exercising the original synchronous path untouched.
+func (s *DelegationRuntimeService) asyncCapable() bool {
+	return s != nil && s.taskStore != nil
 }
 
 func (s *DelegationRuntimeService) IsHandoffCall(name string) (string, bool) {
@@ -147,6 +276,10 @@ func (s *DelegationRuntimeService) ExecuteHandoffForRequest(ctx context.Context,
 	input := handoffInputFromArgs(args)
 	slog.Info("planner: handoff delegation", "source", source, "agent", agentName, "step", step)
 	emitHandoffStart(req, agentName, input)
+
+	if s.asyncCapable() {
+		return s.executeHandoffAsync(ctx, req, toolName, agentName, input, hooks)
+	}
 
 	cbCtx := ctx
 	if req.StepCallback != nil {

@@ -410,14 +410,44 @@ func (g *Gateway) WireTaskSSE() {
 		return
 	}
 	g.taskRunner.OnTaskEvent(func(event, taskID, detail string) {
-		g.sseBroker.Broadcast(SSEEvent{
-			Type: "task." + event,
-			Data: map[string]string{
-				"task_id": taskID,
-				"detail":  detail,
-			},
-		})
+		broadcastTaskEvent(g.sseBroker, event, taskID, detail)
 	})
+}
+
+// broadcastTaskEvent pushes a task lifecycle event onto the SSE broker. Shared
+// by WireTaskSSE (events from the step-planning Runner) and async handoff
+// delegation (events from a directly-managed task record — see
+// planner.DelegationRuntimeService's async path), so both surfaces speak the
+// same "task.<event>" wire format the frontend listens for.
+func broadcastTaskEvent(broker *SSEBroker, event, taskID, detail string) {
+	if broker == nil {
+		return
+	}
+	broker.Broadcast(SSEEvent{
+		Type: "task." + event,
+		Data: map[string]string{
+			"task_id": taskID,
+			"detail":  detail,
+		},
+	})
+}
+
+// BroadcastTaskEvent is the exported entry point for callers outside the
+// gateway package (e.g. the async handoff notifier wired in cmd/agent) that
+// need to push a "task.<event>" SSE event without reaching into g.sseBroker.
+func (g *Gateway) BroadcastTaskEvent(event, taskID, detail string) {
+	broadcastTaskEvent(g.sseBroker, event, taskID, detail)
+}
+
+// SessionMode returns a session's 小羽/API execution mode ("xiaoyu"/"api", ""
+// meaning 小羽 default). Thin wrapper so callers outside this package (e.g.
+// the planner's async handoff concurrency resolver) don't need direct access
+// to the provider registry.
+func (g *Gateway) SessionMode(sessionID string) string {
+	if g.providerReg == nil {
+		return ""
+	}
+	return g.providerReg.SessionMode(sessionID)
 }
 
 // WireFeishuCardActions registers card button handlers on the Feishu channel

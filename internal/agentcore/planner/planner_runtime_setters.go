@@ -9,6 +9,7 @@ import (
 	ctxwindow "yunque-agent/internal/agentcore/context"
 	"yunque-agent/internal/agentcore/llm"
 	"yunque-agent/internal/agentcore/subagent"
+	"yunque-agent/internal/agentcore/task"
 	"yunque-agent/internal/cognicore/recommend"
 	iledger "yunque-agent/internal/ledger"
 	"yunque-agent/pkg/skills"
@@ -149,6 +150,37 @@ func (p *Planner) SetLLMPool(pool *llm.Pool) {
 func (p *Planner) SetHandoffRegistry(hr *subagent.HandoffRegistry) {
 	delegationRuntime := p.ensureDelegationRuntime()
 	delegationRuntime.SetHandoffRegistry(hr)
+}
+
+// SetHandoffTaskRuntime attaches a task store so handoff delegation runs as a
+// background task instead of blocking the calling chat turn. See
+// DelegationRuntimeService.SetHandoffTaskRuntime.
+func (p *Planner) SetHandoffTaskRuntime(store task.Store) {
+	delegationRuntime := p.ensureDelegationRuntime()
+	delegationRuntime.SetHandoffTaskRuntime(store)
+}
+
+// SetHandoffAsyncNotifier wires how async handoff completion/failure gets
+// reported back to the user. See DelegationRuntimeService.SetHandoffAsyncNotifier.
+func (p *Planner) SetHandoffAsyncNotifier(notifyFn func(sessionID string, msg llm.Message), broadcastFn func(event, taskID, detail string)) {
+	delegationRuntime := p.ensureDelegationRuntime()
+	delegationRuntime.SetHandoffAsyncNotifier(notifyFn, broadcastFn)
+}
+
+// SetSessionModeResolver wires the 小羽/API session mode lookup used to pick a
+// per-session concurrency ceiling for async handoffs. See
+// DelegationRuntimeService.SetSessionModeResolver.
+func (p *Planner) SetSessionModeResolver(fn func(sessionID string) string) {
+	delegationRuntime := p.ensureDelegationRuntime()
+	delegationRuntime.SetSessionModeResolver(fn)
+}
+
+// SetHandoffConcurrency overrides the default per-session async-handoff
+// concurrency ceilings for 小羽/API modes. See
+// DelegationRuntimeService.SetHandoffConcurrency.
+func (p *Planner) SetHandoffConcurrency(xiaoyu, api int) {
+	delegationRuntime := p.ensureDelegationRuntime()
+	delegationRuntime.SetHandoffConcurrency(xiaoyu, api)
 }
 
 // SetSkillOptimizer attaches a skill optimizer for usage analytics-driven hints.

@@ -26,8 +26,10 @@ import (
 	"yunque-agent/internal/agentcore/persona"
 	"yunque-agent/internal/agentcore/planner"
 	agentrt "yunque-agent/internal/agentcore/runtime"
+	"yunque-agent/internal/agentcore/session"
 	"yunque-agent/internal/agentcore/skillmarket"
 	"yunque-agent/internal/agentcore/subagent"
+	"yunque-agent/internal/agentcore/task"
 	"yunque-agent/internal/agentcore/tasksched/rlsched"
 	"yunque-agent/internal/agentcore/taskskills/docparse"
 	"yunque-agent/internal/agentcore/taskskills/filegen"
@@ -475,6 +477,50 @@ func initSubagentHandoff(app *agentrt.App, gw *gateway.Gateway, p *planner.Plann
 
 	p.SetHandoffRegistry(handoffReg)
 	gw.SetHandoffRegistry(handoffReg)
+	wireAsyncHandoff(app, gw, p)
+}
+
+// wireAsyncHandoff attaches the task store + notification plumbing so
+// handoff delegation (research_exec, file_exec, ...) runs as a background
+// task instead of blocking the calling chat turn. Missing task store or
+// conversation store degrades gracefully to the original synchronous path —
+// this is additive wiring, not a hard requirement.
+func wireAsyncHandoff(app *agentrt.App, gw *gateway.Gateway, p *planner.Planner) {
+	if !app.Config.HandoffAsyncEnabled {
+		slog.Info("handoff: async delegation disabled via HANDOFF_ASYNC_ENABLED, delegation stays synchronous")
+		return
+	}
+	taskStoreRaw, ok := app.Get(agentrt.CompTaskStore)
+	if !ok {
+		slog.Info("handoff: task store not available, delegation stays synchronous")
+		return
+	}
+	taskStore, ok := taskStoreRaw.(task.Store)
+	if !ok {
+		slog.Warn("handoff: task store type mismatch, delegation stays synchronous")
+		return
+	}
+
+	convStoreRaw, ok := app.Get(agentrt.CompSessionStore)
+	if !ok {
+		slog.Info("handoff: session store not available, delegation stays synchronous")
+		return
+	}
+	convStore, ok := convStoreRaw.(*session.Store)
+	if !ok {
+		slog.Warn("handoff: session store type mismatch, delegation stays synchronous")
+		return
+	}
+
+	p.SetHandoffTaskRuntime(taskStore)
+	p.SetHandoffAsyncNotifier(
+		func(sessionID string, msg llm.Message) { convStore.Append(sessionID, msg) },
+		func(event, taskID, detail string) { gw.BroadcastTaskEvent(event, taskID, detail) },
+	)
+	p.SetSessionModeResolver(gw.SessionMode)
+	cfg := app.Config
+	p.SetHandoffConcurrency(cfg.HandoffConcurrencyXiaoyu, cfg.HandoffConcurrencyAPI)
+	slog.Info("handoff: async delegation enabled", "concurrency_xiaoyu", cfg.HandoffConcurrencyXiaoyu, "concurrency_api", cfg.HandoffConcurrencyAPI)
 }
 
 // runeClip truncates s to at most n runes, appending an ellipsis when cut, so a
