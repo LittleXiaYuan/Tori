@@ -78,7 +78,7 @@
     "catalogHidden": "true",
     "sync": "backend-registry-drives-frontend",
     "descriptionStyle": "one-line-plus-three-examples",
-    "usability": "actionable",
+    "usability": "experimental",
     "primaryActionLabel": "查看经验和偏好",
     "primaryActionPath": "/packs/experience",
     "usageSurface": "经验页、技能推荐、用户偏好画像与任务自评记录",

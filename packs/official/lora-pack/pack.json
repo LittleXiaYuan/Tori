@@ -117,7 +117,7 @@
     "blueprint": "docs/spec/pack-runtime-blueprint.md",
     "sync": "backend-registry-drives-frontend",
     "descriptionStyle": "one-line-plus-three-examples",
-    "usability": "actionable",
+    "usability": "experimental",
     "primaryActionLabel": "管理训练与回滚",
     "primaryActionPath": "/packs/lora",
     "usageSurface": "LoRA 训练页、训练数据预检、手动触发、训练历史、配置与适配器回滚",

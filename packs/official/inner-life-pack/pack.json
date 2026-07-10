@@ -72,7 +72,7 @@
     "catalogHidden": "true",
     "sync": "backend-registry-drives-frontend",
     "descriptionStyle": "one-line-plus-three-examples",
-    "usability": "actionable",
+    "usability": "experimental",
     "primaryActionLabel": "查看内在生活",
     "primaryActionPath": "/packs/inner-life",
     "usageSurface": "内在生活页、好奇心探索、自动反思与梦境时间线",

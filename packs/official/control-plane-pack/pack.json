@@ -68,7 +68,8 @@
       "/api/providers/tori/discover",
       "/v1/router/stats",
       "/api/breaker/reset",
-      "/api/providers/exec"
+      "/api/providers/exec",
+      "/api/providers/image-gen"
     ],
     "permissions": [
       "control_plane:read",
@@ -77,7 +78,7 @@
   },
   "frontend": {
     "menus": [
-      { "key": "trust", "label": "信任", "path": "/trust", "icon": "shield", "order": 210 },
+      { "key": "trust", "label": "信任", "path": "/system?tab=trust", "icon": "shield", "order": 210 },
       { "key": "audit", "label": "审计", "path": "/audit", "icon": "file-search", "order": 211 },
       { "key": "tenants", "label": "租户", "path": "/tenants", "icon": "users", "order": 212 },
       { "key": "metrics", "label": "指标", "path": "/metrics", "icon": "activity", "order": 213 },
@@ -101,9 +102,9 @@
   "metadata": {
     "group": "control-plane",
     "phase": "A2",
-    "usability": "actionable",
+    "usability": "infrastructure",
     "primaryActionLabel": "查看治理与运维",
-    "primaryActionPath": "/trust",
+    "primaryActionPath": "/system?tab=trust",
     "usageSurface": "信任中心、审计、模型、指标、租户、审批与高级控制面",
     "descriptionStyle": "one-line-plus-three-examples",
     "example1": "查看信任、审计、审批和用量等治理页面。",

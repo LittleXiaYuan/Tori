@@ -83,7 +83,7 @@
     "catalogHidden": "true",
     "sync": "backend-registry-drives-frontend",
     "descriptionStyle": "one-line-plus-three-examples",
-    "usability": "actionable",
+    "usability": "experimental",
     "primaryActionLabel": "查看世界模型",
     "primaryActionPath": "/packs/world-model",
     "usageSurface": "世界模型页、外部状态快照、过期状态提醒、失败根因与因果时间线",

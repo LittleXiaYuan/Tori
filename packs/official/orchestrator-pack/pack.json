@@ -102,7 +102,7 @@
     "blueprint": "docs/spec/pack-runtime-blueprint.md",
     "stage": "native-pack-route-migration",
     "descriptionStyle": "one-line-plus-three-examples",
-    "usability": "actionable",
+    "usability": "infrastructure",
     "primaryActionLabel": "管理任务编排",
     "primaryActionPath": "/workers",
     "usageSurface": "AI IDE 协作页、编排守护进程、IDE 检测、活跃会话与任务分派状态",

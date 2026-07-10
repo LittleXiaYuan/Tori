@@ -44,6 +44,9 @@ make check    # lint + test (pre-commit gate)
 # Other gates
 make openapi              # regenerate docs/openapi.yaml from gateway routes, then verify
 make check-pack-usability # audit official packs for user-visible usefulness
+make vulncheck            # govulncheck ./... (needs govulncheck installed)
+make sbom                 # regenerate CycloneDX SBOM + embedded copy (internal/sbom/sbom.cdx.json)
+make release-safe         # vulncheck + sbom + release (gated release path)
 ```
 
 Frontend dev server runs on **:3001** (`npm run dev`, webpack); the Go gateway runs on **:9090**.
