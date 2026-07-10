@@ -10,6 +10,7 @@ import CommandPalette from "@/components/command-palette";
 import { CherrySettingsModal } from "@/components/cherry/settings-modal";
 import { SelectionToolbar } from "@/components/selection-toolbar";
 import ServiceConnectionGuard from "@/components/service-connection-guard";
+import DesktopUpdater from "@/components/desktop-updater";
 import { I18nProvider } from "@/lib/i18n";
 import { AppTitleBar } from "@/components/layout/app-title-bar";
 
@@ -209,6 +210,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </Suspense>
         </main>
         <Toaster />
+        <DesktopUpdater />
         <ConfirmDialogProvider />
         {!onAuthPath && <CommandPalette />}
         {!onAuthPath && (

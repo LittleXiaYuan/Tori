@@ -97,6 +97,13 @@ jobs:
       - name: Build Tauri desktop bundle
         env:
           HEROUI_AUTH_TOKEN: ${{ secrets.HEROUI_AUTH_TOKEN }}
+          # Updater signing. The private key lives ONLY in repo secrets — never
+          # in the tree. With createUpdaterArtifacts:true the bundler emits a
+          # signed `.sig` next to each installer; without these vars the signing
+          # step fails, so a release build enforces that updates are signed.
+          # Add the secret with the private key printed by `tauri signer generate`.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npm run build
         working-directory: apps/desktop
 
@@ -107,3 +114,18 @@ jobs:
           path: |
             apps/desktop/src-tauri/target/release/bundle/**/*
           if-no-files-found: error
+
+      # ── Self-hosted updater distribution (manual for now) ──────────────────
+      # The updater endpoint in tauri.conf.json points at self-hosted static
+      # storage. To wire the full auto-update loop, after this workflow uploads
+      # the signed bundles you must:
+      #   1. Collect the signed installer + its `.sig` for each platform from
+      #      the target/release/bundle/** artifacts.
+      #   2. Build a `latest.json` Tauri update manifest (version, notes, pub_date,
+      #      and per-platform { signature, url }) — the signature is the `.sig`
+      #      contents, the url points at the installer on your CDN.
+      #   3. Upload the installers + latest.json to the CDN path that the
+      #      endpoint URL resolves to (replace the REPLACE-WITH-YOUR-CDN
+      #      placeholder in tauri.conf.json first).
+      # This step is intentionally left as a documented manual process until the
+      # CDN target is chosen; automate it here once the bucket/credentials exist.

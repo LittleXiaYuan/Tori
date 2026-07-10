@@ -19,6 +19,8 @@
     "@heroui/styles": "^3.0.1",
     "@number-flow/react": "^0.6.1",
     "@tauri-apps/api": "^2.10.1",
+    "@tauri-apps/plugin-process": "^2",
+    "@tauri-apps/plugin-updater": "^2",
     "@tiptap/core": "^3.27.1",
     "@tiptap/extension-link": "^3.27.1",
     "@tiptap/extension-underline": "^3.27.1",
