@@ -240,10 +240,3 @@ func checkFeishu() (string, bool) {
 	}
 	return "已配置", true
 }
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}

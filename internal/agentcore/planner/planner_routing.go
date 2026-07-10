@@ -39,10 +39,6 @@ func (p *Planner) emitModelFallbackEvent(req PlanRequest, model string, attempt 
 	req.StepCallback(evt)
 }
 
-func (p *Planner) isComplexTask(req PlanRequest) bool {
-	return p.executionMode(req).Mode == PlanExecutionLongHorizon
-}
-
 func (p *Planner) modelFallbackEvents(req PlanRequest) ModelFallbackEventFunc {
 	return func(model string, attempt int, err error) {
 		p.emitModelFallbackEvent(req, model, attempt, err)

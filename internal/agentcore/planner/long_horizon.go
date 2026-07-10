@@ -407,10 +407,6 @@ func plannerOutputLooksDiagnostic(output string) bool {
 		strings.Contains(normalized, "tool panic")
 }
 
-func (p *Planner) buildSkillListForDecompose() string {
-	return p.buildSkillListForDecomposeWithAllow(nil)
-}
-
 func (p *Planner) buildSkillListForDecomposeWithAllow(allowed map[string]bool) string {
 	var list string
 	for _, s := range p.registry.All() {
@@ -755,14 +751,6 @@ func hasPlanLikeStep(steps []dagStepDraft) bool {
 		}
 	}
 	return false
-}
-
-func extractJSONArray(s string) string {
-	candidates := extractJSONArrays(s)
-	if len(candidates) == 0 {
-		return ""
-	}
-	return candidates[0]
 }
 
 func extractJSONArrays(s string) []string {
