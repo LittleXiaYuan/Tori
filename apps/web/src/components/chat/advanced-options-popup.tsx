@@ -6,7 +6,7 @@ import {
   ToggleButton,
   ToggleButtonGroup,
 } from "@heroui/react";
-import { SlidersHorizontal, Sparkles, Zap, MessageCircle, Cpu } from "lucide-react";
+import { SlidersHorizontal, Sparkles, Zap, MessageCircle, Cpu, Bird, Terminal } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import type { ChatMode, ThinkingLevel } from "@/components/model-selector-popup";
 
@@ -24,14 +24,23 @@ const EFFORT_KEYS: Record<ThinkingLevel, string> = {
   deep: "model.think.deep",
 };
 
+type ExecMode = "xiaoyu" | "api";
+
+const EXEC_MODE_DEFS: { key: ExecMode; label: string; icon: typeof Bird }[] = [
+  { key: "xiaoyu", label: "小羽", icon: Bird },
+  { key: "api", label: "API", icon: Terminal },
+];
+
 interface Props {
   chatMode: ChatMode;
   onModeChange: (mode: ChatMode) => void;
   thinkingLevel: ThinkingLevel;
   onThinkingChange: (level: ThinkingLevel) => void;
+  execMode: ExecMode;
+  onExecModeChange: (mode: ExecMode) => void;
 }
 
-export function AdvancedOptionsPopup({ chatMode, onModeChange, thinkingLevel, onThinkingChange }: Props) {
+export function AdvancedOptionsPopup({ chatMode, onModeChange, thinkingLevel, onThinkingChange, execMode, onExecModeChange }: Props) {
   const { t } = useI18n();
   return (
     <Popover>
@@ -78,6 +87,37 @@ export function AdvancedOptionsPopup({ chatMode, onModeChange, thinkingLevel, on
               aria-label={t("model.modeAria")}
             >
               {MODE_DEFS.map((md) => {
+                const Icon = md.icon;
+                return (
+                  <ToggleButton key={md.key} id={md.key} variant="ghost" className="text-[11px] gap-1.5">
+                    <Icon size={12} />
+                    {md.label}
+                  </ToggleButton>
+                );
+              })}
+            </ToggleButtonGroup>
+          </div>
+
+          {/* 执行模式：小羽(自研执行器，参与自蒸馏学习) / API(外部模型直给，
+              并发上限更高，不参与自蒸馏) — 与上面的对话模式是独立的一条轴 */}
+          <div>
+            <div className="mb-1.5 text-[11px] font-medium" style={{ color: "var(--yunque-text-secondary)" }}>
+              {t("composer.execMode")}
+            </div>
+            <ToggleButtonGroup
+              selectionMode="single"
+              disallowEmptySelection
+              fullWidth
+              size="sm"
+              isDetached
+              selectedKeys={new Set([execMode])}
+              onSelectionChange={(keys) => {
+                const next = Array.from(keys)[0] as ExecMode | undefined;
+                if (next) onExecModeChange(next);
+              }}
+              aria-label={t("composer.execModeAria")}
+            >
+              {EXEC_MODE_DEFS.map((md) => {
                 const Icon = md.icon;
                 return (
                   <ToggleButton key={md.key} id={md.key} variant="ghost" className="text-[11px] gap-1.5">

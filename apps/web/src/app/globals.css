@@ -1385,6 +1385,11 @@ button, [role="button"] { border-radius: var(--radius-md); }
   display: grid;
   gap: 4px;
 }
+.account-rail-flyout-family-section {
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
+}
 
 @media (max-width: 900px) {
   :root {
@@ -4786,6 +4791,14 @@ button, [role="button"] { border-radius: var(--radius-md); }
 .provider-min__field { min-width: 0; }
 .provider-min__field--wide { grid-column: 1 / -1; }
 .provider-min__form-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.provider-min__imagegen-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--yunque-text-secondary);
+  cursor: pointer;
+}
 .provider-min__empty {
   padding: 24px 16px;
   text-align: center;

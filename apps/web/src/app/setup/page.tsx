@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Card, Chip, Input, Label, ProgressBar, Spinner, TextField, Tooltip } from "@heroui/react";
 import { api, getAuthHeaders } from "@/lib/api";
+import { BASE } from "@/lib/api-core";
 import type { SetupEnvironment, SetupTemplate } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import { formatErrorMessage } from "@/lib/error-utils";
@@ -101,7 +102,7 @@ export default function SetupPage() {
     (async () => {
       try {
         const token = localStorage.getItem("yunque_token");
-        const res = await fetch("/v1/auth/status", {
+        const res = await fetch(`${BASE}/v1/auth/status`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
         const data = await res.json();

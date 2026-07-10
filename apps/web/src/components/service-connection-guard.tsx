@@ -15,6 +15,11 @@ const POLL_INTERVAL_MS = 10000;
 // (dev rebuilds, a single slow health check) no longer flash the splash.
 const FAIL_THRESHOLD = 3;
 const BLIP_RECHECK_MS = 1200;
+// Before the very first successful connect, a few failed probes just mean the
+// backend is still cold-starting (migrations, plugin warmup, etc. per
+// CLAUDE.md) — not an actual outage. Keep the copy calm ("starting up") for
+// this many attempts before switching to the more urgent "unavailable" wording.
+const PRE_CONNECT_GRACE_ATTEMPTS = 5;
 
 function Splash({ state, detail, onRetry }: { state: ServiceState; detail?: string; onRetry: () => void }) {
   const [elapsedMs, setElapsedMs] = useState(0);
@@ -173,9 +178,15 @@ export default function ServiceConnectionGuard({ children }: { children: React.R
         return;
       }
       setState("offline");
-      setDetail(error instanceof Error && error.name === "AbortError"
-        ? "本地服务响应超时，正在重试..."
-        : "本地服务暂时不可用，正在重试...");
+      if (!everReadyRef.current && failRef.current <= PRE_CONNECT_GRACE_ATTEMPTS) {
+        // First connect still pending and within the cold-start grace period —
+        // read as "loading", not "something broke".
+        setDetail("正在启动本地服务，请稍候…");
+      } else {
+        setDetail(error instanceof Error && error.name === "AbortError"
+          ? "本地服务响应超时，正在重试..."
+          : "本地服务暂时不可用，正在重试...");
+      }
     }
   }, []);
 

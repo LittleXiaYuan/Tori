@@ -796,8 +796,8 @@ export const api = {
     fetcher<{ backend: string; base_url: string; available: boolean; models?: { id: string; name: string; backend: string; base_url: string }[]; error?: string; latency: number }>("/api/providers/local/discover"),
   providerLocalRegister: (name: string, baseUrl: string, models: string[]) =>
     fetcher<{ status: string }>("/api/providers/local/register", { method: "POST", body: JSON.stringify({ name, base_url: baseUrl, models }) }),
-  providerSessionOverride: (providerId: string, sessionId?: string) =>
-    fetcher<{ status: string }>("/api/providers/session", { method: "POST", body: JSON.stringify({ provider_id: providerId, session_id: sessionId }) }),
+  providerSessionOverride: (providerId: string, sessionId?: string, execMode?: "xiaoyu" | "api") =>
+    fetcher<{ status: string; ok?: boolean; mode?: string }>("/api/providers/session", { method: "POST", body: JSON.stringify({ provider_id: providerId, session_id: sessionId, mode: execMode }) }),
 
   providerMode: () =>
     fetcher<{ mode: string }>("/api/providers/mode"),
@@ -805,7 +805,7 @@ export const api = {
     fetcher<{ mode: string }>("/api/providers/mode", { method: "POST", body: JSON.stringify({ mode }) }),
   providerPresets: () =>
     fetcher<{ presets: ProviderPreset[] }>("/api/providers/presets"),
-  providerRegister: (req: { preset_id?: string; id?: string; base_url?: string; api_key?: string; model?: string; name?: string; tier?: string }) =>
+  providerRegister: (req: { preset_id?: string; id?: string; base_url?: string; api_key?: string; model?: string; name?: string; tier?: string; image_gen?: boolean }) =>
     fetcher<{ ok: boolean; provider_id?: string }>("/api/providers/register", { method: "POST", body: JSON.stringify(req) }),
   providerDelete: (id: string) =>
     fetcher<{ ok: boolean }>("/api/providers/delete", { method: "POST", body: JSON.stringify({ id }) }),
@@ -815,6 +815,10 @@ export const api = {
     fetcher<{ exec_provider: string; available_providers: string[] }>("/api/providers/exec"),
   setExecProvider: (providerId: string) =>
     fetcher<{ ok: boolean; exec_provider: string }>("/api/providers/exec", { method: "POST", body: JSON.stringify({ provider_id: providerId }) }),
+  imageGenProvider: () =>
+    fetcher<{ image_gen_provider: string; available_providers: ProviderInfo[] }>("/api/providers/image-gen"),
+  setImageGenProvider: (providerId: string) =>
+    fetcher<{ ok: boolean; image_gen_provider: string }>("/api/providers/image-gen", { method: "POST", body: JSON.stringify({ provider_id: providerId }) }),
   toriDiscover: (autoRegister = false) =>
     fetcher<{ models: Array<{ id: string }>; registered?: number }>(`/api/providers/tori/discover?auto_register=${autoRegister}`),
 

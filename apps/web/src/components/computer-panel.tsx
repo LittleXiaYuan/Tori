@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import type { AgentEvent } from "@/components/execution-trace";
 import MarkdownRenderer from "@/components/markdown-renderer";
+import { BASE } from "@/lib/api-core";
 
 // The computer panel is always dark; force light-on-dark tokens so the
 // token-based MarkdownRenderer stays readable even under the light app theme.
@@ -691,7 +692,7 @@ export function ComputerPanel({ steps, traceEvents, taskStatus, taskName, isLive
 
     (async () => {
       try {
-        const res = await fetch("/v1/events/stream", { headers, signal: controller.signal });
+        const res = await fetch(`${BASE}/v1/events/stream`, { headers, signal: controller.signal });
         if (!res.ok || !res.body) return;
         reader = res.body.getReader();
         const decoder = new TextDecoder();

@@ -95,6 +95,11 @@ interface ExecutionTraceProps {
   events: AgentEvent[];
   isLive?: boolean;
   onRecoveryPrompt?: (prompt: string) => void;
+  // When true, the backend already returned raw (unsanitized) events — skip
+  // the client-side friendly-text rewrite so the real underlying error (e.g.
+  // literal HTTP status/body) is visible instead of the generic "现场已保留"
+  // wording. Only ever set from Trace page's explicit raw-mode toggle.
+  raw?: boolean;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -473,14 +478,18 @@ function FailureRecoveryDetailCard({ detail, onRecoveryPrompt }: { detail: Recor
   );
 }
 
-function TraceDetailView({ detail, onRecoveryPrompt }: { detail: unknown; onRecoveryPrompt?: (prompt: string) => void }) {
+function TraceDetailView({ detail, onRecoveryPrompt, raw }: { detail: unknown; onRecoveryPrompt?: (prompt: string) => void; raw?: boolean }) {
+  const forDisplay = raw ? detail : sanitizeTraceDetailForDisplay(detail);
   if (!isRecord(detail)) {
     return (
       <pre className="mt-1.5 p-2.5 rounded-lg font-mono text-[11px] whitespace-pre-wrap break-all max-h-[200px] overflow-y-auto" style={{ background: "rgba(0,0,0,0.2)", color: "var(--yunque-text-muted)", border: "1px solid var(--yunque-border)" }}>
-        {JSON.stringify(sanitizeTraceDetailForDisplay(detail), null, 2)}
+        {JSON.stringify(forDisplay, null, 2)}
       </pre>
     );
   }
+  // Structured cards (cogni/checkpoint/handoff/…) render friendly summaries
+  // by construction — raw mode only affects the generic JSON fallback below,
+  // where the actual error strings live.
   const kind = detailKind(detail);
   if (kind === "cogni") return <CogniDetailCard detail={detail} />;
   if (kind === "checkpoint") return <CheckpointDetailCard detail={detail} onRecoveryPrompt={onRecoveryPrompt} />;
@@ -493,7 +502,7 @@ function TraceDetailView({ detail, onRecoveryPrompt }: { detail: unknown; onReco
       className="mt-1.5 p-2.5 rounded-lg font-mono text-[11px] whitespace-pre-wrap break-all max-h-[200px] overflow-y-auto"
       style={{ background: "rgba(0,0,0,0.2)", color: "var(--yunque-text-muted)", border: "1px solid var(--yunque-border)" }}
     >
-      {JSON.stringify(sanitizeTraceDetailForDisplay(detail), null, 2)}
+      {JSON.stringify(forDisplay, null, 2)}
     </pre>
   );
 }
@@ -513,7 +522,7 @@ function sanitizeTraceDetailForDisplay(value: unknown): unknown {
   return value;
 }
 
-export function ExecutionTrace({ events, isLive, onRecoveryPrompt }: ExecutionTraceProps) {
+export function ExecutionTrace({ events, isLive, onRecoveryPrompt, raw }: ExecutionTraceProps) {
   const [expanded, setExpanded] = useState(false);
 
   if (events.length === 0) return null;
@@ -553,7 +562,7 @@ export function ExecutionTrace({ events, isLive, onRecoveryPrompt }: ExecutionTr
       {expanded && (
         <div className="px-3.5 pb-3.5 pt-1">
           {events.map((evt, idx) => (
-            <TraceItem key={`${evt.id}-${idx}`} event={evt} startTs={firstTs} onRecoveryPrompt={onRecoveryPrompt} />
+            <TraceItem key={`${evt.id}-${idx}`} event={evt} startTs={firstTs} onRecoveryPrompt={onRecoveryPrompt} raw={raw} />
           ))}
         </div>
       )}
@@ -561,13 +570,13 @@ export function ExecutionTrace({ events, isLive, onRecoveryPrompt }: ExecutionTr
   );
 }
 
-function TraceItem({ event, startTs, onRecoveryPrompt }: { event: AgentEvent; startTs: string; onRecoveryPrompt?: (prompt: string) => void }) {
+function TraceItem({ event, startTs, onRecoveryPrompt, raw }: { event: AgentEvent; startTs: string; onRecoveryPrompt?: (prompt: string) => void; raw?: boolean }) {
   const [detailOpen, setDetailOpen] = useState(false);
   const icon = domainIcon(event.domain, event.type);
   const color = domainColor(event.domain, event.type);
   const offset = formatDuration(startTs, event.ts);
   const hasDetail = event.detail !== null && event.detail !== undefined;
-  const summary = displaySummary(event.summary);
+  const summary = raw ? (event.summary || "") : displaySummary(event.summary);
 
   return (
     <div className="relative pl-7 pb-1.5">
@@ -620,7 +629,7 @@ function TraceItem({ event, startTs, onRecoveryPrompt }: { event: AgentEvent; st
         >
           {summary}
         </div>
-        {detailOpen && hasDetail && <TraceDetailView detail={event.detail} onRecoveryPrompt={onRecoveryPrompt} />}
+        {detailOpen && hasDetail && <TraceDetailView detail={event.detail} onRecoveryPrompt={onRecoveryPrompt} raw={raw} />}
       </div>
     </div>
   );

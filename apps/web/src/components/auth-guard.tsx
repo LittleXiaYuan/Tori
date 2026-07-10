@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Spinner } from "@heroui/react";
 import { useI18n } from "@/lib/i18n";
-import { getAuthHeaders } from "@/lib/api-core";
+import { BASE, getAuthHeaders } from "@/lib/api-core";
 
 const PUBLIC_PATHS = ["/login", "/setup", "/selection-popup"];
 const AUTH_TIMEOUT_MS = 8000;
@@ -40,7 +40,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
       localStorage.removeItem("yunque_api_key");
     };
     const bootstrapDesktopToken = async (signal: AbortSignal): Promise<Record<string, string>> => {
-      const res = await fetch("/v1/auth/desktop-bootstrap", {
+      const res = await fetch(`${BASE}/v1/auth/desktop-bootstrap`, {
         method: "POST",
         signal,
       });
@@ -83,7 +83,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
         redirectToLogin();
         return null;
       }
-      return fetch("/v1/auth/status", {
+      return fetch(`${BASE}/v1/auth/status`, {
         headers,
         signal: controller.signal,
       });

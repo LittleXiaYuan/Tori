@@ -10,6 +10,7 @@ import {
 import { useOnboarding, markOnboardingComplete, type OnboardingPhase } from "@/hooks/use-onboarding";
 import { useI18n } from "@/lib/i18n";
 import { formatErrorMessage } from "@/lib/error-utils";
+import { BASE } from "@/lib/api-core";
 import { ONBOARDING_SCENARIOS, scenarioChatHref } from "@/lib/product-scenarios";
 
 function WelcomeAuroraMark() {
@@ -86,7 +87,7 @@ function SetupCheckStep({ onNext, onProviderSetup }: { onNext: () => void; onPro
         const token = localStorage.getItem("yunque_token") || localStorage.getItem("yunque_api_key");
         const headers: Record<string, string> = {};
         if (token) headers["Authorization"] = `Bearer ${token}`;
-        const res = await fetch("/v1/version", { headers });
+        const res = await fetch(`${BASE}/v1/version`, { headers });
         serverOk = res.ok;
       } catch { /* offline */ }
 
@@ -102,7 +103,7 @@ function SetupCheckStep({ onNext, onProviderSetup }: { onNext: () => void; onPro
           const token = localStorage.getItem("yunque_token") || localStorage.getItem("yunque_api_key");
           const headers: Record<string, string> = {};
           if (token) headers["Authorization"] = `Bearer ${token}`;
-        const res = await fetch("/api/providers", { headers });
+        const res = await fetch(`${BASE}/api/providers`, { headers });
         if (res.ok) {
           const data = await res.json();
           modelOk = Array.isArray(data?.providers) && data.providers.length > 0;
@@ -164,7 +165,7 @@ function ProviderSetupStep({ onNext, onSkip }: { onNext: () => void; onSkip: () 
     const token = localStorage.getItem("yunque_token") || localStorage.getItem("yunque_api_key");
     const headers: Record<string, string> = {};
     if (token) headers["Authorization"] = `Bearer ${token}`;
-    fetch("/api/providers/presets", { headers })
+    fetch(`${BASE}/api/providers/presets`, { headers })
       .then((r) => r.ok ? r.json() : { presets: [] })
       .then((data) => {
         const list = (data.presets || []) as PresetInfo[];
@@ -200,7 +201,7 @@ function ProviderSetupStep({ onNext, onSkip }: { onNext: () => void; onSkip: () 
       const body: Record<string, string> = { api_key: apiKey.trim() };
       if (selectedPreset) body.preset_id = selectedPreset;
 
-      const res = await fetch("/api/providers/register", {
+      const res = await fetch(`${BASE}/api/providers/register`, {
         method: "POST",
         headers,
         body: JSON.stringify(body),

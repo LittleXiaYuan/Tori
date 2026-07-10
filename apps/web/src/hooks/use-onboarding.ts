@@ -115,11 +115,11 @@ export function useOnboarding() {
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (token) headers["Authorization"] = `Bearer ${token}`;
 
-      const vRes = await fetch("/v1/version", { headers });
+      const vRes = await fetch(`${BASE}/v1/version`, { headers });
       status.serverOnline = vRes.ok;
 
       if (status.serverOnline) {
-        const pRes = await fetch("/api/providers", { headers });
+        const pRes = await fetch(`${BASE}/api/providers`, { headers });
         if (pRes.ok) {
           const data = await pRes.json();
           status.modelConfigured = Array.isArray(data?.providers) && data.providers.length > 0;

@@ -35,6 +35,23 @@ const GROUP_LABEL_EN: Record<NavGroup, string> = {
   扩展: "Extensions",
 };
 
+/** Bucket items by their pack family label (metadata.group), sorted with the
+ *  unlabeled "其他" bucket last. Shared by the primary 扩展 group (which absorbs
+ *  every enabled actionable pack) and the collapsible advanced section — both
+ *  flood with pack-driven items and need the same sub-grouping to stay scannable. */
+function groupByFamily(items: NavItem[]): { label: string; items: NavItem[] }[] {
+  const families = new Map<string, NavItem[]>();
+  for (const item of items) {
+    const key = item.familyLabel || "其他";
+    const bucket = families.get(key);
+    if (bucket) bucket.push(item);
+    else families.set(key, [item]);
+  }
+  return [...families.entries()]
+    .sort(([a], [b]) => (a === "其他" ? 1 : b === "其他" ? -1 : a.localeCompare(b, "zh-Hans-CN")))
+    .map(([label, items]) => ({ label, items }));
+}
+
 export default function AccountRailFlyout({ open, extItems = [], enabledPackIds, anchorTop = 0, onMouseEnter, onMouseLeave, onPick }: AccountRailFlyoutProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -43,25 +60,24 @@ export default function AccountRailFlyout({ open, extItems = [], enabledPackIds,
 
   // Nav is fully pack-driven: core items always show; pack-owned items show only
   // when their pack is enabled. The 轻松/完整 profile toggle has been retired.
-  const { grouped, advancedFamilies, advancedCount } = useMemo(() => {
+  const { grouped, extensionCore, extensionFamilies, advancedFamilies, advancedCount } = useMemo(() => {
     const visible = filterNavItemsByEnabledPacks([...NAV_ITEMS, ...extItems], enabledPackIds ?? new Set<string>());
     const primary = visible.filter((item) => item.layer !== "lab" && item.layer !== "control-plane");
     const advanced = visible.filter((item) => item.layer === "lab" || item.layer === "control-plane");
-    // Advanced items group by family (a pack's metadata.group label); core
-    // advanced items (workflows / skills…) without a family fall under 其他.
-    const families = new Map<string, NavItem[]>();
-    for (const item of advanced) {
-      const key = item.familyLabel || "其他";
-      const bucket = families.get(key);
-      if (bucket) bucket.push(item);
-      else families.set(key, [item]);
-    }
-    const advancedFamilies = [...families.entries()]
-      .sort(([a], [b]) => (a === "其他" ? 1 : b === "其他" ? -1 : a.localeCompare(b, "zh-Hans-CN")))
-      .map(([label, items]) => ({ label, items }));
+    const groupedPrimary = groupNavItems(primary);
+    // The 扩展 group absorbs every enabled actionable pack on top of the
+    // hand-curated core entries (能力包/Cogni/夜校…) — flattened, that list grows
+    // without bound as packs get enabled. Curated entries (no familyLabel) stay
+    // an ungrouped "always visible" list; pack-provided entries get bucketed by
+    // family so e.g. all 内在世界 packs cluster instead of interleaving alphabetically.
+    const extensionItems = groupedPrimary["扩展"] || [];
+    const extensionCore = extensionItems.filter((item) => !item.familyLabel);
+    const extensionFamilies = groupByFamily(extensionItems.filter((item) => item.familyLabel));
     return {
-      grouped: groupNavItems(primary),
-      advancedFamilies,
+      grouped: groupedPrimary,
+      extensionCore,
+      extensionFamilies,
+      advancedFamilies: groupByFamily(advanced),
       advancedCount: advanced.length,
     };
   }, [extItems, enabledPackIds]);
@@ -111,6 +127,27 @@ export default function AccountRailFlyout({ open, extItems = [], enabledPackIds,
       </div>
       <div className="account-rail-flyout-body">
         {NAV_GROUP_ORDER.map((g) => {
+          if (g === "扩展") {
+            if (extensionCore.length === 0 && extensionFamilies.length === 0) return null;
+            return (
+              <section key={g} className="account-rail-flyout-group">
+                <h3 className="account-rail-flyout-group-title">{groupLabel(g)}</h3>
+                {extensionCore.length > 0 && (
+                  <div className="account-rail-flyout-list">
+                    {extensionCore.map(renderItem)}
+                  </div>
+                )}
+                {extensionFamilies.map(({ label, items }) => (
+                  <div key={label} className="account-rail-flyout-family-section">
+                    <h4 className="account-rail-flyout-group-title">{label}</h4>
+                    <div className="account-rail-flyout-list">
+                      {items.map(renderItem)}
+                    </div>
+                  </div>
+                ))}
+              </section>
+            );
+          }
           const items = grouped[g];
           if (!items || items.length === 0) return null;
           return (

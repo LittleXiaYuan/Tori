@@ -9,6 +9,7 @@ import {
   Monitor, Maximize2, MoreHorizontal,
 } from "lucide-react";
 import { api, type ConversationInfo, type NotifyChannel } from "@/lib/api";
+import { BASE } from "@/lib/api-core";
 import { createBrowserIntentPackClient } from "@/lib/browser-intent-pack-client";
 import { createCogniKernelPackClient } from "@/lib/cogni-kernel-pack-client";
 import { type SlashCogniOption } from "@/components/slash-command-menu";
@@ -107,6 +108,9 @@ export default function ChatPage() {
   const activeCogniRef = useRef<SlashCogniOption | null>(null);
   const [thinkingEnabled, setThinkingEnabled] = useState<boolean | null>(null);
   const [chatMode, setChatMode] = useState<"agent" | "fast" | "chat">("agent");
+  // 小羽模式(默认，走自研执行器+参与自蒸馏反馈) / API模式(显式外部 provider，
+  // 不参与自蒸馏，子代理委托并发上限更高)。与 chatMode 是两条独立的轴。
+  const [execMode, setExecMode] = useState<"xiaoyu" | "api">("xiaoyu");
   const [suggestedTab, setSuggestedTab] = useState<"terminal" | "browser" | "editor" | "thinking" | undefined>(undefined);
   const [resourceSnapshot, setResourceSnapshot] = useState<ResourceSnapshot | null>(null);
   const [prevResourceSnapshot, setPrevResourceSnapshot] = useState<ResourceSnapshot | null>(null);
@@ -148,12 +152,22 @@ export default function ChatPage() {
     try {
       await api.setExecProvider(m.id);
       if (conv.activeId) {
-        await api.providerSessionOverride(m.id, conv.activeId).catch(() => {});
+        await api.providerSessionOverride(m.id, conv.activeId, execMode).catch(() => {});
       }
     } catch (e) {
       showToast(formatErrorMessage(e, t("chat.toast.modelSwitchFailed")), "error");
     }
-  }, [conv.activeId, setCurrentModel, setCurrentModelId, t]);
+  }, [conv.activeId, execMode, setCurrentModel, setCurrentModelId, t]);
+
+  const handleExecModeChange = useCallback(async (mode: "xiaoyu" | "api") => {
+    setExecMode(mode);
+    if (mode === "api" && !currentModelId) {
+      showToast(t("chat.toast.apiModeNeedsProvider"), "info");
+    }
+    if (conv.activeId) {
+      await api.providerSessionOverride(currentModelId || "", conv.activeId, mode).catch(() => {});
+    }
+  }, [conv.activeId, currentModelId, t]);
 
   useEffect(() => { loadConversations(); }, [loadConversations]);
 
@@ -468,11 +482,11 @@ export default function ChatPage() {
 
       let resp: Response;
       try {
-        resp = await fetch("/v1/chat/agentic", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders },
-        body: JSON.stringify(bodyObj),
-        signal: abort.signal,
+        resp = await fetch(`${BASE}/v1/chat/agentic`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeaders },
+          body: JSON.stringify(bodyObj),
+          signal: abort.signal,
         });
       } catch (e) {
         if (initialResponseTimedOut) {
@@ -906,6 +920,7 @@ export default function ChatPage() {
       currentModel={currentModel || t("composer.selectModel")}
       currentModelId={currentModelId}
       thinkingLevel={thinkingLevel}
+      execMode={execMode}
       isRecording={isRecording}
       inputRef={inputRef}
       fileInputRef={fileInputRef}
@@ -930,6 +945,7 @@ export default function ChatPage() {
         setThinkingLevel(lvl);
         setThinkingEnabled(lvl === "deep" ? true : lvl === "none" ? false : null);
       }}
+      onExecModeChange={handleExecModeChange}
       onStartRecording={startRecording}
       onStopRecording={stopRecording}
       onOpenImagePicker={() => { if (fileInputRef.current) { fileInputRef.current.accept = "image/*"; fileInputRef.current.click(); } }}

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Button, Card, Chip, Input, Label, Spinner, TextField } from "@heroui/react";
+import { Button, Card, Chip, Input, Label, Spinner, Switch, TextField } from "@heroui/react";
 import { Activity, ListFilter, RefreshCw, Search } from "lucide-react";
 import EmptyState from "@/components/empty-state";
 import ExecutionTrace from "@/components/execution-trace";
@@ -27,8 +27,12 @@ export default function TracePage() {
   const [data, setData] = useState<TraceEventsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  // Raw mode bypasses the friendly-text rewrite so the literal underlying
+  // error (HTTP status, provider response body, etc.) is visible instead of
+  // generic wording like "现场已保留" — for debugging, not end-user display.
+  const [rawMode, setRawMode] = useState(false);
 
-  const load = useCallback(async (nextMode = mode, nextQuery = query) => {
+  const load = useCallback(async (nextMode = mode, nextQuery = query, nextRaw = rawMode) => {
     setLoading(true);
     setError("");
     try {
@@ -36,12 +40,12 @@ export default function TracePage() {
       let res: TraceEventsResponse;
       if (nextMode === "task") {
         if (!trimmed) throw new Error("请输入任务 ID");
-        res = await traceClient.byTask(trimmed);
+        res = await traceClient.byTask(trimmed, nextRaw);
       } else if (nextMode === "trace") {
         if (!trimmed) throw new Error("请输入 Trace ID");
-        res = await traceClient.byTrace(trimmed);
+        res = await traceClient.byTrace(trimmed, nextRaw);
       } else {
-        res = await traceClient.recent(50);
+        res = await traceClient.recent(50, nextRaw);
       }
       setData(res);
     } catch (e) {
@@ -49,7 +53,7 @@ export default function TracePage() {
     } finally {
       setLoading(false);
     }
-  }, [mode, query]);
+  }, [mode, query, rawMode]);
 
   useEffect(() => {
     const task = searchParams.get("task");
@@ -148,16 +152,28 @@ export default function TracePage() {
           <div>
             <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>轨迹事件</div>
             <div className="text-xs mt-1" style={{ color: "var(--yunque-text-muted)" }}>
-              默认展示用户安全文案；原始审计事件仍由后端 raw 模式保留。
+              默认展示用户安全文案；开启「原始日志」查看后端未加工的真实错误。
             </div>
           </div>
-          {data && (
-            <div className="flex flex-wrap gap-1.5">
-              <Chip size="sm" variant="soft">{data.raw ? "Raw" : "安全文案"}</Chip>
-              {data.task_id && <Chip size="sm" variant="soft">任务 {data.task_id}</Chip>}
-              {data.trace_id && <Chip size="sm" variant="soft">Trace {data.trace_id}</Chip>}
-            </div>
-          )}
+          <div className="flex flex-wrap items-center gap-2.5">
+            <label className="flex items-center gap-1.5 text-xs" style={{ color: "var(--yunque-text-secondary)" }}>
+              <Switch
+                isSelected={rawMode}
+                onChange={(v) => { setRawMode(v); void load(mode, query, v); }}
+                aria-label="原始日志"
+              >
+                <Switch.Control><Switch.Thumb /></Switch.Control>
+              </Switch>
+              原始日志
+            </label>
+            {data && (
+              <div className="flex flex-wrap gap-1.5">
+                <Chip size="sm" variant="soft">{data.raw ? "Raw" : "安全文案"}</Chip>
+                {data.task_id && <Chip size="sm" variant="soft">任务 {data.task_id}</Chip>}
+                {data.trace_id && <Chip size="sm" variant="soft">Trace {data.trace_id}</Chip>}
+              </div>
+            )}
+          </div>
         </div>
         {loading ? (
           <div className="flex h-40 items-center justify-center">
@@ -170,7 +186,7 @@ export default function TracePage() {
             description="运行一次对话、任务或工作流后，执行事件会显示在这里。"
           />
         ) : (
-          <ExecutionTrace events={events} />
+          <ExecutionTrace events={events} raw={data?.raw} />
         )}
       </Card>
     </div>

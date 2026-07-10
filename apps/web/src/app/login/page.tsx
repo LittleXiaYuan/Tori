@@ -6,6 +6,7 @@ import { Button, Card, Checkbox, FieldError, Input, Label, Spinner, TextField, T
 import { Eye, EyeOff, Shield, ExternalLink } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { formatErrorMessage } from "@/lib/error-utils";
+import { BASE } from "@/lib/api-core";
 
 const AUTH_STATUS_TIMEOUT_MS = 8000;
 
@@ -35,7 +36,7 @@ export default function LoginPage() {
     (async () => {
       try {
         const token = localStorage.getItem("yunque_token");
-        const res = await fetch("/v1/auth/status", {
+        const res = await fetch(`${BASE}/v1/auth/status`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
           signal: controller.signal,
         });
@@ -80,7 +81,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       if (needsSetup) {
-        const res = await fetch("/v1/auth/set-password", {
+        const res = await fetch(`${BASE}/v1/auth/set-password`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ password }),
@@ -97,7 +98,7 @@ export default function LoginPage() {
         return;
       }
 
-      const res = await fetch("/v1/auth/login", {
+      const res = await fetch(`${BASE}/v1/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password, remember }),

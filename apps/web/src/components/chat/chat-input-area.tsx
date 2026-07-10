@@ -43,6 +43,7 @@ export interface ChatInputAreaProps {
   currentModel: string;
   currentModelId: string;
   thinkingLevel: "none" | "auto" | "deep";
+  execMode: "xiaoyu" | "api";
   isRecording: boolean;
   inputRef: RefObject<HTMLTextAreaElement | null>;
   fileInputRef: RefObject<HTMLInputElement | null>;
@@ -64,6 +65,7 @@ export interface ChatInputAreaProps {
   onModelSelect: (model: ModelOption) => void;
   onModeChange: (mode: "agent" | "fast" | "chat") => void;
   onThinkingChange: (level: "none" | "auto" | "deep") => void;
+  onExecModeChange: (mode: "xiaoyu" | "api") => void;
   onStartRecording: () => void;
   onStopRecording: () => void;
   onOpenImagePicker: () => void;
@@ -99,6 +101,7 @@ export function ChatInputArea(props: ChatInputAreaProps) {
     currentModel,
     currentModelId,
     thinkingLevel,
+    execMode,
     isRecording,
     inputRef,
     fileInputRef,
@@ -120,6 +123,7 @@ export function ChatInputArea(props: ChatInputAreaProps) {
     onModelSelect,
     onModeChange,
     onThinkingChange,
+    onExecModeChange,
     onStartRecording,
     onStopRecording,
     onOpenImagePicker,
@@ -374,6 +378,8 @@ export function ChatInputArea(props: ChatInputAreaProps) {
                 onModeChange={onModeChange}
                 thinkingLevel={thinkingLevel}
                 onThinkingChange={onThinkingChange}
+                execMode={execMode}
+                onExecModeChange={onExecModeChange}
               />
               <input
                 type="file"

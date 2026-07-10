@@ -106,6 +106,9 @@ const STATIC_NAV_PACK_IDS = new Set<string>([
   "yunque.pack.knowledge",
   "yunque.pack.cogni-console",
   "yunque.pack.workspace",
+  // missions-pack's only menu (任务中心 @ /missions) duplicates the
+  // always-on core nav-missions item — same label, same href.
+  "yunque.pack.missions",
 ]);
 
 export function buildPackNavItems(packs: InstalledPack[]): PackNavItem[] {

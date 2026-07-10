@@ -87,6 +87,8 @@ vi.mock("lucide-react", () => ({
   Zap: () => <svg data-testid="zap-icon" />,
   MessageCircle: () => <svg data-testid="message-circle-icon" />,
   Cpu: () => <svg data-testid="cpu-icon" />,
+  Bird: () => <svg data-testid="bird-icon" />,
+  Terminal: () => <svg data-testid="terminal-icon" />,
 }));
 
 vi.mock("@/components/slash-command-menu", () => ({
@@ -119,6 +121,7 @@ function baseProps(): ChatInputAreaProps {
     currentModel: "demo",
     currentModelId: "demo",
     thinkingLevel: "auto",
+    execMode: "xiaoyu",
     isRecording: false,
     inputRef: createRef<HTMLTextAreaElement>(),
     fileInputRef: createRef<HTMLInputElement>(),
@@ -138,6 +141,7 @@ function baseProps(): ChatInputAreaProps {
     onModelSelect: vi.fn(),
     onModeChange: vi.fn(),
     onThinkingChange: vi.fn(),
+    onExecModeChange: vi.fn(),
     onStartRecording: vi.fn(),
     onStopRecording: vi.fn(),
     onOpenImagePicker: vi.fn(),

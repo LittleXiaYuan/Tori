@@ -15,7 +15,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button, TextField, Input, Label, Switch, Tooltip } from "@heroui/react";
-import { Cpu, Plus, Trash2, Zap, Loader2 } from "lucide-react";
+import { Cpu, Plus, Trash2, Zap, Loader2, Image as ImageIcon } from "lucide-react";
 import { api, type ProviderInfo } from "@/lib/api";
 import { showToast } from "@/components/toast-provider";
 import { formatErrorMessage } from "@/lib/error-utils";
@@ -25,9 +25,10 @@ interface DraftModel {
   baseUrl: string;
   apiKey: string;
   model: string;
+  imageGen: boolean;
 }
 
-const EMPTY_DRAFT: DraftModel = { name: "", baseUrl: "", apiKey: "", model: "" };
+const EMPTY_DRAFT: DraftModel = { name: "", baseUrl: "", apiKey: "", model: "", imageGen: false };
 
 function slugify(name: string, model: string): string {
   const base = `${name || model || "custom"}`
@@ -52,16 +53,19 @@ export function ProvidersPanel(_props?: {
   const [submitting, setSubmitting] = useState(false);
   const [testing, setTesting] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string>("");
+  const [imageGenId, setImageGenId] = useState<string>("");
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [list, exec] = await Promise.all([
+      const [list, exec, imageGen] = await Promise.all([
         api.providerList().catch(() => ({ providers: [] as ProviderInfo[], count: 0 })),
         api.execProvider().catch(() => ({ exec_provider: "", available_providers: [] as string[] })),
+        api.imageGenProvider().catch(() => ({ image_gen_provider: "", available_providers: [] as ProviderInfo[] })),
       ]);
       setProviders(list.providers || []);
       setActiveId(exec.exec_provider || "");
+      setImageGenId(imageGen.image_gen_provider || "");
     } finally {
       setLoading(false);
     }
@@ -81,6 +85,7 @@ export function ProvidersPanel(_props?: {
         base_url: draft.baseUrl.trim(),
         api_key: draft.apiKey.trim(),
         model: draft.model.trim(),
+        image_gen: draft.imageGen,
       });
       showToast("已添加模型", "success");
       setDraft(EMPTY_DRAFT);
@@ -134,6 +139,16 @@ export function ProvidersPanel(_props?: {
     }
   };
 
+  const useForImageGen = async (p: ProviderInfo) => {
+    try {
+      await api.setImageGenProvider(p.id);
+      setImageGenId(p.id);
+      showToast(`已切换生图模型：${p.display_name || p.model}`, "success");
+    } catch (e) {
+      showToast(formatErrorMessage(e, "切换失败"), "error");
+    }
+  };
+
   const sorted = useMemo(
     () => [...providers].sort((a, b) => (a.display_name || a.id).localeCompare(b.display_name || b.id)),
     [providers],
@@ -162,6 +177,12 @@ export function ProvidersPanel(_props?: {
               <Input type="password" placeholder="sk-..." />
             </TextField>
           </div>
+          <label className="provider-min__imagegen-check">
+            <Switch isSelected={draft.imageGen} onChange={(v) => setDraft({ ...draft, imageGen: v })} aria-label="支持生图">
+              <Switch.Control><Switch.Thumb /></Switch.Control>
+            </Switch>
+            <span>这个模型支持生图（比如 gemini-2.5-flash-image / gpt-image-1 / qwen-image）</span>
+          </label>
           <div className="provider-min__form-actions">
             <Button size="sm" variant="ghost" onPress={() => { setAdding(false); setDraft(EMPTY_DRAFT); }}>取消</Button>
             <Button size="sm" className="btn-accent" isPending={submitting} isDisabled={!canSubmit} onPress={submit}>添加</Button>
@@ -182,6 +203,8 @@ export function ProvidersPanel(_props?: {
         <div className="provider-min__list">
           {sorted.map((p) => {
             const isActive = p.id === activeId;
+            const canImageGen = (p.capabilities || []).includes("image_gen");
+            const isImageGenActive = p.id === imageGenId;
             return (
               <div key={p.id} className={`provider-min__row ${p.enabled ? "" : "is-off"}`}>
                 <span className="provider-min__icon"><Cpu size={15} /></span>
@@ -189,12 +212,23 @@ export function ProvidersPanel(_props?: {
                   <div className="provider-min__name">
                     {p.display_name || p.model}
                     {isActive && <span className="provider-min__active">主模型</span>}
+                    {isImageGenActive && <span className="provider-min__active">生图模型</span>}
                   </div>
                   <div className="provider-min__sub">{p.model} · {p.base_url}</div>
                 </div>
                 <div className="provider-min__actions">
                   {!isActive && p.enabled && (
                     <Button size="sm" variant="ghost" onPress={() => useForChat(p)}>设为主模型</Button>
+                  )}
+                  {canImageGen && !isImageGenActive && p.enabled && (
+                    <Tooltip delay={0}>
+                      <Tooltip.Trigger>
+                        <Button isIconOnly size="sm" variant="ghost" aria-label="设为生图模型" onPress={() => useForImageGen(p)}>
+                          <ImageIcon size={14} />
+                        </Button>
+                      </Tooltip.Trigger>
+                      <Tooltip.Content>设为生图模型</Tooltip.Content>
+                    </Tooltip>
                   )}
                   <Tooltip delay={0}>
                     <Tooltip.Trigger>
