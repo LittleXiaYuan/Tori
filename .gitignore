@@ -1,9 +1,6 @@
 # ── Build outputs ──
 *.exe
 *.exe~
-/tori
-/tori_*
-/agent
 /agent.exe
 /yunque.exe
 dist/
@@ -44,12 +41,7 @@ Thumbs.db
 *~
 nul
 
-# ── Go ──
-vendor/
-
-# ── Legacy frontend (已归档) ──
-/web/
-docs/node_modules/
+# ── Legacy docs tooling (VitePress) ──
 docs/.vitepress/cache/
 docs/.vitepress/dist/
 .next/
@@ -103,9 +95,6 @@ id_rsa
 id_ed25519
 *.gpg
 *.asc
-
-# ── Internal dev docs (not for public) ──
-doc/
 
 # ── Competitive analysis (not for public) ──
 apps/browser-extension/manus-analysis/
