@@ -1615,6 +1615,32 @@ async fn launch_backend(handle: &AppHandle) {
     let port = resolve_backend_port();
     let start = Instant::now();
 
+    // Pre-flight the port before spawning. This turns the old failure mode —
+    // "stale sidecar holds :9090 → we spawn a second Go process that can't bind
+    // → 60s spinner → generic timeout → relaunch still fails" — into an
+    // immediate, correct outcome:
+    if port_is_occupied(port).await {
+        if probe_healthz(port).await {
+            // A healthy Yunque backend is already here (e.g. a previous instance
+            // still resident, or an operator-run headless server). Reuse it
+            // instead of spawning a competing process that can't bind the port.
+            log::info!("backend already healthy on port {port}; reusing existing instance");
+            if let Err(e) = handle.emit(
+                EVT_READY,
+                ReadyPayload { port, elapsed_ms: start.elapsed().as_millis() },
+            ) {
+                log::debug!("emit {EVT_READY} failed: {e}");
+            }
+            return;
+        }
+        // Port is taken but not by a healthy backend — surface it now rather
+        // than making the user wait out the full 60s health timeout.
+        let msg = format!("端口 {port} 已被占用，且不是可用的云雀后端。请关闭占用该端口的程序（或已在运行的旧实例）后重试。");
+        log::error!("port {port} occupied by a non-Yunque listener; aborting spawn");
+        emit_error(handle, &msg, port);
+        return;
+    }
+
     emit_status(handle, "searching", "定位后端二进制…", 2, port, start);
 
     let data_dir = if let Ok(app_data) = handle.path().app_data_dir() {
@@ -1657,46 +1683,7 @@ async fn launch_backend(handle: &AppHandle) {
         Some(ref bin_path) => {
             emit_status(handle, "spawning", "启动 Go 后端…", 8, port, start);
             log::info!("launching backend: {}", bin_path.display());
-            let mut cmd = Command::new(bin_path);
-            cmd.env("OPEN_BROWSER", "false")
-                .env("HIDE_CONSOLE", "true");
-            if let Some(ref dd) = data_dir {
-                cmd.env("YUNQUE_DATA_DIR", dd.to_string_lossy().to_string());
-            }
-
-            // Desktop is a local-only app: force loopback binding so the
-            // backend's fail-closed "production-like" heuristic doesn't reject
-            // startup because of a weak/empty JWT_SECRET on first run. Respect
-            // an operator override if AGENT_ADDR is already in the parent env.
-            if std::env::var_os("AGENT_ADDR").is_none() {
-                cmd.env("AGENT_ADDR", format!("127.0.0.1:{port}"));
-            }
-            // Tag the process so Go-side warnings can tell this is the GUI
-            // wrapper rather than a headless server.
-            cmd.env("YUNQUE_LAUNCHER", "tauri-desktop");
-
-            // The desktop UI is served from the embedded webview, whose origin
-            // is `tauri.localhost` (Windows/Linux) or `tauri://localhost`
-            // (macOS) — NOT a loopback host the backend auto-trusts. Without
-            // this the Go CORS layer returns no Access-Control-Allow-Origin and
-            // every UI→backend fetch is blocked, leaving the shell stuck on the
-            // "本地服务暂时不可用" splash. Whitelist the webview origins so the
-            // (loopback-bound) backend accepts cross-origin calls from the shell.
-            // Respect an operator override if AGENT/env already set it.
-            if std::env::var_os("ALLOWED_ORIGINS").is_none() {
-                cmd.env(
-                    "ALLOWED_ORIGINS",
-                    "http://tauri.localhost,https://tauri.localhost,tauri://localhost",
-                );
-            }
-
-            // On Windows the sidecar MUST live in its own process group so
-            // GenerateConsoleCtrlEvent(CTRL_BREAK_EVENT) does not also kill us.
-            #[cfg(windows)]
-            {
-                use std::os::windows::process::CommandExt;
-                cmd.creation_flags(CREATE_NEW_PROCESS_GROUP);
-            }
+            let mut cmd = build_backend_command(bin_path, port, data_dir.as_deref());
 
             match cmd.spawn() {
                 Ok(child) => {
@@ -1746,6 +1733,14 @@ async fn launch_backend(handle: &AppHandle) {
         ) {
             log::debug!("emit {EVT_READY} failed: {e}");
         }
+        // Only watch a sidecar WE spawned. When we're reusing an external /
+        // operator-run backend (sidecar_started == false), its lifetime isn't
+        // ours to manage, so we don't monitor or restart it.
+        if sidecar_started {
+            if let Some(ref bin_path) = backend_path {
+                spawn_backend_watchdog(handle.clone(), bin_path.clone(), port, data_dir.clone());
+            }
+        }
     } else if sidecar_started {
         // We started a sidecar but it never came up — don't leave a zombie
         // Go process fighting for the port while the user sees the timeout
@@ -1757,6 +1752,151 @@ async fn launch_backend(handle: &AppHandle) {
     } else {
         emit_error(handle, "未检测到后端服务", port);
     }
+}
+
+/// Build the sidecar launch command with the exact env the desktop backend
+/// needs. Shared by the initial launch and the watchdog's restart path so a
+/// respawned process gets identical loopback binding / CORS / data-dir config —
+/// a restart that silently dropped ALLOWED_ORIGINS would come back up but every
+/// UI fetch would then be CORS-blocked, which is worse than staying down.
+fn build_backend_command(bin_path: &std::path::Path, port: u16, data_dir: Option<&std::path::Path>) -> Command {
+    let mut cmd = Command::new(bin_path);
+    cmd.env("OPEN_BROWSER", "false").env("HIDE_CONSOLE", "true");
+    if let Some(dd) = data_dir {
+        cmd.env("YUNQUE_DATA_DIR", dd.to_string_lossy().to_string());
+    }
+    // Desktop is a local-only app: force loopback binding so the backend's
+    // fail-closed "production-like" heuristic doesn't reject startup because of
+    // a weak/empty JWT_SECRET on first run. Respect an operator override if
+    // AGENT_ADDR is already in the parent env.
+    if std::env::var_os("AGENT_ADDR").is_none() {
+        cmd.env("AGENT_ADDR", format!("127.0.0.1:{port}"));
+    }
+    // Tag the process so Go-side warnings can tell this is the GUI wrapper.
+    cmd.env("YUNQUE_LAUNCHER", "tauri-desktop");
+    // The webview origin is tauri.localhost / tauri://localhost — NOT a loopback
+    // host the backend auto-trusts. Whitelist it so the loopback-bound backend
+    // accepts the shell's cross-origin fetches. Respect an operator override.
+    if std::env::var_os("ALLOWED_ORIGINS").is_none() {
+        cmd.env(
+            "ALLOWED_ORIGINS",
+            "http://tauri.localhost,https://tauri.localhost,tauri://localhost",
+        );
+    }
+    // On Windows the sidecar MUST live in its own process group so
+    // GenerateConsoleCtrlEvent(CTRL_BREAK_EVENT) does not also kill us.
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(CREATE_NEW_PROCESS_GROUP);
+    }
+    cmd
+}
+
+/// How many times the watchdog will try to respawn a crashed sidecar before
+/// giving up and asking the user to relaunch. Bounded so a hard crash-loop
+/// (misconfig, corrupt DB) doesn't peg the CPU restarting forever.
+const MAX_BACKEND_RESTARTS: u32 = 3;
+/// Backoff between crash-restart attempts. Fixed rather than exponential — a
+/// local process either comes back in a couple seconds or it's genuinely broken.
+const RESTART_BACKOFF: Duration = Duration::from_secs(2);
+/// How often the watchdog checks whether the sidecar is still alive.
+const WATCHDOG_POLL: Duration = Duration::from_secs(2);
+
+/// Watch the running sidecar and restart it if it dies unexpectedly.
+///
+/// Distinguishing an unexpected crash from our own deliberate shutdown is the
+/// crux: `graceful_kill` / `Drop` both `take()` the child out of the shared
+/// slot. So when the watchdog finds the slot empty, that's "we shut it down on
+/// purpose" → stop watching, don't restart. Only a child that is *still in the
+/// slot* but has *exited on its own* counts as a crash worth restarting.
+fn spawn_backend_watchdog(
+    handle: AppHandle,
+    bin_path: std::path::PathBuf,
+    port: u16,
+    data_dir: Option<std::path::PathBuf>,
+) {
+    tauri::async_runtime::spawn(async move {
+        let mut restarts: u32 = 0;
+        loop {
+            tokio::time::sleep(WATCHDOG_POLL).await;
+
+            let Some(state) = handle.try_state::<BackendState>() else {
+                return; // app tearing down
+            };
+
+            // Inspect the child without holding the lock across an await.
+            let exited = {
+                let mut guard = lock_or_recover(&state.child);
+                match guard.as_mut() {
+                    // Slot emptied by graceful_kill/Drop → intentional shutdown.
+                    None => return,
+                    Some(child) => match child.try_wait() {
+                        Ok(Some(status)) => {
+                            log::warn!("sidecar exited unexpectedly (status={status:?})");
+                            // Drop the dead handle so a later graceful_kill is a no-op.
+                            *guard = None;
+                            true
+                        }
+                        Ok(None) => false, // still running
+                        Err(e) => {
+                            log::warn!("watchdog try_wait error: {e}");
+                            false
+                        }
+                    },
+                }
+            };
+
+            if !exited {
+                continue;
+            }
+
+            if restarts >= MAX_BACKEND_RESTARTS {
+                log::error!("sidecar crashed {restarts} times; giving up on auto-restart");
+                emit_error(
+                    &handle,
+                    "本地后端多次异常退出，已停止自动重启。请查看日志或退出后重新启动应用。",
+                    port,
+                );
+                return;
+            }
+
+            restarts += 1;
+            log::info!("watchdog restarting sidecar (attempt {restarts}/{MAX_BACKEND_RESTARTS})");
+            emit_error(&handle, "本地后端已退出，正在自动重启…", port);
+            tokio::time::sleep(RESTART_BACKOFF).await;
+
+            // A crash may have freed the port only after a TIME_WAIT delay; if
+            // it's still held we can't rebind, so surface that instead of
+            // spawning a doomed process.
+            match build_backend_command(&bin_path, port, data_dir.as_deref()).spawn() {
+                Ok(child) => {
+                    log::info!("sidecar restarted (pid={})", child.id());
+                    if let Some(state) = handle.try_state::<BackendState>() {
+                        *lock_or_recover(&state.child) = Some(child);
+                    }
+                    // Re-confirm health so the UI can recover from its banner.
+                    let restart_start = Instant::now();
+                    if wait_for_healthy(&handle, port, restart_start).await {
+                        log::info!("sidecar healthy again after restart");
+                        restarts = 0; // healthy run resets the budget
+                        if let Err(e) = handle.emit(
+                            EVT_READY,
+                            ReadyPayload { port, elapsed_ms: restart_start.elapsed().as_millis() },
+                        ) {
+                            log::debug!("emit {EVT_READY} after restart failed: {e}");
+                        }
+                    } else {
+                        log::warn!("restarted sidecar never became healthy");
+                    }
+                }
+                Err(e) => {
+                    log::error!("watchdog failed to restart sidecar: {e}");
+                    emit_error(&handle, &format!("本地后端重启失败：{e}"), port);
+                }
+            }
+        }
+    });
 }
 
 /// Backend port exposed to the webview so the frontend can target the live Go
@@ -1866,6 +2006,22 @@ async fn wait_for_healthy(handle: &AppHandle, port: u16, start: Instant) -> bool
 
         tokio::time::sleep(POLL_INTERVAL).await;
     }
+}
+
+/// Can we open a TCP connection to `127.0.0.1:port`? A successful connect
+/// means *something* is already listening there. Combined with `probe_healthz`
+/// this lets `launch_backend` tell three cases apart before spending 60s on a
+/// health wait:
+///   - connect ok + healthz ok  → a live Yunque backend we can just reuse
+///   - connect ok + healthz bad → the port is held by something else (or a
+///                                half-dead sidecar) → fail fast with a clear msg
+///   - connect fails            → the port is free → spawn normally
+async fn port_is_occupied(port: u16) -> bool {
+    let addr = format!("127.0.0.1:{port}");
+    matches!(
+        tokio::time::timeout(HTTP_PROBE_TIMEOUT, TokioTcpStream::connect(&addr)).await,
+        Ok(Ok(_))
+    )
 }
 
 /// Minimal async HTTP/1.1 GET /healthz probe. Returns true on `2xx`.
