@@ -168,6 +168,18 @@ type ActivationRules struct {
 	// no PerceptionHint is wired (backward compatible).
 	IntentMatch []string `json:"intent_match,omitempty"`
 	IntentWeight float64 `json:"intent_weight,omitempty"`
+
+	// CategoryMatch declares activation using cognisdk's finer-grained
+	// task-type classification ("coding" / "writing" / "research") — a
+	// separate, independent signal from IntentMatch so existing Declarations
+	// keyed on Intent (general/work_task/seek_reassurance) are unaffected.
+	// When cognisdk detects one of these categories for the turn and a
+	// Declaration lists it here, CategoryWeight is added to the activation
+	// score. Primarily used to bias which Cognis' context survives the
+	// context-budget allocator (Hook.SetContextByteBudget) toward the task
+	// at hand. Inert when no PerceptionHint is wired (backward compatible).
+	CategoryMatch  []string `json:"category_match,omitempty"`
+	CategoryWeight float64  `json:"category_weight,omitempty"`
 }
 
 // SemanticActivation declares embedding-based activation signals. The example

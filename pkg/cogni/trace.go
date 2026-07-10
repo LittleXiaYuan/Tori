@@ -57,6 +57,11 @@ type TraceContext struct {
 	// TemplateFallbacks counts how many activated cognis hit a template
 	// parse/execute error and fell back to their Static block.
 	TemplateFallbacks int `json:"template_fallbacks,omitempty"`
+	// DroppedForBudget lists Cogni IDs whose context block was dropped
+	// entirely because the turn's total context exceeded Hook's configured
+	// context-byte budget (see Hook.SetContextByteBudget). Empty when no
+	// budget is configured or nothing needed to be dropped.
+	DroppedForBudget []string `json:"dropped_for_budget,omitempty"`
 }
 
 // TraceToolFilter records the cogni Surface filter's effect on the planner's

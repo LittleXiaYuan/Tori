@@ -205,6 +205,82 @@ func TestHook_BuildContextStacksMultipleCognis(t *testing.T) {
 	}
 }
 
+// Budget=0 (the default, unset) must reproduce today's unbounded behavior
+// exactly — this is the regression guard for the byte-budget feature.
+func TestHook_BuildContextZeroBudgetIsUnlimited(t *testing.T) {
+	r := NewRegistry()
+	_ = r.Add(&Declaration{
+		ID:         "always-a",
+		Activation: ActivationRules{AlwaysOn: true},
+		Context:    ContextInjection{Static: strings.Repeat("A", 500)},
+	}, "test")
+	_ = r.Add(&Declaration{
+		ID:         "always-b",
+		Activation: ActivationRules{AlwaysOn: true},
+		Context:    ContextInjection{Static: strings.Repeat("B", 500)},
+	}, "test")
+
+	h := NewHook(r)
+	// SetContextByteBudget(0) is the explicit form of "disabled" — must behave
+	// identically to never calling the setter at all.
+	h.SetContextByteBudget(0)
+	got := h.BuildContext(ContextRequest{Message: "x"})
+	if !strings.Contains(got, strings.Repeat("A", 500)) || !strings.Contains(got, strings.Repeat("B", 500)) {
+		t.Fatalf("budget=0 should keep every block, got len=%d", len(got))
+	}
+}
+
+// Over budget, the lower-scoring Cogni's block is dropped wholesale (never
+// truncated mid-block) and the drop is recorded in the trace so operators can
+// see the tradeoff instead of silently losing content.
+func TestHook_BuildContextDropsLowestScoreBlockOverBudget(t *testing.T) {
+	store := NewInMemoryTraceStore(8)
+	r := NewRegistry()
+	// Score 1.0 (always-on) — must always survive budget triage.
+	_ = r.Add(&Declaration{
+		ID:         "high",
+		Activation: ActivationRules{AlwaysOn: true},
+		Context:    ContextInjection{Static: strings.Repeat("H", 200)},
+	}, "test")
+	// Score 0.3 (single keyword hit, below "high") — should be the one
+	// dropped when the budget can't fit both.
+	_ = r.Add(&Declaration{
+		ID: "low",
+		Activation: ActivationRules{
+			Keywords:      []string{"x"},
+			KeywordWeight: 0.3,
+			MinScore:      0.2,
+		},
+		Context: ContextInjection{Static: strings.Repeat("L", 200)},
+	}, "test")
+
+	h := NewHook(r)
+	h.SetTraceStore(store)
+	// Budget fits the "high" block plus the "## 智体上下文\n" header, but not
+	// both 200-byte blocks plus the "\n\n" separator.
+	h.SetContextByteBudget(250)
+
+	req := ContextRequest{Message: "x"}
+	got := h.BuildContext(req)
+	_ = h.FilterSkills(req, []skills.Skill{sk("a")}) // flushes the trace (FilterSkills no-ops on an empty input slice)
+
+	if !strings.Contains(got, strings.Repeat("H", 200)) {
+		t.Fatalf("higher-score block must survive budget triage, got %q", got)
+	}
+	if strings.Contains(got, strings.Repeat("L", 200)) {
+		t.Fatalf("lower-score block should have been dropped, got %q", got)
+	}
+
+	rec := store.Recent(0)
+	if len(rec) != 1 {
+		t.Fatalf("expected exactly one trace, got %d", len(rec))
+	}
+	dropped := rec[0].Context.DroppedForBudget
+	if len(dropped) != 1 || dropped[0] != "low" {
+		t.Fatalf("expected DroppedForBudget=[low], got %v", dropped)
+	}
+}
+
 func TestHook_ExclusivityAppliesInActivate(t *testing.T) {
 	r := NewRegistry()
 	_ = r.Add(&Declaration{

@@ -45,7 +45,27 @@ func detectPerception(input Input) PerceptionState {
 		p.Signals = append(p.Signals, "tool_risk")
 	}
 
+	p.Category = detectCategory(lower)
+
 	return p
+}
+
+// detectCategory classifies the message into a finer-grained task type than
+// Intent's coarse general/work_task/seek_reassurance buckets. Independent of
+// Intent by design — used only by Cogni's context-budget allocator to weight
+// which activated Cognis matter most for this turn, so it must not disturb
+// any existing Intent-keyed activation rule.
+func detectCategory(lower string) string {
+	switch {
+	case containsAny(lower, "代码", "debug", "bug", "报错", "重构", "编译", "implement", "fix", "test", "api", "git", "函数", "脚本", "script"):
+		return "coding"
+	case containsAny(lower, "写一篇", "文案", "总结", "润色", "翻译", "大纲", "summarize", "translate", "draft", "文章", "ppt"):
+		return "writing"
+	case containsAny(lower, "调研", "搜索", "资料", "对比", "分析", "研究", "search", "research", "compare"):
+		return "research"
+	default:
+		return ""
+	}
 }
 
 func buildDisposition(p PerceptionState, merged MergedPack) ResponseDisposition {

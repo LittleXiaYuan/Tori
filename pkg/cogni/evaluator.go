@@ -269,6 +269,26 @@ func (e *Evaluator) evaluateOne(d *Declaration, s Session) Activation {
 		}
 	}
 
+	// Category-based activation: cognisdk's finer-grained task-type
+	// classification (coding/writing/research), independent of IntentMatch
+	// above. Inert when no PerceptionHint is wired or no category detected.
+	if len(d.Activation.CategoryMatch) > 0 && s.PerceptionHint != nil {
+		category := s.PerceptionHint.Category
+		if category != "" {
+			cw := d.Activation.CategoryWeight
+			if cw == 0 {
+				cw = 0.4
+			}
+			for _, want := range d.Activation.CategoryMatch {
+				if want == category {
+					score += cw
+					act.Reasons = append(act.Reasons, "category: "+category)
+					break
+				}
+			}
+		}
+	}
+
 	// Semantic activation: cosine(message, cogni examples). Only contributes when
 	// an embedder is wired (s.MessageVec set) and the cogni declares examples, so
 	// keyword-only Cognis and embedder-less hosts are completely unaffected.

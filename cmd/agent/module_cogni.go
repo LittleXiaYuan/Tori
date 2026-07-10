@@ -59,8 +59,9 @@ func (r plannerCogniRuntime) request(message, tenantID, channel string) cogni.Co
 		res := r.beliefAdapter.Evaluate(context.Background(), cognisdk.Input{Message: message})
 		if res.Perception.Intent != "" || res.Perception.Risk != "" {
 			req.PerceptionHint = &cogni.PerceptionHint{
-				Intent: res.Perception.Intent,
-				Risk:   string(res.Perception.Risk),
+				Intent:   res.Perception.Intent,
+				Risk:     string(res.Perception.Risk),
+				Category: res.Perception.Category,
 			}
 		}
 	}
@@ -360,6 +361,7 @@ func plannerCogniTraceDetail(trace cogni.Trace) planner.CogniTraceDetail {
 		TemplateFallbacks: trace.Context.TemplateFallbacks,
 		MessageHash:       trace.MessageHash,
 		DurationMs:        trace.DurationMs,
+		DroppedForBudget:  append([]string(nil), trace.Context.DroppedForBudget...),
 	}
 	for _, activation := range trace.Activations {
 		if !activation.Activated {
@@ -776,6 +778,12 @@ func (m *cogniModule) Init(ctx context.Context, app *agentrt.App) error {
 			hook.SetExperienceTuning(tuneCfg)
 			slog.Info("cogni: experience surface tuning enabled",
 				"min_observations", tuneCfg.MinObservations, "min_success_rate", tuneCfg.MinSuccessRate)
+		}
+		// Context byte budget: opt-in via env. Default (unset) keeps legacy
+		// unbounded BuildContext concatenation.
+		if budget := cogniContextByteBudgetFromEnv(); budget > 0 {
+			hook.SetContextByteBudget(budget)
+			slog.Info("cogni: context byte budget enabled", "budget_bytes", budget)
 		}
 		// Step 1 of cogni consolidation: pull the cognisdk belief adapter
 		// (exposed by init_task_cognition.go) and merge it into the unified
@@ -1212,6 +1220,22 @@ func cogniExperienceTuningFromEnv() cogni.ExperienceTuningConfig {
 		}
 	}
 	return cfg
+}
+
+// cogniContextByteBudgetFromEnv reads COGNI_CONTEXT_BYTE_BUDGET: the max
+// total size (bytes) of the context block BuildContext assembles per turn.
+// Unset or <= 0 (the default) disables enforcement, preserving today's
+// unbounded concatenation until an operator opts in.
+func cogniContextByteBudgetFromEnv() int {
+	v := strings.TrimSpace(os.Getenv("COGNI_CONTEXT_BYTE_BUDGET"))
+	if v == "" {
+		return 0
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n <= 0 {
+		return 0
+	}
+	return n
 }
 
 func (m *cogniModule) Status() agentrt.ModuleStatus {

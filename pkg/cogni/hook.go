@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"log/slog"
+	"sort"
 	"strings"
 	"sync"
 	"text/template"
@@ -77,7 +78,34 @@ type Hook struct {
 	budgetMu    sync.RWMutex
 	budgetGuard func(cogniID string) error
 
+	ctxBudgetMu sync.RWMutex
+	ctxBudget   int
+
 	turnCache *turnCache
+}
+
+// SetContextByteBudget caps the total size (in bytes) of the context block
+// BuildContext assembles from all activated Cognis. When the concatenated
+// blocks would exceed the budget, whole blocks are dropped lowest-score-first
+// (Priority breaks ties) until the total fits — never truncated mid-block, to
+// avoid corrupting a Cogni's markdown. Pass 0 (the default) to disable
+// enforcement and keep the legacy unbounded behavior.
+func (h *Hook) SetContextByteBudget(n int) {
+	if h == nil {
+		return
+	}
+	h.ctxBudgetMu.Lock()
+	h.ctxBudget = n
+	h.ctxBudgetMu.Unlock()
+}
+
+func (h *Hook) contextByteBudget() int {
+	if h == nil {
+		return 0
+	}
+	h.ctxBudgetMu.RLock()
+	defer h.ctxBudgetMu.RUnlock()
+	return h.ctxBudget
 }
 
 // SetBudgetGuard attaches an economics gate consulted at activation time:
@@ -442,6 +470,11 @@ type ContextRequest struct {
 type PerceptionHint struct {
 	Intent string // "general" / "work_task" / "seek_reassurance" 等
 	Risk   string // "low" / "medium" / "high" / "dependency"
+	// Category is cognisdk's finer-grained task-type classification
+	// ("coding" / "writing" / "research", empty = none detected) — independent
+	// of Intent, used only by Activation.CategoryMatch for context-budget
+	// weighting. See ActivationRules.CategoryMatch.
+	Category string
 }
 
 // turnState is the shared evaluation snapshot for a single request fingerprint.
@@ -660,28 +693,86 @@ func (h *Hook) BuildContext(req ContextRequest) string {
 	if len(st.activations) == 0 {
 		return ""
 	}
-	var blocks []string
-	var sources []string
+	type renderedBlock struct {
+		id       string
+		score    float64
+		priority int
+		text     string
+	}
+	var rendered []renderedBlock
 	fallbacks := 0
 	for _, a := range st.activations {
 		h.fireActivation(a.Declaration.ID, a.Score)
 		block, fellBack := h.renderContextOnce(a.Declaration, req)
 		if block != "" {
-			blocks = append(blocks, block)
-			sources = append(sources, a.Declaration.ID)
+			rendered = append(rendered, renderedBlock{
+				id:       a.Declaration.ID,
+				score:    a.Score,
+				priority: priority(a.Declaration),
+				text:     block,
+			})
 		}
 		if fellBack {
 			fallbacks++
 		}
 	}
-	if len(blocks) == 0 {
+	if len(rendered) == 0 {
 		return ""
+	}
+
+	kept := rendered
+	var droppedIDs []string
+	if budget := h.contextByteBudget(); budget > 0 {
+		total := 0
+		for _, r := range rendered {
+			total += len(r.text)
+		}
+		if total > budget {
+			// Rank by the same score-desc/priority-asc order Evaluate already
+			// uses, so budget triage favors exactly the Cognis the activation
+			// scorer (including task-Category weighting) considers most
+			// relevant to this turn — not insertion order.
+			ranked := append([]renderedBlock(nil), rendered...)
+			sort.Slice(ranked, func(i, j int) bool {
+				if ranked[i].score != ranked[j].score {
+					return ranked[i].score > ranked[j].score
+				}
+				return ranked[i].priority < ranked[j].priority
+			})
+			keepSet := make(map[string]bool, len(ranked))
+			running := 0
+			for _, r := range ranked {
+				if running+len(r.text) > budget {
+					continue
+				}
+				running += len(r.text)
+				keepSet[r.id] = true
+			}
+			// Reassemble in original activation order (not score order) so the
+			// resulting prompt reads the same as it always has, just shorter.
+			kept = kept[:0]
+			for _, r := range rendered {
+				if keepSet[r.id] {
+					kept = append(kept, r)
+				} else {
+					droppedIDs = append(droppedIDs, r.id)
+				}
+			}
+		}
+	}
+
+	blocks := make([]string, len(kept))
+	sources := make([]string, len(kept))
+	for i, r := range kept {
+		blocks[i] = r.text
+		sources[i] = r.id
 	}
 	out := "## 智体上下文\n" + strings.Join(blocks, "\n\n")
 	st.trace.Context = TraceContext{
 		Bytes:             len(out),
 		Sources:           sources,
 		TemplateFallbacks: fallbacks,
+		DroppedForBudget:  droppedIDs,
 	}
 	return out
 }

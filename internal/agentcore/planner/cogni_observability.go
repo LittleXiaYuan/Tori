@@ -18,6 +18,11 @@ type CogniTraceDetail struct {
 	FellBackToInput   bool     `json:"fell_back_to_input,omitempty"`
 	MessageHash       string   `json:"message_hash,omitempty"`
 	DurationMs        int64    `json:"duration_ms,omitempty"`
+	// DroppedForBudget lists Cognis whose context block was dropped because
+	// the turn's context exceeded the configured byte budget (see
+	// pkg/cogni.Hook.SetContextByteBudget). Empty when no budget is
+	// configured or nothing needed dropping.
+	DroppedForBudget []string `json:"dropped_for_budget,omitempty"`
 }
 
 func (d CogniTraceDetail) hasVisibleEffect() bool {
@@ -38,7 +43,11 @@ func (d CogniTraceDetail) summary() string {
 		return fmt.Sprintf("Cogni 已激活：%s，工具面 %d → %d", names, d.ToolBefore, d.ToolAfter)
 	}
 	if d.ContextBytes > 0 {
-		return fmt.Sprintf("Cogni 已激活：%s，注入上下文 %d 字节", names, d.ContextBytes)
+		summary := fmt.Sprintf("Cogni 已激活：%s，注入上下文 %d 字节", names, d.ContextBytes)
+		if len(d.DroppedForBudget) > 0 {
+			summary += fmt.Sprintf("，因预算丢弃：%s", strings.Join(d.DroppedForBudget, "、"))
+		}
+		return summary
 	}
 	return fmt.Sprintf("Cogni 已激活：%s", names)
 }

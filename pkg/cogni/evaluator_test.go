@@ -96,6 +96,95 @@ func TestEvaluator_InvalidRegexIsIgnored(t *testing.T) {
 	}
 }
 
+func TestEvaluator_IntentMatchScoring(t *testing.T) {
+	e := NewEvaluator()
+	d := &Declaration{
+		ID: "intent",
+		Activation: ActivationRules{
+			IntentMatch:  []string{"work_task"},
+			IntentWeight: 0.6,
+			MinScore:     0.5,
+		},
+	}
+	got := e.Evaluate([]*Declaration{d}, Session{PerceptionHint: &PerceptionHint{Intent: "work_task"}})
+	if !got[0].Activated {
+		t.Fatalf("matching intent should activate, got %+v", got[0])
+	}
+	if !containsReason(got[0].Reasons, "intent: work_task") {
+		t.Fatalf("missing intent reason: %v", got[0].Reasons)
+	}
+
+	got = e.Evaluate([]*Declaration{d}, Session{PerceptionHint: &PerceptionHint{Intent: "general"}})
+	if got[0].Activated {
+		t.Fatalf("non-matching intent should not activate")
+	}
+
+	got = e.Evaluate([]*Declaration{d}, Session{})
+	if got[0].Activated {
+		t.Fatalf("nil PerceptionHint should leave IntentMatch inert")
+	}
+}
+
+// CategoryMatch is an independent scoring channel from IntentMatch — a
+// Declaration can key on either or both without interference.
+func TestEvaluator_CategoryMatchScoring(t *testing.T) {
+	e := NewEvaluator()
+	d := &Declaration{
+		ID: "coding-cogni",
+		Activation: ActivationRules{
+			CategoryMatch:  []string{"coding"},
+			CategoryWeight: 0.6,
+			MinScore:       0.5,
+		},
+	}
+	got := e.Evaluate([]*Declaration{d}, Session{PerceptionHint: &PerceptionHint{Category: "coding"}})
+	if !got[0].Activated {
+		t.Fatalf("matching category should activate, got %+v", got[0])
+	}
+	if !containsReason(got[0].Reasons, "category: coding") {
+		t.Fatalf("missing category reason: %v", got[0].Reasons)
+	}
+
+	got = e.Evaluate([]*Declaration{d}, Session{PerceptionHint: &PerceptionHint{Category: "writing"}})
+	if got[0].Activated {
+		t.Fatalf("non-matching category should not activate")
+	}
+
+	got = e.Evaluate([]*Declaration{d}, Session{PerceptionHint: &PerceptionHint{Intent: "work_task"}})
+	if got[0].Activated {
+		t.Fatalf("empty category with a set intent should leave CategoryMatch inert")
+	}
+
+	got = e.Evaluate([]*Declaration{d}, Session{})
+	if got[0].Activated {
+		t.Fatalf("nil PerceptionHint should leave CategoryMatch inert")
+	}
+}
+
+// IntentMatch and CategoryMatch on the same Declaration must add
+// independently — this is what lets a Cogni benefit from both the coarse
+// work_task signal and the finer coding/writing/research signal at once.
+func TestEvaluator_IntentAndCategoryMatchAreAdditive(t *testing.T) {
+	e := NewEvaluator()
+	d := &Declaration{
+		ID: "both",
+		Activation: ActivationRules{
+			IntentMatch:    []string{"work_task"},
+			IntentWeight:   0.3,
+			CategoryMatch:  []string{"coding"},
+			CategoryWeight: 0.3,
+			MinScore:       0.5,
+		},
+	}
+	got := e.Evaluate([]*Declaration{d}, Session{PerceptionHint: &PerceptionHint{Intent: "work_task", Category: "coding"}})
+	if !got[0].Activated {
+		t.Fatalf("intent+category should combine to activate (0.6 >= 0.5), got %+v", got[0])
+	}
+	if got[0].Score < 0.59 || got[0].Score > 0.61 {
+		t.Fatalf("expected score ~0.6, got %v", got[0].Score)
+	}
+}
+
 func TestEvaluator_ChannelAndTenantGate(t *testing.T) {
 	e := NewEvaluator()
 	d := &Declaration{

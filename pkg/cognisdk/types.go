@@ -51,6 +51,13 @@ type PerceptionState struct {
 	Signals             []string          `json:"signals,omitempty" yaml:"signals,omitempty"`
 	Hints               map[string]string `json:"hints,omitempty" yaml:"hints,omitempty"`
 	RequestedToolAction *ToolAction       `json:"requested_tool_action,omitempty" yaml:"requested_tool_action,omitempty"`
+	// Category is a finer-grained, independent task-type classification
+	// ("coding" / "writing" / "research", empty = none detected) used by
+	// Cogni's context-budget allocator to weight which activated Cognis'
+	// context survives truncation. Deliberately separate from Intent (which
+	// stays "general"/"work_task"/"seek_reassurance") so existing
+	// Declarations keyed on Intent are unaffected.
+	Category string `json:"category,omitempty" yaml:"category,omitempty"`
 }
 
 // BeliefKind separates durable values from softer contextual preferences.
