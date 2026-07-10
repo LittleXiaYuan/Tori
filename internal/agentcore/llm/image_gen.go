@@ -474,20 +474,39 @@ func normalizeGoogleBaseURL(base string) string {
 // ── Provider Registry extension for image generation ──
 
 // GetImageGenerator returns an ImageGenerator for a provider that has CapImageGen.
+// If a provider has been pinned via SetImageGenProvider, it is used when still
+// enabled and capable; otherwise this falls back to the first enabled
+// CapImageGen provider found (registration order, not priority-ordered).
 func (r *ProviderRegistry) GetImageGenerator() ImageGenerator {
+	if pinned := r.ImageGenProvider(); pinned != "" {
+		if p := r.Get(pinned); p != nil && p.Enabled() && hasAllCapsSlice(p.Config.Capabilities, []Capability{CapImageGen}) {
+			return createImageGen(p.Config)
+		}
+		slog.Warn("image_gen: pinned provider unavailable, falling back to auto-select", "provider", pinned)
+	}
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	for _, p := range r.providers {
 		if !p.Enabled() {
 			continue
 		}
-		for _, cap := range p.Config.Capabilities {
-			if cap == CapImageGen {
-				return createImageGen(p.Config)
-			}
+		if hasAllCapsSlice(p.Config.Capabilities, []Capability{CapImageGen}) {
+			return createImageGen(p.Config)
 		}
 	}
 	return nil
+}
+
+// ImageGenCapableProviders lists enabled providers carrying CapImageGen, for
+// surfacing a selectable list in settings.
+func (r *ProviderRegistry) ImageGenCapableProviders() []ProviderStatus {
+	var out []ProviderStatus
+	for _, p := range r.List() {
+		if p.Enabled && hasAllCapsSlice(p.Capabilities, []Capability{CapImageGen}) {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 func createImageGen(cfg ProviderConfig) ImageGenerator {

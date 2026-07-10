@@ -81,6 +81,12 @@ func (g *Gateway) handleProviderRegister(w http.ResponseWriter, r *http.Request)
 		Model    string `json:"model"`
 		Name     string `json:"name"`
 		Tier     string `json:"tier"`
+		// ImageGen marks a manually-added (non-preset) model as image-generation
+		// capable. Preset-based registration already gets this from the preset's
+		// per-model Capabilities; the simplified "add model" form has no preset
+		// step, so it needs an explicit opt-in instead of silently guessing from
+		// the model name.
+		ImageGen bool `json:"image_gen,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		apperror.WriteCode(w, apperror.CodeBadRequest, "invalid body")
@@ -148,6 +154,10 @@ func (g *Gateway) handleProviderRegister(w http.ResponseWriter, r *http.Request)
 		cfg.ID = "custom-" + req.Model
 	}
 
+	if req.ImageGen && !hasCapability(cfg.Capabilities, llm.CapImageGen) {
+		cfg.Capabilities = append(cfg.Capabilities, llm.CapImageGen)
+	}
+
 	if cfg.BaseURL == "" || cfg.Model == "" {
 		apperror.WriteCode(w, apperror.CodeBadRequest, "base_url and model are required")
 		return
@@ -161,4 +171,13 @@ func (g *Gateway) handleProviderRegister(w http.ResponseWriter, r *http.Request)
 	slog.Info("provider registered", "id", cfg.ID, "source", cfg.Source, "model", cfg.Model)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{"ok": true, "provider_id": cfg.ID})
+}
+
+func hasCapability(caps []llm.Capability, want llm.Capability) bool {
+	for _, c := range caps {
+		if c == want {
+			return true
+		}
+	}
+	return false
 }

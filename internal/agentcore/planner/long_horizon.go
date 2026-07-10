@@ -459,6 +459,8 @@ func plannerFriendlyFailureText(rawErr string) string {
 		return "这一步需要更高信任或确认，现场已保留，可确认后继续。"
 	case strings.Contains(normalized, "tool panic") || strings.Contains(normalized, "panic"):
 		return "工具运行时遇到异常，现场已保留，可重试或切换策略继续。"
+	case plannerFailureMentionsProviderRecovery(normalized):
+		return "模型供应商认证或额度异常（如 API Key 无效/过期），现场已保留，请在设置中检查供应商配置后重试。"
 	case strings.Contains(normalized, "context canceled"),
 		strings.Contains(normalized, "context cancelled"):
 		return "连接暂时中断，现场已保留，可稍后继续或先查看阶段结果。"

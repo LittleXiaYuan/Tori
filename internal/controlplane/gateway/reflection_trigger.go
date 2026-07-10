@@ -52,6 +52,12 @@ func (g *Gateway) fireReflection(tenantID, sessionID, intent, reply string, skil
 	if !g.evolutionEnabled() {
 		return
 	}
+	if g.providerReg != nil && g.providerReg.SessionMode(sessionID) == "api" {
+		// API模式 turns run against an explicitly-picked external model and are
+		// excluded from self-distill sample collection — 小羽模式 keeps learning,
+		// API模式 stays a stateless pass-through.
+		return
+	}
 	select {
 	case reflectionSem <- struct{}{}:
 	default:

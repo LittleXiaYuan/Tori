@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"yunque-agent/internal/agentcore/llm"
 	"yunque-agent/internal/cognikernel"
 	reflectpkg "yunque-agent/internal/experimental/reflect"
 	"yunque-agent/pkg/packruntime"
@@ -88,5 +89,24 @@ func TestFireReflectionGatedByEvolutionPack(t *testing.T) {
 	g.fireReflection("tenant-1", "sess-1", "intent", "reply", nil, "smart")
 	if n := waitForExperience(t, store, 1); n != 1 {
 		t.Fatalf("enabled pack should allow learning, got %d", n)
+	}
+}
+
+// The 小羽/API mode gate: API模式 sessions are explicit pass-throughs to an
+// external model and must not feed self-distill sample collection — only
+// 小羽模式 (the default, unset mode) keeps learning.
+func TestFireReflectionGatedByAPIMode(t *testing.T) {
+	g, store := newReflectionTestGateway(t)
+	g.providerReg = llm.NewProviderRegistry(nil)
+
+	g.providerReg.SetSessionMode("api-sess", "api")
+	g.fireReflection("tenant-1", "api-sess", "intent", "reply", nil, "smart")
+	if n := waitForExperience(t, store, 1); n != 0 {
+		t.Fatalf("API模式 session must not record experience, got %d", n)
+	}
+
+	g.fireReflection("tenant-1", "xiaoyu-sess", "intent", "reply", nil, "smart")
+	if n := waitForExperience(t, store, 1); n != 1 {
+		t.Fatalf("小羽模式 (unset mode) session should still learn, got %d", n)
 	}
 }

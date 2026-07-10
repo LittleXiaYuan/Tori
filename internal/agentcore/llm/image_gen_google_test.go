@@ -203,3 +203,42 @@ func TestCreateImageGenDispatch(t *testing.T) {
 		})
 	}
 }
+
+func TestGetImageGeneratorRespectsPin(t *testing.T) {
+	reg := NewProviderRegistry(nil)
+	if err := reg.Register(ProviderConfig{
+		ID: "openai-img", Type: ProviderTypeChat, BaseURL: "https://api.openai.com/v1",
+		Model: "gpt-image-1", Enabled: true, Capabilities: []Capability{CapImageGen},
+	}); err != nil {
+		t.Fatalf("register openai-img: %v", err)
+	}
+	if err := reg.Register(ProviderConfig{
+		ID: "gemini-img", Type: ProviderTypeChat, BaseURL: "https://generativelanguage.googleapis.com/v1beta",
+		Model: "gemini-2.5-flash-image", Enabled: true, Capabilities: []Capability{CapImageGen},
+	}); err != nil {
+		t.Fatalf("register gemini-img: %v", err)
+	}
+
+	reg.SetImageGenProvider("gemini-img")
+	if _, ok := reg.GetImageGenerator().(*GeminiFlashImageGen); !ok {
+		t.Fatalf("expected pinned gemini-img to win")
+	}
+
+	// Pinning a disabled/unknown provider falls back to auto-select rather
+	// than returning nil — a stale pin (e.g. provider deleted) must not
+	// silently break image generation.
+	reg.SetImageGenProvider("does-not-exist")
+	if reg.GetImageGenerator() == nil {
+		t.Fatalf("expected fallback to auto-select when pinned provider is unavailable")
+	}
+
+	reg.SetImageGenProvider("")
+	if reg.GetImageGenerator() == nil {
+		t.Fatalf("expected auto-select to find a CapImageGen provider when unpinned")
+	}
+
+	providers := reg.ImageGenCapableProviders()
+	if len(providers) != 2 {
+		t.Fatalf("expected 2 image-gen-capable providers, got %d", len(providers))
+	}
+}

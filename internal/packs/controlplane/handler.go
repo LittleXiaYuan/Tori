@@ -129,6 +129,7 @@ var Paths = []string{
 	"/v1/router/stats",
 	"/api/breaker/reset",
 	"/api/providers/exec",
+	"/api/providers/image-gen",
 }
 
 // ControlPlaneGateway is the narrow gateway surface the control-plane pack needs.
@@ -335,6 +336,8 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 			handler = h.handleBreakerReset
 		case "/api/providers/exec":
 			handler = h.handleExecProvider
+		case "/api/providers/image-gen":
+			handler = h.handleImageGenProvider
 		case "/v1/usage":
 			handler = h.handleUsage
 		case "/v1/quota":

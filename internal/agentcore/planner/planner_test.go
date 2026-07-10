@@ -1235,6 +1235,32 @@ func TestLongHorizonFriendlyFailureTextCoversToolExecutionFailures(t *testing.T)
 	}
 }
 
+// A single failed skill/tool call (e.g. image_generate or websearch hitting a
+// 401) must surface an honest "check your provider key" message here — this
+// is the tool-result text fed straight back to the model mid-turn, and before
+// this test's case existed it fell through to the generic "现场已保留" filler
+// (or, worse, the unrelated "连接不稳定" bucket), leaving the model with no
+// real reason to give the user and forcing it to fabricate one.
+func TestLongHorizonFriendlyFailureTextExplainsProviderAuthFailure(t *testing.T) {
+	cases := []string{
+		`llm api 401: {"error":{"message":"Authentication Fails, Your api key: ****3709 is invalid","type":"authentication_error"}}`,
+		`gemini image gen 401: {"error":{"message":"API key not valid"}}`,
+		"all fallback LLM clients failed (FC): chat API status 401: invalid api key",
+	}
+	for _, raw := range cases {
+		friendly := plannerFriendlyFailureText(raw)
+		if !strings.Contains(friendly, "供应商") || !strings.Contains(friendly, "API Key") {
+			t.Fatalf("expected provider auth guidance for %q, got %q", raw, friendly)
+		}
+		lower := strings.ToLower(friendly)
+		for _, banned := range []string{"3709", "401", "authentication_error", "连接不稳定"} {
+			if strings.Contains(lower, strings.ToLower(banned)) {
+				t.Fatalf("friendly text for %q still exposes raw detail %q: %q", raw, banned, friendly)
+			}
+		}
+	}
+}
+
 func TestSynthesizePlanResultHidesRawDiagnosticsFromSummaryPrompt(t *testing.T) {
 	var summaryPrompt string
 	client := mockLLMServer(t, func(msgs []llm.Message) string {

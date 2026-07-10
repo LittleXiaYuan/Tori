@@ -167,6 +167,12 @@ func (h *Handler) handleProviderSessionOverride(w http.ResponseWriter, r *http.R
 	var req struct {
 		SessionID  string `json:"session_id"`
 		ProviderID string `json:"provider_id"`
+		// Mode selects 小羽模式("xiaoyu", default) or API模式("api"). Distinct
+		// from ProviderID (which model answers) — Mode gates whether this
+		// session's turns feed self-distill collection and how many
+		// concurrent async sub-agent handoffs it may run. See
+		// ProviderRegistry.SetSessionMode.
+		Mode string `json:"mode,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		apperror.WriteCode(w, apperror.CodeBadRequest, "invalid request body")
@@ -183,12 +189,23 @@ func (h *Handler) handleProviderSessionOverride(w http.ResponseWriter, r *http.R
 			return
 		}
 	}
-	reg.SetSessionProvider(req.SessionID, req.ProviderID)
+	modeOnly := req.ProviderID == "" && (req.Mode == "xiaoyu" || req.Mode == "api")
 	action := "set"
-	if req.ProviderID == "" {
-		action = "cleared"
+	if modeOnly {
+		// A mode-only switch (小羽↔API toggle with no model change) must not
+		// clear an existing provider override — only an explicit empty
+		// provider_id with no mode does that.
+		action = "unchanged"
+	} else {
+		reg.SetSessionProvider(req.SessionID, req.ProviderID)
+		if req.ProviderID == "" {
+			action = "cleared"
+		}
 	}
-	writeJSON(w, map[string]any{"ok": true, "action": action})
+	if req.Mode == "xiaoyu" || req.Mode == "api" {
+		reg.SetSessionMode(req.SessionID, req.Mode)
+	}
+	writeJSON(w, map[string]any{"ok": true, "action": action, "mode": reg.SessionMode(req.SessionID)})
 }
 
 func (h *Handler) handleLocalDiscover(w http.ResponseWriter, r *http.Request) {
@@ -366,6 +383,48 @@ func (h *Handler) handleExecProvider(w http.ResponseWriter, r *http.Request) {
 func strconvQuote(s string) string {
 	b, _ := json.Marshal(s)
 	return string(b)
+}
+
+// handleImageGenProvider lets settings pin which provider GetImageGenerator
+// uses, independent of the global exec (chat) provider — image generation
+// and chat may reasonably use different providers.
+func (h *Handler) handleImageGenProvider(w http.ResponseWriter, r *http.Request) {
+	reg := h.providerRegistry()
+	if reg == nil {
+		apperror.WriteCode(w, apperror.CodeInternal, "provider registry not configured")
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		writeJSON(w, map[string]any{
+			"image_gen_provider":  reg.ImageGenProvider(),
+			"available_providers": reg.ImageGenCapableProviders(),
+		})
+
+	case http.MethodPost:
+		var req struct {
+			ProviderID string `json:"provider_id"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			apperror.WriteCode(w, apperror.CodeBadRequest, "invalid body")
+			return
+		}
+		if req.ProviderID != "" {
+			p := reg.Get(req.ProviderID)
+			if p == nil || !p.Enabled() {
+				apperror.WriteCode(w, apperror.CodeBadRequest, "provider is not available")
+				return
+			}
+		}
+		reg.SetImageGenProvider(req.ProviderID)
+		_ = os.WriteFile(appdir.File("image_gen_provider.json"), []byte(`{"provider_id":`+strconvQuote(req.ProviderID)+`}`), 0o600)
+		slog.Info("image gen provider updated via API", "provider", req.ProviderID)
+		writeJSON(w, map[string]any{"ok": true, "image_gen_provider": req.ProviderID})
+
+	default:
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "method not allowed")
+	}
 }
 
 func (h *Handler) handleRouterStats(w http.ResponseWriter, r *http.Request) {

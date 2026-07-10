@@ -170,14 +170,16 @@ func (p *ProviderInstance) Models() []string {
 
 // ProviderRegistry manages multiple LLM provider instances with lifecycle.
 type ProviderRegistry struct {
-	mu           sync.RWMutex
-	providers    map[string]*ProviderInstance // id → instance
-	pool         *Pool                        // synced pool for backward compat
-	sessionMu    sync.RWMutex
-	sessions     map[string]string // session_id → provider_id override
-	mode         ProviderMode
-	persistStore PersistStore // KV store for persistence (preferred)
-	persistPath  string       // file path for JSON fallback
+	mu                 sync.RWMutex
+	providers          map[string]*ProviderInstance // id → instance
+	pool               *Pool                        // synced pool for backward compat
+	sessionMu          sync.RWMutex
+	sessions           map[string]string // session_id → provider_id override
+	sessionMode        map[string]string // session_id → 小羽/API execution mode ("xiaoyu"/"api")
+	mode               ProviderMode
+	imageGenProviderID string       // explicit pin for GetImageGenerator; empty = auto-select first enabled CapImageGen provider
+	persistStore       PersistStore // KV store for persistence (preferred)
+	persistPath        string       // file path for JSON fallback
 }
 
 // NewProviderRegistry creates a registry, optionally wrapping an existing Pool.
@@ -186,10 +188,11 @@ func NewProviderRegistry(pool *Pool) *ProviderRegistry {
 		pool = NewPool()
 	}
 	return &ProviderRegistry{
-		providers: make(map[string]*ProviderInstance),
-		pool:      pool,
-		sessions:  make(map[string]string),
-		mode:      ProviderModeHybrid,
+		providers:   make(map[string]*ProviderInstance),
+		pool:        pool,
+		sessions:    make(map[string]string),
+		sessionMode: make(map[string]string),
+		mode:        ProviderModeHybrid,
 	}
 }
 
@@ -440,6 +443,44 @@ func (r *ProviderRegistry) SetSessionProvider(sessionID, providerID string) {
 // ClearSessionProvider removes a session-level override.
 func (r *ProviderRegistry) ClearSessionProvider(sessionID string) {
 	r.SetSessionProvider(sessionID, "")
+}
+
+// SetSessionMode records a session's 小羽/API execution mode ("xiaoyu"/"api").
+// This is deliberately a separate field from `sessions` (plain provider
+// override, also written by ordinary model switching) and from `mode`/
+// `SetMode` (the local/tori/hybrid routing axis) — conflating either would
+// make the signal ambiguous for callers like self-distill gating.
+func (r *ProviderRegistry) SetSessionMode(sessionID, mode string) {
+	r.sessionMu.Lock()
+	defer r.sessionMu.Unlock()
+	if mode == "" {
+		delete(r.sessionMode, sessionID)
+	} else {
+		r.sessionMode[sessionID] = mode
+	}
+}
+
+// SessionMode returns a session's 小羽/API execution mode, or "" (小羽 default)
+// if unset.
+func (r *ProviderRegistry) SessionMode(sessionID string) string {
+	r.sessionMu.RLock()
+	defer r.sessionMu.RUnlock()
+	return r.sessionMode[sessionID]
+}
+
+// SetImageGenProvider pins which provider GetImageGenerator uses, overriding
+// the auto-select-first-enabled-CapImageGen default. Pass "" to clear the pin.
+func (r *ProviderRegistry) SetImageGenProvider(id string) {
+	r.sessionMu.Lock()
+	defer r.sessionMu.Unlock()
+	r.imageGenProviderID = id
+}
+
+// ImageGenProvider returns the pinned image-gen provider id, or "" if unset.
+func (r *ProviderRegistry) ImageGenProvider() string {
+	r.sessionMu.RLock()
+	defer r.sessionMu.RUnlock()
+	return r.imageGenProviderID
 }
 
 // List returns all registered providers.

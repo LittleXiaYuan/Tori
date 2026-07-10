@@ -353,6 +353,31 @@ func initSubagentHandoff(app *agentrt.App, gw *gateway.Gateway, p *planner.Plann
 	gw.SetExecProvider(initExecProvider)
 	slog.Info("exec agent provider configured", "provider", initExecProvider)
 
+	if app.Providers != nil {
+		initImageGenProvider := os.Getenv("IMAGE_GEN_PROVIDER")
+		if initImageGenProvider == "" {
+			var persisted struct {
+				ProviderID string `json:"provider_id"`
+			}
+			if b, err := os.ReadFile(appdir.File("image_gen_provider.json")); err == nil {
+				if err := json.Unmarshal(b, &persisted); err == nil {
+					initImageGenProvider = strings.TrimSpace(persisted.ProviderID)
+				}
+			}
+		}
+		if initImageGenProvider != "" {
+			provider := app.Providers.Get(initImageGenProvider)
+			if provider == nil || !provider.Enabled() {
+				slog.Warn("image gen provider unavailable, falling back to auto-select", "provider", initImageGenProvider)
+				initImageGenProvider = ""
+			}
+		}
+		app.Providers.SetImageGenProvider(initImageGenProvider)
+		if initImageGenProvider != "" {
+			slog.Info("image gen provider configured", "provider", initImageGenProvider)
+		}
+	}
+
 	// file_exec generates whole documents (PPT/Word) in a single long LLM turn.
 	// A slow reasoning model (e.g. gpt-5.5) stalls tens of seconds before the
 	// first byte and repeatedly blew past the handoff timeout mid-generation —
