@@ -77,6 +77,21 @@ export function AppTitleBar() {
     window.dispatchEvent(new CustomEvent("yunque:open-settings"));
   }, []);
 
+  // Double-click the drag strip to toggle maximize. Windows/Linux get this for
+  // free from `-webkit-app-region: drag`, but macOS WKWebView does NOT
+  // synthesize double-click-zoom from app-region, so mac users otherwise lose a
+  // standard title-bar gesture. Wiring it explicitly makes the behavior
+  // identical on every platform. We ignore double-clicks that land on
+  // interactive children (brand button, profile, window controls) — those live
+  // under `.no-drag`, so a closest() check keeps their double-clicks from
+  // maximizing the window.
+  const onTitlebarDoubleClick = useCallback((e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest(".no-drag")) return;
+    if (typeof window === "undefined") return;
+    const ti = (window as unknown as { __TAURI_INTERNALS__?: { invoke?: (c: string) => Promise<unknown> } }).__TAURI_INTERNALS__;
+    ti?.invoke?.("plugin:window|toggle_maximize").catch(() => {});
+  }, []);
+
   const onPickAvatar = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -96,7 +111,7 @@ export function AppTitleBar() {
   const displayName = profile.nickname || (zh ? "设置你的称呼" : "Set your name");
 
   return (
-    <div className="app-titlebar">
+    <div className="app-titlebar" onDoubleClick={onTitlebarDoubleClick}>
       {/* Brand (left) — clickable, aligns over the nav rail */}
       <button
         type="button"
