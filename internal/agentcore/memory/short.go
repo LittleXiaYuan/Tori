@@ -201,6 +201,3 @@ func (s *ShortTerm) GC() {
 	}
 }
 
-func contains(s, sub string) bool {
-	return len(sub) > 0 && strings.Contains(strings.ToLower(s), strings.ToLower(sub))
-}

@@ -53,16 +53,6 @@ func NewLedgerBridge(sink TaskEventSink) *LedgerBridge {
 	return &LedgerBridge{sink: sink}
 }
 
-// forwardTaskCreated safely delegates to the sink.
-func (lb *LedgerBridge) forwardTaskCreated(ctx context.Context, t *Task) {
-	if lb == nil || lb.sink == nil {
-		return
-	}
-	if err := lb.sink.OnTaskCreated(ctx, t); err != nil {
-		slog.Warn("ledger bridge: OnTaskCreated failed", "task", t.ID, "err", err)
-	}
-}
-
 // forwardTransition safely delegates to the sink.
 func (lb *LedgerBridge) forwardTransition(ctx context.Context, taskID string, oldStatus, newStatus Status) {
 	if lb == nil || lb.sink == nil {

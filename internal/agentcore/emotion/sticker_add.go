@@ -7,12 +7,6 @@ import (
 	"yunque-agent/internal/execution/channel"
 )
 
-// addSession tracks a bulk sticker add session (learn entire sticker set).
-type addSession struct {
-	Platform  string
-	CreatedAt time.Time
-}
-
 // StartAddSession starts a bulk sticker-set collection session.
 // Returns the prompt message to show the user.
 func (sc *StickerCollector) StartAddSession(channelType, userID string) string {

@@ -266,8 +266,6 @@ const (
 	autoLearnCooldown = 24 * time.Hour
 	// autoLearnMinConfidence is the minimum emotion confidence to auto-register.
 	autoLearnMinConfidence = 0.6
-	// seenCleanupInterval controls how often stale entries are purged.
-	seenCleanupInterval = 6 * time.Hour
 )
 
 // stickerKey builds a deduplication key for a sticker.

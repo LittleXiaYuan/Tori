@@ -309,24 +309,6 @@ func (d *ConflictDetector) detectWithLLM(ctx context.Context, newContent string,
 
 // ---- helpers ----
 
-// wordOverlap counts shared words (>1 rune) between two lowercased strings.
-func (d *ConflictDetector) wordOverlap(a, b string) int {
-	wordsA := strings.Fields(a)
-	wordSet := make(map[string]bool, len(wordsA))
-	for _, w := range wordsA {
-		if len([]rune(w)) > 1 { // skip single-char words
-			wordSet[w] = true
-		}
-	}
-	overlap := 0
-	for _, w := range strings.Fields(b) {
-		if wordSet[w] {
-			overlap++
-		}
-	}
-	return overlap
-}
-
 func (d *ConflictDetector) extractSubject(a, b string) string {
 	wordsA := strings.Fields(a)
 	wordSet := make(map[string]bool)

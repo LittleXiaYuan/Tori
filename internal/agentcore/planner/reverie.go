@@ -32,7 +32,6 @@ type Reverie struct {
 	llmCall       LLMCallFunc                                         // LLM for thought generation
 	recall        func(query string) string                           // memory recall
 	deliver       func(thought Thought)                               // proactive message delivery
-	persistFn     func([]Thought)                                     // save journal to disk
 	eventBus      *ReverieEventBus                                    // event-driven triggers
 	writeMemory   func(ctx context.Context, fact string) error        // P4: write fact to memory
 	createTask    func(ctx context.Context, title, desc string) error // P4: create a task

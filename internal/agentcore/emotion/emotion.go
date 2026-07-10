@@ -74,11 +74,6 @@ func (r *Result) ContextSnippetLocale(locale string) string {
 	}
 }
 
-// emotionLabel returns a Chinese description for the emotion.
-func emotionLabel(e Emotion) string {
-	return emotionLabelLocale(e, "zh")
-}
-
 // emotionLabelLocale returns a locale-aware description for the emotion.
 func emotionLabelLocale(e Emotion, locale string) string {
 	switch locale {

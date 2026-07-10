@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 
 	"yunque-agent/pkg/safego"
@@ -19,7 +18,6 @@ import (
 type Transport struct {
 	hub     *Hub
 	client  *http.Client
-	mu      sync.Mutex
 	pending map[string]chan *Message // msg.ID → response channel
 }
 

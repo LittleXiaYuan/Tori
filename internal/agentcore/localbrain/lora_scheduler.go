@@ -39,7 +39,6 @@ type LoRAScheduler struct {
 	trainFn TrainFunc
 	evalFn  EvalFunc
 	brain   *LocalBrain
-	dataDir string
 	kvs     *iledger.KVConfigStore
 	metrics *TrainingMetrics
 
