@@ -15,10 +15,11 @@ yunque-agent.exe
 /*.jsonl
 
 # ── Test / coverage outputs ──
-coverage
-coverage_*
-coverage.*
-coverage_report*.txt
+# Anchor to repo root so tracked source like scripts/coverage.ps1 isn't swept up.
+/coverage
+/coverage_*
+/coverage.*
+/coverage_report*.txt
 *.test
 
 # ── Logs & temp files ──
