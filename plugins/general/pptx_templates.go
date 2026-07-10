@@ -243,34 +243,6 @@ func searchGitHubTemplates(ctx context.Context, keyword string, maxResults int) 
 	return pptxItems, nil
 }
 
-func downloadGitHubTemplate(ctx context.Context, item ghSearchItem) (string, error) {
-	if item.DownloadURL == "" {
-		return "", fmt.Errorf("no download URL for %s", item.Name)
-	}
-
-	safeName := strings.Map(func(r rune) rune {
-		if r == '/' || r == '\\' || r == ':' || r == '*' || r == '?' || r == '"' || r == '<' || r == '>' || r == '|' {
-			return '_'
-		}
-		return r
-	}, item.Name)
-	if !strings.HasSuffix(strings.ToLower(safeName), ".pptx") {
-		safeName += ".pptx"
-	}
-
-	dir := templatesDir()
-	dest := filepath.Join(dir, safeName)
-	if info, err := os.Stat(dest); err == nil && info.Size() > 0 {
-		return dest, nil
-	}
-
-	slog.Info("pptx_templates: downloading from GitHub", "name", item.Name, "repo", item.Repository.FullName)
-	if err := downloadFile(item.DownloadURL, dest); err != nil {
-		return "", err
-	}
-	return dest, nil
-}
-
 // --- PptxTemplateSearchSkill: LLM-callable skill ---
 
 type PptxTemplateSearchSkill struct {
