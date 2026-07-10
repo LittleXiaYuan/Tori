@@ -21,8 +21,34 @@ const BLIP_RECHECK_MS = 1200;
 // this many attempts before switching to the more urgent "unavailable" wording.
 const PRE_CONNECT_GRACE_ATTEMPTS = 5;
 
+// After this many ms stuck on the first-connect splash, surface the escape
+// hatch (retry / view logs / quit). Below this we assume a normal cold start
+// (migrations, plugin warmup) and keep the UI calm — no scary buttons.
+const ESCAPE_HATCH_AFTER_MS = 12000;
+
+async function invokeTauri(cmd: string): Promise<void> {
+  const mod = await import("@tauri-apps/api/core").catch(() => null);
+  if (!mod) throw new Error("not running in desktop shell");
+  await mod.invoke(cmd);
+}
+
+function escapeBtnStyle(primary: boolean): React.CSSProperties {
+  return {
+    padding: "6px 16px",
+    borderRadius: 999,
+    fontSize: 12.5,
+    fontWeight: 600,
+    cursor: "pointer",
+    color: primary ? "#fff" : "rgba(255,255,255,0.7)",
+    background: primary ? "var(--yunque-accent, rgba(255,255,255,0.15))" : "rgba(255,255,255,0.06)",
+    border: `1px solid ${primary ? "transparent" : "rgba(255,255,255,0.14)"}`,
+    transition: "background 0.15s, color 0.15s",
+  };
+}
+
 function Splash({ state, detail, onRetry }: { state: ServiceState; detail?: string; onRetry: () => void }) {
   const [elapsedMs, setElapsedMs] = useState(0);
+  const [isDesktop, setIsDesktop] = useState(false);
 
   useEffect(() => {
     const start = Date.now();
@@ -32,7 +58,15 @@ function Splash({ state, detail, onRetry }: { state: ServiceState; detail?: stri
     return () => clearInterval(interval);
   }, []);
 
+  // Only offer the desktop escape hatch when we're actually in the Tauri shell.
+  useEffect(() => {
+    setIsDesktop(typeof window !== "undefined" && "__TAURI_INTERNALS__" in window);
+  }, []);
+
   const elapsedSecs = (elapsedMs / 1000).toFixed(1);
+  // Show the escape hatch once we've been stuck long enough AND the backend is
+  // actually reported offline (not merely a slow-but-progressing cold start).
+  const showEscapeHatch = elapsedMs >= ESCAPE_HATCH_AFTER_MS && state === "offline";
 
   return (
     <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, width: "100vw", height: "100vh", zIndex: 9999, background: "var(--yunque-bg, #000)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "#fff", overflow: "hidden" }}>
@@ -46,11 +80,46 @@ function Splash({ state, detail, onRetry }: { state: ServiceState; detail?: stri
           <div style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--yunque-accent, #fff)", boxShadow: "0 0 12px var(--yunque-accent, #fff)" }} />
         </div>
         <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 16, fontWeight: 500, letterSpacing: "0.1em", marginBottom: 8 }}>等待健康信号...</div>
+          <div style={{ fontSize: 16, fontWeight: 500, letterSpacing: "0.1em", marginBottom: 8 }}>
+            {state === "offline" ? "本地服务未就绪" : "等待健康信号..."}
+          </div>
           <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", letterSpacing: "0.05em" }}>{detail || "CONNECTING"}</div>
         </div>
+
+        {/* Escape hatch: only after a genuinely stuck first connect, so a
+            normal cold start never shows scary buttons. Retry works in browser
+            and desktop; view-logs / quit are desktop-only (Tauri commands). */}
+        {showEscapeHatch && (
+          <div style={{ display: "flex", gap: 10, marginTop: 8, flexWrap: "wrap", justifyContent: "center" }}>
+            <button
+              type="button"
+              onClick={onRetry}
+              style={escapeBtnStyle(true)}
+            >
+              立即重试
+            </button>
+            {isDesktop && (
+              <button
+                type="button"
+                onClick={() => { void invokeTauri("open_log_dir").catch(() => {}); }}
+                style={escapeBtnStyle(false)}
+              >
+                查看日志
+              </button>
+            )}
+            {isDesktop && (
+              <button
+                type="button"
+                onClick={() => { void invokeTauri("quit_from_ui").catch(() => {}); }}
+                style={escapeBtnStyle(false)}
+              >
+                退出应用
+              </button>
+            )}
+          </div>
+        )}
       </div>
-      
+
       <div style={{ position: "absolute", bottom: 40, fontSize: 11, fontFamily: "ui-monospace, monospace", color: "rgba(255,255,255,0.3)" }}>
         {elapsedSecs}s
       </div>
@@ -152,9 +221,11 @@ const BARE_SERVICE_PATHS = ["/selection-popup"];
 
 export default function ServiceConnectionGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  if (BARE_SERVICE_PATHS.some((p) => pathname?.startsWith(p))) {
-    return <>{children}</>;
-  }
+  // Bare paths (e.g. the selection popup) skip the connection gate entirely.
+  // Compute this as a flag rather than an early return: an early return BEFORE
+  // the hooks below would change the hook count between renders and violate the
+  // Rules of Hooks (React throws / the window blanks when the path changes).
+  const isBarePath = BARE_SERVICE_PATHS.some((p) => pathname?.startsWith(p));
 
   const [state, setState] = useState<ServiceState>("checking");
   const [detail, setDetail] = useState("正在连接 127.0.0.1:9090...");
@@ -191,6 +262,8 @@ export default function ServiceConnectionGuard({ children }: { children: React.R
   }, []);
 
   useEffect(() => {
+    // Bare paths render children unconditionally, so there's nothing to probe.
+    if (isBarePath) return;
     const controller = new AbortController();
     // Resolve the real backend base (desktop port may differ from the
     // build-time default) before the first probe so we never poll a dead port.
@@ -202,7 +275,11 @@ export default function ServiceConnectionGuard({ children }: { children: React.R
       controller.abort();
       clearInterval(retry);
     };
-  }, [probe, state]);
+  }, [probe, state, isBarePath]);
+
+  // Bare paths bypass the gate (hooks above already ran, so this is a safe
+  // post-hooks conditional — not an early return before the hook list).
+  if (isBarePath) return <>{children}</>;
 
   // Full-screen splash ONLY before the very first successful connect. Once
   // we've been connected, a later disconnect shows a non-blocking top banner

@@ -1407,6 +1407,41 @@ fn quit_app(handle: &AppHandle) {
     handle.exit(0);
 }
 
+/// UI-invokable quit. The connection-guard splash offers this as an escape
+/// hatch when the backend never comes up on first launch — without it a stuck
+/// user's only exit is the tray menu, which is easy to miss on a frameless
+/// window. Routes through `quit_app` so the sidecar is still reaped gracefully.
+#[tauri::command]
+fn quit_from_ui(handle: AppHandle) {
+    log::info!("quit requested from UI (connection splash escape hatch)");
+    quit_app(&handle);
+}
+
+/// Open the desktop log directory in the OS file browser. Paired with the
+/// splash escape hatch so a user staring at a stuck "本地服务不可用" screen can
+/// grab logs for a bug report instead of being dead-ended. Uses a per-OS
+/// reveal command rather than the opener plugin to avoid widening capabilities.
+#[tauri::command]
+fn open_log_dir(handle: AppHandle) -> Result<(), String> {
+    let dir = handle
+        .path()
+        .app_log_dir()
+        .map_err(|e| format!("resolve log dir: {e}"))?;
+    // Best-effort: the dir may not exist yet if logging never wrote a file.
+    let _ = std::fs::create_dir_all(&dir);
+
+    #[cfg(target_os = "windows")]
+    let result = Command::new("explorer").arg(&dir).spawn();
+    #[cfg(target_os = "macos")]
+    let result = Command::new("open").arg(&dir).spawn();
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    let result = Command::new("xdg-open").arg(&dir).spawn();
+
+    result
+        .map(|_| ())
+        .map_err(|e| format!("open log dir {}: {e}", dir.display()))
+}
+
 /// Persist the floating-ball position from a window context. Shared by the
 /// close-to-tray and real-teardown paths.
 fn save_ball_pos_from(window: &tauri::Window) {
@@ -1457,6 +1492,8 @@ pub fn run() {
             apply_window_theme,
             get_selection_assistant_enabled,
             set_selection_assistant_enabled,
+            quit_from_ui,
+            open_log_dir,
         ])
         .setup(|app| {
             let handle = app.handle().clone();
