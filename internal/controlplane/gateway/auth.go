@@ -138,34 +138,6 @@ const (
 	errInvalidIssuer    authError = "invalid issuer"
 )
 
-// requireAuthJWT is a middleware that supports both API Key and JWT.
-func (g *Gateway) requireAuthJWT(jwtCfg *JWTConfig, next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		token := authTokenFromHeaders(r)
-		if token == "" {
-			apperror.WriteCode(w, apperror.CodeUnauthorized, "invalid or missing credentials")
-			return
-		}
-
-		if t := g.tenants.ByAPIKey(token); t != nil {
-			ctx := contextWithTenant(r.Context(), t.ID)
-			next(w, r.WithContext(ctx))
-			return
-		}
-
-		if jwtCfg != nil {
-			claims, err := ValidateJWT(*jwtCfg, token)
-			if err == nil {
-				ctx := contextWithTenant(r.Context(), claims.TenantID)
-				ctx = context.WithValue(ctx, ctxRoleKey, claims.Role)
-				next(w, r.WithContext(ctx))
-				return
-			}
-		}
-		apperror.WriteCode(w, apperror.CodeUnauthorized, "invalid or missing credentials")
-	}
-}
-
 func authTokenFromHeaders(r *http.Request) string {
 	token := r.Header.Get("X-API-Key")
 	if token == "" {
